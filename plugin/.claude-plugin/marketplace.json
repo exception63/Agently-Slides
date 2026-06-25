@@ -1,6 +1,7 @@
 {
   "name": "slidesmith-local",
   "owner": { "name": "Slidesmith" },
+  "description": "Slidesmith 本地市场 — HTML slides 一条龙插件（出片 + 讲稿 + 副屏同步 + 浏览器 Studio 就地改 + Claude Code 桥接回写）。",
   "plugins": [
     {
       "name": "slidesmith",
