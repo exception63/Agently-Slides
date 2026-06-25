@@ -107,15 +107,30 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   // patches that arrived while no Studio was connected — flushed on next connect
   const queuedPatches: string[] = [];
 
+  // permissive CORS so the offline (file://) Studio can probe the bridge and hand
+  // its deck over before jumping to the connected version. Localhost dev tool only.
+  const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET,POST,OPTIONS', 'access-control-allow-headers': 'content-type' } as const;
+
   const httpServer: Server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const url = (req.url || '/').split('?')[0];
+    if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return; }
     if (url === '/' || url === '/studio' || url === '/index.html') {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...CORS });
       res.end(studioHtml);
       return;
     }
     if (url === '/healthz' || url === '/status' || url === '/api/status') {
       sendJson(res, statusObj());
+      return;
+    }
+    // POST /api/open  body: a contract HTML deck → load it (used by the offline Studio's
+    // "连接 Claude" hand-off, so the connected version opens with the same deck)
+    if (url === '/api/open' && req.method === 'POST') {
+      readBody(req).then((body) => {
+        const name = decodeURIComponent((/[?&]name=([^&]+)/.exec(req.url || '') || [])[1] || 'deck.html');
+        if (body.trim()) handle.openHtml(name, body);
+        sendJson(res, { ok: !!body.trim(), name });
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
     // ---- control API: drive a running bridge without MCP (curl / scripts / dogfood) ----
@@ -141,7 +156,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   });
 
   function sendJson(res: ServerResponse, obj: unknown, code = 200): void {
-    res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+    res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS });
     res.end(JSON.stringify(obj));
   }
   function readBody(req: IncomingMessage): Promise<string> {

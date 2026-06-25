@@ -17,6 +17,12 @@
 3. bridge：HTTP 控制 API + patch 回灌内存 deck（`syncExportToBridge`）+ EADDRINUSE 自动换端口。
 4. dogfood：真浏览器弹出（serve 的 `open` 没被沙箱挡）→ 全闭环跑通，第3页标题被精准改写、其它不动、晚到者也见。
 
+## 🆕 2026-06-25 三续:一键「连接 Claude」按钮 + 文档清洗
+- **Studio 加了顶栏蓝色「🔌 连接 Claude」按钮**(未连接时显示)。点开弹 modal,**自动探测** `localhost:8765/healthz`(每 2s):检测到→绿 ✅ +「打开连接版」按钮(先 `POST /api/open` 把当前 deck 交给 bridge,再 `location.href` 跳过去,带着改动);没检测到→三步小白指引 + 自动重试。**浏览器不能自启服务**(沙箱),所以按钮做的是"探测+一键跳连接版"。`bridgeUrl()` 读 `window.__SM_BRIDGE_URL__`(测试可覆盖,默认 8765)。
+- **bridge 加了 CORS**(`*`,含 OPTIONS 预检)+ **`POST /api/open?name=`**(body=html → openHtml),供离线页探测/交接。`scripts/verify-connect.mjs` 7 项过,截图 `docs/screenshots/editor/04-connect-modal.png`。
+- **三份根文档(README/GUIDE/AGENTS)全部清洗**:按用户要求**删掉所有历史/版本记录**(v1/v2/M0-8/N1-5/里程碑/老路/legacy),只留现状。grep 已确认无残留。
+- (提醒仍然适用:运行中的 bridge 服缓存的旧 studio;用户当前 tab 要重开/重连才见新按钮。)
+
 ## 🆕 2026-06-25 再续:live dogfood + 进度提示 + GitHub
 - **项目已上 GitHub**:`https://github.com/exception63/Agently-Slides.git`(remote `origin`,main,commit 6ec69c6)。以后改完照常 `git add/commit/push`(凭据走 osxkeychain,无需我输密码)。
 - **进度提示已加**(用户要带动效):`aiSent` Set,徽标 3 态(待发送橙/**已发送蓝脉冲**/已改绿)+ 闪烁横幅 `#aiSentBanner`。状态机:send→sent、apply→done、edit/revert→回退。verify 8 项过。

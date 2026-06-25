@@ -150,18 +150,24 @@ don't re-touch a page they reverted unless they ask again.
 
 ## 5. Hand-off to the human
 
-After generating a deck, tell the user: double-click **`studio/slidesmith-studio.html`**
-(offline, no install), drag the `.html` deck in, and edit visually — click text to
-change it, use the right panel for colors / fonts / animations, 「视觉自检」 to check,
-and 「导出 HTML / 导出 PDF」 to save. For big changes per slide, use **Submit to AI**.
+Best path: call `slidesmith_open(deckPath)` — the Studio opens in their browser already
+connected. Tell them to edit visually (click text, right panel for colors / fonts /
+animations / move·delete element, 「视觉自检」, 「导出 HTML / 导出 PDF」), and for
+complex changes to **leave a comment on the slide and hit 🚀 发送给 Claude** — you'll
+pick it up via `slidesmith_get_requests`.
+
+If you can't open it for them (no MCP), they can double-click `studio/slidesmith-studio.html`
+(offline) and drag the deck in; to connect to you, they click the top-bar **🔌 连接 Claude**
+button (auto-detects the bridge and jumps to the connected Studio), or you run
+`slidesmith serve <deck>`.
 
 ---
 
-## 6. Alternative / legacy: the IR + CLI pipeline
+## 6. Optional: the IR + CLI pipeline
 
-A structured **JSON IR** + CLI still exists (useful when you want strict guard-rails,
-programmatic validation, or PDF/PNG via headless Chromium). It is **not** the v2
-primary path, but is supported.
+A structured **JSON IR** + CLI is also available — use it when you want strict
+guard-rails, programmatic validation, or headless PDF/PNG. The contract HTML deck +
+bridge (above) is the primary path; this is a secondary, more constrained one.
 
 ```
 INPUT   <name>.deck.json (IR) | <name>.deck.md | -  (stdin JSON)

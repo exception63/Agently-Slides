@@ -980,7 +980,55 @@ function toast(msg: string, bad = false): void {
 // ======================= bridge: connected mode =======================
 function updateBridgeBadge(): void {
   const b = $('#bridgeBadge'); if (b) { b.textContent = bridge.connected ? '● 已连接 Claude' : ''; b.className = 'bridge-badge' + (bridge.connected ? ' on' : ''); }
+  // when NOT connected, offer the one-click "连接 Claude" button (hidden once connected)
+  const cb = $('#connectBtn'); if (cb) cb.style.display = bridge.connected ? 'none' : '';
   updateSendButton();
+}
+
+// ======================= one-click 连接 Claude (offline → connected hand-off) =======================
+// A browser page can't launch a server, so this button DETECTS the local bridge and
+// jumps you to the connected Studio (carrying your current deck). When the bridge isn't
+// up yet it shows dead-simple steps + auto-retries until it appears.
+function bridgeUrl(): string { return (window as unknown as { __SM_BRIDGE_URL__?: string }).__SM_BRIDGE_URL__ || 'http://localhost:8765/'; }
+let cProbeTimer: ReturnType<typeof setInterval> | null = null;
+async function probeBridgeOnce(): Promise<boolean> {
+  try {
+    const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 1500);
+    const r = await fetch(bridgeUrl() + 'healthz', { signal: ctrl.signal, cache: 'no-store' });
+    clearTimeout(t); return r.ok;
+  } catch { return false; }
+}
+async function openConnected(): Promise<void> {
+  // hand the current deck to the bridge first (best-effort), then open the connected Studio
+  if (mode === 'html') {
+    try { await fetch(bridgeUrl() + 'api/open?name=' + encodeURIComponent(fileBase + '.html'), { method: 'POST', headers: { 'content-type': 'text/plain' }, body: exportHtmlDeck() }); } catch { /* best effort */ }
+  }
+  window.location.href = bridgeUrl();
+}
+function renderConnectState(found: boolean): void {
+  const box = $('#cstate'); if (!box) return;
+  if (found) {
+    box.innerHTML = '<div class="cstatus ok">✅ 检测到本地服务，可以连上 Claude 了！</div>'
+      + '<button id="cgo" class="primary-mini" style="width:100%;margin-top:12px;padding:10px">🔗 打开「已连接」的 Studio（带上当前 deck）→</button>'
+      + '<div class="cfaint">会在 ' + bridgeUrl() + ' 打开连接版，自动连上 Claude；你当前的改动会一起带过去。</div>';
+    const go = $('#cgo'); if (go) go.addEventListener('click', openConnected);
+  } else {
+    box.innerHTML = '<div class="cstatus">⏳ 正在检测本地服务…（开着 Claude Code 就会自动连上）</div>'
+      + '<div class="chint">最简单的连法（小白也行）：</div>'
+      + '<ol class="csteps"><li>打开 <b>Claude Code</b></li>'
+      + '<li>跟它说「<b>用 slidesmith 打开这份 slides</b>」，或敲 <code>/slidesmith</code></li>'
+      + '<li>它会自动把服务跑起来、弹出一个<b>已连接</b>的 Studio —— 在那一版里改就行</li></ol>'
+      + '<div class="cfaint">检测到服务后，上面会自动变绿、出现「打开连接版」按钮。<br>技术党也可在仓库目录运行 <code>npm run sm -- serve</code>。</div>';
+  }
+}
+function openConnectModal(): void {
+  const m = $('#connectModal'); if (!m) return; m.style.display = 'flex';
+  const tick = async () => renderConnectState(await probeBridgeOnce());
+  tick(); if (cProbeTimer) clearInterval(cProbeTimer); cProbeTimer = setInterval(tick, 2000);
+}
+function closeConnectModal(): void {
+  const m = $('#connectModal'); if (m) m.style.display = 'none';
+  if (cProbeTimer) { clearInterval(cProbeTimer); cProbeTimer = null; }
 }
 // the action behind the "submit" button: send over the bridge when connected,
 // else fall back to downloading the prompt file for the human to hand to an AI.
@@ -1046,6 +1094,18 @@ body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;color:#1c1c1f;
 .ehead .sep{width:1px;height:22px;background:#3a3a3d;margin:0 2px}
 .ehead .bridge-badge{font-size:12px;padding:3px 10px;border-radius:11px;line-height:1.4}
 .ehead .bridge-badge.on{background:#13321f;color:#7fe0a0;border:1px solid #2c6b48}
+.ehead .connect-btn{background:#185FA5;border-color:#185FA5;color:#fff;font-weight:600}
+.ehead .connect-btn:hover{background:#0c447c}
+.cmodal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100}
+.cbox{background:#fff;border-radius:12px;padding:20px 22px;width:460px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.cbox .ctitle{font-size:16px;font-weight:700;margin-bottom:14px;color:#1c1c1f}
+.cbox .cstatus{font-size:14px;padding:10px 13px;border-radius:8px;background:#f1f1f2;color:#555}
+.cbox .cstatus.ok{background:#e1f5ee;color:#0f6e56;font-weight:600}
+.cbox .chint{font-size:13px;color:#6a6a6e;margin:14px 0 6px;font-weight:600}
+.cbox .csteps{margin:0;padding-left:22px;font-size:13px;line-height:1.95;color:#333}
+.cbox code{background:#f1f1f2;border-radius:4px;padding:1px 6px;font-size:12px;font-family:ui-monospace,Menlo,monospace}
+.cbox .cfaint{font-size:12px;color:#9a9a9e;margin-top:14px;line-height:1.7;border-top:1px solid #eee;padding-top:11px}
+.cbox .cclose{margin-top:16px;width:100%}
 .emain{flex:1;display:flex;min-height:0}
 .left{width:240px;flex:0 0 auto;background:#fff;border-right:1px solid #e2e2e4;display:flex;flex-direction:column}
 body.navcollapsed .left{display:none}
@@ -1133,6 +1193,7 @@ function buildUI(): void {
   <span class="brand">✎ Slidesmith Studio</span>
   <span class="dn" id="deckname">${esc(fileBase)}</span>
   <span id="bridgeBadge" class="bridge-badge" title="与 Claude Code 的连接状态"></span>
+  <button id="connectBtn" class="connect-btn" title="一键连接 Claude Code">🔌 连接 Claude</button>
   <span class="grow"></span>
   <button id="imp">导入 HTML / deck.json / .md</button>
   <span class="sep"></span>
@@ -1245,7 +1306,14 @@ function buildUI(): void {
     </div>
   </aside>
 </div>
-<div class="toast" id="toast"></div>`;
+<div class="toast" id="toast"></div>
+<div class="cmodal" id="connectModal" style="display:none">
+  <div class="cbox">
+    <div class="ctitle">🔌 连接 Claude Code</div>
+    <div id="cstate"></div>
+    <button class="mini cclose" id="cclose">关闭</button>
+  </div>
+</div>`;
 
   function fillSel(id: string, values: readonly string[], labels?: Record<string, string>, defaultLabel?: string): HTMLSelectElement {
     const sel = $(id) as HTMLSelectElement; sel.innerHTML = '';
@@ -1345,6 +1413,9 @@ function buildUI(): void {
   $('#down').addEventListener('click', () => moveSlide(1));
 
   $('#navtog').addEventListener('click', () => document.body.classList.toggle('navcollapsed'));
+  $('#connectBtn').addEventListener('click', openConnectModal);
+  $('#cclose').addEventListener('click', closeConnectModal);
+  $('#connectModal').addEventListener('click', (e) => { if (e.target === $('#connectModal')) closeConnectModal(); });
   $('#imp').addEventListener('click', () => $('#file').click());
   ($('#file') as HTMLInputElement).addEventListener('change', (e) => {
     const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return;
