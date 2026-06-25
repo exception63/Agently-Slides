@@ -1,6 +1,7 @@
 // Slidesmith Studio — a fully client-side editor bundled into one HTML file.
-// Open it (file:// or http), drag in a deck.json / deck.md, edit Keynote-style,
-// and export the deck.json / deck.md / presentation HTML. No server, no CLI.
+// Open it (file:// or http), drag in a contract HTML deck (or deck.json / deck.md),
+// edit Keynote-style, then "保存 HTML" to overwrite the opened file in place (File
+// System Access API) or "导出 HTML 副本" to download a copy. No server, no CLI.
 import {
   validateDeck,
   LAYOUTS,
@@ -17,7 +18,6 @@ import {
   renderDeckHtml,
   renderTranscriptHtml,
   renderPresenterHtml,
-  irToMarkdown,
 } from '@slidesmith/engine';
 import { listThemes } from '@slidesmith/themes';
 
@@ -154,6 +154,14 @@ interface HtmlSlide { id: string; title: string; seg: string; segName: string; v
 let htmlSlides: HtmlSlide[] = [];
 let htmlSelEl: Element | null = null; // currently selected element inside the edit iframe
 let htmlGotoAfterRender = -1; // restore this slide after a re-render (e.g. after applying a patch)
+
+// ---- File System Access: a writable handle captured when the user opens a deck,
+// so "保存 HTML" can overwrite that exact file in place (one click, no re-pick).
+// Cleared on every import; re-set by the open-picker / drop paths below. Null when
+// the deck came from the bridge or the browser lacks the API → save falls back to a picker. ----
+interface FsWritable { write(data: BlobPart): Promise<void>; close(): Promise<void> }
+interface FsFileHandle { kind?: string; name?: string; getFile(): Promise<File>; createWritable(): Promise<FsWritable> }
+let fileHandle: FsFileHandle | null = null;
 const aiInstructions: Record<string, string> = {}; // per-slide-id comment to AI (the human's task for that page)
 const aiApplied = new Set<string>(); // slide ids AI has already applied a patch to (badge ✓ 已改)
 const aiSent = new Set<string>(); // slide ids sent to Claude, waiting for a patch back (badge 已发送, pulsing)
@@ -372,8 +380,49 @@ function download(name: string, content: string, mime: string): void {
   setTimeout(() => URL.revokeObjectURL(a.href), 2000);
 }
 
+// 保存 HTML — write the current deck back to the file the user opened, overwriting it
+// in place. Reuses the captured handle for a silent one-click overwrite; if there is no
+// handle (deck came from the bridge, or first save) it asks the user to pick the file
+// once and remembers it; browsers without the File System Access API get a download.
+async function saveHtmlInPlace(): Promise<void> {
+  const html = mode === 'html' ? exportHtmlDeck() : renderDeckHtml(deck);
+  // 1) reuse a known handle → silent overwrite
+  if (fileHandle) {
+    try {
+      const w = await fileHandle.createWritable();
+      await w.write(html); await w.close();
+      toast('已保存 → ' + (fileHandle.name || fileBase + '.html'));
+      syncExportToBridge();
+      return;
+    } catch { /* permission lost / file moved → fall through to picker */ fileHandle = null; }
+  }
+  // 2) no handle → let the user pick the file to overwrite, then remember it
+  const w = window as unknown as { showSaveFilePicker?: (o?: unknown) => Promise<FsFileHandle> };
+  if (w.showSaveFilePicker) {
+    try {
+      const h = await w.showSaveFilePicker({
+        suggestedName: fileBase + '.html',
+        types: [{ description: 'HTML deck', accept: { 'text/html': ['.html', '.htm'] } }],
+      });
+      const ws = await h.createWritable();
+      await ws.write(html); await ws.close();
+      fileHandle = h;
+      toast('已保存 → ' + (h.name || fileBase + '.html'));
+      syncExportToBridge();
+      return;
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return; // user cancelled the dialog
+      /* fall through to download */
+    }
+  }
+  // 3) browser without File System Access API → download a copy
+  download(fileBase + '.html', html, 'text/html');
+  toast('当前浏览器不支持原地覆盖，已下载副本', true);
+}
+
 // route an imported file by type: contract HTML deck → html mode; json/md → IR mode
 function importFile(name: string, text: string): void {
+  fileHandle = null; // a new deck arrived → drop any stale writable handle; open-picker/drop re-set it after
   if (/\.html?$/i.test(name) || /^\s*<(!doctype|html|section|div|body)/i.test(text)) loadHtmlDeck(name, text);
   else loadDeck(name, text);
 }
@@ -1197,10 +1246,9 @@ function buildUI(): void {
   <span class="grow"></span>
   <button id="imp">导入 HTML / deck.json / .md</button>
   <span class="sep"></span>
-  <button id="expJson">存 .json</button>
-  <button id="expMd">存 .md</button>
   <button id="expPdf">导出 PDF</button>
-  <button id="expHtml" class="primary">导出 HTML</button>
+  <button id="expHtml">导出 HTML 副本</button>
+  <button id="saveHtml" class="primary" title="直接覆盖你导入的那个 HTML 文件">💾 保存 HTML</button>
   <input id="file" type="file" accept=".html,.htm,.json,.md" style="display:none">
 </div>
 <div class="emain">
@@ -1416,19 +1464,28 @@ function buildUI(): void {
   $('#connectBtn').addEventListener('click', openConnectModal);
   $('#cclose').addEventListener('click', closeConnectModal);
   $('#connectModal').addEventListener('click', (e) => { if (e.target === $('#connectModal')) closeConnectModal(); });
-  $('#imp').addEventListener('click', () => $('#file').click());
+  // import via the File System Access picker when available (captures a writable handle
+  // so 保存 HTML can later overwrite in place); else fall back to the classic <input>.
+  $('#imp').addEventListener('click', async () => {
+    const w = window as unknown as { showOpenFilePicker?: (o?: unknown) => Promise<FsFileHandle[]> };
+    if (w.showOpenFilePicker) {
+      try {
+        const [h] = await w.showOpenFilePicker({
+          types: [{ description: 'Deck', accept: { 'text/html': ['.html', '.htm'], 'application/json': ['.json'], 'text/markdown': ['.md'] } }],
+        });
+        const file = await h.getFile();
+        importFile(file.name, await file.text()); // clears fileHandle…
+        fileHandle = h;                            // …then remember this one for overwrite-save
+        return;
+      } catch (e) { if ((e as Error).name === 'AbortError') return; /* else fall back */ }
+    }
+    ($('#file') as HTMLInputElement).click();
+  });
   ($('#file') as HTMLInputElement).addEventListener('change', (e) => {
     const f = (e.target as HTMLInputElement).files?.[0]; if (!f) return;
-    f.text().then((t) => importFile(f.name, t));
+    f.text().then((t) => importFile(f.name, t)); // no handle from a plain <input> → save will prompt once
   });
-  $('#expJson').addEventListener('click', () => {
-    if (mode === 'html') { toast('HTML 模式下请用「导出 HTML」', true); return; }
-    download(fileBase + '.deck.json', JSON.stringify(deck, null, 2), 'application/json');
-  });
-  $('#expMd').addEventListener('click', () => {
-    if (mode === 'html') { toast('HTML 模式下请用「导出 HTML」', true); return; }
-    download(fileBase + '.deck.md', irToMarkdown(deck), 'text/markdown');
-  });
+  $('#saveHtml').addEventListener('click', () => { void saveHtmlInPlace(); });
   $('#expHtml').addEventListener('click', () => {
     if (mode === 'html') { download(fileBase + '.html', exportHtmlDeck(), 'text/html'); toast('已导出编辑后的 HTML'); return; }
     const tn = fileBase + '.transcript.html', pn = fileBase + '.presenter.html';
@@ -1443,15 +1500,32 @@ function buildUI(): void {
   window.addEventListener('dragenter', (e) => { e.preventDefault(); dragN++; document.body.classList.add('dragging'); });
   window.addEventListener('dragover', (e) => e.preventDefault());
   window.addEventListener('dragleave', () => { if (--dragN <= 0) document.body.classList.remove('dragging'); });
-  window.addEventListener('drop', (e) => {
+  window.addEventListener('drop', async (e) => {
     e.preventDefault(); dragN = 0; document.body.classList.remove('dragging');
-    const f = e.dataTransfer?.files?.[0]; if (f) f.text().then((t) => importFile(f.name, t));
+    const dt = e.dataTransfer; if (!dt) return;
+    // prefer a file-system handle (drag-drop on Chromium) so 保存 HTML can overwrite in place
+    const item = dt.items && dt.items[0];
+    const getH = item && (item as unknown as { getAsFileSystemHandle?: () => Promise<FsFileHandle | null> }).getAsFileSystemHandle;
+    if (getH) {
+      try {
+        const h = await (item as unknown as { getAsFileSystemHandle(): Promise<FsFileHandle | null> }).getAsFileSystemHandle();
+        if (h && h.kind !== 'directory' && h.getFile) {
+          const file = await h.getFile();
+          importFile(file.name, await file.text()); // clears fileHandle…
+          fileHandle = h;                            // …then remember the dropped file
+          return;
+        }
+      } catch { /* fall through to plain file read */ }
+    }
+    const f = dt.files?.[0]; if (f) f.text().then((t) => importFile(f.name, t));
   });
 
   // automation hooks: agents / verification can drive Studio programmatically
   (window as unknown as { __SM_IMPORT__: typeof importFile }).__SM_IMPORT__ = importFile;
   (window as unknown as { __SM_EXPORT_HTML__: () => string }).__SM_EXPORT_HTML__ = () =>
     mode === 'html' ? exportHtmlDeck() : renderDeckHtml(deck);
+  (window as unknown as { __SM_SAVE_HTML__: typeof saveHtmlInPlace }).__SM_SAVE_HTML__ = saveHtmlInPlace;
+  (window as unknown as { __SM_HAS_FILE_HANDLE__: () => boolean }).__SM_HAS_FILE_HANDLE__ = () => !!fileHandle;
   (window as unknown as { __SM_AI_REQUEST__: typeof buildAiRequest }).__SM_AI_REQUEST__ = buildAiRequest;
   (window as unknown as { __SM_AI_REQUEST_ALL__: typeof buildAllAiRequests }).__SM_AI_REQUEST_ALL__ = buildAllAiRequests;
   (window as unknown as { __SM_SET_INSTR__: (id: string, t: string) => void }).__SM_SET_INSTR__ = (id, t) => { if (t) { aiInstructions[id] = t; aiApplied.delete(id); } else { delete aiInstructions[id]; } if (mode === 'html') refreshTasks(); };
