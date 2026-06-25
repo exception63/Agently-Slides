@@ -13,8 +13,9 @@
 ## Current State(已完成)
 - **Studio** `studio/slidesmith-studio.html`(单文件离线 355KB);源 `packages/studio/src/main.ts`,改后 `npm run build:studio`。
 - **桥接** `packages/bridge`:`slidesmith serve`/`mcp`;HTTP+WS+MCP+控制 API(`/api/{status,requests,patch,open}`+CORS)。**插件**`plugin/`(市场 `slidesmith-local` + `.mcp.json` + `/slidesmith` 命令)已装。MCP 4 工具 `slidesmith_open/get_requests/apply_patch/status`。
-- **编辑器功能**:页内评论(跟随当前页·队列·徽标 ●待发送/●已发送脉冲/✓已改)· 整份 deck 评论 · 审阅「↩︎还原本页」· 直接编辑(选中元素 ↑↓🗑)· 动态进度横幅 · 🔌连接 Claude 按钮(探测+一键跳连接版+带 deck)· 视觉自检 · 导出 HTML/PDF。
-- **验证全绿**:`scripts/verify-{bridge(14),editor(22),connect(7)}.mjs` + `dogfood.mjs`;40 单测;typecheck 0 错。截图 `docs/screenshots/{bridge,editor,dogfood,live}/`。
+- **编辑器功能**:页内评论(跟随当前页·队列·徽标 ●待发送/●已发送脉冲/✓已改)· 整份 deck 评论 · 审阅「↩︎还原本页」· 直接编辑(选中元素 ↑↓🗑)· 动态进度横幅 · 🔌连接 Claude 按钮(探测+一键跳连接版+带 deck)· 视觉自检 · **💾 保存 HTML(原地覆盖导入文件)** / 导出 HTML 副本 / 导出 PDF。
+- **保存 HTML(2026-06-25,commit cda8515)**:新增「保存 HTML」=用 **File System Access API 原地覆盖**用户导入的那个 .html。导入时(open-picker `#imp` + drag)抓 `fileHandle`,`saveHtmlInPlace()` 有句柄→静默覆盖;无句柄(桥接来的 deck/首存)→`showSaveFilePicker` 弹一次记住;无 API(Safari/FF)→下载副本。**桥接不行**(deck 经 `POST /api/open` 交接只剩 basename,无磁盘路径),故走浏览器。移除旧 **存 .json/存 .md**(HTML-first 后在 html 模式只弹提示无实效)+ 删 `irToMarkdown` import。钩子 `__SM_SAVE_HTML__`/`__SM_HAS_FILE_HANDLE__`。验证 `scripts/verify-save.mjs` 13/13。**连不上 Claude 的原因**:桥接 MCP 插件只在 Claude Code **新会话启动**才连(不是 bug)。
+- **验证全绿**:`scripts/verify-{bridge(14),editor(22),connect(7),save(13)}.mjs` + `dogfood.mjs`;40 单测;typecheck 0 错。注:`verify-{connect,bridge}` 需 `npx tsx`(引 bridge 的 `.js`→`.ts`),其余 `node` 即可。截图 `docs/screenshots/{bridge,editor,dogfood,live,save}/`。
 - **文档**:README/GUIDE/AGENTS 已清洗成纯现状(无历史);`packages/bridge/README.md`、`plugin/slidesmith/README.md`、`docs/DECK-CONTRACT.md`。
 
 ## Next Likely Action (v2)
