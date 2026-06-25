@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>学术汇报 · academic 样板</title>
+<!-- 在线时加载该皮肤的字体；离线时自动回退到系统字体（字体栈已含 fallback） -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* skin: academic · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
+/* ════════════════════════════════════════════════════════════════════
+   _core.css · 与风格无关的骨架 + 引擎界面（topbar / 段导航 / 进度条 / 投屏态）
+   所有皮肤共用。它只用令牌，不定义令牌——令牌由各皮肤的 :root 提供：
+     必需：--paper --ink --accent --accent-2 --accent-soft --rule
+          --pad-x --pad-y --font-sans --font-display --font-mono --fit-scale
+   引擎周边的工具 UI（顶栏/侧栏）固定深色，只有强调色（进度条/当前态/缩略框）
+   跟随皮肤的 --accent，使工具一致、内容随皮变化。
+   ════════════════════════════════════════════════════════════════════ */
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:#2a2a2a;font-family:var(--font-sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+body{padding-left:0;padding-top:60px;transition:padding 0.2s;}
+.deck{display:flex;flex-direction:column;gap:32px;padding:32px 24px 60px 320px;align-items:center;}
+.slide-wrap{width:calc(1920px * var(--fit-scale));height:calc(1080px * var(--fit-scale));position:relative;flex-shrink:0;}
+.slide{width:1920px;height:1080px;background:var(--paper);color:var(--ink);padding:var(--pad-y) var(--pad-x);position:absolute;top:0;left:0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,0.4);transform:scale(var(--fit-scale));transform-origin:top left;}
+
+/* ============================ 顶部控制条 ============================ */
+.topbar{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(20,23,31,0.96);color:#F2EDE2;display:flex;align-items:center;gap:16px;padding:0 24px;z-index:1000;backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.08);}
+.topbar__brand{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:0.02em;color:#F2EDE2;}
+.topbar__sub{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;color:rgba(242,237,226,0.5);text-transform:uppercase;}
+.topbar__spacer{flex:1;}
+.topbar__btn{background:transparent;color:#F2EDE2;border:1px solid rgba(242,237,226,0.3);padding:7px 16px;border-radius:4px;font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;font-weight:500;}
+.topbar__btn:hover{background:rgba(242,237,226,0.1);border-color:rgba(242,237,226,0.6);}
+.topbar__btn--primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.topbar__btn--primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
+.topbar__btn--presenter{background:#2A2A2A;border-color:#2A2A2A;color:#F5E3B0;}
+.topbar__btn--presenter:hover{background:#3a3a3a;border-color:#B58530;color:#F5E3B0;}
+.topbar__btn--presenter.active{background:#B58530;border-color:#B58530;color:#fff;box-shadow:0 0 0 2px rgba(181,133,48,0.3);}
+.topbar__info{font-family:var(--font-mono);font-size:12px;color:rgba(242,237,226,0.7);letter-spacing:0.08em;}
+.topbar__info strong{color:#F2EDE2;font-weight:600;}
+
+/* ============================ 折叠式段导航 + 缩略图 ============================ */
+.segnav{position:fixed;left:0;top:60px;bottom:0;width:300px;background:rgba(20,23,31,0.94);border-right:1px solid rgba(255,255,255,0.08);z-index:999;overflow-y:auto;backdrop-filter:blur(8px);}
+.segnav::-webkit-scrollbar{width:6px;}
+.segnav::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);}
+.segnav::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+.segnav__seg{border-bottom:1px solid rgba(255,255,255,0.06);}
+.segnav__head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:transparent;border:0;color:rgba(242,237,226,0.78);width:100%;cursor:pointer;text-align:left;font-family:var(--font-sans);transition:background 0.15s;}
+.segnav__head:hover{background:rgba(255,255,255,0.04);color:#F2EDE2;}
+.segnav__seg--current > .segnav__head{background:var(--accent-soft);color:#F2EDE2;}
+.segnav__head-id{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--accent-ui,#C2A06B);text-transform:uppercase;font-weight:600;width:42px;flex-shrink:0;}
+.segnav__head-name{flex:1;font-size:13px;font-weight:500;line-height:1.3;}
+.segnav__head-meta{font-family:var(--font-mono);font-size:10px;color:rgba(242,237,226,0.4);letter-spacing:0.1em;}
+.segnav__head-arrow{font-size:10px;color:rgba(242,237,226,0.4);transition:transform 0.2s;flex-shrink:0;width:12px;text-align:center;}
+.segnav__seg--expanded .segnav__head-arrow{transform:rotate(90deg);}
+.segnav__thumbs{display:none;padding:8px 12px 14px;grid-template-columns:1fr 1fr;gap:8px;}
+.segnav__seg--expanded .segnav__thumbs{display:grid;}
+.thumb{width:126px;height:71px;background:var(--paper);cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden;transition:border-color 0.15s;flex-shrink:0;}
+.thumb:hover{border-color:var(--accent);}
+.thumb--active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
+.thumb__inner{width:1920px !important;height:1080px !important;transform:scale(0.0656) !important;transform-origin:top left !important;position:absolute !important;top:0 !important;left:0 !important;box-shadow:none !important;pointer-events:none !important;}
+/* 编号徽标固定深字 + 白底——所有皮通用（深色皮的 --ink 是浅色，不能用 var(--ink)，否则白底白字看不清）*/
+.thumb__num{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;color:#16181E;background:rgba(255,255,255,0.85);padding:1px 5px;border-radius:2px;z-index:2;font-weight:600;}
+
+/* —— 进度条 / 提示 —— */
+.progress{position:fixed;top:60px;left:300px;right:0;height:3px;background:rgba(255,255,255,0.08);z-index:998;}
+.progress__bar{height:100%;background:var(--accent);transition:width 0.2s;}
+.hint{position:fixed;bottom:16px;right:20px;font-family:var(--font-mono);font-size:11px;color:#888;pointer-events:none;z-index:1000;letter-spacing:0.1em;}
+body.present .hint,body:fullscreen .hint{color:rgba(255,255,255,0.3);}
+
+/* ============================ 投屏 / 全屏模式 ============================ */
+body.present{background:#000;padding:0;}
+body.present .topbar,body.present .segnav,body.present .progress{display:none;}
+body.present .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+body.present .slide-wrap{width:auto;height:auto;position:static;flex-shrink:0;}
+body.present .slide{display:none;position:static;transform:scale(var(--sc,1));transform-origin:center center;box-shadow:none;}
+body.present .slide.active{display:flex;}
+body.fullscreen{background:#000;}
+:fullscreen{background:#000;}
+:fullscreen .topbar,:fullscreen .segnav,:fullscreen .progress{display:none;}
+:fullscreen .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+:fullscreen .slide{box-shadow:none;}
+
+
+/* —— 皮肤 academic —— */
+/* FONTS https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap */
+/* ════════════════════════════════════════════════════════════════════
+   skin: academic · 学术汇报风（社科 / 人文 · 舒展）
+   规范来源：会议汇报惯例 + ui-ux-pro-max（typography #14 News Editorial /
+   #8 Wellness Calm；colors #40 Legal「权威藏青 + 信任金」暖化）。
+   气质：克制单主色（深靛青）· 易读无衬线正文 + 宋体/衬线标题 · 图表优先 +
+   编号图注 · 规范参考文献 · 大留白 · 引用密集也不挤。
+   换主色 → 只改 :root 的 --accent / --accent-2 / --accent-soft。
+   想要「全宋体期刊感」→ 见 references/skins/academic.md 的开关说明。
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* —— 配色（暖白纸 + 深靛青主色 + 赭金稀用 · 改主题只改这一组）—— */
+  --paper:#F8F6F1;--paper-soft:#F1EEE6;--paper-warm:#ECE7DB;
+  --rule:#DCD6C9;--rule-soft:#E7E2D6;--rule-strong:#C7C0B0;
+  --ink:#1C2024;--ink-2:#3A4047;--ink-3:#5E6670;--ink-4:#969CA6;
+  --accent:#27406B;--accent-2:#1B2E4D;--accent-soft:rgba(39,64,107,0.09);--accent-ui:#9FB3D1;
+  --gold:#9A6E2E;--gold-soft:#B89357;        /* 第二色，稀用 */
+  --good:#3F6E55;--warn:#9A6E2E;--bad:#A24632; /* 语义色，克制 */
+  --night:#1A2230;--night-2:#222C3D;--night-paper:#EDEAE2;
+  /* —— 字号阶梯（比杂志风更小更密 · 承载更多文字）—— */
+  --t-display:120px;--t-h1:80px;--t-h2:56px;--t-h3:40px;--t-h4:32px;
+  --t-lead:30px;--t-body:28px;--t-small:23px;--t-eyebrow:19px;
+  --pad-x:120px;--pad-y:84px;
+  /* 字体栈 · 标题衬线（Newsreader/Lora + 思源宋体）· 正文无衬线（Source Sans + 思源黑体）*/
+  --font-serif:"Newsreader","Lora","Source Han Serif SC","Noto Serif SC","Songti SC","STSong",serif;
+  --font-display:"Newsreader","Lora","Source Han Serif SC","Noto Serif SC","Songti SC",serif;
+  --font-sans:"Source Sans 3","Inter","Source Han Sans SC","Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55;
+}
+
+/* —— 页脚 chrome：细发丝线 + 段名 / 作者 · 页码（会议汇报坐标感）—— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:40px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-sans);font-size:17px;letter-spacing:0.02em;color:var(--ink-4);padding-top:14px;border-top:1px solid var(--rule);}
+.chrome__l{display:flex;gap:24px;align-items:baseline;white-space:nowrap;}
+.chrome__seg{color:var(--ink-3);font-weight:500;}
+.chrome__r{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:0.06em;}
+/* —— runner：可选顶部页眉条（讲题 / 机构）—— */
+.runner{position:absolute;top:54px;left:var(--pad-x);right:var(--pad-x);display:flex;justify-content:space-between;align-items:center;font-family:var(--font-sans);font-size:18px;color:var(--ink-3);padding-bottom:14px;border-bottom:1px solid var(--rule);}
+.runner__r{font-family:var(--font-mono);font-size:15px;letter-spacing:0.1em;color:var(--ink-4);text-transform:uppercase;}
+
+/* —— 通用排版原子 —— */
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-eyebrow);letter-spacing:0.18em;color:var(--accent);text-transform:uppercase;font-weight:600;}
+.title{font-family:var(--font-display);font-weight:600;font-size:var(--t-h2);line-height:1.18;letter-spacing:0;color:var(--ink);margin:0;}
+.title--xl{font-size:104px;}.title--lg{font-size:80px;}.title--md{font-size:48px;}.title--sm{font-size:38px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.6;color:var(--ink-2);max-width:1480px;margin:0;font-weight:400;}
+.body{font-size:var(--t-body);line-height:1.7;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.65;color:var(--ink-3);}
+.num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
+.mark-v{color:var(--accent);}.mark-n{color:var(--accent);}.mark-g{color:var(--gold);}
+.key{color:var(--accent);font-weight:600;font-style:normal;}
+strong{font-weight:600;color:var(--accent);}
+em{font-style:italic;color:var(--ink);font-family:var(--font-serif);}     /* 学术：斜体 = 术语 / 强调，不抢色 */
+.cite{font-family:var(--font-sans);font-size:0.7em;color:var(--ink-3);letter-spacing:0.01em;white-space:nowrap;font-style:normal;font-weight:400;}
+.head{margin-top:6px;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--rule);}  /* 学术：标题下加发丝线 = 页眉感 */
+.head__eyebrow{margin-bottom:14px;}.head__title{margin:0 0 8px;}
+.head__sub{font-family:var(--font-sans);font-size:24px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.5;}
+.fill{flex:1;min-height:0;}
+.center{align-items:center;justify-content:center;text-align:center;}
+.center .lead{margin-left:auto;margin-right:auto;}
+.center .head{border-bottom:0;}
+
+/* —— cover 封面 —— */
+.cover{background:var(--paper);justify-content:space-between;}
+.cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover__brand{font-family:var(--font-sans);font-size:22px;letter-spacing:0.02em;color:var(--ink-3);font-weight:500;}
+.cover__seal{font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;color:var(--accent);text-transform:uppercase;border:1px solid var(--accent);padding:8px 16px;border-radius:2px;}
+.cover__main{display:flex;flex-direction:column;gap:30px;border-left:3px solid var(--accent);padding-left:44px;}
+.cover__eyebrow{font-family:var(--font-mono);font-size:21px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;font-weight:600;}
+.cover__title{font-family:var(--font-display);font-weight:600;font-size:100px;line-height:1.08;letter-spacing:0;color:var(--ink);margin:0;}
+.cover__title em{color:var(--accent);font-style:italic;}
+.cover__sub{font-family:var(--font-sans);font-size:33px;color:var(--ink-2);max-width:1500px;font-weight:400;line-height:1.5;}
+.cover__meta{display:flex;gap:64px;font-family:var(--font-sans);color:var(--ink-3);padding-top:30px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:7px;}
+.cover__meta-k{font-family:var(--font-mono);color:var(--ink-4);font-size:14px;letter-spacing:0.12em;text-transform:uppercase;}
+.cover__meta-v{color:var(--ink);font-size:21px;font-weight:500;}
+
+/* —— section divider 段分隔（克制 · 无巨型幽灵数字）—— */
+.secdiv{background:var(--paper);justify-content:center;}
+.secdiv--dark{background:var(--night);color:var(--night-paper);}
+.secdiv--accent{background:var(--accent);color:var(--paper);}
+.secdiv__num{font-family:var(--font-mono);font-size:24px;font-weight:600;letter-spacing:0.18em;color:var(--accent);text-transform:uppercase;margin-bottom:22px;}
+.secdiv--dark .secdiv__num,.secdiv--accent .secdiv__num{color:var(--gold-soft);}
+.secdiv__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--ink-3);text-transform:uppercase;margin-bottom:30px;font-weight:500;}
+.secdiv--dark .secdiv__eyebrow,.secdiv--accent .secdiv__eyebrow{color:rgba(237,234,226,0.7);}
+.secdiv__title{font-family:var(--font-display);font-weight:600;font-size:88px;line-height:1.12;letter-spacing:0;color:var(--ink);margin:0 0 32px;max-width:1500px;padding-top:30px;border-top:2px solid var(--accent);}
+.secdiv__title em{color:var(--accent);font-style:italic;}
+.secdiv--dark .secdiv__title{color:var(--night-paper);border-top-color:var(--gold-soft);}
+.secdiv--accent .secdiv__title{color:var(--paper);border-top-color:var(--paper);}
+.secdiv__lead{font-family:var(--font-sans);font-size:30px;line-height:1.6;color:var(--ink-2);max-width:1400px;margin:0;font-weight:400;}
+.secdiv--dark .secdiv__lead{color:rgba(237,234,226,0.78);}
+.secdiv--accent .secdiv__lead{color:rgba(248,246,241,0.9);}
+.secdiv__meta{font-family:var(--font-mono);font-size:17px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;padding-top:26px;margin-top:30px;border-top:1px solid var(--rule);display:flex;gap:36px;}
+
+/* —— manifesto / insight 中心论断（学术：稳重衬线，不喊口号）—— */
+.manifesto,.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 140px;}
+.manifesto__eyebrow,.insight__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;margin-bottom:46px;font-weight:600;}
+.manifesto__title,.insight__statement{font-family:var(--font-display);font-weight:500;font-size:80px;line-height:1.22;letter-spacing:0;color:var(--ink);margin:0;max-width:1640px;}
+.manifesto__title em,.insight__statement em{color:var(--accent);font-style:italic;}
+.manifesto__sub,.insight__sub{font-family:var(--font-sans);font-size:30px;color:var(--ink-3);margin:42px auto 0;max-width:1400px;line-height:1.6;font-weight:400;}
+.manifesto--dark{background:var(--night);color:var(--night-paper);}
+.manifesto--dark .manifesto__title{color:var(--night-paper);}
+.manifesto--dark .manifesto__sub{color:rgba(237,234,226,0.78);}
+
+/* —— bullets 论点清单（学术主力版式 · ≤6 条 · 舒展）—— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:26px;}
+.bullets > li{font-family:var(--font-sans);font-size:30px;line-height:1.6;color:var(--ink-2);padding-left:46px;position:relative;}
+.bullets > li::before{content:"";position:absolute;left:4px;top:18px;width:18px;height:2px;background:var(--accent);}
+.bullets li b,.bullets li strong{color:var(--accent);font-weight:600;}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:13px;}
+.bullets ul li{font-size:25px;color:var(--ink-3);padding-left:40px;position:relative;line-height:1.55;}
+.bullets ul li::before{content:"";position:absolute;left:8px;top:15px;width:9px;height:9px;border:1.5px solid var(--ink-4);border-radius:50%;}
+.bullets--lead > li{font-size:33px;}
+
+/* —— figure 图（社科主力：模型图 / 图表 + 编号图注）—— */
+.figure{display:flex;flex-direction:column;gap:18px;height:100%;}
+.figure__frame{flex:1;min-height:0;background:#FFFFFF;border:1px solid var(--rule);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+.figure__cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--accent);font-weight:600;margin-right:12px;text-transform:uppercase;}
+.figure__src{font-family:var(--font-sans);font-size:16px;color:var(--ink-4);}
+.figure--row{flex-direction:row;gap:36px;align-items:stretch;}
+
+/* —— 概念模型小零件（X→M→Y / 调节）· 给 figure 内联 SVG 用作参照 —— */
+.node{fill:#FFFFFF;stroke:var(--accent);stroke-width:2;}
+.node-accent{fill:var(--accent);}
+.path-arrow{stroke:var(--accent);stroke-width:2;fill:none;}
+.path-dash{stroke:var(--gold);stroke-width:2;stroke-dasharray:7 5;fill:none;}
+
+/* —— cards 卡片组（研究问题 / 贡献 · 克制）—— */
+.cards{display:grid;gap:26px;grid-template-columns:repeat(3,1fr);}
+.cards--2{grid-template-columns:repeat(2,1fr);}
+.cards--4{grid-template-columns:repeat(4,1fr);}
+.cards--5{grid-template-columns:repeat(5,1fr);}
+.cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{background:#FFFFFF;padding:30px 28px;display:flex;flex-direction:column;gap:13px;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;}
+.card--v{border-top-color:var(--accent);}.card--n{border-top-color:var(--gold);}.card--g{border-top-color:var(--good);}
+.card--plain{background:transparent;border:0;border-top:1px solid var(--rule);border-radius:0;padding:24px 0;}
+.card__eyebrow{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+.card__level{font-family:var(--font-display);font-size:54px;font-weight:600;line-height:0.95;color:var(--accent);}
+.card__title{font-family:var(--font-display);font-weight:600;font-size:31px;color:var(--ink);line-height:1.3;margin-top:6px;}
+.card__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.6;}
+.card__meta{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule);}
+
+/* —— numlist 编号清单（证据 / 步骤）—— */
+.numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule);}
+.numitem{display:grid;grid-template-columns:64px 1fr auto;align-items:baseline;gap:30px;padding:18px 0;border-bottom:1px solid var(--rule);}
+.numitem--tight{padding:12px 0;}
+.numitem__n{font-family:var(--font-display);font-size:32px;font-weight:600;color:var(--accent);line-height:1;}
+.numitem__main{display:flex;flex-direction:column;gap:6px;}
+.numitem__title{font-family:var(--font-display);font-weight:600;font-size:29px;color:var(--ink);line-height:1.3;}
+.numitem__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.6;}
+.numitem__tag{font-family:var(--font-sans);font-size:18px;color:var(--ink-4);padding-top:8px;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--accent);}
+.numlist--lg .numitem{padding:13px 0;gap:22px;grid-template-columns:60px 1fr auto;}
+.numlist--lg .numitem__n{font-size:30px;}.numlist--lg .numitem__title{font-size:24px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.5;}.numlist--lg .numitem__tag{font-size:15px;}
+
+/* —— terminal 终端 / prompt（HCI / AI 演示）—— */
+.terminal{background:var(--night);color:#DDE2E8;padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.55;position:relative;border-radius:4px;}
+.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(221,226,232,0.5);margin-bottom:22px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--gold-soft);}
+.terminal__user{color:#9FB3D1;}.terminal__system{color:#9ECbB0;}.terminal__hint{color:#C9A86A;}.terminal__dim{color:rgba(221,226,232,0.45);}
+.terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
+
+/* —— compare 两栏对比 —— */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:2px solid var(--accent);border-bottom:1px solid var(--rule);}
+.compare__col{padding:38px 40px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:16px;}
+.compare__col:last-child{border-right:0;}
+.compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
+.compare__col--good .compare__title{color:var(--accent);}
+.compare__label{font-family:var(--font-mono);font-size:17px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-4);}
+.compare__title{font-family:var(--font-display);font-weight:600;font-size:40px;color:var(--ink);line-height:1.2;margin-bottom:10px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:15px;}
+.compare__list li{font-family:var(--font-sans);font-size:22px;line-height:1.6;color:var(--ink-2);padding-left:26px;position:relative;}
+.compare__list li::before{content:"–";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--accent);}
+
+/* —— steps 流程 —— */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid var(--accent);border-bottom:1px solid var(--rule);}
+.steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
+.step{padding:34px 28px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:12px;}
+.step:last-child{border-right:0;}
+.step__n{font-family:var(--font-mono);font-size:18px;font-weight:600;letter-spacing:0.1em;color:var(--accent);text-transform:uppercase;}
+.step__title{font-family:var(--font-display);font-weight:600;font-size:29px;color:var(--ink);line-height:1.25;}
+.step__desc{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.6;}
+
+/* —— table 表格（booktabs：上下粗线、无竖线）—— */
+.table-cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);margin-bottom:14px;}
+.table-cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--accent);font-weight:600;margin-right:12px;text-transform:uppercase;}
+.table{width:100%;border-collapse:collapse;font-family:var(--font-sans);font-size:22px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);}
+.table th,.table td{padding:15px 18px;text-align:left;vertical-align:top;line-height:1.5;}
+.table thead th{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--rule-strong);font-weight:600;}
+.table tbody tr{border-bottom:1px solid var(--rule);}
+.table tbody tr:last-child{border-bottom:0;}
+.table td.num{font-variant-numeric:tabular-nums;}
+.table td.bad{color:var(--ink-4);}.table td.good{color:var(--accent);font-weight:600;}
+.table tr.hl td{background:var(--accent-soft);}
+
+/* —— formula5 编号公式行 —— */
+.formula5{display:grid;grid-template-columns:80px 1fr 1.2fr;gap:0;border-top:2px solid var(--accent);}
+.formula5__row{display:contents;}
+.formula5__row > div{padding:22px 24px;border-bottom:1px solid var(--rule);}
+.formula5__n{font-family:var(--font-display);font-size:38px;font-weight:600;color:var(--accent);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--ink);}
+.formula5__v{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.6;}
+
+/* —— arch 分层堆栈 —— */
+.arch{display:flex;flex-direction:column;gap:6px;}
+.arch__layer{display:grid;grid-template-columns:60px 240px 1fr;gap:24px;align-items:center;padding:14px 24px;background:#FFFFFF;border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:2px;}
+.arch__layer--5{border-left-color:var(--accent);}
+.arch__layer--4{border-left-color:var(--gold);}
+.arch__layer--3{border-left-color:var(--good);}
+.arch__layer--2{border-left-color:var(--ink-3);}
+.arch__layer--1{border-left-color:var(--ink);}
+.arch__n{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--accent);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-4);letter-spacing:0.1em;margin-top:3px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-family:var(--font-sans);font-size:18px;color:var(--ink-2);line-height:1.5;}
+.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;text-align:right;}
+
+/* —— three-circle 三区 —— */
+.three-circle{display:flex;gap:30px;align-items:stretch;}
+.zone{flex:1;padding:34px 32px;background:#FFFFFF;border:1px solid var(--rule);border-top:5px solid;border-radius:3px;display:flex;flex-direction:column;gap:15px;}
+.zone--g{border-top-color:var(--good);}
+.zone--y{border-top-color:var(--gold);}
+.zone--r{border-top-color:var(--bad);}
+.zone__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600;}
+.zone__title{font-family:var(--font-display);font-size:38px;font-weight:600;color:var(--ink);}
+.zone--g .zone__title{color:var(--good);}.zone--y .zone__title{color:var(--gold);}.zone--r .zone__title{color:var(--bad);}
+.zone__test{font-family:var(--font-serif);font-size:22px;color:var(--ink-2);font-style:italic;}
+.zone__eg{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.6;}
+.zone__action{margin-top:auto;padding-top:15px;border-top:1px solid var(--rule);font-family:var(--font-sans);font-size:21px;font-weight:600;color:var(--accent);}
+
+/* —— bigq 装框大引用 —— */
+.bigq{background:var(--paper-soft);padding:40px 56px;border-left:4px solid var(--accent);border-radius:3px;text-align:left;}
+.bigq__t{font-family:var(--font-serif);font-size:48px;font-weight:500;font-style:italic;line-height:1.35;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--accent);}
+.bigq__sub{font-family:var(--font-sans);font-size:21px;color:var(--ink-3);margin-top:18px;font-style:normal;}
+
+/* —— matrix 矩阵 —— */
+.matrix{display:grid;grid-template-columns:260px repeat(3,1fr);border-top:2px solid var(--accent);border-left:1px solid var(--rule);}
+.matrix__h{padding:18px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);background:var(--paper-soft);text-align:center;font-weight:600;}
+.matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;}
+.matrix__cell{padding:20px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-sans);font-size:18px;line-height:1.5;color:var(--ink-2);min-height:84px;}
+.matrix__cell strong{color:var(--accent);}
+
+/* —— bignum 关键数字（学术：克制 · 衬线深靛青）—— */
+.bignum{display:flex;flex-direction:column;gap:8px;padding:30px 30px;background:#FFFFFF;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;}
+.bignum__v{font-family:var(--font-display);font-size:84px;font-weight:600;line-height:0.98;color:var(--accent);letter-spacing:-0.01em;}
+.bignum__u{font-family:var(--font-sans);font-size:25px;color:var(--ink-2);font-weight:500;line-height:1.4;}
+.bignum__k{font-family:var(--font-sans);font-size:17px;color:var(--ink-4);margin-top:12px;}
+
+/* —— summary 总结三栏 —— */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+.sum-card{padding:34px 32px;background:#FFFFFF;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--accent);}.sum-card--n{border-top-color:var(--gold);}.sum-card--g{border-top-color:var(--good);}
+.sum-card__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;font-weight:600;}
+.sum-card__v{font-family:var(--font-display);font-weight:600;font-size:42px;color:var(--accent);line-height:1.15;}
+.sum-card--n .sum-card__v{color:var(--gold);}.sum-card--g .sum-card__v{color:var(--good);}
+.sum-card__hint{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.6;}
+
+/* —— refs 参考文献（编号 + 悬挂缩进 + 刊名斜体 · 两列）—— */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:14px 56px;counter-reset:ref;list-style:none;margin:0;padding:0;}
+.refs--1col{grid-template-columns:1fr;}
+.refs li{font-family:var(--font-sans);font-size:19px;line-height:1.5;color:var(--ink-2);padding-left:38px;position:relative;break-inside:avoid;}
+.refs li::before{counter-increment:ref;content:"["counter(ref)"]";position:absolute;left:0;top:0;font-family:var(--font-mono);font-size:16px;color:var(--accent);font-weight:600;}
+.refs li em,.refs li .jrnl{font-style:italic;color:var(--ink);}
+.refs--plain li::before{content:"";}
+.refs--plain li{padding-left:30px;text-indent:-30px;}
+.refs--dim li{color:var(--ink-4);}
+
+/* —— helpers —— */
+.callout{border-left:3px solid var(--accent);padding:18px 26px;background:var(--accent-soft);font-family:var(--font-sans);font-size:22px;line-height:1.6;color:var(--ink-2);border-radius:0 3px 3px 0;}
+.note-box{margin-top:24px;padding:20px 28px;background:var(--paper-soft);border-left:3px solid var(--gold);font-family:var(--font-sans);font-size:22px;line-height:1.6;color:var(--ink-2);border-radius:0 3px 3px 0;}
+.row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:34px;}.mt-l{margin-top:54px;}
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__brand">学术汇报</div>
+  <div class="topbar__sub">academic skin</div>
+  <div class="topbar__spacer"></div>
+  <span class="topbar__info">当前 <strong id="curSeg">段 0</strong> · <strong id="curIdx">1</strong> / <strong id="totalIdx">0</strong></span>
+  <button class="topbar__btn" id="prevBtn" title="上一页 ←">←</button>
+  <button class="topbar__btn" id="nextBtn" title="下一页 →">→</button>
+  <button class="topbar__btn topbar__btn--primary" id="playBtn" title="全屏播放（F 或 Enter）">▶ 全屏播放</button>
+  <button class="topbar__btn topbar__btn--presenter" id="presenterBtn" title="演讲者模式 · 副屏同步讲稿">🖥 演讲者</button>
+</header>
+
+<nav class="segnav" id="segnav"></nav>
+<div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
+<div class="hint">F 全屏播放 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
+
+<div class="deck" id="deck">
+
+<!-- ① 封面 cover -->
+<section data-seg="0" data-segname="段 0 · 引言" class="slide cover">
+  <div class="cover__top">
+    <div class="cover__brand">学术汇报</div>
+    <div class="cover__seal">Working Paper</div>
+  </div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">Consumer Behavior · HCI</div>
+    <h1 class="cover__title">沉浸何以转化为<em>拥有</em><br>VR 购物中的心理所有权路径</h1>
+    <p class="cover__sub">When Immersion Becomes Ownership: A Psychological-Ownership Account of Purchase Intention in VR Retail</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Author</span><span class="cover__meta-v">周立影</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Affiliation</span><span class="cover__meta-v">贵州财经大学</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Venue</span><span class="cover__meta-v">2026 消费者行为研讨会</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Date</span><span class="cover__meta-v">2026.06</span></div>
+  </div>
+</section>
+
+<!-- ② 提纲 outline -->
+<section data-seg="0" data-segname="段 0 · 引言" data-title="研究提纲" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">Outline · 研究提纲</div>
+    <h2 class="title head__title">今天分四步讲</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets bullets--lead">
+      <li><b>研究问题</b>　VR 的"沉浸感"为何、又如何提升购买意愿？现有解释为何不够。</li>
+      <li><b>理论框架</b>　提出"沉浸 → 心理所有权 → 购买意愿"的中介路径，并引入边界条件。</li>
+      <li><b>方法与结果</b>　2 组实验（N = 412）+ 中介与调节检验。</li>
+      <li><b>讨论与贡献</b>　对沉浸技术营销与心理所有权理论的双重启示。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ③ 段分隔 secdiv -->
+<section data-seg="1" data-segname="段 1 · 理论框架" class="slide secdiv">
+  <div class="secdiv__num">Part I</div>
+  <div class="secdiv__eyebrow">Theoretical Framework</div>
+  <h2 class="secdiv__title">从"看得真"<br>到"像是<em>我的</em>"</h2>
+  <p class="secdiv__lead">沉浸感提升的不只是体验逼真度——它可能改变人对虚拟物的<em>归属感知</em>。我们把这条路径讲清楚。</p>
+</section>
+
+<!-- ④ 研究问题 / gap（bullets）-->
+<section data-seg="1" data-segname="段 1 · 理论框架" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.1　Research Gap</div>
+    <h2 class="title head__title">已有解释缺了一环</h2>
+    <p class="head__sub">沉浸感—购买意愿的正向关系已被反复验证，但<em>中介机制</em>仍不清楚。</p>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets">
+      <li>多数研究停在"沉浸感→态度/意愿"的<b>直接效应</b>，把中间的心理过程当黑箱 <span class="cite">(Pizzi et al., 2019)</span>。</li>
+      <li>流体验（flow）解释了"投入"，却不解释为何用户对虚拟物产生<b>占有欲</b> <span class="cite">(Hoffman &amp; Novak, 1996)</span>。</li>
+      <li>心理所有权理论指出：<em>控制感、自我投入、深度了解</em>三条途径可催生"它是我的" <span class="cite">(Pierce et al., 2003)</span>——而 VR 恰好放大这三者。</li>
+      <li>本研究主张：<b>心理所有权</b>是连接沉浸感与购买意愿的<em>关键中介</em>。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ⑤ 概念模型图 figure（内联 SVG）-->
+<section data-seg="1" data-segname="段 1 · 理论框架" data-title="概念模型" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.2　Conceptual Model</div>
+    <h2 class="title head__title">一条中介 + 一个边界</h2>
+  </div>
+  <div class="fill">
+    <div class="figure">
+      <div class="figure__frame">
+        <svg viewBox="0 0 1400 540" xmlns="http://www.w3.org/2000/svg" font-family="'Source Sans 3','Noto Sans SC',sans-serif">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#27406B"/>
+            </marker>
+            <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#9A6E2E"/>
+            </marker>
+          </defs>
+          <!-- nodes -->
+          <rect class="node" x="60" y="230" width="320" height="120" rx="4"/>
+          <text x="220" y="280" text-anchor="middle" fill="#1C2024" font-size="34" font-weight="600">VR 沉浸感</text>
+          <text x="220" y="316" text-anchor="middle" fill="#5E6670" font-size="22">Immersion (X)</text>
+
+          <rect class="node" x="540" y="60" width="320" height="120" rx="4"/>
+          <text x="700" y="110" text-anchor="middle" fill="#1C2024" font-size="34" font-weight="600">心理所有权</text>
+          <text x="700" y="146" text-anchor="middle" fill="#5E6670" font-size="22">Psych. Ownership (M)</text>
+
+          <rect class="node" x="1020" y="230" width="320" height="120" rx="4"/>
+          <text x="1180" y="280" text-anchor="middle" fill="#1C2024" font-size="34" font-weight="600">购买意愿</text>
+          <text x="1180" y="316" text-anchor="middle" fill="#5E6670" font-size="22">Purchase Intention (Y)</text>
+
+          <rect x="540" y="400" width="320" height="104" rx="4" fill="#F1EEE6" stroke="#9A6E2E" stroke-width="2"/>
+          <text x="700" y="445" text-anchor="middle" fill="#1C2024" font-size="28" font-weight="600">产品触觉重要性</text>
+          <text x="700" y="478" text-anchor="middle" fill="#5E6670" font-size="20">Need for Touch (W)</text>
+
+          <!-- paths -->
+          <path class="path-arrow" d="M300,235 C400,150 470,135 540,128" marker-end="url(#arr)"/>
+          <text x="395" y="150" fill="#27406B" font-size="24" font-style="italic">a</text>
+
+          <path class="path-arrow" d="M860,128 C940,135 1010,150 1100,232" marker-end="url(#arr)"/>
+          <text x="985" y="150" fill="#27406B" font-size="24" font-style="italic">b</text>
+
+          <path class="path-dash" d="M380,300 L1020,300" marker-end="url(#arr)"/>
+          <text x="700" y="290" text-anchor="middle" fill="#5E6670" font-size="22" font-style="italic">c′ (直接效应)</text>
+
+          <path class="path-dash" d="M700,400 L700,300" marker-end="url(#arrG)"/>
+          <text x="730" y="360" fill="#9A6E2E" font-size="22" font-style="italic">调节 b 路径</text>
+        </svg>
+      </div>
+      <div class="figure__cap"><b>图 1</b>沉浸感经由心理所有权影响购买意愿的有调节中介模型。实线为假设的中介路径（a、b），虚线为直接效应（c′）；产品触觉重要性调节 b 路径。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑥ 假设 numlist -->
+<section data-seg="1" data-segname="段 1 · 理论框架" data-title="研究假设" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.3　Hypotheses</div>
+    <h2 class="title head__title">四条可检验的假设</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="numlist numlist--lg">
+      <div class="numitem"><div class="numitem__n">H1</div><div class="numitem__main"><div class="numitem__title">沉浸感正向影响购买意愿。</div><div class="numitem__desc">复制既有发现，作为基线。</div></div><div class="numitem__tag">直接效应</div></div>
+      <div class="numitem numitem--accent"><div class="numitem__n">H2</div><div class="numitem__main"><div class="numitem__title">心理所有权中介上述关系。</div><div class="numitem__desc">沉浸 → 所有权 → 意愿（a×b 显著）。</div></div><div class="numitem__tag">核心 · 中介</div></div>
+      <div class="numitem"><div class="numitem__n">H3</div><div class="numitem__main"><div class="numitem__title">产品触觉重要性调节 b 路径。</div><div class="numitem__desc">高触觉需求者，所有权→意愿更强。</div></div><div class="numitem__tag">调节</div></div>
+      <div class="numitem"><div class="numitem__n">H4</div><div class="numitem__main"><div class="numitem__title">合并为有调节的中介。</div><div class="numitem__desc">间接效应随 W 增强（index of moderated mediation）。</div></div><div class="numitem__tag">整合</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑦ 段分隔 -->
+<section data-seg="2" data-segname="段 2 · 方法与结果" class="slide secdiv secdiv--dark">
+  <div class="secdiv__num">Part II</div>
+  <div class="secdiv__eyebrow">Method &amp; Results</div>
+  <h2 class="secdiv__title">两组实验<br>把路径<em>测出来</em></h2>
+  <p class="secdiv__lead">实验 1 建立中介，实验 2 加入调节并复制。预注册于 OSF。</p>
+</section>
+
+<!-- ⑧ 表格 table（booktabs）-->
+<section data-seg="2" data-segname="段 2 · 方法与结果" data-title="实验设计" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.1　Design &amp; Samples</div>
+    <h2 class="title head__title">两组实验概览</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="table-cap"><b>表 1</b>实验设计、样本与操纵方式</div>
+    <table class="table">
+      <thead><tr><th>实验</th><th>设计</th><th class="num">N</th><th>沉浸感操纵</th><th>关键测量</th></tr></thead>
+      <tbody>
+        <tr><td>实验 1</td><td>单因素两水平（高/低沉浸）</td><td class="num">196</td><td>VR 头显 vs. 平面网页</td><td>心理所有权、购买意愿</td></tr>
+        <tr class="hl"><td>实验 2</td><td>2（沉浸）×连续（触觉需求）</td><td class="num">216</td><td>VR 头显 vs. 360° 视频</td><td>+ Need for Touch（NFT 量表）</td></tr>
+        <tr><td>合计</td><td>2 项 · 预注册</td><td class="num">412</td><td>—</td><td>含注意力检验、操纵检验</td></tr>
+      </tbody>
+    </table>
+    <div class="note-box">操纵检验：高沉浸组的临场感显著高于对照组（实验 1：<span class="num">M</span> = 5.42 vs. 3.18，<em>p</em> &lt; .001）。</div>
+  </div>
+</section>
+
+<!-- ⑨ 关键结果 bignum -->
+<section data-seg="2" data-segname="段 2 · 方法与结果" data-title="关键结果" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.2　Key Results</div>
+    <h2 class="title head__title">中介成立，且被调节</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="row" style="gap:28px;width:100%;">
+      <div class="bignum" style="flex:1;"><div class="bignum__v">.34</div><div class="bignum__u">间接效应 a×b<br>95% CI [.19, .51]</div><div class="bignum__k">Bootstrap 5000 · 实验 1</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">.28</div><div class="bignum__u">有调节中介指数<br>index of mod. med.</div><div class="bignum__k">CI [.11, .47] · 实验 2</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">62%</div><div class="bignum__u">总效应中<br>经由所有权传导</div><div class="bignum__k">P<sub>M</sub> = 间接 / 总</div></div>
+    </div>
+    <div class="callout mt-m">直接效应 c′ 在控制中介后明显减弱但仍显著 → <em>部分中介</em>；高触觉需求者的间接效应约为低需求者的两倍。</div>
+  </div>
+</section>
+
+<!-- ⑩ 段分隔 + 讨论 -->
+<section data-seg="3" data-segname="段 3 · 讨论" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part III</div>
+  <div class="secdiv__eyebrow">Discussion</div>
+  <h2 class="secdiv__title">沉浸的意义<br>是<em>占有</em></h2>
+  <p class="secdiv__lead">理论与实践的双重启示，以及边界与未来方向。</p>
+</section>
+
+<!-- ⑪ 贡献 cards -->
+<section data-seg="3" data-segname="段 3 · 讨论" data-title="理论贡献" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§3.1　Contributions</div>
+    <h2 class="title head__title">三点贡献</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--3">
+      <div class="card card--v"><div class="card__eyebrow">理论</div><div class="card__title">打开中介黑箱</div><div class="card__desc">把心理所有权确立为沉浸—意愿关系的核心机制，超越"流体验"解释。</div><div class="card__meta">机制</div></div>
+      <div class="card card--n"><div class="card__eyebrow">边界</div><div class="card__title">识别个体差异</div><div class="card__desc">触觉需求决定虚拟所有权能否转化为购买，回应"对谁更有效"。</div><div class="card__meta">调节</div></div>
+      <div class="card card--g"><div class="card__eyebrow">实践</div><div class="card__title">设计可操作</div><div class="card__desc">提升控制感与自我投入的交互（试穿、定制、把玩）应被优先设计。</div><div class="card__meta">营销</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑫ 核心论断 insight -->
+<section data-seg="3" data-segname="段 3 · 讨论" class="slide insight">
+  <div class="insight__eyebrow">Take-home Message</div>
+  <h2 class="insight__statement">让用户在虚拟里<em>拥有</em>，<br>他才会在现实里买单。</h2>
+  <p class="insight__sub">沉浸技术的营销价值，最终兑现于心理所有权。</p>
+</section>
+
+<!-- ⑬ 参考文献 refs -->
+<section data-seg="3" data-segname="段 3 · 讨论" data-title="参考文献" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">References · 示例文献 · 仅供版式参照</div>
+    <h2 class="title head__title" style="font-size:46px;">参考文献</h2>
+  </div>
+  <div class="fill">
+    <ol class="refs">
+      <li>Hoffman, D. L., &amp; Novak, T. P. (1996). Marketing in hypermedia computer-mediated environments. <em>Journal of Marketing</em>, 60(3), 50–68.</li>
+      <li>Longoni, C., Bonezzi, A., &amp; Morewedge, C. K. (2019). Resistance to medical artificial intelligence. <em>Journal of Consumer Research</em>, 46(4), 629–650.</li>
+      <li>Peck, J., &amp; Shu, S. B. (2009). The effect of mere touch on perceived ownership. <em>Journal of Consumer Research</em>, 36(3), 434–447.</li>
+      <li>Pierce, J. L., Kostova, T., &amp; Dirks, K. T. (2003). The state of psychological ownership. <em>Review of General Psychology</em>, 7(1), 84–107.</li>
+      <li>Pizzi, G., Scarpi, D., Pichierri, M., &amp; Vannucci, V. (2019). Virtual reality, real reactions? <em>Journal of Retailing and Consumer Services</em>, 51, 1–9.</li>
+      <li style="color:var(--ink-4);">周立影 等（进行中）. VR 沉浸感与心理所有权. 自有研究，数据收集中——此处仅示意版式。</li>
+    </ol>
+  </div>
+</section>
+
+
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   自配置引擎 · 与风格无关 · 所有皮肤共用 · 不用改这里
+   它会：① 从各 slide 的 data-seg 自动建段导航 + 缩略图 + 计数
+        ② 自动注入页脚 chrome（段名 + 页码）
+        ③ 自动取每张标题给副屏用
+        ④ 翻页广播给"演讲者模式.html"（配 slides-presenter-mode skill）
+   皮肤只通过 CSS（:root 令牌 + 组件样式）改外观，引擎逻辑不变。
+   ════════════════════════════════════════════════════════════════════ */
+(function () {
+  /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
+  const CONFIG = { channel: 'academic-demo', presenterFile: '演讲者模式.html' };
+
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll(':scope > .slide'));
+  const total = slides.length;
+  const body = document.body;
+  const segOf = s => parseInt(s.dataset.seg || '0', 10);
+
+  // —— 段名 / 计数 / 起始索引（全自动）——
+  const segName = [], segCount = [];
+  slides.forEach(s => {
+    const g = segOf(s);
+    if (segName[g] === undefined) segName[g] = s.dataset.segname || ('段 ' + g);
+    segCount[g] = (segCount[g] || 0) + 1;
+  });
+  const segShort = segName.map((n, g) => (n || ('段 ' + g)).replace(/^段\s*\d+\s*·?\s*/, '') || ('段 ' + g));
+  const segStarts = []; let _acc = 0; segCount.forEach((c, i) => { segStarts[i] = _acc; _acc += (c || 0); });
+
+  // —— 包 wrap + 注入 chrome 页脚 ——
+  slides.forEach((s, i) => {
+    s.dataset.globalIdx = i;
+    const wrap = document.createElement('div'); wrap.className = 'slide-wrap';
+    s.parentNode.insertBefore(wrap, s); wrap.appendChild(s);
+    if (!s.querySelector('.chrome')) {
+      const g = segOf(s);
+      const div = document.createElement('div'); div.className = 'chrome';
+      div.innerHTML = `<div class="chrome__l"><span class="chrome__seg">${s.dataset.segname || segName[g]}</span></div>`
+        + `<div class="chrome__r">${String(i + 1).padStart(3, '0')} / ${String(total).padStart(3, '0')}</div>`;
+      s.appendChild(div);
+    }
+  });
+
+  // —— 自动建段导航 ——
+  const segnav = document.getElementById('segnav');
+  segCount.forEach((c, g) => {
+    const seg = document.createElement('div'); seg.className = 'segnav__seg'; seg.dataset.seg = g;
+    seg.innerHTML = `<button class="segnav__head" type="button">`
+      + `<span class="segnav__head-id">段 ${g}</span>`
+      + `<span class="segnav__head-name">${segShort[g]}</span>`
+      + `<span class="segnav__head-meta">${c} 张</span>`
+      + `<span class="segnav__head-arrow">▸</span></button>`
+      + `<div class="segnav__thumbs" data-seg-thumbs="${g}"></div>`;
+    segnav.appendChild(seg);
+  });
+
+  // —— 缩略图（克隆 slide）——
+  slides.forEach((s, i) => {
+    const container = document.querySelector(`[data-seg-thumbs="${segOf(s)}"]`);
+    if (!container) return;
+    const thumb = document.createElement('div'); thumb.className = 'thumb'; thumb.dataset.idx = i;
+    const inner = s.cloneNode(true); inner.classList.add('thumb__inner'); inner.classList.remove('active');
+    const ch = inner.querySelector('.chrome'); if (ch) ch.remove();
+    thumb.appendChild(inner);
+    const num = document.createElement('div'); num.className = 'thumb__num'; num.textContent = (i + 1);
+    thumb.appendChild(num);
+    thumb.addEventListener('click', e => { e.stopPropagation(); setActive(i); });
+    container.appendChild(thumb);
+  });
+
+  // —— 段导航折叠 ——
+  document.querySelectorAll('.segnav__head').forEach(btn =>
+    btn.addEventListener('click', () => btn.closest('.segnav__seg').classList.toggle('segnav__seg--expanded')));
+  const firstSeg = document.querySelector('.segnav__seg'); if (firstSeg) firstSeg.classList.add('segnav__seg--expanded');
+
+  // —— 副屏标题（自动取标题文本，可被 data-title 覆盖）——
+  function deriveTitle(s) {
+    if (s.dataset.title) return s.dataset.title;
+    const el = s.querySelector('.cover__title,.secdiv__title,.manifesto__title,.insight__statement,.bigq__t,.head__title,.title,h1,h2,h3');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : ('slide ' + (slides.indexOf(s) + 1));
+  }
+  const SLIDE_TITLES = slides.map(deriveTitle);
+  // 副屏锚点：优先用全局 window.SLIDE_MAP（slides-presenter-mode 注入），否则自动 s{seg}-{段内序号}
+  const segRun = [];
+  const SLIDE_MAP = (window.SLIDE_MAP && window.SLIDE_MAP.length === total) ? window.SLIDE_MAP
+    : slides.map(s => { const g = segOf(s); segRun[g] = (segRun[g] || 0) + 1; return `s${g}-${segRun[g]}`; });
+
+  // —— 状态 + UI ——
+  const curSegEl = document.getElementById('curSeg'), curIdxEl = document.getElementById('curIdx'),
+        totalIdxEl = document.getElementById('totalIdx'), progressBar = document.getElementById('progressBar');
+  totalIdxEl.textContent = total;
+  let idx = 0, present = false;
+
+  // —— 演讲者模式广播（BroadcastChannel + localStorage 双通道）——
+  let channel = null; try { channel = new BroadcastChannel(CONFIG.channel); } catch (e) {}
+  let presenterWindow = null;
+  function broadcastPresenter(i) {
+    const p = { slideIdx: i, total, segment: segOf(slides[i]), anchor: SLIDE_MAP[i] || ('s0-1'),
+      title: SLIDE_TITLES[i] || '', prevTitle: i > 0 ? SLIDE_TITLES[i - 1] : '',
+      nextTitle: i < total - 1 ? SLIDE_TITLES[i + 1] : '', ts: Date.now(), source: 'slides' };
+    if (channel) { try { channel.postMessage(p); } catch (e) {} }
+    try { localStorage.setItem(CONFIG.channel + '-state', JSON.stringify(p)); } catch (e) {}
+  }
+  function handleReverseJump(p) {
+    if (!p || p.type !== 'jump-to-slide' || p.source !== 'presenter' || typeof p.slideIdx !== 'number') return;
+    const t = Math.max(0, Math.min(total - 1, p.slideIdx)); if (t !== idx) setActive(t);
+  }
+  if (channel) { channel.onmessage = e => { if (e && e.data && e.data.type === 'jump-to-slide') handleReverseJump(e.data); }; }
+  window.addEventListener('storage', e => { if (e.key === CONFIG.channel + '-jump' && e.newValue) { try { handleReverseJump(JSON.parse(e.newValue)); } catch (x) {} } });
+  function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); broadcastPresenter(idx); return; }
+    presenterWindow = window.open(CONFIG.presenterFile, 'presenter', 'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no');
+    if (!presenterWindow) { alert('副屏窗口被阻止 · 请允许弹窗后再试。\n（演讲者模式需先用 slides-presenter-mode skill 生成 ' + CONFIG.presenterFile + '）'); return; }
+    document.getElementById('presenterBtn').classList.add('active');
+    setTimeout(() => broadcastPresenter(idx), 400); setTimeout(() => broadcastPresenter(idx), 1200);
+    const t = setInterval(() => { if (!presenterWindow || presenterWindow.closed) { clearInterval(t); document.getElementById('presenterBtn').classList.remove('active'); presenterWindow = null; } }, 1000);
+  }
+
+  // —— 核心导航 ——
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    if (present) {
+      const sc = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 0.98;
+      slides[idx].style.setProperty('--sc', sc);
+    } else {
+      const wrap = slides[idx].parentNode; if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    updateUI(); broadcastPresenter(idx);
+  }
+  function updateUI() {
+    const g = segOf(slides[idx]);
+    curSegEl.textContent = '段 ' + g; curIdxEl.textContent = idx + 1;
+    progressBar.style.width = ((idx + 1) / total * 100).toFixed(2) + '%';
+    document.querySelectorAll('.segnav__seg').forEach(segEl => {
+      const cur = +segEl.dataset.seg === g;
+      segEl.classList.toggle('segnav__seg--current', cur); if (cur) segEl.classList.add('segnav__seg--expanded');
+    });
+    document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('thumb--active', +t.dataset.idx === idx));
+    const at = document.querySelector('.thumb--active');
+    if (at) { const nr = segnav.getBoundingClientRect(), tr = at.getBoundingClientRect();
+      if (tr.top < nr.top + 60 || tr.bottom > nr.bottom - 20) at.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
+  function next() { setActive(idx + 1); } function prev() { setActive(idx - 1); }
+  function goSeg(n) { setActive(segStarts[n] || 0); }
+
+  function togglePresent() {
+    present = !present; body.classList.toggle('present', present);
+    if (present) setActive(idx);
+    else { slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+      setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); }
+  }
+  function enterFullscreen() {
+    const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) req.call(el).then(() => { if (!present) togglePresent(); body.classList.add('fullscreen'); }).catch(() => { if (!present) togglePresent(); });
+    else if (!present) togglePresent();
+  }
+  function exitFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen; if (ex) ex.call(document);
+    }
+    body.classList.remove('fullscreen'); if (present) togglePresent();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) { body.classList.remove('fullscreen');
+      if (present) { present = false; body.classList.remove('present');
+        slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+        setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); } }
+  });
+
+  // —— 键盘 ——
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea, select')) return;
+    const k = e.key;
+    if (k === 'f' || k === 'F' || k === 'Enter') { (document.fullscreenElement || body.classList.contains('present')) ? exitFullscreen() : enterFullscreen(); e.preventDefault(); return; }
+    if (k === 'p' || k === 'P') { togglePresent(); e.preventDefault(); return; }
+    if (k === 's' || k === 'S') { if (!e.ctrlKey && !e.metaKey) { openPresenter(); e.preventDefault(); } return; }
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown') { next(); e.preventDefault(); return; }
+    if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') { prev(); e.preventDefault(); return; }
+    if (k === 'Escape') { if (document.fullscreenElement || body.classList.contains('present')) { exitFullscreen(); e.preventDefault(); } return; }
+    if (k === 'Home') { setActive(0); e.preventDefault(); return; }
+    if (k === 'End') { setActive(total - 1); e.preventDefault(); return; }
+    if (k >= '1' && k <= '9') { const n = +k - 1; if (n < segCount.length) { goSeg(n); e.preventDefault(); } return; }
+  });
+  // —— 投屏态点击翻页 ——
+  document.addEventListener('click', e => {
+    if (!present) return; if (e.target.closest('a, button, input, select, .topbar, .segnav')) return;
+    (e.clientX > window.innerWidth * 0.6) ? next() : (e.clientX < window.innerWidth * 0.4 ? prev() : 0);
+  });
+  document.getElementById('prevBtn').addEventListener('click', prev);
+  document.getElementById('nextBtn').addEventListener('click', next);
+  document.getElementById('playBtn').addEventListener('click', enterFullscreen);
+  document.getElementById('presenterBtn').addEventListener('click', openPresenter);
+
+  // —— 编辑态自适应缩放 + 滚动跟随 ——
+  function updateFitScale() {
+    const availW = window.innerWidth - 300 - 60, availH = window.innerHeight - 100;
+    const scale = Math.max(0.25, Math.min(0.7, availW / 1920, availH / 1080));
+    document.documentElement.style.setProperty('--fit-scale', scale.toFixed(4));
+  }
+  updateFitScale();
+  window.addEventListener('resize', () => { updateFitScale(); if (present) setActive(idx); });
+  let st = null;
+  window.addEventListener('scroll', () => {
+    if (present) return; if (st) clearTimeout(st);
+    st = setTimeout(() => {
+      const vc = window.scrollY + window.innerHeight / 2; let best = 0, bd = Infinity;
+      slides.forEach((s, i) => { const w = s.parentNode; if (!w) return; const r = w.getBoundingClientRect();
+        const c = r.top + window.scrollY + r.height / 2, d = Math.abs(c - vc); if (d < bd) { bd = d; best = i; } });
+      if (best !== idx) { idx = best; updateUI(); }
+    }, 100);
+  });
+
+  updateUI();
+  // 暴露给 slides-presenter-mode / 控制台调试
+  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
+})();
+
+</script>
+</body>
+</html>

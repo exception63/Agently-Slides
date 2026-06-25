@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>暗色学术 · vellum 样板</title>
+<!-- 在线时加载该皮肤的字体；离线时自动回退到系统字体（字体栈已含 fallback） -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&family=Courier+Prime:wght@400;700&family=Noto+Serif+SC:wght@400;500;600&family=Noto+Sans+SC:wght@400;500&display=swap">
+<style>
+/* skin: vellum · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
+/* ════════════════════════════════════════════════════════════════════
+   _core.css · 与风格无关的骨架 + 引擎界面（topbar / 段导航 / 进度条 / 投屏态）
+   所有皮肤共用。它只用令牌，不定义令牌——令牌由各皮肤的 :root 提供：
+     必需：--paper --ink --accent --accent-2 --accent-soft --rule
+          --pad-x --pad-y --font-sans --font-display --font-mono --fit-scale
+   引擎周边的工具 UI（顶栏/侧栏）固定深色，只有强调色（进度条/当前态/缩略框）
+   跟随皮肤的 --accent，使工具一致、内容随皮变化。
+   ════════════════════════════════════════════════════════════════════ */
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:#2a2a2a;font-family:var(--font-sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+body{padding-left:0;padding-top:60px;transition:padding 0.2s;}
+.deck{display:flex;flex-direction:column;gap:32px;padding:32px 24px 60px 320px;align-items:center;}
+.slide-wrap{width:calc(1920px * var(--fit-scale));height:calc(1080px * var(--fit-scale));position:relative;flex-shrink:0;}
+.slide{width:1920px;height:1080px;background:var(--paper);color:var(--ink);padding:var(--pad-y) var(--pad-x);position:absolute;top:0;left:0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,0.4);transform:scale(var(--fit-scale));transform-origin:top left;}
+
+/* ============================ 顶部控制条 ============================ */
+.topbar{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(20,23,31,0.96);color:#F2EDE2;display:flex;align-items:center;gap:16px;padding:0 24px;z-index:1000;backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.08);}
+.topbar__brand{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:0.02em;color:#F2EDE2;}
+.topbar__sub{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;color:rgba(242,237,226,0.5);text-transform:uppercase;}
+.topbar__spacer{flex:1;}
+.topbar__btn{background:transparent;color:#F2EDE2;border:1px solid rgba(242,237,226,0.3);padding:7px 16px;border-radius:4px;font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;font-weight:500;}
+.topbar__btn:hover{background:rgba(242,237,226,0.1);border-color:rgba(242,237,226,0.6);}
+.topbar__btn--primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.topbar__btn--primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
+.topbar__btn--presenter{background:#2A2A2A;border-color:#2A2A2A;color:#F5E3B0;}
+.topbar__btn--presenter:hover{background:#3a3a3a;border-color:#B58530;color:#F5E3B0;}
+.topbar__btn--presenter.active{background:#B58530;border-color:#B58530;color:#fff;box-shadow:0 0 0 2px rgba(181,133,48,0.3);}
+.topbar__info{font-family:var(--font-mono);font-size:12px;color:rgba(242,237,226,0.7);letter-spacing:0.08em;}
+.topbar__info strong{color:#F2EDE2;font-weight:600;}
+
+/* ============================ 折叠式段导航 + 缩略图 ============================ */
+.segnav{position:fixed;left:0;top:60px;bottom:0;width:300px;background:rgba(20,23,31,0.94);border-right:1px solid rgba(255,255,255,0.08);z-index:999;overflow-y:auto;backdrop-filter:blur(8px);}
+.segnav::-webkit-scrollbar{width:6px;}
+.segnav::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);}
+.segnav::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+.segnav__seg{border-bottom:1px solid rgba(255,255,255,0.06);}
+.segnav__head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:transparent;border:0;color:rgba(242,237,226,0.78);width:100%;cursor:pointer;text-align:left;font-family:var(--font-sans);transition:background 0.15s;}
+.segnav__head:hover{background:rgba(255,255,255,0.04);color:#F2EDE2;}
+.segnav__seg--current > .segnav__head{background:var(--accent-soft);color:#F2EDE2;}
+.segnav__head-id{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--accent-ui,#C2A06B);text-transform:uppercase;font-weight:600;width:42px;flex-shrink:0;}
+.segnav__head-name{flex:1;font-size:13px;font-weight:500;line-height:1.3;}
+.segnav__head-meta{font-family:var(--font-mono);font-size:10px;color:rgba(242,237,226,0.4);letter-spacing:0.1em;}
+.segnav__head-arrow{font-size:10px;color:rgba(242,237,226,0.4);transition:transform 0.2s;flex-shrink:0;width:12px;text-align:center;}
+.segnav__seg--expanded .segnav__head-arrow{transform:rotate(90deg);}
+.segnav__thumbs{display:none;padding:8px 12px 14px;grid-template-columns:1fr 1fr;gap:8px;}
+.segnav__seg--expanded .segnav__thumbs{display:grid;}
+.thumb{width:126px;height:71px;background:var(--paper);cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden;transition:border-color 0.15s;flex-shrink:0;}
+.thumb:hover{border-color:var(--accent);}
+.thumb--active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
+.thumb__inner{width:1920px !important;height:1080px !important;transform:scale(0.0656) !important;transform-origin:top left !important;position:absolute !important;top:0 !important;left:0 !important;box-shadow:none !important;pointer-events:none !important;}
+/* 编号徽标固定深字 + 白底——所有皮通用（深色皮的 --ink 是浅色，不能用 var(--ink)，否则白底白字看不清）*/
+.thumb__num{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;color:#16181E;background:rgba(255,255,255,0.85);padding:1px 5px;border-radius:2px;z-index:2;font-weight:600;}
+
+/* —— 进度条 / 提示 —— */
+.progress{position:fixed;top:60px;left:300px;right:0;height:3px;background:rgba(255,255,255,0.08);z-index:998;}
+.progress__bar{height:100%;background:var(--accent);transition:width 0.2s;}
+.hint{position:fixed;bottom:16px;right:20px;font-family:var(--font-mono);font-size:11px;color:#888;pointer-events:none;z-index:1000;letter-spacing:0.1em;}
+body.present .hint,body:fullscreen .hint{color:rgba(255,255,255,0.3);}
+
+/* ============================ 投屏 / 全屏模式 ============================ */
+body.present{background:#000;padding:0;}
+body.present .topbar,body.present .segnav,body.present .progress{display:none;}
+body.present .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+body.present .slide-wrap{width:auto;height:auto;position:static;flex-shrink:0;}
+body.present .slide{display:none;position:static;transform:scale(var(--sc,1));transform-origin:center center;box-shadow:none;}
+body.present .slide.active{display:flex;}
+body.fullscreen{background:#000;}
+:fullscreen{background:#000;}
+:fullscreen .topbar,:fullscreen .segnav,:fullscreen .progress{display:none;}
+:fullscreen .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+:fullscreen .slide{box-shadow:none;}
+
+
+/* —— 皮肤 vellum —— */
+/* FONTS https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&family=Courier+Prime:wght@400;700&family=Noto+Serif+SC:wght@400;500;600&family=Noto+Sans+SC:wght@400;500&display=swap */
+/* skin: vellum · ported from beautiful-html-templates/vellum (MIT · © 2026 Zara Zhang) · 深色文艺学术/羊皮手稿 */
+/* ════════════════════════════════════════════════════════════════════
+   skin: vellum · 深色文艺学术风（深夜书房 · 羊皮手稿 · 思想史讲座）
+   DNA：scheme dark · formality high · density low ·
+        mood scholarly / literary / considered / quiet / intellectual。
+   气质：深靛蓝底（羊皮纸的"夜"）+ 暖金/羊皮色文字 + 衬线大标题（灵魂）·
+        极大留白 · 单一克制强调（青墨 teal 做线条/数字/眉标，亮金做 em 点睛）·
+        em = 文艺学术的强调（Cormorant 斜体 + 亮金）。
+   配色角色（依据 vellum/template.html 的 :root）：
+     --c-bg #2a3870（靛蓝底）→ --paper
+     --c-bg-alt #343f80（抬升面板）→ --paper-soft
+     --c-fg #E8D85C（羊皮金 · 全篇正文与标题主色）→ --ink
+     --c-accent #3a7878（青墨 teal · 引号/线条/眉标/数字的那个强调）→ --accent
+     --c-emphasis #F5E168（更亮的金 · <em> 点睛）→ em / --gold
+   深色皮坑：所有卡片/面板/secdiv/insight 底色用 --paper-soft 深面板，
+            文字用亮的 --ink（羊皮金），杜绝浅底浅字 / 深底深字。
+   换强调色 → 只改 :root 的 --accent / --accent-2 / --accent-soft。
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* —— 配色（靛蓝底 + 羊皮金字 + 青墨强调 · 改强调色只改 --accent 几个）—— */
+  --paper:#2A3870;--paper-soft:#343F80;--paper-warm:#3B468C;       /* slide 底 + 抬升面板 */
+  --rule:rgba(232,216,92,0.20);--rule-soft:rgba(232,216,92,0.12);--rule-strong:rgba(232,216,92,0.34);
+  --ink:#E8D85C;--ink-2:rgba(232,216,92,0.78);--ink-3:rgba(232,216,92,0.55);--ink-4:rgba(232,216,92,0.36);
+  --accent:#6FB6B6;--accent-2:#3A7878;--accent-soft:rgba(111,182,182,0.14);--accent-ui:#6FB6B6;
+  --navy:#9FB6E8;--gold:#F5E168;--green:#8FC9A6;                   /* 卡片/层级的稀用第二三色 */
+  --good:#8FC9A6;--warn:#F5E168;--bad:#E89C8C;
+  --night:#1F2858;--night-2:#222C66;--night-paper:#E8D85C;         /* terminal / compare 更深的靛 */
+  /* —— 字号阶梯（low density：大字 · 衬线标题 · 少而舒展）—— */
+  --t-display:160px;--t-h1:104px;--t-h2:72px;--t-h3:50px;--t-h4:38px;
+  --t-lead:36px;--t-body:31px;--t-small:25px;--t-eyebrow:19px;
+  --pad-x:128px;--pad-y:96px;
+  /* 字体栈 · 中文优先 · 衬线大标题（Cormorant Garamond + 思源宋体）· 正文 DM Sans · 引用斜体衬线 */
+  --font-display:"Cormorant Garamond","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --font-serif:"Cormorant Garamond","Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  --font-sans:"DM Sans","Noto Sans SC","Source Han Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:"Courier Prime","IBM Plex Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55;
+}
+
+/* —— 页脚 chrome / 顶部 runner（type-only · 细金发丝线 · 打字机眉标）—— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:44px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:15px;letter-spacing:0.10em;color:var(--ink-4);padding-top:14px;border-top:1px solid var(--rule-soft);}
+.chrome__l{display:flex;gap:26px;align-items:baseline;white-space:nowrap;}
+.chrome__seg{color:var(--ink-3);font-weight:400;}
+.chrome__r{font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:0.06em;}
+.runner{position:absolute;top:58px;left:var(--pad-x);right:var(--pad-x);display:flex;gap:18px;align-items:center;font-family:var(--font-mono);font-size:15px;letter-spacing:0.16em;color:var(--ink-4);text-transform:uppercase;}
+.runner::before{content:"";width:34px;height:1px;background:var(--accent);}
+
+/* —— 通用排版原子 —— */
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-eyebrow);letter-spacing:0.16em;color:var(--accent);text-transform:uppercase;font-weight:400;}
+.title{font-family:var(--font-display);font-weight:500;font-size:var(--t-h2);line-height:1.06;letter-spacing:-0.01em;color:var(--ink);margin:0;}
+.title--xl{font-size:140px;}.title--lg{font-size:104px;}.title--md{font-size:58px;}.title--sm{font-size:44px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.6;color:var(--ink-2);max-width:1500px;margin:0;font-weight:400;}
+.body{font-size:var(--t-body);line-height:1.65;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.6;color:var(--ink-3);}
+.num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
+.mark-v{color:var(--gold);}.mark-n{color:var(--navy);}.mark-g{color:var(--green);}
+.key{color:var(--gold);font-weight:500;font-style:normal;}
+strong{font-weight:500;color:var(--ink);}
+em{font-style:italic;color:var(--gold);font-family:var(--font-serif);}   /* vellum：强调 = Cormorant 斜体亮金，文艺点睛 */
+.cite{font-family:var(--font-mono);font-size:0.62em;letter-spacing:0.02em;color:var(--ink-4);vertical-align:0.12em;white-space:nowrap;font-style:normal;}
+.head{margin-top:8px;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--rule-soft);}
+.head__eyebrow{margin-bottom:16px;}.head__title{margin:0 0 10px;}
+.head__sub{font-family:var(--font-sans);font-size:25px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.5;}
+.fill{flex:1;min-height:0;}
+.center{align-items:center;justify-content:center;text-align:center;}
+.center .lead{margin-left:auto;margin-right:auto;}
+.center .head{border-bottom:0;}
+
+/* —— cover 封面（衬线大标题浮于靛蓝场 · 左下打字机签注感）—— */
+.cover{background:var(--paper);justify-content:space-between;}
+.cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover__brand{font-family:var(--font-mono);font-size:17px;letter-spacing:0.12em;color:var(--ink-3);text-transform:uppercase;}
+.cover__seal{font-family:var(--font-mono);font-size:14px;letter-spacing:0.14em;color:var(--accent);text-transform:uppercase;border:1px solid var(--accent);padding:8px 16px;border-radius:2px;}
+.cover__main{display:flex;flex-direction:column;gap:32px;}
+.cover__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;font-weight:400;}
+.cover__title{font-family:var(--font-display);font-weight:500;font-size:138px;line-height:1.0;letter-spacing:-0.015em;color:var(--ink);margin:0;}
+.cover__title em{color:var(--gold);font-style:italic;}
+.cover__sub{font-family:var(--font-sans);font-size:34px;color:var(--ink-2);max-width:1500px;font-weight:400;line-height:1.5;}
+.cover__meta{display:flex;gap:60px;font-family:var(--font-mono);color:var(--ink-3);padding-top:32px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:8px;}
+.cover__meta-k{color:var(--ink-4);font-size:13px;letter-spacing:0.12em;text-transform:uppercase;}
+.cover__meta-v{color:var(--ink);font-size:21px;font-weight:400;}
+
+/* —— section divider 段分隔（巨型幽灵衬线数字 · 深靛场）—— */
+.secdiv{background:var(--paper);justify-content:flex-end;padding-bottom:140px;}
+.secdiv--dark{background:var(--night);}
+.secdiv--accent,.secdiv--vermilion{background:var(--accent-2);color:var(--ink);}
+.secdiv__num{position:absolute;top:64px;right:var(--pad-x);font-family:var(--font-display);font-weight:500;font-size:480px;font-style:italic;line-height:0.8;letter-spacing:-0.04em;color:var(--ink);opacity:0.07;}
+.secdiv--accent .secdiv__num,.secdiv--vermilion .secdiv__num{color:var(--ink);opacity:0.14;}
+.secdiv__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;margin-bottom:32px;font-weight:400;}
+.secdiv--accent .secdiv__eyebrow,.secdiv--vermilion .secdiv__eyebrow{color:var(--ink-2);}
+.secdiv__title{font-family:var(--font-display);font-weight:500;font-size:128px;line-height:1.02;letter-spacing:-0.015em;color:var(--ink);margin:0 0 34px;max-width:1550px;position:relative;z-index:1;}
+.secdiv__title em{color:var(--gold);font-style:italic;}
+.secdiv--accent .secdiv__title,.secdiv--vermilion .secdiv__title{color:var(--ink);}
+.secdiv--accent .secdiv__title em,.secdiv--vermilion .secdiv__title em{color:var(--gold);}
+.secdiv__lead{font-family:var(--font-sans);font-size:33px;line-height:1.55;color:var(--ink-2);max-width:1450px;margin:0;font-weight:400;position:relative;z-index:1;}
+.secdiv--accent .secdiv__lead,.secdiv--vermilion .secdiv__lead{color:var(--ink-2);}
+.secdiv__meta{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;color:var(--ink-3);text-transform:uppercase;padding-top:28px;margin-top:30px;border-top:1px solid var(--rule);display:flex;gap:40px;}
+
+/* —— manifesto / insight 大字宣言（vellum 招牌：衬线斜体大字论断）—— */
+.manifesto,.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 140px;}
+.manifesto--dark{background:var(--night);}
+.manifesto__eyebrow,.insight__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;margin-bottom:52px;font-weight:400;}
+.manifesto__title,.insight__statement{font-family:var(--font-display);font-weight:500;font-size:118px;line-height:1.1;letter-spacing:-0.015em;color:var(--ink);margin:0;max-width:1700px;}
+.manifesto__title em,.insight__statement em{color:var(--gold);font-style:italic;}
+.manifesto__sub,.insight__sub{font-family:var(--font-sans);font-size:34px;color:var(--ink-3);margin:48px auto 0;max-width:1450px;line-height:1.55;font-weight:400;}
+
+/* —— cards 卡片组（抬升靛面板 + 强调顶边 · 文字亮金）—— */
+.cards{display:grid;gap:26px;grid-template-columns:repeat(3,1fr);}
+.cards--2{grid-template-columns:repeat(2,1fr);}
+.cards--4{grid-template-columns:repeat(4,1fr);}
+.cards--5{grid-template-columns:repeat(5,1fr);}
+.cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{background:var(--paper-soft);padding:32px 30px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--rule-soft);border-top:3px solid var(--accent);border-radius:4px;}
+.card--v{border-top-color:var(--accent);}.card--n{border-top-color:var(--navy);}.card--g{border-top-color:var(--green);}
+.card--plain{background:transparent;border:0;border-top:1px solid var(--rule);border-radius:0;padding:28px 0;}
+.card__eyebrow{font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);font-weight:400;}
+.card__level{font-family:var(--font-display);font-size:58px;font-weight:500;font-style:italic;line-height:0.92;color:var(--gold);letter-spacing:-0.02em;}
+.card--n .card__level{color:var(--navy);}.card--g .card__level{color:var(--green);}
+.card__title{font-family:var(--font-display);font-weight:500;font-size:34px;color:var(--ink);line-height:1.2;margin-top:6px;}
+.card__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.55;}
+.card__meta{font-family:var(--font-mono);font-size:14px;letter-spacing:0.10em;color:var(--ink-4);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule-soft);}
+
+/* —— numlist 编号清单（衬线斜体序号）—— */
+.numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule);}
+.numitem{display:grid;grid-template-columns:80px 1fr auto;align-items:baseline;gap:32px;padding:18px 0;border-bottom:1px solid var(--rule-soft);}
+.numitem--tight{padding:12px 0;}
+.numitem__n{font-family:var(--font-display);font-size:40px;font-weight:500;font-style:italic;color:var(--gold);line-height:1;}
+.numitem__main{display:flex;flex-direction:column;gap:6px;}
+.numitem__title{font-family:var(--font-display);font-weight:500;font-size:33px;color:var(--ink);line-height:1.2;}
+.numitem__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.55;}
+.numitem__tag{font-family:var(--font-mono);font-size:15px;letter-spacing:0.10em;text-transform:uppercase;color:var(--ink-4);padding-top:10px;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--gold);}
+.numlist--lg .numitem{padding:14px 0;gap:24px;grid-template-columns:72px 1fr auto;}
+.numlist--lg .numitem__n{font-size:36px;}.numlist--lg .numitem__title{font-size:27px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.45;}.numlist--lg .numitem__tag{font-size:14px;}
+
+/* —— bullets 论点清单（vellum 学术主力 · ≤6 条 · 舒展）—— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:26px;}
+.bullets > li{font-family:var(--font-sans);font-size:32px;line-height:1.55;color:var(--ink);padding-left:48px;position:relative;}
+.bullets > li::before{content:"";position:absolute;left:4px;top:18px;width:20px;height:2px;background:var(--accent);}
+.bullets li b,.bullets li strong{color:var(--gold);font-weight:500;}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.bullets ul li{font-size:26px;color:var(--ink-3);padding-left:40px;position:relative;line-height:1.5;}
+.bullets ul li::before{content:"";position:absolute;left:8px;top:15px;width:9px;height:9px;border:1.5px solid var(--accent);border-radius:50%;}
+.bullets--lead > li{font-size:36px;}
+
+/* —— figure 图（学术主力：模型图/图表 · 框靛面板承载内联 SVG）—— */
+.figure{display:flex;flex-direction:column;gap:18px;height:100%;}
+.figure__frame{flex:1;min-height:0;background:var(--paper-soft);border:1px solid var(--rule-soft);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.5;}
+.figure__cap b{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;color:var(--accent);font-weight:400;margin-right:12px;text-transform:uppercase;}
+.figure__src{font-family:var(--font-mono);font-size:14px;color:var(--ink-4);letter-spacing:0.02em;}
+.figure--row{flex-direction:row;gap:36px;align-items:stretch;}
+
+/* —— 概念模型小零件（X→M→Y / 调节）· 给 figure 内联 SVG 用作参照（深底版）—— */
+.node{fill:var(--paper-soft);stroke:var(--accent);stroke-width:2;}
+.node-accent{fill:var(--accent);}
+.path-arrow{stroke:var(--accent);stroke-width:2;fill:none;}
+.path-dash{stroke:var(--gold);stroke-width:2;stroke-dasharray:7 5;fill:none;}
+
+/* —— terminal 终端 / prompt（HCI / AI 演示 · 最深靛底）—— */
+.terminal{background:var(--night);color:var(--ink-2);padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.55;position:relative;border:1px solid var(--rule-soft);border-radius:6px;}
+.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:22px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--accent);}
+.terminal__user{color:var(--gold);}.terminal__system{color:var(--green);}.terminal__hint{color:var(--navy);}.terminal__dim{color:var(--ink-4);}
+.terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
+
+/* —— compare 两栏对比（vellum/template 的双靛纸版式）—— */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.compare__col{padding:42px 44px;border-right:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:16px;}
+.compare__col:last-child{border-right:0;}
+.compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
+.compare__col--good .compare__title{color:var(--ink);}
+.compare__label{font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);}
+.compare__title{font-family:var(--font-display);font-weight:500;font-size:46px;color:var(--ink);line-height:1.12;margin-bottom:12px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px;}
+.compare__list li{font-family:var(--font-sans);font-size:24px;line-height:1.5;color:var(--ink-2);padding-left:28px;position:relative;}
+.compare__list li::before{content:"—";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--accent);}
+
+/* —— steps 流程 —— */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
+.step{padding:38px 30px;border-right:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:12px;}
+.step:last-child{border-right:0;}
+.step__n{font-family:var(--font-mono);font-size:18px;font-weight:400;letter-spacing:0.12em;color:var(--accent);text-transform:uppercase;}
+.step__title{font-family:var(--font-display);font-weight:500;font-size:33px;color:var(--ink);line-height:1.16;}
+.step__desc{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+
+/* —— table 表格（booktabs：上下金粗线、无竖线）—— */
+.table-cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);margin-bottom:14px;}
+.table-cap b{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;color:var(--accent);font-weight:400;margin-right:12px;text-transform:uppercase;}
+.table{width:100%;border-collapse:collapse;font-family:var(--font-sans);font-size:23px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);}
+.table th,.table td{padding:16px 18px;text-align:left;vertical-align:top;line-height:1.5;}
+.table thead th{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--rule-strong);font-weight:400;}
+.table tbody tr{border-bottom:1px solid var(--rule-soft);}
+.table tbody tr:last-child{border-bottom:0;}
+.table td.num{font-variant-numeric:tabular-nums;}
+.table td.bad{color:var(--ink-4);}.table td.good{color:var(--gold);font-weight:500;}
+.table tr.hl td{background:var(--accent-soft);}
+
+/* —— formula5 编号公式行 —— */
+.formula5{display:grid;grid-template-columns:90px 1fr 1.1fr;gap:0;border-top:2px solid var(--accent);}
+.formula5__row{display:contents;}
+.formula5__row > div{padding:24px 26px;border-bottom:1px solid var(--rule-soft);}
+.formula5__n{font-family:var(--font-display);font-size:44px;font-weight:500;font-style:italic;color:var(--gold);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:34px;font-weight:500;color:var(--ink);}
+.formula5__v{font-family:var(--font-sans);font-size:23px;color:var(--ink-2);line-height:1.55;}
+
+/* —— arch 分层堆栈 —— */
+.arch{display:flex;flex-direction:column;gap:6px;}
+.arch__layer{display:grid;grid-template-columns:64px 240px 1fr;gap:24px;align-items:center;padding:14px 24px;background:var(--paper-soft);border:1px solid var(--rule-soft);border-left:5px solid var(--accent);border-radius:3px;}
+.arch__layer--5{border-left-color:var(--accent);}
+.arch__layer--4{border-left-color:var(--navy);}
+.arch__layer--3{border-left-color:var(--green);}
+.arch__layer--2{border-left-color:var(--ink-3);}
+.arch__layer--1{border-left-color:var(--ink-4);}
+.arch__n{font-family:var(--font-display);font-size:34px;font-weight:500;font-style:italic;color:var(--gold);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:26px;font-weight:500;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-4);letter-spacing:0.08em;margin-top:3px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-family:var(--font-sans);font-size:18px;color:var(--ink-2);line-height:1.45;}
+.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;text-align:right;}
+
+/* —— three-circle 三区 —— */
+.three-circle{display:flex;gap:30px;align-items:stretch;}
+.zone{flex:1;padding:36px 32px;background:var(--paper-soft);border:1px solid var(--rule-soft);border-top:6px solid;border-radius:4px;display:flex;flex-direction:column;gap:16px;}
+.zone--g{border-top-color:var(--good);}
+.zone--y{border-top-color:var(--warn);}
+.zone--r{border-top-color:var(--bad);}
+.zone__k{font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);font-weight:400;}
+.zone__title{font-family:var(--font-display);font-size:44px;font-weight:500;color:var(--ink);}
+.zone--g .zone__title{color:var(--good);}.zone--y .zone__title{color:var(--warn);}.zone--r .zone__title{color:var(--bad);}
+.zone__test{font-family:var(--font-serif);font-size:23px;color:var(--ink-2);font-style:italic;}
+.zone__eg{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+.zone__action{margin-top:auto;padding-top:16px;border-top:1px solid var(--rule-soft);font-family:var(--font-sans);font-size:22px;font-weight:500;color:var(--ink);}
+
+/* —— bigq 装框大引用（vellum 灵魂版式：青墨引号 + 衬线斜体大字）—— */
+.bigq{background:var(--paper-soft);padding:44px 60px;border-left:4px solid var(--accent);border-radius:4px;text-align:left;position:relative;}
+.bigq__t{font-family:var(--font-serif);font-size:60px;font-weight:500;font-style:italic;line-height:1.22;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--gold);font-style:italic;}
+.bigq__sub{font-family:var(--font-mono);font-size:19px;letter-spacing:0.06em;color:var(--ink-3);margin-top:20px;text-transform:uppercase;font-style:normal;}
+
+/* —— matrix 矩阵 —— */
+.matrix{display:grid;grid-template-columns:260px repeat(3,1fr);border-top:2px solid var(--accent);border-left:1px solid var(--rule-soft);}
+.matrix__h{padding:18px 18px;border-right:1px solid var(--rule-soft);border-bottom:1px solid var(--rule-soft);font-family:var(--font-mono);font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);background:var(--paper-soft);text-align:center;font-weight:400;}
+.matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:24px;font-weight:500;color:var(--ink);text-transform:none;letter-spacing:0;}
+.matrix__cell{padding:20px 18px;border-right:1px solid var(--rule-soft);border-bottom:1px solid var(--rule-soft);font-family:var(--font-sans);font-size:18px;line-height:1.45;color:var(--ink-2);min-height:84px;}
+.matrix__cell strong{color:var(--gold);}
+
+/* —— bignum 大数字（vellum：衬线斜体巨型亮金数字 · 文艺克制）—— */
+.bignum{display:flex;flex-direction:column;gap:10px;padding:34px 32px;background:var(--paper-soft);border:1px solid var(--rule-soft);border-top:4px solid var(--accent);border-radius:4px;}
+.bignum__v{font-family:var(--font-display);font-size:120px;font-weight:500;font-style:italic;line-height:0.9;color:var(--gold);letter-spacing:-0.02em;}
+.bignum__u{font-family:var(--font-sans);font-size:26px;color:var(--ink);font-weight:400;line-height:1.35;}
+.bignum__k{font-family:var(--font-mono);font-size:15px;letter-spacing:0.10em;color:var(--ink-4);text-transform:uppercase;margin-top:12px;}
+
+/* —— summary 总结三栏 —— */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+.sum-card{padding:36px 34px;background:var(--paper-soft);border:1px solid var(--rule-soft);border-top:3px solid var(--accent);border-radius:4px;display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--accent);}.sum-card--n{border-top-color:var(--navy);}.sum-card--g{border-top-color:var(--green);}
+.sum-card__k{font-family:var(--font-mono);font-size:15px;letter-spacing:0.12em;color:var(--ink-3);text-transform:uppercase;font-weight:400;}
+.sum-card__v{font-family:var(--font-display);font-weight:500;font-size:50px;color:var(--gold);line-height:1.06;}
+.sum-card--n .sum-card__v{color:var(--navy);}.sum-card--g .sum-card__v{color:var(--green);}
+.sum-card__hint{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+
+/* —— refs 参考文献（编号 + 悬挂缩进 + 刊名斜体 · 两列）—— */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:14px 56px;counter-reset:ref;list-style:none;margin:0;padding:0;}
+.refs--1col{grid-template-columns:1fr;}
+.refs li{font-family:var(--font-sans);font-size:19px;line-height:1.5;color:var(--ink-2);padding-left:38px;position:relative;break-inside:avoid;}
+.refs li::before{counter-increment:ref;content:"["counter(ref)"]";position:absolute;left:0;top:0;font-family:var(--font-mono);font-size:16px;color:var(--accent);font-weight:400;}
+.refs li em,.refs li .jrnl{font-style:italic;color:var(--ink);font-family:var(--font-serif);}
+.refs--plain li::before{content:"";}
+.refs--plain li{padding-left:30px;text-indent:-30px;}
+.refs--dim li{color:var(--ink-4);}
+
+/* —— helpers —— */
+.callout{border-left:3px solid var(--accent);padding:20px 28px;background:var(--accent-soft);font-family:var(--font-sans);font-size:24px;line-height:1.5;color:var(--ink);border-radius:0 4px 4px 0;}
+.note-box{margin-top:24px;padding:22px 30px;background:var(--paper-soft);border-left:3px solid var(--accent);font-family:var(--font-sans);font-size:23px;line-height:1.5;color:var(--ink-2);border-radius:0 4px 4px 0;}
+.row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:36px;}.mt-l{margin-top:56px;}
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__brand">VELLUM</div>
+  <div class="topbar__sub">vellum skin</div>
+  <div class="topbar__spacer"></div>
+  <span class="topbar__info">当前 <strong id="curSeg">段 0</strong> · <strong id="curIdx">1</strong> / <strong id="totalIdx">0</strong></span>
+  <button class="topbar__btn" id="prevBtn" title="上一页 ←">←</button>
+  <button class="topbar__btn" id="nextBtn" title="下一页 →">→</button>
+  <button class="topbar__btn topbar__btn--primary" id="playBtn" title="全屏播放（F 或 Enter）">▶ 全屏播放</button>
+  <button class="topbar__btn topbar__btn--presenter" id="presenterBtn" title="演讲者模式 · 副屏同步讲稿">🖥 演讲者</button>
+</header>
+
+<nav class="segnav" id="segnav"></nav>
+<div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
+<div class="hint">F 全屏播放 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
+
+<div class="deck" id="deck">
+
+<!-- ① 封面 cover -->
+<section data-seg="0" data-segname="段 0 · 开场" class="slide cover">
+  <div class="cover__top">
+    <div class="cover__brand">VELLUM</div>
+    <div class="cover__seal">人文讲座</div>
+  </div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">A Lecture in Intellectual History</div>
+    <h1 class="cover__title">孤独的<em>发明</em></h1>
+    <p class="cover__sub">从修道院的静默到社交时代的喧嚣——独处如何被书写、被驯服，又被重新渴望。</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Speaker</span><span class="cover__meta-v">周立影</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Series</span><span class="cover__meta-v">深夜书房 · 思想史十讲</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Reading</span><span class="cover__meta-v">第三讲</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Date</span><span class="cover__meta-v">2026</span></div>
+  </div>
+</section>
+
+<!-- ② 大字宣言 manifesto（钩子）-->
+<section data-seg="0" data-segname="段 0 · 开场" class="slide manifesto">
+  <div class="manifesto__eyebrow">The Question</div>
+  <h2 class="manifesto__title">独处，<br>是天性，<br>还是一项<em>被发明</em>的技艺？</h2>
+  <p class="manifesto__sub">今晚，我们把"一个人待着"这件最平常的事，放回历史里看。</p>
+</section>
+
+<!-- ③ 段分隔 secdiv（巨型幽灵衬线数字）-->
+<section data-seg="1" data-segname="段 1 · 谱系" class="slide secdiv">
+  <div class="secdiv__num">I</div>
+  <div class="secdiv__eyebrow">Part One · Genealogy</div>
+  <h2 class="secdiv__title">独处，<br>有它的<em>谱系</em></h2>
+  <p class="secdiv__lead">"solitude" 这个词，曾经不指孤单，而指一种被精心保护的、与神和自我相处的状态。它的含义，随时代一再改写。</p>
+</section>
+
+<!-- ④ 论点清单 bullets -->
+<section data-seg="1" data-segname="段 1 · 谱系" data-title="四个转折" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.1　Four Turning Points</div>
+    <h2 class="title head__title">独处含义的四次<em>改写</em></h2>
+    <p class="head__sub">同一个动作，在不同世纪里被赋予了截然不同的道德重量。</p>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets">
+      <li><b>修道院</b>　四世纪的隐修者把独处奉为通向神的<em>必经之路</em>——退隐是德性，而非逃避 <span class="cite">(沙漠教父语录)</span>。</li>
+      <li><b>书斋</b>　文艺复兴的人文主义者在独处中阅读古人，孤独第一次与<em>自我修养</em>相连 <span class="cite">(Petrarch, 1346)</span>。</li>
+      <li><b>浪漫主义</b>　十八世纪末，独处被诗人重估为通向<em>真我与自然</em>的体验 <span class="cite">(Rousseau, 1782)</span>。</li>
+      <li><b>大众社会</b>　二十世纪，独处第一次被诊断为一种需要被治疗的<b>问题</b>——"孤独"取代了"独处"。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ⑤ 大引用 bigq（vellum 灵魂版式）-->
+<section data-seg="1" data-segname="段 1 · 谱系" data-title="一句铭文" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">An Epigraph</div><h2 class="title head__title">先借一句话<em>定调</em></h2></div>
+  <div class="fill" style="justify-content:center;">
+    <div class="bigq">
+      <p class="bigq__t">"人类全部的不幸，都源于<em>一件事</em>：<br>不懂得安静地待在一个房间里。"</p>
+      <div class="bigq__sub">— Blaise Pascal，《沉思录》§139（释义）</div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑥ 段分隔 secdiv（accent 满版）-->
+<section data-seg="2" data-segname="段 2 · 转向" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">II</div>
+  <div class="secdiv__eyebrow">Part Two · The Reversal</div>
+  <h2 class="secdiv__title">当独处<br>变成了<em>稀缺品</em></h2>
+  <p class="secdiv__lead">从未有哪个时代像今天这样，独处既被无限提供，又被彻底剥夺。</p>
+</section>
+
+<!-- ⑦ 三栏对照 cards -->
+<section data-seg="2" data-segname="段 2 · 转向" data-title="三重悖论" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.1　Three Paradoxes</div>
+    <h2 class="title head__title">连接时代的三重<em>悖论</em></h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--3">
+      <div class="card card--v"><div class="card__eyebrow">在场</div><div class="card__title">独自，却从未真的一个人</div><div class="card__desc">屏幕让人随时"在线"。物理的独处，不再等于心灵的独处。</div><div class="card__meta">技术 · 在场</div></div>
+      <div class="card card--n"><div class="card__eyebrow">注意力</div><div class="card__title">安静，却无法停止接收</div><div class="card__desc">沉默被通知填满。独处需要的那种"无所事事"，成了奢侈。</div><div class="card__meta">注意力 · 经济</div></div>
+      <div class="card card--g"><div class="card__eyebrow">自我</div><div class="card__title">独白，却时刻面向观众</div><div class="card__desc">连内心独白都被训练成可发布的。私密性，悄悄外包给了平台。</div><div class="card__meta">自我 · 表演</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑧ 洞见金句 insight -->
+<section data-seg="2" data-segname="段 2 · 转向" class="slide insight">
+  <div class="insight__eyebrow">The Thesis</div>
+  <h2 class="insight__statement">独处不是<em>退场</em>，<br>而是把自己<em>赎回</em>。</h2>
+  <p class="insight__sub">不是离开世界，而是重新获得与世界相处的资格。</p>
+</section>
+
+<!-- ⑨ 参考文献 refs -->
+<section data-seg="3" data-segname="段 3 · 余响" data-title="延伸阅读" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">Further Reading · 延伸阅读 · 仅供版式参照</div>
+    <h2 class="title head__title" style="font-size:46px;">延伸阅读</h2>
+  </div>
+  <div class="fill">
+    <ol class="refs">
+      <li>Pascal, B. (1670/1995). <em>Pensées</em>. Penguin Classics.</li>
+      <li>Petrarch, F. (1346/2002). <em>The Life of Solitude</em>（De vita solitaria）. Hyperion.</li>
+      <li>Rousseau, J.-J. (1782/1979). <em>Reveries of the Solitary Walker</em>. Penguin.</li>
+      <li>Arendt, H. (1958). <em>The Human Condition</em>. University of Chicago Press.</li>
+      <li>Turkle, S. (2011). <em>Alone Together</em>: Why We Expect More from Technology and Less from Each Other. Basic Books.</li>
+      <li style="color:var(--ink-4);">周立影（备课笔记）. 独处的思想史. 深夜书房讲义，整理中——此处仅示意版式。</li>
+    </ol>
+  </div>
+</section>
+
+
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   自配置引擎 · 与风格无关 · 所有皮肤共用 · 不用改这里
+   它会：① 从各 slide 的 data-seg 自动建段导航 + 缩略图 + 计数
+        ② 自动注入页脚 chrome（段名 + 页码）
+        ③ 自动取每张标题给副屏用
+        ④ 翻页广播给"演讲者模式.html"（配 slides-presenter-mode skill）
+   皮肤只通过 CSS（:root 令牌 + 组件样式）改外观，引擎逻辑不变。
+   ════════════════════════════════════════════════════════════════════ */
+(function () {
+  /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
+  const CONFIG = { channel: 'vellum-demo', presenterFile: '演讲者模式.html' };
+
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll(':scope > .slide'));
+  const total = slides.length;
+  const body = document.body;
+  const segOf = s => parseInt(s.dataset.seg || '0', 10);
+
+  // —— 段名 / 计数 / 起始索引（全自动）——
+  const segName = [], segCount = [];
+  slides.forEach(s => {
+    const g = segOf(s);
+    if (segName[g] === undefined) segName[g] = s.dataset.segname || ('段 ' + g);
+    segCount[g] = (segCount[g] || 0) + 1;
+  });
+  const segShort = segName.map((n, g) => (n || ('段 ' + g)).replace(/^段\s*\d+\s*·?\s*/, '') || ('段 ' + g));
+  const segStarts = []; let _acc = 0; segCount.forEach((c, i) => { segStarts[i] = _acc; _acc += (c || 0); });
+
+  // —— 包 wrap + 注入 chrome 页脚 ——
+  slides.forEach((s, i) => {
+    s.dataset.globalIdx = i;
+    const wrap = document.createElement('div'); wrap.className = 'slide-wrap';
+    s.parentNode.insertBefore(wrap, s); wrap.appendChild(s);
+    if (!s.querySelector('.chrome')) {
+      const g = segOf(s);
+      const div = document.createElement('div'); div.className = 'chrome';
+      div.innerHTML = `<div class="chrome__l"><span class="chrome__seg">${s.dataset.segname || segName[g]}</span></div>`
+        + `<div class="chrome__r">${String(i + 1).padStart(3, '0')} / ${String(total).padStart(3, '0')}</div>`;
+      s.appendChild(div);
+    }
+  });
+
+  // —— 自动建段导航 ——
+  const segnav = document.getElementById('segnav');
+  segCount.forEach((c, g) => {
+    const seg = document.createElement('div'); seg.className = 'segnav__seg'; seg.dataset.seg = g;
+    seg.innerHTML = `<button class="segnav__head" type="button">`
+      + `<span class="segnav__head-id">段 ${g}</span>`
+      + `<span class="segnav__head-name">${segShort[g]}</span>`
+      + `<span class="segnav__head-meta">${c} 张</span>`
+      + `<span class="segnav__head-arrow">▸</span></button>`
+      + `<div class="segnav__thumbs" data-seg-thumbs="${g}"></div>`;
+    segnav.appendChild(seg);
+  });
+
+  // —— 缩略图（克隆 slide）——
+  slides.forEach((s, i) => {
+    const container = document.querySelector(`[data-seg-thumbs="${segOf(s)}"]`);
+    if (!container) return;
+    const thumb = document.createElement('div'); thumb.className = 'thumb'; thumb.dataset.idx = i;
+    const inner = s.cloneNode(true); inner.classList.add('thumb__inner'); inner.classList.remove('active');
+    const ch = inner.querySelector('.chrome'); if (ch) ch.remove();
+    thumb.appendChild(inner);
+    const num = document.createElement('div'); num.className = 'thumb__num'; num.textContent = (i + 1);
+    thumb.appendChild(num);
+    thumb.addEventListener('click', e => { e.stopPropagation(); setActive(i); });
+    container.appendChild(thumb);
+  });
+
+  // —— 段导航折叠 ——
+  document.querySelectorAll('.segnav__head').forEach(btn =>
+    btn.addEventListener('click', () => btn.closest('.segnav__seg').classList.toggle('segnav__seg--expanded')));
+  const firstSeg = document.querySelector('.segnav__seg'); if (firstSeg) firstSeg.classList.add('segnav__seg--expanded');
+
+  // —— 副屏标题（自动取标题文本，可被 data-title 覆盖）——
+  function deriveTitle(s) {
+    if (s.dataset.title) return s.dataset.title;
+    const el = s.querySelector('.cover__title,.secdiv__title,.manifesto__title,.insight__statement,.bigq__t,.head__title,.title,h1,h2,h3');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : ('slide ' + (slides.indexOf(s) + 1));
+  }
+  const SLIDE_TITLES = slides.map(deriveTitle);
+  // 副屏锚点：优先用全局 window.SLIDE_MAP（slides-presenter-mode 注入），否则自动 s{seg}-{段内序号}
+  const segRun = [];
+  const SLIDE_MAP = (window.SLIDE_MAP && window.SLIDE_MAP.length === total) ? window.SLIDE_MAP
+    : slides.map(s => { const g = segOf(s); segRun[g] = (segRun[g] || 0) + 1; return `s${g}-${segRun[g]}`; });
+
+  // —— 状态 + UI ——
+  const curSegEl = document.getElementById('curSeg'), curIdxEl = document.getElementById('curIdx'),
+        totalIdxEl = document.getElementById('totalIdx'), progressBar = document.getElementById('progressBar');
+  totalIdxEl.textContent = total;
+  let idx = 0, present = false;
+
+  // —— 演讲者模式广播（BroadcastChannel + localStorage 双通道）——
+  let channel = null; try { channel = new BroadcastChannel(CONFIG.channel); } catch (e) {}
+  let presenterWindow = null;
+  function broadcastPresenter(i) {
+    const p = { slideIdx: i, total, segment: segOf(slides[i]), anchor: SLIDE_MAP[i] || ('s0-1'),
+      title: SLIDE_TITLES[i] || '', prevTitle: i > 0 ? SLIDE_TITLES[i - 1] : '',
+      nextTitle: i < total - 1 ? SLIDE_TITLES[i + 1] : '', ts: Date.now(), source: 'slides' };
+    if (channel) { try { channel.postMessage(p); } catch (e) {} }
+    try { localStorage.setItem(CONFIG.channel + '-state', JSON.stringify(p)); } catch (e) {}
+  }
+  function handleReverseJump(p) {
+    if (!p || p.type !== 'jump-to-slide' || p.source !== 'presenter' || typeof p.slideIdx !== 'number') return;
+    const t = Math.max(0, Math.min(total - 1, p.slideIdx)); if (t !== idx) setActive(t);
+  }
+  if (channel) { channel.onmessage = e => { if (e && e.data && e.data.type === 'jump-to-slide') handleReverseJump(e.data); }; }
+  window.addEventListener('storage', e => { if (e.key === CONFIG.channel + '-jump' && e.newValue) { try { handleReverseJump(JSON.parse(e.newValue)); } catch (x) {} } });
+  function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); broadcastPresenter(idx); return; }
+    presenterWindow = window.open(CONFIG.presenterFile, 'presenter', 'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no');
+    if (!presenterWindow) { alert('副屏窗口被阻止 · 请允许弹窗后再试。\n（演讲者模式需先用 slides-presenter-mode skill 生成 ' + CONFIG.presenterFile + '）'); return; }
+    document.getElementById('presenterBtn').classList.add('active');
+    setTimeout(() => broadcastPresenter(idx), 400); setTimeout(() => broadcastPresenter(idx), 1200);
+    const t = setInterval(() => { if (!presenterWindow || presenterWindow.closed) { clearInterval(t); document.getElementById('presenterBtn').classList.remove('active'); presenterWindow = null; } }, 1000);
+  }
+
+  // —— 核心导航 ——
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    if (present) {
+      const sc = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 0.98;
+      slides[idx].style.setProperty('--sc', sc);
+    } else {
+      const wrap = slides[idx].parentNode; if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    updateUI(); broadcastPresenter(idx);
+  }
+  function updateUI() {
+    const g = segOf(slides[idx]);
+    curSegEl.textContent = '段 ' + g; curIdxEl.textContent = idx + 1;
+    progressBar.style.width = ((idx + 1) / total * 100).toFixed(2) + '%';
+    document.querySelectorAll('.segnav__seg').forEach(segEl => {
+      const cur = +segEl.dataset.seg === g;
+      segEl.classList.toggle('segnav__seg--current', cur); if (cur) segEl.classList.add('segnav__seg--expanded');
+    });
+    document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('thumb--active', +t.dataset.idx === idx));
+    const at = document.querySelector('.thumb--active');
+    if (at) { const nr = segnav.getBoundingClientRect(), tr = at.getBoundingClientRect();
+      if (tr.top < nr.top + 60 || tr.bottom > nr.bottom - 20) at.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
+  function next() { setActive(idx + 1); } function prev() { setActive(idx - 1); }
+  function goSeg(n) { setActive(segStarts[n] || 0); }
+
+  function togglePresent() {
+    present = !present; body.classList.toggle('present', present);
+    if (present) setActive(idx);
+    else { slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+      setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); }
+  }
+  function enterFullscreen() {
+    const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) req.call(el).then(() => { if (!present) togglePresent(); body.classList.add('fullscreen'); }).catch(() => { if (!present) togglePresent(); });
+    else if (!present) togglePresent();
+  }
+  function exitFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen; if (ex) ex.call(document);
+    }
+    body.classList.remove('fullscreen'); if (present) togglePresent();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) { body.classList.remove('fullscreen');
+      if (present) { present = false; body.classList.remove('present');
+        slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+        setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); } }
+  });
+
+  // —— 键盘 ——
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea, select')) return;
+    const k = e.key;
+    if (k === 'f' || k === 'F' || k === 'Enter') { (document.fullscreenElement || body.classList.contains('present')) ? exitFullscreen() : enterFullscreen(); e.preventDefault(); return; }
+    if (k === 'p' || k === 'P') { togglePresent(); e.preventDefault(); return; }
+    if (k === 's' || k === 'S') { if (!e.ctrlKey && !e.metaKey) { openPresenter(); e.preventDefault(); } return; }
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown') { next(); e.preventDefault(); return; }
+    if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') { prev(); e.preventDefault(); return; }
+    if (k === 'Escape') { if (document.fullscreenElement || body.classList.contains('present')) { exitFullscreen(); e.preventDefault(); } return; }
+    if (k === 'Home') { setActive(0); e.preventDefault(); return; }
+    if (k === 'End') { setActive(total - 1); e.preventDefault(); return; }
+    if (k >= '1' && k <= '9') { const n = +k - 1; if (n < segCount.length) { goSeg(n); e.preventDefault(); } return; }
+  });
+  // —— 投屏态点击翻页 ——
+  document.addEventListener('click', e => {
+    if (!present) return; if (e.target.closest('a, button, input, select, .topbar, .segnav')) return;
+    (e.clientX > window.innerWidth * 0.6) ? next() : (e.clientX < window.innerWidth * 0.4 ? prev() : 0);
+  });
+  document.getElementById('prevBtn').addEventListener('click', prev);
+  document.getElementById('nextBtn').addEventListener('click', next);
+  document.getElementById('playBtn').addEventListener('click', enterFullscreen);
+  document.getElementById('presenterBtn').addEventListener('click', openPresenter);
+
+  // —— 编辑态自适应缩放 + 滚动跟随 ——
+  function updateFitScale() {
+    const availW = window.innerWidth - 300 - 60, availH = window.innerHeight - 100;
+    const scale = Math.max(0.25, Math.min(0.7, availW / 1920, availH / 1080));
+    document.documentElement.style.setProperty('--fit-scale', scale.toFixed(4));
+  }
+  updateFitScale();
+  window.addEventListener('resize', () => { updateFitScale(); if (present) setActive(idx); });
+  let st = null;
+  window.addEventListener('scroll', () => {
+    if (present) return; if (st) clearTimeout(st);
+    st = setTimeout(() => {
+      const vc = window.scrollY + window.innerHeight / 2; let best = 0, bd = Infinity;
+      slides.forEach((s, i) => { const w = s.parentNode; if (!w) return; const r = w.getBoundingClientRect();
+        const c = r.top + window.scrollY + r.height / 2, d = Math.abs(c - vc); if (d < bd) { bd = d; best = i; } });
+      if (best !== idx) { idx = best; updateUI(); }
+    }, 100);
+  });
+
+  updateUI();
+  // 暴露给 slides-presenter-mode / 控制台调试
+  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
+})();
+
+</script>
+</body>
+</html>

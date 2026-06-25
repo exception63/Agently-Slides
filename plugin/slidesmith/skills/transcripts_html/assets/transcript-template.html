@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{DOC_TITLE}}</title>
+<!-- 在线时加载杂志级字体；离线自动回退系统宋体/苹方 -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Noto+Serif+SC:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#F6F1E6;--paper-2:#EFE8D8;--rule:#DDD3BD;
+  --ink:#1F1B16;--ink-2:#3A3530;--ink-3:#6B6457;--ink-4:#938B7B;
+  --vermilion:#B5293A;--vermilion-deep:#8A1F2D;--navy:#1B2B4F;--gold:#9A7A35;--green:#4E7549;
+  --font-serif:"Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --font-disp:"Playfair Display","Noto Serif SC",serif;
+  --font-sans:"Inter","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{margin:0;background:var(--paper);color:var(--ink-2);font-family:var(--font-serif);
+  font-size:19px;line-height:1.85;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:920px;margin:0 auto;padding:56px 40px 200px;}
+
+/* 文档抬头 */
+.doc-head{border-bottom:3px solid var(--ink);padding-bottom:28px;margin-bottom:8px;}
+.doc-head .kicker{font-family:var(--font-mono);font-size:13px;letter-spacing:0.22em;color:var(--vermilion);text-transform:uppercase;margin-bottom:14px;}
+.doc-head h1{font-family:var(--font-disp);font-size:46px;line-height:1.15;color:var(--ink);margin:0 0 14px;font-weight:700;}
+.doc-head h1 em{color:var(--vermilion);font-style:italic;}
+.doc-head .meta{font-family:var(--font-sans);font-size:15px;color:var(--ink-3);line-height:1.7;}
+.doc-head .meta b{color:var(--ink);font-weight:600;}
+
+/* 目录（演讲者模式下点击联动 slides 翻页）*/
+.toc-nav{margin:30px 0 10px;background:var(--paper-2);border:1px solid var(--rule);border-radius:8px;padding:20px 26px;}
+.toc-nav h2{font-family:var(--font-sans);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-3);margin:0 0 14px;font-weight:600;}
+.toc-nav ol{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:1fr 1fr;gap:8px 28px;}
+.toc-nav a{font-family:var(--font-sans);font-size:15px;color:var(--ink-2);text-decoration:none;display:flex;gap:10px;align-items:baseline;padding:3px 0;}
+.toc-nav a:hover{color:var(--vermilion);}
+.toc-nav a .n{font-family:var(--font-mono);font-size:12px;color:var(--vermilion);width:32px;flex-shrink:0;}
+
+/* 段封面（讲稿里的"第几章"分隔 · id="seg-N" 供 TOC 与反向同步用）*/
+.seg-cover{margin:64px 0 8px;padding:30px 0 22px;border-top:2px solid var(--ink);border-bottom:1px solid var(--rule);}
+.seg-cover .seg-n{font-family:var(--font-disp);font-size:18px;letter-spacing:0.1em;color:var(--vermilion);font-weight:700;text-transform:uppercase;}
+.seg-cover h2{font-family:var(--font-disp);font-size:38px;color:var(--ink);margin:8px 0 10px;font-weight:700;line-height:1.15;}
+.seg-cover .seg-lead{font-family:var(--font-sans);font-size:17px;color:var(--ink-3);line-height:1.6;margin:0;}
+
+/* 子节标题 = 每张 slide 的锚点（id="sN-M" · 必须 1:1 唯一）*/
+h3.sub{font-family:var(--font-disp);font-size:25px;color:var(--ink);margin:42px 0 12px;font-weight:700;line-height:1.3;
+  padding-bottom:8px;border-bottom:1px dashed var(--rule);scroll-margin-top:18px;}
+h3.sub .slide-tag{display:inline-block;font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;
+  color:#fff;background:var(--ink);padding:2px 9px;border-radius:3px;margin-right:12px;vertical-align:middle;font-weight:500;}
+h3.sub .slide-tag.tag-v{background:var(--vermilion);}
+
+p{margin:0 0 16px;}
+strong{color:var(--ink);font-weight:700;}                 /* 关键词 · Keywords 提词会高亮这些 */
+em{color:var(--vermilion);font-style:normal;font-weight:600;} /* 朱红强调 · 句中点睛 1-2 处 */
+.q{font-family:var(--font-serif);font-style:italic;color:var(--vermilion-deep);} /* 原文引述 */
+
+/* 讲法提示 / 金句 / 数据 三种盒子 */
+.cue{font-family:var(--font-sans);font-size:15px;color:var(--ink-3);font-style:italic;
+  background:rgba(154,122,53,0.08);border-left:3px solid var(--gold);padding:10px 16px;margin:0 0 18px;line-height:1.6;border-radius:0 4px 4px 0;}
+.cue::before{content:"讲法 · ";font-style:normal;font-weight:600;color:var(--gold);}
+.golden{background:linear-gradient(180deg,#FBF4DF 0%,#F8EAC6 100%);border:1px solid #E6CE94;border-left:4px solid var(--vermilion);
+  padding:16px 22px;margin:0 0 18px;border-radius:0 6px 6px 0;font-family:var(--font-serif);}
+.golden .gk{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--gold);display:block;margin-bottom:6px;}
+.golden strong{color:var(--vermilion-deep);}
+.data{font-family:var(--font-sans);font-size:15px;color:var(--ink-3);background:var(--paper-2);border:1px solid var(--rule);
+  padding:10px 16px;margin:0 0 18px;border-radius:4px;}
+.data b{font-family:var(--font-mono);color:var(--vermilion);font-weight:600;}
+.callout{border-left:3px solid var(--vermilion);background:rgba(181,41,58,0.06);padding:12px 18px;margin:0 0 18px;border-radius:0 4px 4px 0;}
+
+/* ========================================================
+   演讲者模式 · 注入 CSS（来自 slides-presenter-mode v0.3 · 片段①）· 勿删
+======================================================== */
+h3.sub.presenter-current{
+  background:linear-gradient(90deg,rgba(181,41,58,0.12) 0%,transparent 100%);
+  border-left:4px solid #B5293A;padding-left:14px;margin-left:-18px;
+  animation:presenterPulse 0.6s ease-out;
+}
+@keyframes presenterPulse{0%{background-color:rgba(181,41,58,0.35);}100%{background-color:rgba(181,41,58,0.12);}}
+.presenter-block-current{
+  background-color:rgba(220,30,45,0.12);
+  box-shadow:-8px 0 0 -2px rgba(220,30,45,0.70);
+  transition:background-color 0.45s ease-out,box-shadow 0.45s ease-out;border-radius:2px;
+}
+.golden.presenter-block-current{background-color:#FBF0D4;box-shadow:-8px 0 0 -2px #C8203A;}
+body.cue-on :is(.presenter-block-current,.presenter-current) strong{
+  color:var(--vermilion,#B5293A);
+  background:linear-gradient(180deg,transparent 0%,transparent 55%,rgba(245,227,228,0.85) 55%,rgba(245,227,228,0.85) 92%,transparent 92%);
+  padding:0 3px;border-radius:1.5px;transition:background 0.25s ease,color 0.25s ease;
+}
+body.cue-on .presenter-block-current.golden strong,body.cue-on .golden.presenter-block-current strong{
+  color:var(--vermilion-deep,#8A1F2D);background:rgba(255,235,200,0.55);
+}
+body.cue-on .seg-cover strong{color:var(--ink,#1F1B16);background:transparent;}
+
+@media(max-width:680px){.wrap{padding:32px 20px 160px;}.toc-nav ol{grid-template-columns:1fr;}.doc-head h1{font-size:34px;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="doc-head">
+  <div class="kicker">{{KICKER}}</div>
+  <h1>{{TITLE_HTML}}</h1>
+  <div class="meta">{{META_HTML}}</div>
+</div>
+
+<nav class="toc-nav">
+  <h2>目录 · 点击跳转（演讲者模式下联动 slides）</h2>
+  <ol>
+    {{TOC_ITEMS}}
+    <!-- 每段一条：<li><a href="#seg-0"><span class="n">段 0</span>段名</a></li> -->
+  </ol>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════════
+     ▼▼▼  讲稿正文写在这里  ▼▼▼
+     结构纪律（红线）：
+       · 每段一个 <section class="seg">，内含 1 个 .seg-cover(id="seg-N") + N 个 h3.sub 锚点块
+       · 每张 slide 对应一个 <h3 class="sub" id="sN-M">，id 必须与 slides 的 SLIDE_MAP / 副屏 SLIDE_MAP_LOCAL 三处 1:1 一致、唯一
+       · 用 <section class="seg"> 包住每段 → 整块高亮不会越界串到下一段封面
+     块组件速查见 references/components.md
+     ════════════════════════════════════════════════════════════════ -->
+
+<!-- ———————— 段 0 示例 ———————— -->
+<section class="seg">
+<div class="seg-cover" id="seg-0">
+  <div class="seg-n">段 0</div>
+  <h2>开场 · 这一段讲什么</h2>
+  <p class="seg-lead">一句话点明这一段的目的——给听众"我们在第几章、要解决什么"的坐标感。</p>
+</div>
+
+<h3 class="sub" id="s0-1"><span class="slide-tag">SLIDE 01</span>封面 · 标题</h3>
+<p class="cue">站定，不急着翻页。让封面停留三五秒，再开口。</p>
+<p>这里写第一张 slide（封面）对应的开场白。<strong>加粗的是关键词</strong>（演讲者模式按 K 会高亮它们），<em>朱红的是点睛词</em>，句中一两处即可。</p>
+
+<h3 class="sub" id="s0-2"><span class="slide-tag tag-v">SLIDE 02</span>一句话破题</h3>
+<p class="cue">这是钩子页。语速放慢，重音落在 em 上。</p>
+<p>这里写第二张 slide 的讲稿。可以引用原文：<em class="q">"一句你想原样念出来的话。"</em></p>
+<div class="golden">
+  <span class="gk">金句 · 想让全场记住的一句</span>
+  <p style="margin:0;">把这一段的<strong>核心论断</strong>，用一句话钉下来。</p>
+</div>
+<div class="data">关键数据：某指标 <b>从 65% 降到 27%</b>（12 年）· 出处说明。</div>
+</section>
+
+<!-- ———————— 段 1 示例 ———————— -->
+<section class="seg">
+<div class="seg-cover" id="seg-1">
+  <div class="seg-n">段 1</div>
+  <h2>第一章标题</h2>
+  <p class="seg-lead">这一段的定调句。</p>
+</div>
+
+<h3 class="sub" id="s1-1"><span class="slide-tag">SLIDE 03</span>段一开场 · 段分隔</h3>
+<p>对应 slides 里这一段的 secdiv（段分隔页）。这里给本章定个调、抛出本章要回答的问题。</p>
+<div class="callout">侧重提示：本章的<strong>主线</strong>是什么，请听众带着这根线往下听。</div>
+
+<h3 class="sub" id="s1-2"><span class="slide-tag">SLIDE 04</span>本章第一个要点</h3>
+<p>正文段落。一张 slide 对应讲稿的<strong>一整块</strong>（h3.sub + 其后所有兄弟元素，直到下一个 h3.sub），翻页时这一整块会被浅红高亮。</p>
+<p>所以：<em>一张 slide 写一块、一块讲一件事</em>；要点多就拆成多张 slide、多个 h3.sub 锚点。</p>
+
+<h3 class="sub" id="s1-3"><span class="slide-tag tag-v">SLIDE 05</span>本章落点 · 金句收束</h3>
+<p>段尾用一句话收束，呼应段首。</p>
+<div class="golden"><span class="gk">段落落点</span><p style="margin:0;">用一句<strong>金句</strong>把这一段收住，并为下一段铺路。</p></div>
+</section>
+
+<!-- ▲▲▲  讲稿正文到此为止  ▲▲▲ -->
+
+</div>
+
+<script>
+/* ========================================================
+   演讲者模式 · 讲稿监听（slides-presenter-mode v0.3 · 片段② · 勿删）
+   postMessage 监听 + 整块高亮 + Keywords + 反向同步查询
+   postMessage type 名（fuquan-scroll / fuquan-cue / fuquan-query-current / fuquan-current-anchor）
+   是 parent(副屏) ↔ iframe(讲稿) 之间的固定约定，与广播频道名无关 —— 不要改。
+======================================================== */
+(function() {
+  let currentSubHighlight = null;
+  let currentBlockEls = [];
+
+  function clearHighlights() {
+    if (currentSubHighlight) { currentSubHighlight.classList.remove('presenter-current'); currentSubHighlight.style.animation = ''; }
+    currentBlockEls.forEach(e => e.classList.remove('presenter-block-current'));
+    currentBlockEls = [];
+  }
+
+  function highlightBlock(startEl) {
+    const startIsSub = startEl.matches('h3.sub');
+    if (!startIsSub) { startEl.classList.add('presenter-block-current'); currentBlockEls.push(startEl); }
+    let cur = startEl.nextElementSibling;
+    while (cur) {
+      if (cur.id && /^s\d/.test(cur.id)) break;
+      if (cur.matches && cur.matches('h3.sub')) break;
+      if (cur.classList && cur.classList.contains('appendix')) break;
+      cur.classList.add('presenter-block-current'); currentBlockEls.push(cur);
+      cur = cur.nextElementSibling;
+    }
+  }
+
+  function scrollToAnchor(anchor) {
+    const el = document.getElementById(anchor);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    clearHighlights();
+    let subTarget = el;
+    if (!el.matches('h3.sub')) {
+      const subs = document.querySelectorAll('h3.sub');
+      for (let i = subs.length - 1; i >= 0; i--) { if (subs[i].offsetTop <= el.offsetTop) { subTarget = subs[i]; break; } }
+    }
+    subTarget.classList.add('presenter-current');
+    currentSubHighlight = subTarget;
+    setTimeout(() => { if (subTarget.classList.contains('presenter-current')) subTarget.style.animation = 'none'; }, 700);
+    highlightBlock(el);
+  }
+
+  function findCurrentAnchor() {
+    const scrollY = window.scrollY + window.innerHeight * 0.25;
+    const anchored = Array.from(document.querySelectorAll('[id^="s"]')).filter(el => /^s\d/.test(el.id));
+    let cur = anchored[0];
+    for (const el of anchored) { if (el.offsetTop <= scrollY) cur = el; else break; }
+    return cur ? cur.id : null;
+  }
+
+  window.addEventListener('message', e => {
+    if (!e || !e.data) return;
+    if (e.data.type === 'fuquan-scroll' && e.data.anchor) { scrollToAnchor(e.data.anchor); }
+    else if (e.data.type === 'fuquan-cue') { document.body.classList.toggle('cue-on', !!e.data.on); }
+    else if (e.data.type === 'fuquan-query-current') {
+      const anchor = findCurrentAnchor();
+      if (anchor && window.parent) { try { window.parent.postMessage({ type: 'fuquan-current-anchor', anchor: anchor }, '*'); } catch (err) {} }
+    }
+  });
+
+  if (location.hash) { const anchor = location.hash.slice(1); setTimeout(() => scrollToAnchor(anchor), 200); }
+})();
+
+/* ========================================================
+   演讲者模式 · 键盘 + TOC 转发（片段③ · 勿删）
+   讲稿单独阅读时这段不生效（守门 window.parent === window）；只在被副屏 iframe 嵌入时转发按键/目录点击。
+======================================================== */
+(function() {
+  if (!window.parent || window.parent === window) return;
+  const NAV_KEYS  = new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown',' ']);
+  const FUNC_KEYS = new Set(['l','j','s','d','k','o','h','r','=','+','-','_']);
+  window.addEventListener('keydown', e => {
+    if (e.target.matches && e.target.matches('input, textarea, select')) return;
+    const k = e.key;
+    if (!NAV_KEYS.has(k) && !FUNC_KEYS.has(k.toLowerCase())) return;
+    try { window.parent.postMessage({ type: 'fuquan-nav-key', key: k }, '*'); } catch (err) {}
+    e.preventDefault();
+  });
+  document.querySelectorAll('.toc-nav a').forEach(link => {
+    link.addEventListener('click', () => {
+      const href = link.getAttribute('href');
+      if (!href || !href.startsWith('#')) return;
+      try { window.parent.postMessage({ type: 'fuquan-toc-jump', anchor: href.slice(1) }, '*'); } catch (err) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>

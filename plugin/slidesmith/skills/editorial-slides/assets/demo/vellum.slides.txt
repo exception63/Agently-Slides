@@ -1,0 +1,109 @@
+<!-- ① 封面 cover -->
+<section data-seg="0" data-segname="段 0 · 开场" class="slide cover">
+  <div class="cover__top">
+    <div class="cover__brand">{{BRAND}}</div>
+    <div class="cover__seal">人文讲座</div>
+  </div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">A Lecture in Intellectual History</div>
+    <h1 class="cover__title">孤独的<em>发明</em></h1>
+    <p class="cover__sub">从修道院的静默到社交时代的喧嚣——独处如何被书写、被驯服，又被重新渴望。</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Speaker</span><span class="cover__meta-v">周立影</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Series</span><span class="cover__meta-v">深夜书房 · 思想史十讲</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Reading</span><span class="cover__meta-v">第三讲</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Date</span><span class="cover__meta-v">2026</span></div>
+  </div>
+</section>
+
+<!-- ② 大字宣言 manifesto（钩子）-->
+<section data-seg="0" data-segname="段 0 · 开场" class="slide manifesto">
+  <div class="manifesto__eyebrow">The Question</div>
+  <h2 class="manifesto__title">独处，<br>是天性，<br>还是一项<em>被发明</em>的技艺？</h2>
+  <p class="manifesto__sub">今晚，我们把"一个人待着"这件最平常的事，放回历史里看。</p>
+</section>
+
+<!-- ③ 段分隔 secdiv（巨型幽灵衬线数字）-->
+<section data-seg="1" data-segname="段 1 · 谱系" class="slide secdiv">
+  <div class="secdiv__num">I</div>
+  <div class="secdiv__eyebrow">Part One · Genealogy</div>
+  <h2 class="secdiv__title">独处，<br>有它的<em>谱系</em></h2>
+  <p class="secdiv__lead">"solitude" 这个词，曾经不指孤单，而指一种被精心保护的、与神和自我相处的状态。它的含义，随时代一再改写。</p>
+</section>
+
+<!-- ④ 论点清单 bullets -->
+<section data-seg="1" data-segname="段 1 · 谱系" data-title="四个转折" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.1　Four Turning Points</div>
+    <h2 class="title head__title">独处含义的四次<em>改写</em></h2>
+    <p class="head__sub">同一个动作，在不同世纪里被赋予了截然不同的道德重量。</p>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets">
+      <li><b>修道院</b>　四世纪的隐修者把独处奉为通向神的<em>必经之路</em>——退隐是德性，而非逃避 <span class="cite">(沙漠教父语录)</span>。</li>
+      <li><b>书斋</b>　文艺复兴的人文主义者在独处中阅读古人，孤独第一次与<em>自我修养</em>相连 <span class="cite">(Petrarch, 1346)</span>。</li>
+      <li><b>浪漫主义</b>　十八世纪末，独处被诗人重估为通向<em>真我与自然</em>的体验 <span class="cite">(Rousseau, 1782)</span>。</li>
+      <li><b>大众社会</b>　二十世纪，独处第一次被诊断为一种需要被治疗的<b>问题</b>——"孤独"取代了"独处"。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ⑤ 大引用 bigq（vellum 灵魂版式）-->
+<section data-seg="1" data-segname="段 1 · 谱系" data-title="一句铭文" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">An Epigraph</div><h2 class="title head__title">先借一句话<em>定调</em></h2></div>
+  <div class="fill" style="justify-content:center;">
+    <div class="bigq">
+      <p class="bigq__t">"人类全部的不幸，都源于<em>一件事</em>：<br>不懂得安静地待在一个房间里。"</p>
+      <div class="bigq__sub">— Blaise Pascal，《沉思录》§139（释义）</div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑥ 段分隔 secdiv（accent 满版）-->
+<section data-seg="2" data-segname="段 2 · 转向" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">II</div>
+  <div class="secdiv__eyebrow">Part Two · The Reversal</div>
+  <h2 class="secdiv__title">当独处<br>变成了<em>稀缺品</em></h2>
+  <p class="secdiv__lead">从未有哪个时代像今天这样，独处既被无限提供，又被彻底剥夺。</p>
+</section>
+
+<!-- ⑦ 三栏对照 cards -->
+<section data-seg="2" data-segname="段 2 · 转向" data-title="三重悖论" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.1　Three Paradoxes</div>
+    <h2 class="title head__title">连接时代的三重<em>悖论</em></h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--3">
+      <div class="card card--v"><div class="card__eyebrow">在场</div><div class="card__title">独自，却从未真的一个人</div><div class="card__desc">屏幕让人随时"在线"。物理的独处，不再等于心灵的独处。</div><div class="card__meta">技术 · 在场</div></div>
+      <div class="card card--n"><div class="card__eyebrow">注意力</div><div class="card__title">安静，却无法停止接收</div><div class="card__desc">沉默被通知填满。独处需要的那种"无所事事"，成了奢侈。</div><div class="card__meta">注意力 · 经济</div></div>
+      <div class="card card--g"><div class="card__eyebrow">自我</div><div class="card__title">独白，却时刻面向观众</div><div class="card__desc">连内心独白都被训练成可发布的。私密性，悄悄外包给了平台。</div><div class="card__meta">自我 · 表演</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑧ 洞见金句 insight -->
+<section data-seg="2" data-segname="段 2 · 转向" class="slide insight">
+  <div class="insight__eyebrow">The Thesis</div>
+  <h2 class="insight__statement">独处不是<em>退场</em>，<br>而是把自己<em>赎回</em>。</h2>
+  <p class="insight__sub">不是离开世界，而是重新获得与世界相处的资格。</p>
+</section>
+
+<!-- ⑨ 参考文献 refs -->
+<section data-seg="3" data-segname="段 3 · 余响" data-title="延伸阅读" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">Further Reading · 延伸阅读 · 仅供版式参照</div>
+    <h2 class="title head__title" style="font-size:46px;">延伸阅读</h2>
+  </div>
+  <div class="fill">
+    <ol class="refs">
+      <li>Pascal, B. (1670/1995). <em>Pensées</em>. Penguin Classics.</li>
+      <li>Petrarch, F. (1346/2002). <em>The Life of Solitude</em>（De vita solitaria）. Hyperion.</li>
+      <li>Rousseau, J.-J. (1782/1979). <em>Reveries of the Solitary Walker</em>. Penguin.</li>
+      <li>Arendt, H. (1958). <em>The Human Condition</em>. University of Chicago Press.</li>
+      <li>Turkle, S. (2011). <em>Alone Together</em>: Why We Expect More from Technology and Less from Each Other. Basic Books.</li>
+      <li style="color:var(--ink-4);">周立影（备课笔记）. 独处的思想史. 深夜书房讲义，整理中——此处仅示意版式。</li>
+    </ol>
+  </div>
+</section>

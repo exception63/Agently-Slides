@@ -1,0 +1,170 @@
+/*
+============================================================
+SLIDES-INJECTION · 主屏 slides 注入代码片段 · v0.3
+============================================================
+用法：4 处 Edit 注入到现有 slides HTML
+
+v0.3 新增（vs v0.2）：
+- broadcastPresenter payload 加 `source:'slides'` 字段（防回声）
+- 新增 handleReverseJump · 接收演讲者模式反向广播的 jump-to-slide
+- BroadcastChannel.onmessage 包装 + localStorage 'fuquan-slide-jump' 双通道接收
+- 现在 slides 既会发也会收 · 实现双向联动
+============================================================
+*/
+
+/* ============================================================
+   片段 ① · HTML（紧挨"全屏播放"按钮右边加按钮）
+   位置：找到 id="playBtn" 那一行 · 在它后面加一行
+============================================================ */
+
+/* 替换前：
+<button class="topbar__btn topbar__btn--primary" id="playBtn" ...>▶ 全屏播放</button>
+</header>
+
+替换后：*/
+/*
+<button class="topbar__btn topbar__btn--primary" id="playBtn" ...>▶ 全屏播放</button>
+<button class="topbar__btn topbar__btn--presenter" id="presenterBtn" title="演讲者模式 · 副屏同步讲稿">🖥 演讲者</button>
+</header>
+*/
+
+
+/* ============================================================
+   片段 ② · CSS（按钮样式）
+   位置：找现有 .topbar__btn--primary 样式 · 紧跟其后加
+============================================================ */
+/*
+.topbar__btn--presenter{background:#2A2A2A;border-color:#2A2A2A;color:#F5E3B0;}
+.topbar__btn--presenter:hover{background:#3a3a3a;border-color:#B58530;color:#F5E3B0;}
+.topbar__btn--presenter.active{background:#B58530;border-color:#B58530;color:#fff;box-shadow:0 0 0 2px rgba(181,133,48,0.3);}
+*/
+
+
+/* ============================================================
+   片段 ③ · JS（核心：SLIDE_MAP + SLIDE_TITLES + 广播 + 打开副屏）
+   位置：现有 IIFE 内 · `totalIdxEl.textContent = total;` 这一行后插入
+   `setActive` 函数定义之前
+============================================================ */
+
+// ============================ 演讲者模式 · 副屏同步 ============================
+// SLIDE_MAP · N 个 slide → 讲稿子节锚点
+const SLIDE_MAP = [
+  // 替换为实际映射：每个 slide 一个锚点 id
+  // 段 0 (0~17): 's0-1','s0-2','s0-2', ...
+  // 段 1 (18~53): 's1-1','s1-1','s1-2', ...
+  // 长度 = total（slide 总数）
+  {{SLIDE_MAP_ENTRIES}}
+];
+
+// SLIDE_TITLES · 副屏显示用的简短标题（必须与 SLIDE_MAP 等长）
+const SLIDE_TITLES = [
+  {{SLIDE_TITLES_ENTRIES}}
+];
+
+// SEG_NAMES · 段名称（用于副屏 header 显示）
+const SEG_NAMES = {{SEG_NAMES}}; // 例：['开场','prompt 深讲','agents 深讲','Case 01','Case 02']
+
+// BroadcastChannel + localStorage 双通道
+let presenterChannel = null;
+try { presenterChannel = new BroadcastChannel('fuquan-presenter-sync'); }
+catch(e) { console.warn('BroadcastChannel 不可用 · 仅用 localStorage'); }
+let presenterWindow = null;
+
+function broadcastPresenter(slideIdx) {
+  const payload = {
+    slideIdx: slideIdx,
+    total: total,                                              // 改成你 slides 的总数变量名
+    segment: parseInt(slides[slideIdx].dataset.seg || '0', 10), // 改成你的段属性
+    anchor: SLIDE_MAP[slideIdx] || SLIDE_MAP[0],
+    title: SLIDE_TITLES[slideIdx] || '',
+    prevTitle: slideIdx > 0 ? SLIDE_TITLES[slideIdx - 1] || '' : '',
+    nextTitle: slideIdx < total - 1 ? SLIDE_TITLES[slideIdx + 1] || '' : '',
+    ts: Date.now(),
+    source: 'slides'   // v0.3 · 防回声标识 · 演讲者模式据此忽略自己反向广播的回声
+  };
+  if (presenterChannel) { try { presenterChannel.postMessage(payload); } catch(e){} }
+  try { localStorage.setItem('fuquan-presenter-state', JSON.stringify(payload)); } catch(e){}
+}
+
+// v0.3 · 反向通道：接收演讲者模式的 {type:'jump-to-slide', source:'presenter'}
+// 来源：演讲者模式键盘翻页 / TOC 点击 / 反向同步按钮（D 键）
+function handleReverseJump(payload) {
+  if (!payload || payload.type !== 'jump-to-slide') return;
+  if (payload.source !== 'presenter') return;   // 只接受演讲者模式触发 · 忽略自己回声
+  if (typeof payload.slideIdx !== 'number') return;
+  const target = Math.max(0, Math.min(total - 1, payload.slideIdx));
+  if (target !== idx) setActive(target);        // setActive 会自动 broadcastPresenter 正向更新副屏
+}
+// 包装 BroadcastChannel 接收（叠加在正向广播之上 · 不影响原有逻辑）
+if (presenterChannel) {
+  const origOnMsg = presenterChannel.onmessage;   // 若有别的逻辑挂在上面（一般没有 · 防御性）
+  presenterChannel.onmessage = e => {
+    if (e && e.data && e.data.type === 'jump-to-slide') handleReverseJump(e.data);
+    else if (typeof origOnMsg === 'function') origOnMsg(e);
+  };
+}
+// localStorage 兜底通道
+window.addEventListener('storage', e => {
+  if (e.key !== 'fuquan-slide-jump' || !e.newValue) return;
+  try { handleReverseJump(JSON.parse(e.newValue)); } catch(err) {}
+});
+
+function openPresenter() {
+  if (presenterWindow && !presenterWindow.closed) {
+    presenterWindow.focus();
+    broadcastPresenter(idx);
+    return;
+  }
+  const features = 'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no';
+  presenterWindow = window.open('演讲者模式.html', 'presenter-window', features);
+  if (!presenterWindow) { alert('副屏窗口被阻止 · 请允许弹出窗口后再试'); return; }
+  document.getElementById('presenterBtn').classList.add('active');
+  // 等子窗口加载完再推一次（防丢失初始状态）
+  setTimeout(() => { try { broadcastPresenter(idx); } catch(e){} }, 400);
+  setTimeout(() => { try { broadcastPresenter(idx); } catch(e){} }, 1200);
+  const checkClosed = setInterval(() => {
+    if (!presenterWindow || presenterWindow.closed) {
+      clearInterval(checkClosed);
+      document.getElementById('presenterBtn').classList.remove('active');
+      presenterWindow = null;
+    }
+  }, 1000);
+}
+
+
+/* ============================================================
+   片段 ④ · 改 setActive 函数 · 末尾加 broadcast 调用
+============================================================ */
+/*
+替换前：
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    // ... 现有逻辑 ...
+    updateUI();
+  }
+
+替换后（仅末尾加 1 行）：
+*/
+//   function setActive(n) {
+//     idx = Math.max(0, Math.min(total - 1, n));
+//     // ... 现有逻辑 ...
+//     updateUI();
+//     broadcastPresenter(idx);  // ← 新增
+//   }
+
+
+/* ============================================================
+   片段 ⑤ · 按钮事件绑定 + S 键快捷键
+   位置：现有 playBtn 事件绑定后
+============================================================ */
+/*
+document.getElementById('presenterBtn').addEventListener('click', openPresenter);
+
+document.addEventListener('keydown', e => {
+  if (e.target.matches('input, textarea, select')) return;
+  if ((e.key === 's' || e.key === 'S') && !e.ctrlKey && !e.metaKey) {
+    openPresenter();
+    e.preventDefault();
+  }
+});
+*/

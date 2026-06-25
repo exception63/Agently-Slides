@@ -1,0 +1,257 @@
+/*
+============================================================
+SCRIPT-LISTENER · 讲稿 HTML 注入代码（v0.3 · 双向通信 + Keywords 块级高亮）
+============================================================
+用法：3 处 Edit 注入到讲稿 HTML
+- 片段 ①：CSS（小节脉冲 + 整块高亮 + Keywords 块级 strong 高亮）
+- 片段 ②：JS（postMessage 监听 + 4 类新消息 + 块界定 + Keywords toggle）
+- 片段 ③：JS（可选 · 讲稿端 keydown 转发 + TOC 点击转发）
+
+v0.3 关键升级（vs v0.2）：
+- ✦ Keywords：body.cue-on 时仅高亮当前激活板块 (.presenter-block-current) 内的 <strong>
+- ⌨ 键盘转发：iframe 焦点时 · 把翻页/快捷键 postMessage 给 parent · 演讲者模式不失灵
+- 🧭 TOC 转发：点目录链接 · 通知 parent 反向广播让 slides 跳到对应 slide
+- ❓ Query-current：parent 问"当前可视位置是哪个 anchor" · 用于反向同步 (D 键)
+
+v0.2 升级（保留）：
+- 整块高亮 .presenter-block-current（沿 sibling 链向后到下一个 sN 锚点）
+- 用 box-shadow 画"外左金条" · 不占布局 · 不和 border-left 打架
+============================================================
+*/
+
+
+/* ============================================================
+   片段 ① · CSS（粘到讲稿 HTML <style> 块末尾）
+============================================================ */
+
+/*
+  小节标题（h3.sub）红边脉冲 · v0.1 已有 · v0.2 保留
+*/
+h3.sub.presenter-current {
+  background: linear-gradient(90deg, rgba(181, 41, 58, 0.12) 0%, transparent 100%);
+  border-left: 4px solid #B5293A;  /* 朱红 · 改成你讲稿的主题色 */
+  padding-left: 14px;
+  margin-left: -18px;
+  animation: presenterPulse 0.6s ease-out;
+}
+@keyframes presenterPulse {
+  0%   { background-color: rgba(181, 41, 58, 0.35); }
+  100% { background-color: rgba(181, 41, 58, 0.12); }
+}
+
+/*
+  ⭐ v0.2 新增 · 整块高亮（当前 slide 对应的所有元素）
+  设计：用 box-shadow 画"外左正红条"（不占布局 · 不和已有 border 打架）+ 浅红 bg
+  应用到从锚点元素开始 · 沿 sibling 链向后 · 直到遇到下一个 sN 锚点为止的所有元素
+  v0.2.1：从浅金改为正红 · 视觉更突出（福泉课实测反馈：浅棕色不显眼）
+*/
+.presenter-block-current {
+  background-color: rgba(220, 30, 45, 0.14);
+  box-shadow: -8px 0 0 -2px rgba(220, 30, 45, 0.70);
+  transition: background-color 0.45s ease-out,
+              box-shadow 0.45s ease-out;
+}
+
+/* h4 加强 bg · 让二级标题仍然突出 */
+h4.presenter-block-current {
+  background-color: rgba(220, 30, 45, 0.22);
+  box-shadow: -8px 0 0 -2px #C8203A;
+  border-radius: 3px;
+  padding: 4px 8px;
+  margin-left: -8px;
+}
+
+/* pre.prompt 深色底 · 保留原 bg · 用偏亮的正红条 */
+pre.prompt.presenter-block-current {
+  background-color: #2A2A2A;  /* 保留原深色底 */
+  box-shadow: -8px 0 0 -2px #E83048,
+              0 0 0 1px rgba(220, 30, 45, 0.30);
+}
+
+/* table 用浅红背景 + 描边 · 让整张表的范围清晰 */
+table.presenter-block-current {
+  background-color: rgba(220, 30, 45, 0.10);
+  box-shadow: -8px 0 0 -2px rgba(220, 30, 45, 0.70),
+              0 0 0 1px rgba(220, 30, 45, 0.22);
+}
+
+/*
+  ⭐ v0.3 新增 · Keywords 块级高亮（由副屏 K 键 toggle body.cue-on）
+  设计要点：
+  - 仅高亮当前激活板块（.presenter-block-current 或 .presenter-current 小节标题）内的 <strong>
+  - 其他板块的 <strong> 保持讲稿原貌（避免满屏发红 · 提词专注当前讲到哪儿）
+  - 底部 vermilion-tint 半透明渐变 · 像水彩高亮笔 · 不突兀
+  - 字色变 vermilion · 同色系 · 不刺眼
+  - 已有自定义 strong 样式的区域（.golden / .seg-cover / .seg-goal）有 override · 不被覆盖
+  - 配色 var(--vermilion) / var(--vermilion-deep) 来自讲稿 :root · 若没有 · 换具体色值
+*/
+body.cue-on :is(.presenter-block-current, .presenter-current) strong {
+  color: var(--vermilion, #B5293A);
+  background: linear-gradient(180deg,
+    transparent 0%,
+    transparent 55%,
+    rgba(245, 227, 228, 0.85) 55%,
+    rgba(245, 227, 228, 0.85) 92%,
+    transparent 92%);
+  padding: 0 3px;
+  border-radius: 1.5px;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+/* 金句区域内的 strong 已是 vermilion-deep · 高亮态保持原色避免互相冲淡 */
+body.cue-on .presenter-block-current.golden strong,
+body.cue-on .golden.presenter-block-current strong {
+  color: var(--vermilion-deep, #8A1F2D);
+  background: rgba(255, 235, 200, 0.55);
+}
+/* 段封面/学习目标里的 strong 保持原墨色（防主题色被覆盖） */
+body.cue-on .seg-cover strong,
+body.cue-on .seg-goal strong { color: var(--ink, #1F1B16); background: transparent; }
+
+
+/* ============================================================
+   片段 ② · JS（粘到讲稿 HTML 末尾 · </body> 之前 · 在另一个 IIFE 内）
+============================================================ */
+
+// ========== 演讲者模式 · postMessage 监听（v0.2 含整块高亮）==========
+(function() {
+  let currentSubHighlight = null;   // 小节标题（h3.sub）高亮
+  let currentBlockEls = [];          // 当前 slide 对应的内容块元素集合
+
+  function clearHighlights() {
+    if (currentSubHighlight) {
+      currentSubHighlight.classList.remove('presenter-current');
+      currentSubHighlight.style.animation = '';
+    }
+    currentBlockEls.forEach(e => e.classList.remove('presenter-block-current'));
+    currentBlockEls = [];
+  }
+
+  function highlightBlock(startEl) {
+    // 从 startEl 开始 · 沿 nextElementSibling 链向后走 · 直到遇到下一个 sN-X 锚点为止
+    // 这样当前 slide 对应的"那块内容"（可能含多个 blockquote / golden / pre 等）全部被高亮
+    const startIsSub = startEl.matches('h3.sub');
+
+    // 第一个元素：如果是 h3.sub · 不加 block-current（它有 presenter-current 红边）
+    // 否则加 block-current
+    if (!startIsSub) {
+      startEl.classList.add('presenter-block-current');
+      currentBlockEls.push(startEl);
+    }
+
+    // 向后走
+    let cur = startEl.nextElementSibling;
+    while (cur) {
+      // 停止条件：下一个锚点（id 以 s 开头的元素 · 或新的 h3.sub · 或 appendix）
+      if (cur.id && /^s\d/.test(cur.id)) break;
+      if (cur.matches && cur.matches('h3.sub')) break;
+      if (cur.classList && cur.classList.contains('appendix')) break;
+      cur.classList.add('presenter-block-current');
+      currentBlockEls.push(cur);
+      cur = cur.nextElementSibling;
+    }
+  }
+
+  function scrollToAnchor(anchor) {
+    const el = document.getElementById(anchor);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    // 清掉上一次的全部高亮
+    clearHighlights();
+
+    // 1) 标记小节标题（h3.sub）—— 给红边脉冲
+    let subTarget = el;
+    if (!el.matches('h3.sub')) {
+      const subs = document.querySelectorAll('h3.sub');
+      for (let i = subs.length - 1; i >= 0; i--) {
+        if (subs[i].offsetTop <= el.offsetTop) { subTarget = subs[i]; break; }
+      }
+    }
+    subTarget.classList.add('presenter-current');
+    currentSubHighlight = subTarget;
+    // 700ms 后停止脉冲动画 · 保留稳态高亮
+    setTimeout(() => {
+      if (subTarget.classList.contains('presenter-current')) {
+        subTarget.style.animation = 'none';
+      }
+    }, 700);
+
+    // 2) 标记当前 slide 对应的整块内容（柔和金色背景 + 左金条）
+    highlightBlock(el);
+  }
+
+  // v0.3 · 找当前可视区最近的 sN 锚点（按 scrollY 比对 offsetTop）· 反向同步用
+  function findCurrentAnchor() {
+    const scrollY = window.scrollY + window.innerHeight * 0.25;  // 视窗上 1/4 处算"当前"
+    const anchored = Array.from(document.querySelectorAll('[id^="s"]'))
+      .filter(el => /^s\d/.test(el.id));
+    let cur = anchored[0];
+    for (const el of anchored) {
+      if (el.offsetTop <= scrollY) cur = el;
+      else break;
+    }
+    return cur ? cur.id : null;
+  }
+
+  // v0.3 · 监听父窗口（演讲者模式）发来的 4 类消息
+  window.addEventListener('message', e => {
+    if (!e || !e.data) return;
+    // 1) 滚动到锚点（正向跟随：slides 翻页时触发）
+    if (e.data.type === 'fuquan-scroll' && e.data.anchor) {
+      scrollToAnchor(e.data.anchor);
+    }
+    // 2) Keywords 开关（K 键 toggle · body.cue-on 控制 CSS）
+    else if (e.data.type === 'fuquan-cue') {
+      document.body.classList.toggle('cue-on', !!e.data.on);
+    }
+    // 3) 查询当前可视位置的 anchor（反向同步 D 键 · 回传给 parent）
+    else if (e.data.type === 'fuquan-query-current') {
+      const anchor = findCurrentAnchor();
+      if (anchor && window.parent) {
+        try { window.parent.postMessage({ type: 'fuquan-current-anchor', anchor: anchor }, '*'); } catch (err) {}
+      }
+    }
+  });
+
+  // 初始如果 URL 已带 hash · 触发一次高亮
+  if (location.hash) {
+    const anchor = location.hash.slice(1);
+    setTimeout(() => scrollToAnchor(anchor), 200);
+  }
+})();
+
+
+/* ============================================================
+   片段 ③ · JS（可选 · 讲稿端键盘 + TOC 点击转发给 parent）
+   位置：在另一个 IIFE 内 · 或合并到现有 toc IIFE 里
+   作用：iframe 焦点时键盘不失灵 · 点目录联动 slides
+============================================================ */
+
+(function() {
+  // 仅在被嵌入演讲者模式时启用（standalone 浏览讲稿时不影响原生键盘滚动 / 点目录）
+  if (!window.parent || window.parent === window) return;
+
+  // ========== 1) 键盘转发：iframe 焦点时 · 把翻页/快捷键交给 parent ==========
+  const NAV_KEYS  = new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown',' ']);
+  const FUNC_KEYS = new Set(['l','j','s','d','k','o','h','r','=','+','-','_']);
+  window.addEventListener('keydown', e => {
+    if (e.target.matches && e.target.matches('input, textarea, select')) return;
+    const k = e.key;
+    if (!NAV_KEYS.has(k) && !FUNC_KEYS.has(k.toLowerCase())) return;
+    try { window.parent.postMessage({ type: 'fuquan-nav-key', key: k }, '*'); } catch (err) {}
+    e.preventDefault();   // 阻止 iframe 本地原生滚动 · 翻页/滚动统一由 parent 控制
+  });
+
+  // ========== 2) TOC 点击转发：点目录 → parent 反向广播到 slides ==========
+  // 适用于讲稿里有 .toc-nav a · href="#sN-x" 或 "#seg-N" 的导航
+  // 不 preventDefault · 让浏览器原生 smooth scroll + hash 跳锚照常工作
+  const tocLinks = document.querySelectorAll('.toc-nav a');
+  tocLinks.forEach(link => {
+    link.addEventListener('click', () => {
+      const href = link.getAttribute('href');
+      if (!href || !href.startsWith('#')) return;
+      const anchor = href.slice(1);
+      try { window.parent.postMessage({ type: 'fuquan-toc-jump', anchor: anchor }, '*'); } catch (err) {}
+    });
+  });
+})();

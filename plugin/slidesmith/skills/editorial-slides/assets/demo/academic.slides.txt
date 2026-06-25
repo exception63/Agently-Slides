@@ -1,0 +1,221 @@
+<!-- ① 封面 cover -->
+<section data-seg="0" data-segname="段 0 · 引言" class="slide cover">
+  <div class="cover__top">
+    <div class="cover__brand">{{BRAND}}</div>
+    <div class="cover__seal">Working Paper</div>
+  </div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">Consumer Behavior · HCI</div>
+    <h1 class="cover__title">沉浸何以转化为<em>拥有</em><br>VR 购物中的心理所有权路径</h1>
+    <p class="cover__sub">When Immersion Becomes Ownership: A Psychological-Ownership Account of Purchase Intention in VR Retail</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Author</span><span class="cover__meta-v">周立影</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Affiliation</span><span class="cover__meta-v">贵州财经大学</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Venue</span><span class="cover__meta-v">2026 消费者行为研讨会</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Date</span><span class="cover__meta-v">2026.06</span></div>
+  </div>
+</section>
+
+<!-- ② 提纲 outline -->
+<section data-seg="0" data-segname="段 0 · 引言" data-title="研究提纲" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">Outline · 研究提纲</div>
+    <h2 class="title head__title">今天分四步讲</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets bullets--lead">
+      <li><b>研究问题</b>　VR 的"沉浸感"为何、又如何提升购买意愿？现有解释为何不够。</li>
+      <li><b>理论框架</b>　提出"沉浸 → 心理所有权 → 购买意愿"的中介路径，并引入边界条件。</li>
+      <li><b>方法与结果</b>　2 组实验（N = 412）+ 中介与调节检验。</li>
+      <li><b>讨论与贡献</b>　对沉浸技术营销与心理所有权理论的双重启示。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ③ 段分隔 secdiv -->
+<section data-seg="1" data-segname="段 1 · 理论框架" class="slide secdiv">
+  <div class="secdiv__num">Part I</div>
+  <div class="secdiv__eyebrow">Theoretical Framework</div>
+  <h2 class="secdiv__title">从"看得真"<br>到"像是<em>我的</em>"</h2>
+  <p class="secdiv__lead">沉浸感提升的不只是体验逼真度——它可能改变人对虚拟物的<em>归属感知</em>。我们把这条路径讲清楚。</p>
+</section>
+
+<!-- ④ 研究问题 / gap（bullets）-->
+<section data-seg="1" data-segname="段 1 · 理论框架" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.1　Research Gap</div>
+    <h2 class="title head__title">已有解释缺了一环</h2>
+    <p class="head__sub">沉浸感—购买意愿的正向关系已被反复验证，但<em>中介机制</em>仍不清楚。</p>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets">
+      <li>多数研究停在"沉浸感→态度/意愿"的<b>直接效应</b>，把中间的心理过程当黑箱 <span class="cite">(Pizzi et al., 2019)</span>。</li>
+      <li>流体验（flow）解释了"投入"，却不解释为何用户对虚拟物产生<b>占有欲</b> <span class="cite">(Hoffman &amp; Novak, 1996)</span>。</li>
+      <li>心理所有权理论指出：<em>控制感、自我投入、深度了解</em>三条途径可催生"它是我的" <span class="cite">(Pierce et al., 2003)</span>——而 VR 恰好放大这三者。</li>
+      <li>本研究主张：<b>心理所有权</b>是连接沉浸感与购买意愿的<em>关键中介</em>。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ⑤ 概念模型图 figure（内联 SVG）-->
+<section data-seg="1" data-segname="段 1 · 理论框架" data-title="概念模型" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.2　Conceptual Model</div>
+    <h2 class="title head__title">一条中介 + 一个边界</h2>
+  </div>
+  <div class="fill">
+    <div class="figure">
+      <div class="figure__frame">
+        <svg viewBox="0 0 1400 540" xmlns="http://www.w3.org/2000/svg" font-family="'Source Sans 3','Noto Sans SC',sans-serif">
+          <defs>
+            <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#27406B"/>
+            </marker>
+            <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#9A6E2E"/>
+            </marker>
+          </defs>
+          <!-- nodes -->
+          <rect class="node" x="60" y="230" width="320" height="120" rx="4"/>
+          <text x="220" y="280" text-anchor="middle" fill="#1C2024" font-size="34" font-weight="600">VR 沉浸感</text>
+          <text x="220" y="316" text-anchor="middle" fill="#5E6670" font-size="22">Immersion (X)</text>
+
+          <rect class="node" x="540" y="60" width="320" height="120" rx="4"/>
+          <text x="700" y="110" text-anchor="middle" fill="#1C2024" font-size="34" font-weight="600">心理所有权</text>
+          <text x="700" y="146" text-anchor="middle" fill="#5E6670" font-size="22">Psych. Ownership (M)</text>
+
+          <rect class="node" x="1020" y="230" width="320" height="120" rx="4"/>
+          <text x="1180" y="280" text-anchor="middle" fill="#1C2024" font-size="34" font-weight="600">购买意愿</text>
+          <text x="1180" y="316" text-anchor="middle" fill="#5E6670" font-size="22">Purchase Intention (Y)</text>
+
+          <rect x="540" y="400" width="320" height="104" rx="4" fill="#F1EEE6" stroke="#9A6E2E" stroke-width="2"/>
+          <text x="700" y="445" text-anchor="middle" fill="#1C2024" font-size="28" font-weight="600">产品触觉重要性</text>
+          <text x="700" y="478" text-anchor="middle" fill="#5E6670" font-size="20">Need for Touch (W)</text>
+
+          <!-- paths -->
+          <path class="path-arrow" d="M300,235 C400,150 470,135 540,128" marker-end="url(#arr)"/>
+          <text x="395" y="150" fill="#27406B" font-size="24" font-style="italic">a</text>
+
+          <path class="path-arrow" d="M860,128 C940,135 1010,150 1100,232" marker-end="url(#arr)"/>
+          <text x="985" y="150" fill="#27406B" font-size="24" font-style="italic">b</text>
+
+          <path class="path-dash" d="M380,300 L1020,300" marker-end="url(#arr)"/>
+          <text x="700" y="290" text-anchor="middle" fill="#5E6670" font-size="22" font-style="italic">c′ (直接效应)</text>
+
+          <path class="path-dash" d="M700,400 L700,300" marker-end="url(#arrG)"/>
+          <text x="730" y="360" fill="#9A6E2E" font-size="22" font-style="italic">调节 b 路径</text>
+        </svg>
+      </div>
+      <div class="figure__cap"><b>图 1</b>沉浸感经由心理所有权影响购买意愿的有调节中介模型。实线为假设的中介路径（a、b），虚线为直接效应（c′）；产品触觉重要性调节 b 路径。</div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑥ 假设 numlist -->
+<section data-seg="1" data-segname="段 1 · 理论框架" data-title="研究假设" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.3　Hypotheses</div>
+    <h2 class="title head__title">四条可检验的假设</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="numlist numlist--lg">
+      <div class="numitem"><div class="numitem__n">H1</div><div class="numitem__main"><div class="numitem__title">沉浸感正向影响购买意愿。</div><div class="numitem__desc">复制既有发现，作为基线。</div></div><div class="numitem__tag">直接效应</div></div>
+      <div class="numitem numitem--accent"><div class="numitem__n">H2</div><div class="numitem__main"><div class="numitem__title">心理所有权中介上述关系。</div><div class="numitem__desc">沉浸 → 所有权 → 意愿（a×b 显著）。</div></div><div class="numitem__tag">核心 · 中介</div></div>
+      <div class="numitem"><div class="numitem__n">H3</div><div class="numitem__main"><div class="numitem__title">产品触觉重要性调节 b 路径。</div><div class="numitem__desc">高触觉需求者，所有权→意愿更强。</div></div><div class="numitem__tag">调节</div></div>
+      <div class="numitem"><div class="numitem__n">H4</div><div class="numitem__main"><div class="numitem__title">合并为有调节的中介。</div><div class="numitem__desc">间接效应随 W 增强（index of moderated mediation）。</div></div><div class="numitem__tag">整合</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑦ 段分隔 -->
+<section data-seg="2" data-segname="段 2 · 方法与结果" class="slide secdiv secdiv--dark">
+  <div class="secdiv__num">Part II</div>
+  <div class="secdiv__eyebrow">Method &amp; Results</div>
+  <h2 class="secdiv__title">两组实验<br>把路径<em>测出来</em></h2>
+  <p class="secdiv__lead">实验 1 建立中介，实验 2 加入调节并复制。预注册于 OSF。</p>
+</section>
+
+<!-- ⑧ 表格 table（booktabs）-->
+<section data-seg="2" data-segname="段 2 · 方法与结果" data-title="实验设计" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.1　Design &amp; Samples</div>
+    <h2 class="title head__title">两组实验概览</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="table-cap"><b>表 1</b>实验设计、样本与操纵方式</div>
+    <table class="table">
+      <thead><tr><th>实验</th><th>设计</th><th class="num">N</th><th>沉浸感操纵</th><th>关键测量</th></tr></thead>
+      <tbody>
+        <tr><td>实验 1</td><td>单因素两水平（高/低沉浸）</td><td class="num">196</td><td>VR 头显 vs. 平面网页</td><td>心理所有权、购买意愿</td></tr>
+        <tr class="hl"><td>实验 2</td><td>2（沉浸）×连续（触觉需求）</td><td class="num">216</td><td>VR 头显 vs. 360° 视频</td><td>+ Need for Touch（NFT 量表）</td></tr>
+        <tr><td>合计</td><td>2 项 · 预注册</td><td class="num">412</td><td>—</td><td>含注意力检验、操纵检验</td></tr>
+      </tbody>
+    </table>
+    <div class="note-box">操纵检验：高沉浸组的临场感显著高于对照组（实验 1：<span class="num">M</span> = 5.42 vs. 3.18，<em>p</em> &lt; .001）。</div>
+  </div>
+</section>
+
+<!-- ⑨ 关键结果 bignum -->
+<section data-seg="2" data-segname="段 2 · 方法与结果" data-title="关键结果" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.2　Key Results</div>
+    <h2 class="title head__title">中介成立，且被调节</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="row" style="gap:28px;width:100%;">
+      <div class="bignum" style="flex:1;"><div class="bignum__v">.34</div><div class="bignum__u">间接效应 a×b<br>95% CI [.19, .51]</div><div class="bignum__k">Bootstrap 5000 · 实验 1</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">.28</div><div class="bignum__u">有调节中介指数<br>index of mod. med.</div><div class="bignum__k">CI [.11, .47] · 实验 2</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">62%</div><div class="bignum__u">总效应中<br>经由所有权传导</div><div class="bignum__k">P<sub>M</sub> = 间接 / 总</div></div>
+    </div>
+    <div class="callout mt-m">直接效应 c′ 在控制中介后明显减弱但仍显著 → <em>部分中介</em>；高触觉需求者的间接效应约为低需求者的两倍。</div>
+  </div>
+</section>
+
+<!-- ⑩ 段分隔 + 讨论 -->
+<section data-seg="3" data-segname="段 3 · 讨论" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part III</div>
+  <div class="secdiv__eyebrow">Discussion</div>
+  <h2 class="secdiv__title">沉浸的意义<br>是<em>占有</em></h2>
+  <p class="secdiv__lead">理论与实践的双重启示，以及边界与未来方向。</p>
+</section>
+
+<!-- ⑪ 贡献 cards -->
+<section data-seg="3" data-segname="段 3 · 讨论" data-title="理论贡献" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§3.1　Contributions</div>
+    <h2 class="title head__title">三点贡献</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--3">
+      <div class="card card--v"><div class="card__eyebrow">理论</div><div class="card__title">打开中介黑箱</div><div class="card__desc">把心理所有权确立为沉浸—意愿关系的核心机制，超越"流体验"解释。</div><div class="card__meta">机制</div></div>
+      <div class="card card--n"><div class="card__eyebrow">边界</div><div class="card__title">识别个体差异</div><div class="card__desc">触觉需求决定虚拟所有权能否转化为购买，回应"对谁更有效"。</div><div class="card__meta">调节</div></div>
+      <div class="card card--g"><div class="card__eyebrow">实践</div><div class="card__title">设计可操作</div><div class="card__desc">提升控制感与自我投入的交互（试穿、定制、把玩）应被优先设计。</div><div class="card__meta">营销</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑫ 核心论断 insight -->
+<section data-seg="3" data-segname="段 3 · 讨论" class="slide insight">
+  <div class="insight__eyebrow">Take-home Message</div>
+  <h2 class="insight__statement">让用户在虚拟里<em>拥有</em>，<br>他才会在现实里买单。</h2>
+  <p class="insight__sub">沉浸技术的营销价值，最终兑现于心理所有权。</p>
+</section>
+
+<!-- ⑬ 参考文献 refs -->
+<section data-seg="3" data-segname="段 3 · 讨论" data-title="参考文献" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">References · 示例文献 · 仅供版式参照</div>
+    <h2 class="title head__title" style="font-size:46px;">参考文献</h2>
+  </div>
+  <div class="fill">
+    <ol class="refs">
+      <li>Hoffman, D. L., &amp; Novak, T. P. (1996). Marketing in hypermedia computer-mediated environments. <em>Journal of Marketing</em>, 60(3), 50–68.</li>
+      <li>Longoni, C., Bonezzi, A., &amp; Morewedge, C. K. (2019). Resistance to medical artificial intelligence. <em>Journal of Consumer Research</em>, 46(4), 629–650.</li>
+      <li>Peck, J., &amp; Shu, S. B. (2009). The effect of mere touch on perceived ownership. <em>Journal of Consumer Research</em>, 36(3), 434–447.</li>
+      <li>Pierce, J. L., Kostova, T., &amp; Dirks, K. T. (2003). The state of psychological ownership. <em>Review of General Psychology</em>, 7(1), 84–107.</li>
+      <li>Pizzi, G., Scarpi, D., Pichierri, M., &amp; Vannucci, V. (2019). Virtual reality, real reactions? <em>Journal of Retailing and Consumer Services</em>, 51, 1–9.</li>
+      <li style="color:var(--ink-4);">周立影 等（进行中）. VR 沉浸感与心理所有权. 自有研究，数据收集中——此处仅示意版式。</li>
+    </ol>
+  </div>
+</section>

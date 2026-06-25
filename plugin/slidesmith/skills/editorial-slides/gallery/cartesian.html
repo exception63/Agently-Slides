@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>极简网格 · cartesian 样板</title>
+<!-- 在线时加载该皮肤的字体；离线时自动回退到系统字体（字体栈已含 fallback） -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600&display=swap">
+<style>
+/* skin: cartesian · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
+/* ════════════════════════════════════════════════════════════════════
+   _core.css · 与风格无关的骨架 + 引擎界面（topbar / 段导航 / 进度条 / 投屏态）
+   所有皮肤共用。它只用令牌，不定义令牌——令牌由各皮肤的 :root 提供：
+     必需：--paper --ink --accent --accent-2 --accent-soft --rule
+          --pad-x --pad-y --font-sans --font-display --font-mono --fit-scale
+   引擎周边的工具 UI（顶栏/侧栏）固定深色，只有强调色（进度条/当前态/缩略框）
+   跟随皮肤的 --accent，使工具一致、内容随皮变化。
+   ════════════════════════════════════════════════════════════════════ */
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:#2a2a2a;font-family:var(--font-sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+body{padding-left:0;padding-top:60px;transition:padding 0.2s;}
+.deck{display:flex;flex-direction:column;gap:32px;padding:32px 24px 60px 320px;align-items:center;}
+.slide-wrap{width:calc(1920px * var(--fit-scale));height:calc(1080px * var(--fit-scale));position:relative;flex-shrink:0;}
+.slide{width:1920px;height:1080px;background:var(--paper);color:var(--ink);padding:var(--pad-y) var(--pad-x);position:absolute;top:0;left:0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,0.4);transform:scale(var(--fit-scale));transform-origin:top left;}
+
+/* ============================ 顶部控制条 ============================ */
+.topbar{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(20,23,31,0.96);color:#F2EDE2;display:flex;align-items:center;gap:16px;padding:0 24px;z-index:1000;backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.08);}
+.topbar__brand{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:0.02em;color:#F2EDE2;}
+.topbar__sub{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;color:rgba(242,237,226,0.5);text-transform:uppercase;}
+.topbar__spacer{flex:1;}
+.topbar__btn{background:transparent;color:#F2EDE2;border:1px solid rgba(242,237,226,0.3);padding:7px 16px;border-radius:4px;font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;font-weight:500;}
+.topbar__btn:hover{background:rgba(242,237,226,0.1);border-color:rgba(242,237,226,0.6);}
+.topbar__btn--primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.topbar__btn--primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
+.topbar__btn--presenter{background:#2A2A2A;border-color:#2A2A2A;color:#F5E3B0;}
+.topbar__btn--presenter:hover{background:#3a3a3a;border-color:#B58530;color:#F5E3B0;}
+.topbar__btn--presenter.active{background:#B58530;border-color:#B58530;color:#fff;box-shadow:0 0 0 2px rgba(181,133,48,0.3);}
+.topbar__info{font-family:var(--font-mono);font-size:12px;color:rgba(242,237,226,0.7);letter-spacing:0.08em;}
+.topbar__info strong{color:#F2EDE2;font-weight:600;}
+
+/* ============================ 折叠式段导航 + 缩略图 ============================ */
+.segnav{position:fixed;left:0;top:60px;bottom:0;width:300px;background:rgba(20,23,31,0.94);border-right:1px solid rgba(255,255,255,0.08);z-index:999;overflow-y:auto;backdrop-filter:blur(8px);}
+.segnav::-webkit-scrollbar{width:6px;}
+.segnav::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);}
+.segnav::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+.segnav__seg{border-bottom:1px solid rgba(255,255,255,0.06);}
+.segnav__head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:transparent;border:0;color:rgba(242,237,226,0.78);width:100%;cursor:pointer;text-align:left;font-family:var(--font-sans);transition:background 0.15s;}
+.segnav__head:hover{background:rgba(255,255,255,0.04);color:#F2EDE2;}
+.segnav__seg--current > .segnav__head{background:var(--accent-soft);color:#F2EDE2;}
+.segnav__head-id{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--accent-ui,#C2A06B);text-transform:uppercase;font-weight:600;width:42px;flex-shrink:0;}
+.segnav__head-name{flex:1;font-size:13px;font-weight:500;line-height:1.3;}
+.segnav__head-meta{font-family:var(--font-mono);font-size:10px;color:rgba(242,237,226,0.4);letter-spacing:0.1em;}
+.segnav__head-arrow{font-size:10px;color:rgba(242,237,226,0.4);transition:transform 0.2s;flex-shrink:0;width:12px;text-align:center;}
+.segnav__seg--expanded .segnav__head-arrow{transform:rotate(90deg);}
+.segnav__thumbs{display:none;padding:8px 12px 14px;grid-template-columns:1fr 1fr;gap:8px;}
+.segnav__seg--expanded .segnav__thumbs{display:grid;}
+.thumb{width:126px;height:71px;background:var(--paper);cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden;transition:border-color 0.15s;flex-shrink:0;}
+.thumb:hover{border-color:var(--accent);}
+.thumb--active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
+.thumb__inner{width:1920px !important;height:1080px !important;transform:scale(0.0656) !important;transform-origin:top left !important;position:absolute !important;top:0 !important;left:0 !important;box-shadow:none !important;pointer-events:none !important;}
+/* 编号徽标固定深字 + 白底——所有皮通用（深色皮的 --ink 是浅色，不能用 var(--ink)，否则白底白字看不清）*/
+.thumb__num{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;color:#16181E;background:rgba(255,255,255,0.85);padding:1px 5px;border-radius:2px;z-index:2;font-weight:600;}
+
+/* —— 进度条 / 提示 —— */
+.progress{position:fixed;top:60px;left:300px;right:0;height:3px;background:rgba(255,255,255,0.08);z-index:998;}
+.progress__bar{height:100%;background:var(--accent);transition:width 0.2s;}
+.hint{position:fixed;bottom:16px;right:20px;font-family:var(--font-mono);font-size:11px;color:#888;pointer-events:none;z-index:1000;letter-spacing:0.1em;}
+body.present .hint,body:fullscreen .hint{color:rgba(255,255,255,0.3);}
+
+/* ============================ 投屏 / 全屏模式 ============================ */
+body.present{background:#000;padding:0;}
+body.present .topbar,body.present .segnav,body.present .progress{display:none;}
+body.present .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+body.present .slide-wrap{width:auto;height:auto;position:static;flex-shrink:0;}
+body.present .slide{display:none;position:static;transform:scale(var(--sc,1));transform-origin:center center;box-shadow:none;}
+body.present .slide.active{display:flex;}
+body.fullscreen{background:#000;}
+:fullscreen{background:#000;}
+:fullscreen .topbar,:fullscreen .segnav,:fullscreen .progress{display:none;}
+:fullscreen .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+:fullscreen .slide{box-shadow:none;}
+
+
+/* —— 皮肤 cartesian —— */
+/* FONTS https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600&display=swap */
+/* skin: cartesian · ported from beautiful-html-templates/cartesian (MIT · © 2026 Zara Zhang) · 极简网格/安静报纸随笔 */
+/* ════════════════════════════════════════════════════════════════════
+   DNA：scheme light · formality high · density low · quiet/considered/
+   elegant/warm-minimal。暖骨色纸 + 石灰中性 · 无饱和彩色 · 强调全靠
+   字重 + 发丝线（hairline rules）+ 网格秩序，accent 是刻意低调的暖灰。
+   标题 = Playfair Display（过渡衬线）· 正文 = Inter（grotesk）。
+   大留白、细线、瑞士网格感 —— "克制本身就是讯息"。
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* —— 配色（暖骨纸 + 石灰中性 + 单一暖灰 accent · 全系靠色阶与字体，不靠彩色）—— */
+  --paper:#EDE8E0;--paper-soft:#E6E0D6;--paper-warm:#E2DBD1;
+  --rule:#CBC3B6;--rule-soft:#DAD3C6;--rule-strong:#B8B0A4;
+  --ink:#1A1A1A;--ink-2:#3C3A36;--ink-3:#5A5A5A;--ink-4:#8A8178;
+  --accent:#8A8178;--accent-2:#6A6258;--accent-soft:rgba(138,129,120,0.10);--accent-ui:#D9D2C6;
+  --gold:#9A8A6E;--gold-soft:#B3A488;        /* 第二色，低饱和暖砂，稀用 */
+  --navy:#5C5E63;--green:#6E7468;            /* 并列区分次色：低饱和中性偏色，刻意克制 */
+  --good:#6E7468;--warn:#9A8A6E;--bad:#8C6F63; /* 语义色，极克制，中性化 */
+  --night:#28251F;--night-2:#322E27;--night-paper:#E6E0D6;
+  /* —— 字号阶梯（density low：偏小字号 + 大留白）—— */
+  --t-display:118px;--t-h1:78px;--t-h2:54px;--t-h3:38px;--t-h4:30px;
+  --t-lead:29px;--t-body:27px;--t-small:22px;--t-eyebrow:18px;
+  --pad-x:130px;--pad-y:92px;
+  /* 字体栈 · 标题过渡衬线（Playfair + 思源宋体）· 正文 grotesk（Inter + 思源黑体）*/
+  --font-serif:"Playfair Display","Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  --font-display:"Playfair Display","Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  --font-sans:"Inter","Noto Sans SC","Source Han Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55;
+}
+
+/* —— 页脚 chrome：细发丝线 + 段名 / 页码（网格坐标感）—— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:44px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-sans);font-size:16px;letter-spacing:0.08em;color:var(--ink-4);padding-top:16px;border-top:1px solid var(--rule);}
+.chrome__l{display:flex;gap:26px;align-items:baseline;white-space:nowrap;}
+.chrome__seg{color:var(--ink-3);font-weight:500;}
+.chrome__r{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:0.14em;}
+/* —— runner：可选顶部页眉条（讲题 / 机构）—— */
+.runner{position:absolute;top:58px;left:var(--pad-x);right:var(--pad-x);display:flex;justify-content:space-between;align-items:center;font-family:var(--font-sans);font-size:17px;color:var(--ink-3);padding-bottom:16px;border-bottom:1px solid var(--rule);}
+.runner__r{font-family:var(--font-mono);font-size:14px;letter-spacing:0.16em;color:var(--ink-4);text-transform:uppercase;}
+
+/* —— 通用排版原子 —— */
+.eyebrow{font-family:var(--font-sans);font-size:var(--t-eyebrow);letter-spacing:0.24em;color:var(--accent);text-transform:uppercase;font-weight:500;}
+.title{font-family:var(--font-display);font-weight:600;font-size:var(--t-h2);line-height:1.16;letter-spacing:0;color:var(--ink);margin:0;}
+.title--xl{font-size:100px;}.title--lg{font-size:78px;}.title--md{font-size:46px;}.title--sm{font-size:36px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.65;color:var(--ink-2);max-width:1440px;margin:0;font-weight:400;}
+.body{font-size:var(--t-body);line-height:1.72;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.65;color:var(--ink-3);}
+.num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
+.mark-v{color:var(--ink);font-weight:600;}.mark-n{color:var(--accent);}.mark-g{color:var(--gold);}
+.key{color:var(--ink);font-weight:600;font-style:normal;}
+strong{font-weight:600;color:var(--ink);}                                  /* 极简：强调靠字重，不靠彩色 */
+em{font-style:italic;color:var(--ink);font-family:var(--font-serif);}       /* cartesian：斜体衬线 = 克制强调 */
+.cite{font-family:var(--font-sans);font-size:0.7em;color:var(--ink-4);letter-spacing:0.01em;white-space:nowrap;font-style:normal;font-weight:400;}
+.head{margin-top:6px;margin-bottom:34px;padding-bottom:22px;border-bottom:1px solid var(--rule);}  /* 标题下发丝线 = 页眉感 */
+.head__eyebrow{margin-bottom:18px;}.head__title{margin:0 0 10px;}
+.head__sub{font-family:var(--font-sans);font-size:23px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.55;}
+.fill{flex:1;min-height:0;}
+.center{align-items:center;justify-content:center;text-align:center;}
+.center .lead{margin-left:auto;margin-right:auto;}
+.center .head{border-bottom:0;}
+
+/* —— cover 封面（细竖线 + 大留白 · 安静报纸头版）—— */
+.cover{background:var(--paper);justify-content:space-between;}
+.cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover__brand{font-family:var(--font-sans);font-size:21px;letter-spacing:0.04em;color:var(--ink-3);font-weight:500;}
+.cover__seal{font-family:var(--font-sans);font-size:14px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;border:1px solid var(--rule-strong);padding:9px 18px;border-radius:0;font-weight:500;}
+.cover__main{display:flex;flex-direction:column;gap:32px;border-left:1px solid var(--rule-strong);padding-left:52px;}
+.cover__eyebrow{font-family:var(--font-sans);font-size:18px;letter-spacing:0.28em;color:var(--accent);text-transform:uppercase;font-weight:500;}
+.cover__title{font-family:var(--font-display);font-weight:600;font-size:96px;line-height:1.06;letter-spacing:0;color:var(--ink);margin:0;}
+.cover__title em{color:var(--ink);font-style:italic;font-weight:400;}
+.cover__sub{font-family:var(--font-sans);font-size:31px;color:var(--ink-3);max-width:1460px;font-weight:300;line-height:1.55;}
+.cover__meta{display:flex;gap:70px;font-family:var(--font-sans);color:var(--ink-3);padding-top:32px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:8px;}
+.cover__meta-k{font-family:var(--font-sans);color:var(--ink-4);font-size:13px;letter-spacing:0.18em;text-transform:uppercase;font-weight:500;}
+.cover__meta-v{color:var(--ink);font-size:20px;font-weight:500;}
+
+/* —— section divider 段分隔（细线 + 衬线大标 · 无巨型幽灵数字）—— */
+.secdiv{background:var(--paper);justify-content:center;}
+.secdiv--dark{background:var(--night);color:var(--night-paper);}
+.secdiv--accent{background:var(--paper-warm);color:var(--ink);}
+.secdiv__num{font-family:var(--font-display);font-size:26px;font-weight:600;font-style:italic;letter-spacing:0.04em;color:var(--accent);margin-bottom:26px;}
+.secdiv--dark .secdiv__num,.secdiv--accent .secdiv__num{color:var(--accent);}
+.secdiv__eyebrow{font-family:var(--font-sans);font-size:17px;letter-spacing:0.28em;color:var(--ink-4);text-transform:uppercase;margin-bottom:34px;font-weight:500;}
+.secdiv--dark .secdiv__eyebrow{color:rgba(230,224,214,0.6);}.secdiv--accent .secdiv__eyebrow{color:var(--ink-4);}
+.secdiv__title{font-family:var(--font-display);font-weight:600;font-size:84px;line-height:1.1;letter-spacing:0;color:var(--ink);margin:0 0 36px;max-width:1500px;padding-top:34px;border-top:1px solid var(--rule-strong);}
+.secdiv__title em{color:var(--ink);font-style:italic;font-weight:400;}
+.secdiv--dark .secdiv__title{color:var(--night-paper);border-top-color:rgba(230,224,214,0.4);}
+.secdiv--accent .secdiv__title{color:var(--ink);border-top-color:var(--rule-strong);}
+.secdiv__lead{font-family:var(--font-sans);font-size:29px;line-height:1.65;color:var(--ink-3);max-width:1380px;margin:0;font-weight:300;}
+.secdiv--dark .secdiv__lead{color:rgba(230,224,214,0.78);}
+.secdiv--accent .secdiv__lead{color:var(--ink-3);}
+.secdiv__meta{font-family:var(--font-sans);font-size:15px;letter-spacing:0.16em;color:var(--ink-4);text-transform:uppercase;padding-top:28px;margin-top:32px;border-top:1px solid var(--rule);display:flex;gap:40px;font-weight:500;}
+
+/* —— manifesto / insight 中心论断（衬线大字 · 引号留白 · 不喊口号）—— */
+.manifesto,.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 150px;}
+.manifesto__eyebrow,.insight__eyebrow{font-family:var(--font-sans);font-size:17px;letter-spacing:0.28em;color:var(--accent);text-transform:uppercase;margin-bottom:50px;font-weight:500;}
+.manifesto__title,.insight__statement{font-family:var(--font-display);font-weight:500;font-size:76px;line-height:1.24;letter-spacing:0;color:var(--ink);margin:0;max-width:1620px;}
+.manifesto__title em,.insight__statement em{color:var(--ink);font-style:italic;font-weight:400;}
+.manifesto__sub,.insight__sub{font-family:var(--font-sans);font-size:28px;color:var(--ink-3);margin:46px auto 0;max-width:1360px;line-height:1.6;font-weight:300;}
+.manifesto--dark{background:var(--night);color:var(--night-paper);}
+.manifesto--dark .manifesto__title{color:var(--night-paper);}
+.manifesto--dark .manifesto__sub{color:rgba(230,224,214,0.78);}
+
+/* —— bullets 论点清单（主力版式 · 发丝线短破折号 · 舒展）—— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:28px;}
+.bullets > li{font-family:var(--font-sans);font-size:29px;line-height:1.62;color:var(--ink-2);padding-left:48px;position:relative;font-weight:400;}
+.bullets > li::before{content:"";position:absolute;left:0;top:19px;width:22px;height:1px;background:var(--ink-4);}
+.bullets li b,.bullets li strong{color:var(--ink);font-weight:600;}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:13px;}
+.bullets ul li{font-size:24px;color:var(--ink-3);padding-left:42px;position:relative;line-height:1.55;}
+.bullets ul li::before{content:"";position:absolute;left:6px;top:15px;width:7px;height:7px;border:1px solid var(--rule-strong);border-radius:50%;}
+.bullets--lead > li{font-size:32px;}
+
+/* —— figure 图（模型图 / 图表 + 编号图注 · 浅纸框）—— */
+.figure{display:flex;flex-direction:column;gap:20px;height:100%;}
+.figure__frame{flex:1;min-height:0;background:rgba(255,255,255,0.35);border:1px solid var(--rule);border-radius:0;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:28px;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-family:var(--font-sans);font-size:20px;color:var(--ink-3);line-height:1.55;}
+.figure__cap b{font-family:var(--font-sans);font-size:15px;letter-spacing:0.14em;color:var(--accent);font-weight:600;margin-right:14px;text-transform:uppercase;}
+.figure__src{font-family:var(--font-sans);font-size:15px;color:var(--ink-4);}
+.figure--row{flex-direction:row;gap:40px;align-items:stretch;}
+
+/* —— 概念模型小零件（X→M→Y / 调节）· 给 figure 内联 SVG 用作参照 —— */
+.node{fill:rgba(255,255,255,0.5);stroke:var(--ink-3);stroke-width:1.5;}
+.node-accent{fill:var(--accent);}
+.path-arrow{stroke:var(--ink-3);stroke-width:1.5;fill:none;}
+.path-dash{stroke:var(--ink-4);stroke-width:1.5;stroke-dasharray:6 5;fill:none;}
+
+/* —— cards 卡片组（细线框 + 顶部发丝线 · 克制）—— */
+.cards{display:grid;gap:28px;grid-template-columns:repeat(3,1fr);}
+.cards--2{grid-template-columns:repeat(2,1fr);}
+.cards--4{grid-template-columns:repeat(4,1fr);}
+.cards--5{grid-template-columns:repeat(5,1fr);}
+.cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{background:rgba(255,255,255,0.32);padding:34px 30px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--rule);border-top:1px solid var(--ink-4);border-radius:0;}
+.card--v{border-top-color:var(--ink-4);}.card--n{border-top-color:var(--gold);}.card--g{border-top-color:var(--green);}
+.card--plain{background:transparent;border:0;border-top:1px solid var(--rule);border-radius:0;padding:26px 0;}
+.card__eyebrow{font-family:var(--font-sans);font-size:15px;letter-spacing:0.18em;text-transform:uppercase;color:var(--accent);font-weight:500;}
+.card__level{font-family:var(--font-display);font-size:52px;font-weight:600;line-height:0.95;color:var(--ink);}
+.card__title{font-family:var(--font-display);font-weight:600;font-size:30px;color:var(--ink);line-height:1.28;margin-top:6px;}
+.card__desc{font-family:var(--font-sans);font-size:21px;color:var(--ink-3);line-height:1.6;font-weight:400;}
+.card__meta{font-family:var(--font-sans);font-size:14px;letter-spacing:0.14em;color:var(--ink-4);text-transform:uppercase;margin-top:auto;padding-top:14px;border-top:1px solid var(--rule);font-weight:500;}
+
+/* —— numlist 编号清单（衬线编号 + 发丝线分隔 · 报纸目录感）—— */
+.numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule-strong);}
+.numitem{display:grid;grid-template-columns:72px 1fr auto;align-items:baseline;gap:34px;padding:22px 0;border-bottom:1px solid var(--rule);}
+.numitem--tight{padding:14px 0;}
+.numitem__n{font-family:var(--font-display);font-size:34px;font-weight:600;font-style:italic;color:var(--accent);line-height:1;}
+.numitem__main{display:flex;flex-direction:column;gap:6px;}
+.numitem__title{font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1.3;}
+.numitem__desc{font-family:var(--font-sans);font-size:21px;color:var(--ink-3);line-height:1.6;}
+.numitem__tag{font-family:var(--font-sans);font-size:16px;letter-spacing:0.08em;color:var(--ink-4);padding-top:8px;text-transform:uppercase;font-weight:500;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--ink);}
+.numlist--lg .numitem{padding:15px 0;gap:24px;grid-template-columns:64px 1fr auto;}
+.numlist--lg .numitem__n{font-size:30px;}.numlist--lg .numitem__title{font-size:24px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.5;}.numlist--lg .numitem__tag{font-size:14px;}
+
+/* —— terminal 终端 / prompt（暗石底 · 演示用）—— */
+.terminal{background:var(--night);color:#DDD7CC;padding:30px 38px;font-family:var(--font-mono);font-size:18px;line-height:1.6;position:relative;border-radius:0;}
+.terminal__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(221,215,204,0.5);margin-bottom:24px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--gold-soft);}
+.terminal__user{color:#C9C0B2;}.terminal__system{color:#A7AB9C;}.terminal__hint{color:#B3A488;}.terminal__dim{color:rgba(221,215,204,0.45);}
+.terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
+
+/* —— compare 两栏对比（发丝线分栏）—— */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--ink-4);border-bottom:1px solid var(--rule);}
+.compare__col{padding:40px 44px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:16px;}
+.compare__col:last-child{border-right:0;}
+.compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
+.compare__col--good .compare__title{color:var(--ink);}
+.compare__label{font-family:var(--font-sans);font-size:16px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-4);font-weight:500;}
+.compare__title{font-family:var(--font-display);font-weight:600;font-size:38px;color:var(--ink);line-height:1.2;margin-bottom:10px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:15px;}
+.compare__list li{font-family:var(--font-sans);font-size:21px;line-height:1.6;color:var(--ink-3);padding-left:28px;position:relative;}
+.compare__list li::before{content:"–";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--ink);}
+
+/* —— steps 流程（发丝线分格）—— */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--ink-4);border-bottom:1px solid var(--rule);}
+.steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
+.step{padding:36px 30px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:12px;}
+.step:last-child{border-right:0;}
+.step__n{font-family:var(--font-display);font-size:24px;font-weight:600;font-style:italic;letter-spacing:0.02em;color:var(--accent);}
+.step__title{font-family:var(--font-display);font-weight:600;font-size:28px;color:var(--ink);line-height:1.25;}
+.step__desc{font-family:var(--font-sans);font-size:20px;color:var(--ink-3);line-height:1.6;}
+
+/* —— table 表格（booktabs：上下细线、无竖线）—— */
+.table-cap{font-family:var(--font-sans);font-size:20px;color:var(--ink-3);margin-bottom:16px;}
+.table-cap b{font-family:var(--font-sans);font-size:15px;letter-spacing:0.14em;color:var(--accent);font-weight:600;margin-right:14px;text-transform:uppercase;}
+.table{width:100%;border-collapse:collapse;font-family:var(--font-sans);font-size:21px;border-top:1px solid var(--ink);border-bottom:1px solid var(--ink);}
+.table th,.table td{padding:16px 20px;text-align:left;vertical-align:top;line-height:1.5;}
+.table thead th{font-family:var(--font-sans);font-size:14px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--rule-strong);font-weight:600;}
+.table tbody tr{border-bottom:1px solid var(--rule);}
+.table tbody tr:last-child{border-bottom:0;}
+.table td.num{font-variant-numeric:tabular-nums;}
+.table td.bad{color:var(--ink-4);}.table td.good{color:var(--ink);font-weight:600;}
+.table tr.hl td{background:var(--accent-soft);}
+
+/* —— formula5 编号行（衬线编号）—— */
+.formula5{display:grid;grid-template-columns:80px 1fr 1.2fr;gap:0;border-top:1px solid var(--ink-4);}
+.formula5__row{display:contents;}
+.formula5__row > div{padding:24px 26px;border-bottom:1px solid var(--rule);}
+.formula5__n{font-family:var(--font-display);font-size:38px;font-weight:600;font-style:italic;color:var(--accent);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--ink);}
+.formula5__v{font-family:var(--font-sans);font-size:21px;color:var(--ink-3);line-height:1.6;}
+
+/* —— arch 分层堆栈（左侧发丝线分层）—— */
+.arch{display:flex;flex-direction:column;gap:8px;}
+.arch__layer{display:grid;grid-template-columns:60px 240px 1fr;gap:26px;align-items:center;padding:16px 28px;background:rgba(255,255,255,0.32);border:1px solid var(--rule);border-left:2px solid var(--ink-4);border-radius:0;}
+.arch__layer--5{border-left-color:var(--ink);}
+.arch__layer--4{border-left-color:var(--accent);}
+.arch__layer--3{border-left-color:var(--gold);}
+.arch__layer--2{border-left-color:var(--green);}
+.arch__layer--1{border-left-color:var(--navy);}
+.arch__n{font-family:var(--font-display);font-size:30px;font-weight:600;font-style:italic;color:var(--accent);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-sans);font-size:12px;color:var(--ink-4);letter-spacing:0.12em;margin-top:3px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-family:var(--font-sans);font-size:18px;color:var(--ink-3);line-height:1.5;}
+.arch__tag{font-family:var(--font-sans);font-size:13px;letter-spacing:0.1em;color:var(--ink-4);text-transform:uppercase;text-align:right;font-weight:500;}
+
+/* —— three-circle 三区（顶部细线区分）—— */
+.three-circle{display:flex;gap:32px;align-items:stretch;}
+.zone{flex:1;padding:36px 34px;background:rgba(255,255,255,0.32);border:1px solid var(--rule);border-top:2px solid;border-radius:0;display:flex;flex-direction:column;gap:15px;}
+.zone--g{border-top-color:var(--green);}
+.zone--y{border-top-color:var(--gold);}
+.zone--r{border-top-color:var(--bad);}
+.zone__k{font-family:var(--font-sans);font-size:15px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-4);font-weight:500;}
+.zone__title{font-family:var(--font-display);font-size:36px;font-weight:600;color:var(--ink);}
+.zone--g .zone__title{color:var(--green);}.zone--y .zone__title{color:var(--gold);}.zone--r .zone__title{color:var(--bad);}
+.zone__test{font-family:var(--font-serif);font-size:21px;color:var(--ink-3);font-style:italic;}
+.zone__eg{font-family:var(--font-sans);font-size:19px;color:var(--ink-3);line-height:1.6;}
+.zone__action{margin-top:auto;padding-top:15px;border-top:1px solid var(--rule);font-family:var(--font-sans);font-size:20px;font-weight:600;color:var(--ink);}
+
+/* —— bigq 装框大引用（衬线斜体 · 引号留白）—— */
+.bigq{background:var(--paper-soft);padding:44px 60px;border-left:1px solid var(--rule-strong);border-radius:0;text-align:left;}
+.bigq__t{font-family:var(--font-serif);font-size:46px;font-weight:400;font-style:italic;line-height:1.36;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--ink);}
+.bigq__sub{font-family:var(--font-sans);font-size:20px;color:var(--ink-4);margin-top:20px;font-style:normal;letter-spacing:0.04em;text-transform:uppercase;font-weight:500;}
+
+/* —— matrix 矩阵（发丝线网格）—— */
+.matrix{display:grid;grid-template-columns:260px repeat(3,1fr);border-top:1px solid var(--ink-4);border-left:1px solid var(--rule);}
+.matrix__h{padding:20px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-sans);font-size:14px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);background:var(--paper-soft);text-align:center;font-weight:600;}
+.matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;}
+.matrix__cell{padding:22px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-sans);font-size:18px;line-height:1.5;color:var(--ink-3);min-height:84px;}
+.matrix__cell strong{color:var(--ink);}
+
+/* —— bignum 关键数字（衬线大字 · 墨色 · 不靠彩色）—— */
+.bignum{display:flex;flex-direction:column;gap:8px;padding:34px 32px;background:rgba(255,255,255,0.32);border:1px solid var(--rule);border-top:1px solid var(--ink-4);border-radius:0;}
+.bignum__v{font-family:var(--font-display);font-size:84px;font-weight:600;line-height:0.98;color:var(--ink);letter-spacing:-0.01em;}
+.bignum__u{font-family:var(--font-sans);font-size:24px;color:var(--ink-3);font-weight:400;line-height:1.4;}
+.bignum__k{font-family:var(--font-sans);font-size:16px;color:var(--ink-4);margin-top:12px;letter-spacing:0.04em;}
+
+/* —— summary 总结三栏 —— */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:26px;}
+.sum-card{padding:36px 34px;background:rgba(255,255,255,0.32);border:1px solid var(--rule);border-top:1px solid var(--ink-4);border-radius:0;display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--ink-4);}.sum-card--n{border-top-color:var(--gold);}.sum-card--g{border-top-color:var(--green);}
+.sum-card__k{font-family:var(--font-sans);font-size:15px;letter-spacing:0.14em;color:var(--ink-4);text-transform:uppercase;font-weight:500;}
+.sum-card__v{font-family:var(--font-display);font-weight:600;font-size:40px;color:var(--ink);line-height:1.15;}
+.sum-card--n .sum-card__v{color:var(--ink);}.sum-card--g .sum-card__v{color:var(--ink);}
+.sum-card__hint{font-family:var(--font-sans);font-size:20px;color:var(--ink-3);line-height:1.6;}
+
+/* —— refs 参考文献（编号 + 悬挂缩进 + 刊名斜体 · 两列）—— */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:14px 60px;counter-reset:ref;list-style:none;margin:0;padding:0;}
+.refs--1col{grid-template-columns:1fr;}
+.refs li{font-family:var(--font-sans);font-size:18px;line-height:1.5;color:var(--ink-3);padding-left:40px;position:relative;break-inside:avoid;}
+.refs li::before{counter-increment:ref;content:"["counter(ref)"]";position:absolute;left:0;top:0;font-family:var(--font-mono);font-size:15px;color:var(--accent);font-weight:600;}
+.refs li em,.refs li .jrnl{font-style:italic;color:var(--ink);font-family:var(--font-serif);}
+.refs--plain li::before{content:"";}
+.refs--plain li{padding-left:30px;text-indent:-30px;}
+.refs--dim li{color:var(--ink-4);}
+
+/* —— helpers —— */
+.callout{border-left:1px solid var(--rule-strong);padding:20px 30px;background:var(--accent-soft);font-family:var(--font-sans);font-size:21px;line-height:1.6;color:var(--ink-2);border-radius:0;}
+.note-box{margin-top:26px;padding:22px 30px;background:var(--paper-soft);border-left:1px solid var(--rule-strong);font-family:var(--font-sans);font-size:21px;line-height:1.6;color:var(--ink-2);border-radius:0;}
+.row{display:flex;gap:34px;}.col{display:flex;flex-direction:column;gap:26px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:34px;}.mt-l{margin-top:54px;}
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__brand">CARTESIAN</div>
+  <div class="topbar__sub">cartesian skin</div>
+  <div class="topbar__spacer"></div>
+  <span class="topbar__info">当前 <strong id="curSeg">段 0</strong> · <strong id="curIdx">1</strong> / <strong id="totalIdx">0</strong></span>
+  <button class="topbar__btn" id="prevBtn" title="上一页 ←">←</button>
+  <button class="topbar__btn" id="nextBtn" title="下一页 →">→</button>
+  <button class="topbar__btn topbar__btn--primary" id="playBtn" title="全屏播放（F 或 Enter）">▶ 全屏播放</button>
+  <button class="topbar__btn topbar__btn--presenter" id="presenterBtn" title="演讲者模式 · 副屏同步讲稿">🖥 演讲者</button>
+</header>
+
+<nav class="segnav" id="segnav"></nav>
+<div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
+<div class="hint">F 全屏播放 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
+
+<div class="deck" id="deck">
+
+<!-- ① 封面 cover -->
+<section data-seg="0" data-segname="段 0 · 缘起" class="slide cover">
+  <div class="cover__top">
+    <div class="cover__brand">CARTESIAN</div>
+    <div class="cover__seal">Design Essay</div>
+  </div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">留白研究 · Field Notes</div>
+    <h1 class="cover__title">把话<em>留半句</em><br>克制作为一种设计语言</h1>
+    <p class="cover__sub">On Restraint：当界面、品牌与叙事都安静下来，用户究竟读到了什么</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Author</span><span class="cover__meta-v">周立影</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Studio</span><span class="cover__meta-v">安静工作室</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Series</span><span class="cover__meta-v">设计随笔 No.04</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Date</span><span class="cover__meta-v">2026.06</span></div>
+  </div>
+</section>
+
+<!-- ② 提纲 outline（bullets）-->
+<section data-seg="0" data-segname="段 0 · 缘起" data-title="提纲" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">Outline · 今天的走向</div>
+    <h2 class="title head__title">四个安静的命题</h2>
+    <p class="head__sub">不是教你"做减法"——而是问：减下去之后，<em>剩下的</em>该如何说话。</p>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets bullets--lead">
+      <li><b>命题一</b>　留白不是没有内容，而是把节奏交还给读者。</li>
+      <li><b>命题二</b>　发丝线如何替代色块，承担"分区"与"层级"。</li>
+      <li><b>命题三</b>　一个近中性的强调色，能比五种彩色更有声音。</li>
+      <li><b>命题四</b>　克制是一种立场——它对读者的智识表示信任。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ③ 段分隔 secdiv -->
+<section data-seg="1" data-segname="段 1 · 留白与节奏" class="slide secdiv">
+  <div class="secdiv__num">Part I</div>
+  <div class="secdiv__eyebrow">Whitespace &amp; Rhythm</div>
+  <h2 class="secdiv__title">留白<br>是<em>给读者的</em>呼吸</h2>
+  <p class="secdiv__lead">页面上没有印字的地方，并非"空"——它在替你控制语速，决定读者停在哪里、又在哪里加速。</p>
+</section>
+
+<!-- ④ 论点 bullets -->
+<section data-seg="1" data-segname="段 1 · 留白与节奏" data-title="留白做什么" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.1　What Whitespace Does</div>
+    <h2 class="title head__title">空，其实在做事</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets">
+      <li>留白制造<b>层级</b>：元素之间的距离，本身就是"谁更重要"的声明 <span class="cite">(Müller-Brockmann, 1981)</span>。</li>
+      <li>留白控制<b>语速</b>：行距与段距决定读者一口气读多少、在哪里换气。</li>
+      <li>留白传递<b>从容</b>：愿意"浪费"版面的设计，读起来像是有底气、不慌不忙。</li>
+      <li>留白是一种<em>克制的尊重</em>——它假设读者能自己找到重点，无需被高亮推搡。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ⑤ 卡片组 cards -->
+<section data-seg="1" data-segname="段 1 · 留白与节奏" data-title="三种留白" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.2　Three Kinds of Silence</div>
+    <h2 class="title head__title">三种"空"，三种语气</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--3">
+      <div class="card card--v"><div class="card__eyebrow">宏观</div><div class="card__title">页边的余地</div><div class="card__desc">大页边把内容框成一幅画，告诉读者：慢一点，这里值得停留。</div><div class="card__meta">从容</div></div>
+      <div class="card card--n"><div class="card__eyebrow">中观</div><div class="card__title">段落的呼吸</div><div class="card__desc">段距而非分隔线，让结构自然浮现，不必硬画格子。</div><div class="card__meta">秩序</div></div>
+      <div class="card card--g"><div class="card__eyebrow">微观</div><div class="card__title">字距的克制</div><div class="card__desc">标题留一点字距，正文不留——细节处的安静最难，也最见功夫。</div><div class="card__meta">精确</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑥ 段分隔 secdiv（暗）-->
+<section data-seg="2" data-segname="段 2 · 线与色" class="slide secdiv secdiv--dark">
+  <div class="secdiv__num">Part II</div>
+  <div class="secdiv__eyebrow">Hairlines &amp; One Accent</div>
+  <h2 class="secdiv__title">一根<em>发丝线</em><br>胜过一块色</h2>
+  <p class="secdiv__lead">当你拿掉所有彩色，剩下的工具只有线、字重与距离——它们反而更诚实，也更耐看。</p>
+</section>
+
+<!-- ⑦ 数字 bignum -->
+<section data-seg="2" data-segname="段 2 · 线与色" data-title="一个调色盘" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.1　The Palette, Counted</div>
+    <h2 class="title head__title">整套系统，三个数字说完</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="row" style="gap:28px;width:100%;">
+      <div class="bignum" style="flex:1;"><div class="bignum__v">1</div><div class="bignum__u">个强调色<br>近中性的暖灰</div><div class="bignum__k">accent #8A8178 · 刻意低调</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">1px</div><div class="bignum__u">所有分区线<br>同一根发丝</div><div class="bignum__k">hairline · 不加粗、不变色</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">2</div><div class="bignum__u">字族<br>衬线标题 + grotesk 正文</div><div class="bignum__k">Playfair Display + Inter</div></div>
+    </div>
+    <div class="callout mt-m">约束不是贫乏。<em>把工具削到三件</em>，每一件就必须被用得更准——这才是极简真正的难度。</div>
+  </div>
+</section>
+
+<!-- ⑧ 对比 compare -->
+<section data-seg="2" data-segname="段 2 · 线与色" data-title="两种强调" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.2　Two Ways to Emphasize</div>
+    <h2 class="title head__title">用什么喊"看这里"</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="compare">
+      <div class="compare__col compare__col--bad">
+        <div class="compare__label">喧闹的做法</div>
+        <div class="compare__title">靠颜色推搡</div>
+        <ul class="compare__list">
+          <li>高饱和色块、多色标签，互相争夺注意力</li>
+          <li>读者被动接收"重点"，却失去自己判断的余地</li>
+          <li>三个月后审美疲劳，色彩沦为噪音</li>
+        </ul>
+      </div>
+      <div class="compare__col compare__col--good">
+        <div class="compare__label">克制的做法</div>
+        <div class="compare__title">靠字重与线</div>
+        <ul class="compare__list">
+          <li>加粗、斜体、一根分隔线，强调内嵌于阅读流</li>
+          <li>层级靠结构成立，经得起反复看</li>
+          <li>安静，因此更长久——这正是 cartesian 的立场</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑨ 段分隔 secdiv（暖）-->
+<section data-seg="3" data-segname="段 3 · 立场" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part III</div>
+  <div class="secdiv__eyebrow">Restraint as a Stance</div>
+  <h2 class="secdiv__title">克制<br>是对读者的<em>信任</em></h2>
+  <p class="secdiv__lead">最后一段，谈谈为什么"少说"不是技巧，而是态度。</p>
+</section>
+
+<!-- ⑩ 编号清单 numlist -->
+<section data-seg="3" data-segname="段 3 · 立场" data-title="四条原则" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§3.1　Working Principles</div>
+    <h2 class="title head__title">我们在工作台上遵守的四条</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="numlist numlist--lg">
+      <div class="numitem"><div class="numitem__n">i</div><div class="numitem__main"><div class="numitem__title">先删，再排版。</div><div class="numitem__desc">能拿掉的元素，永远先拿掉，留下的才值得精修。</div></div><div class="numitem__tag">减法优先</div></div>
+      <div class="numitem numitem--accent"><div class="numitem__n">ii</div><div class="numitem__main"><div class="numitem__title">一处只用一个强调。</div><div class="numitem__desc">一页里若处处是重点，就等于没有重点。</div></div><div class="numitem__tag">核心 · 克制</div></div>
+      <div class="numitem"><div class="numitem__n">iii</div><div class="numitem__main"><div class="numitem__title">让网格承担秩序。</div><div class="numitem__desc">对齐与节奏到位，装饰自然就多余了。</div></div><div class="numitem__tag">结构</div></div>
+      <div class="numitem"><div class="numitem__n">iv</div><div class="numitem__main"><div class="numitem__title">相信读者读得懂。</div><div class="numitem__desc">不替读者下结论，把发现的乐趣留给他们。</div></div><div class="numitem__tag">态度</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑪ 核心论断 insight -->
+<section data-seg="3" data-segname="段 3 · 立场" class="slide insight">
+  <div class="insight__eyebrow">Take-home</div>
+  <h2 class="insight__statement">设计得好的安静，<br>不是<em>没有声音</em>，<br>是只说要紧的那一句。</h2>
+  <p class="insight__sub">克制不等于贫乏——它是把信任交还给读者的方式。</p>
+</section>
+
+<!-- ⑫ 收尾 closing -->
+<section data-seg="3" data-segname="段 3 · 立场" data-title="谢谢" class="slide cover">
+  <div class="cover__top">
+    <div class="cover__brand">CARTESIAN</div>
+    <div class="cover__seal">Fin</div>
+  </div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">Thank you</div>
+    <h1 class="cover__title">把话<em>留半句</em>，<br>剩下交给读者。</h1>
+    <p class="cover__sub">欢迎在留白里，慢慢提问。</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Contact</span><span class="cover__meta-v">studio@quiet.design</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Series</span><span class="cover__meta-v">设计随笔 No.04</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Date</span><span class="cover__meta-v">2026.06</span></div>
+  </div>
+</section>
+
+
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   自配置引擎 · 与风格无关 · 所有皮肤共用 · 不用改这里
+   它会：① 从各 slide 的 data-seg 自动建段导航 + 缩略图 + 计数
+        ② 自动注入页脚 chrome（段名 + 页码）
+        ③ 自动取每张标题给副屏用
+        ④ 翻页广播给"演讲者模式.html"（配 slides-presenter-mode skill）
+   皮肤只通过 CSS（:root 令牌 + 组件样式）改外观，引擎逻辑不变。
+   ════════════════════════════════════════════════════════════════════ */
+(function () {
+  /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
+  const CONFIG = { channel: 'cartesian-demo', presenterFile: '演讲者模式.html' };
+
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll(':scope > .slide'));
+  const total = slides.length;
+  const body = document.body;
+  const segOf = s => parseInt(s.dataset.seg || '0', 10);
+
+  // —— 段名 / 计数 / 起始索引（全自动）——
+  const segName = [], segCount = [];
+  slides.forEach(s => {
+    const g = segOf(s);
+    if (segName[g] === undefined) segName[g] = s.dataset.segname || ('段 ' + g);
+    segCount[g] = (segCount[g] || 0) + 1;
+  });
+  const segShort = segName.map((n, g) => (n || ('段 ' + g)).replace(/^段\s*\d+\s*·?\s*/, '') || ('段 ' + g));
+  const segStarts = []; let _acc = 0; segCount.forEach((c, i) => { segStarts[i] = _acc; _acc += (c || 0); });
+
+  // —— 包 wrap + 注入 chrome 页脚 ——
+  slides.forEach((s, i) => {
+    s.dataset.globalIdx = i;
+    const wrap = document.createElement('div'); wrap.className = 'slide-wrap';
+    s.parentNode.insertBefore(wrap, s); wrap.appendChild(s);
+    if (!s.querySelector('.chrome')) {
+      const g = segOf(s);
+      const div = document.createElement('div'); div.className = 'chrome';
+      div.innerHTML = `<div class="chrome__l"><span class="chrome__seg">${s.dataset.segname || segName[g]}</span></div>`
+        + `<div class="chrome__r">${String(i + 1).padStart(3, '0')} / ${String(total).padStart(3, '0')}</div>`;
+      s.appendChild(div);
+    }
+  });
+
+  // —— 自动建段导航 ——
+  const segnav = document.getElementById('segnav');
+  segCount.forEach((c, g) => {
+    const seg = document.createElement('div'); seg.className = 'segnav__seg'; seg.dataset.seg = g;
+    seg.innerHTML = `<button class="segnav__head" type="button">`
+      + `<span class="segnav__head-id">段 ${g}</span>`
+      + `<span class="segnav__head-name">${segShort[g]}</span>`
+      + `<span class="segnav__head-meta">${c} 张</span>`
+      + `<span class="segnav__head-arrow">▸</span></button>`
+      + `<div class="segnav__thumbs" data-seg-thumbs="${g}"></div>`;
+    segnav.appendChild(seg);
+  });
+
+  // —— 缩略图（克隆 slide）——
+  slides.forEach((s, i) => {
+    const container = document.querySelector(`[data-seg-thumbs="${segOf(s)}"]`);
+    if (!container) return;
+    const thumb = document.createElement('div'); thumb.className = 'thumb'; thumb.dataset.idx = i;
+    const inner = s.cloneNode(true); inner.classList.add('thumb__inner'); inner.classList.remove('active');
+    const ch = inner.querySelector('.chrome'); if (ch) ch.remove();
+    thumb.appendChild(inner);
+    const num = document.createElement('div'); num.className = 'thumb__num'; num.textContent = (i + 1);
+    thumb.appendChild(num);
+    thumb.addEventListener('click', e => { e.stopPropagation(); setActive(i); });
+    container.appendChild(thumb);
+  });
+
+  // —— 段导航折叠 ——
+  document.querySelectorAll('.segnav__head').forEach(btn =>
+    btn.addEventListener('click', () => btn.closest('.segnav__seg').classList.toggle('segnav__seg--expanded')));
+  const firstSeg = document.querySelector('.segnav__seg'); if (firstSeg) firstSeg.classList.add('segnav__seg--expanded');
+
+  // —— 副屏标题（自动取标题文本，可被 data-title 覆盖）——
+  function deriveTitle(s) {
+    if (s.dataset.title) return s.dataset.title;
+    const el = s.querySelector('.cover__title,.secdiv__title,.manifesto__title,.insight__statement,.bigq__t,.head__title,.title,h1,h2,h3');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : ('slide ' + (slides.indexOf(s) + 1));
+  }
+  const SLIDE_TITLES = slides.map(deriveTitle);
+  // 副屏锚点：优先用全局 window.SLIDE_MAP（slides-presenter-mode 注入），否则自动 s{seg}-{段内序号}
+  const segRun = [];
+  const SLIDE_MAP = (window.SLIDE_MAP && window.SLIDE_MAP.length === total) ? window.SLIDE_MAP
+    : slides.map(s => { const g = segOf(s); segRun[g] = (segRun[g] || 0) + 1; return `s${g}-${segRun[g]}`; });
+
+  // —— 状态 + UI ——
+  const curSegEl = document.getElementById('curSeg'), curIdxEl = document.getElementById('curIdx'),
+        totalIdxEl = document.getElementById('totalIdx'), progressBar = document.getElementById('progressBar');
+  totalIdxEl.textContent = total;
+  let idx = 0, present = false;
+
+  // —— 演讲者模式广播（BroadcastChannel + localStorage 双通道）——
+  let channel = null; try { channel = new BroadcastChannel(CONFIG.channel); } catch (e) {}
+  let presenterWindow = null;
+  function broadcastPresenter(i) {
+    const p = { slideIdx: i, total, segment: segOf(slides[i]), anchor: SLIDE_MAP[i] || ('s0-1'),
+      title: SLIDE_TITLES[i] || '', prevTitle: i > 0 ? SLIDE_TITLES[i - 1] : '',
+      nextTitle: i < total - 1 ? SLIDE_TITLES[i + 1] : '', ts: Date.now(), source: 'slides' };
+    if (channel) { try { channel.postMessage(p); } catch (e) {} }
+    try { localStorage.setItem(CONFIG.channel + '-state', JSON.stringify(p)); } catch (e) {}
+  }
+  function handleReverseJump(p) {
+    if (!p || p.type !== 'jump-to-slide' || p.source !== 'presenter' || typeof p.slideIdx !== 'number') return;
+    const t = Math.max(0, Math.min(total - 1, p.slideIdx)); if (t !== idx) setActive(t);
+  }
+  if (channel) { channel.onmessage = e => { if (e && e.data && e.data.type === 'jump-to-slide') handleReverseJump(e.data); }; }
+  window.addEventListener('storage', e => { if (e.key === CONFIG.channel + '-jump' && e.newValue) { try { handleReverseJump(JSON.parse(e.newValue)); } catch (x) {} } });
+  function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); broadcastPresenter(idx); return; }
+    presenterWindow = window.open(CONFIG.presenterFile, 'presenter', 'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no');
+    if (!presenterWindow) { alert('副屏窗口被阻止 · 请允许弹窗后再试。\n（演讲者模式需先用 slides-presenter-mode skill 生成 ' + CONFIG.presenterFile + '）'); return; }
+    document.getElementById('presenterBtn').classList.add('active');
+    setTimeout(() => broadcastPresenter(idx), 400); setTimeout(() => broadcastPresenter(idx), 1200);
+    const t = setInterval(() => { if (!presenterWindow || presenterWindow.closed) { clearInterval(t); document.getElementById('presenterBtn').classList.remove('active'); presenterWindow = null; } }, 1000);
+  }
+
+  // —— 核心导航 ——
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    if (present) {
+      const sc = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 0.98;
+      slides[idx].style.setProperty('--sc', sc);
+    } else {
+      const wrap = slides[idx].parentNode; if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    updateUI(); broadcastPresenter(idx);
+  }
+  function updateUI() {
+    const g = segOf(slides[idx]);
+    curSegEl.textContent = '段 ' + g; curIdxEl.textContent = idx + 1;
+    progressBar.style.width = ((idx + 1) / total * 100).toFixed(2) + '%';
+    document.querySelectorAll('.segnav__seg').forEach(segEl => {
+      const cur = +segEl.dataset.seg === g;
+      segEl.classList.toggle('segnav__seg--current', cur); if (cur) segEl.classList.add('segnav__seg--expanded');
+    });
+    document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('thumb--active', +t.dataset.idx === idx));
+    const at = document.querySelector('.thumb--active');
+    if (at) { const nr = segnav.getBoundingClientRect(), tr = at.getBoundingClientRect();
+      if (tr.top < nr.top + 60 || tr.bottom > nr.bottom - 20) at.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
+  function next() { setActive(idx + 1); } function prev() { setActive(idx - 1); }
+  function goSeg(n) { setActive(segStarts[n] || 0); }
+
+  function togglePresent() {
+    present = !present; body.classList.toggle('present', present);
+    if (present) setActive(idx);
+    else { slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+      setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); }
+  }
+  function enterFullscreen() {
+    const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) req.call(el).then(() => { if (!present) togglePresent(); body.classList.add('fullscreen'); }).catch(() => { if (!present) togglePresent(); });
+    else if (!present) togglePresent();
+  }
+  function exitFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen; if (ex) ex.call(document);
+    }
+    body.classList.remove('fullscreen'); if (present) togglePresent();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) { body.classList.remove('fullscreen');
+      if (present) { present = false; body.classList.remove('present');
+        slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+        setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); } }
+  });
+
+  // —— 键盘 ——
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea, select')) return;
+    const k = e.key;
+    if (k === 'f' || k === 'F' || k === 'Enter') { (document.fullscreenElement || body.classList.contains('present')) ? exitFullscreen() : enterFullscreen(); e.preventDefault(); return; }
+    if (k === 'p' || k === 'P') { togglePresent(); e.preventDefault(); return; }
+    if (k === 's' || k === 'S') { if (!e.ctrlKey && !e.metaKey) { openPresenter(); e.preventDefault(); } return; }
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown') { next(); e.preventDefault(); return; }
+    if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') { prev(); e.preventDefault(); return; }
+    if (k === 'Escape') { if (document.fullscreenElement || body.classList.contains('present')) { exitFullscreen(); e.preventDefault(); } return; }
+    if (k === 'Home') { setActive(0); e.preventDefault(); return; }
+    if (k === 'End') { setActive(total - 1); e.preventDefault(); return; }
+    if (k >= '1' && k <= '9') { const n = +k - 1; if (n < segCount.length) { goSeg(n); e.preventDefault(); } return; }
+  });
+  // —— 投屏态点击翻页 ——
+  document.addEventListener('click', e => {
+    if (!present) return; if (e.target.closest('a, button, input, select, .topbar, .segnav')) return;
+    (e.clientX > window.innerWidth * 0.6) ? next() : (e.clientX < window.innerWidth * 0.4 ? prev() : 0);
+  });
+  document.getElementById('prevBtn').addEventListener('click', prev);
+  document.getElementById('nextBtn').addEventListener('click', next);
+  document.getElementById('playBtn').addEventListener('click', enterFullscreen);
+  document.getElementById('presenterBtn').addEventListener('click', openPresenter);
+
+  // —— 编辑态自适应缩放 + 滚动跟随 ——
+  function updateFitScale() {
+    const availW = window.innerWidth - 300 - 60, availH = window.innerHeight - 100;
+    const scale = Math.max(0.25, Math.min(0.7, availW / 1920, availH / 1080));
+    document.documentElement.style.setProperty('--fit-scale', scale.toFixed(4));
+  }
+  updateFitScale();
+  window.addEventListener('resize', () => { updateFitScale(); if (present) setActive(idx); });
+  let st = null;
+  window.addEventListener('scroll', () => {
+    if (present) return; if (st) clearTimeout(st);
+    st = setTimeout(() => {
+      const vc = window.scrollY + window.innerHeight / 2; let best = 0, bd = Infinity;
+      slides.forEach((s, i) => { const w = s.parentNode; if (!w) return; const r = w.getBoundingClientRect();
+        const c = r.top + window.scrollY + r.height / 2, d = Math.abs(c - vc); if (d < bd) { bd = d; best = i; } });
+      if (best !== idx) { idx = best; updateUI(); }
+    }, 100);
+  });
+
+  updateUI();
+  // 暴露给 slides-presenter-mode / 控制台调试
+  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
+})();
+
+</script>
+</body>
+</html>

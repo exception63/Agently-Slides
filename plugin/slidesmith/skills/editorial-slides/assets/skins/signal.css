@@ -1,0 +1,285 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap */
+/* skin: signal · ported from beautiful-html-templates/signal (MIT · © 2026 Zara Zhang) · 机构正式 / 可信稳重 */
+/* ════════════════════════════════════════════════════════════════════
+   DNA：scheme=mixed（浅米为主版 + 藏青深色版面）· formality=high · density=high
+   mood：institutional / trustworthy / considered / weighty（机构、可信、有分量；政府 / 智库 / 年报）
+   移植策略：以浅米 #f0ece3 为主纸 · ink = 深藏青近黑 #1c2644 · accent = 古金 #c8a870 ·
+   secdiv / manifesto 的 --dark 变体改用藏青满版（呼应模板深色版式）。
+   机构感 = 衬线标题（Source Serif 4 过渡衬线）+ 高密度承载（表格 / 引用 / 多卡）
+   + 金色克制点缀（唯一抢眼热色）+ 稳重发丝线 / 边框。
+   红线：主强调色只用金一个；藏青是结构色 / 深色版式色，不当强调；em 取稳重处理（衬线斜体 + 藏青，金仅在标题里点睛）。
+   换主色 → 只改 :root 的 --accent / --accent-2 / --accent-soft。
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* —— 配色（浅米纸 + 深藏青墨 + 古金稀用 · 改主题只改这一组）—— */
+  --paper:#f0ece3;--paper-soft:#e9e4d8;--paper-warm:#e2dcd0;
+  --rule:#cac4b4;--rule-soft:#d8d2c4;--rule-strong:#b3ab98;
+  --ink:#1c2644;--ink-2:#3a4360;--ink-3:#5a6270;--ink-4:#9aa0a8;
+  --accent:#c8a870;--accent-2:#a3823f;--accent-soft:rgba(200,168,112,0.12);--accent-ui:#dcc99c;
+  --navy:#1c2644;--navy-2:#232f55;
+  --gold:#c8a870;--gold-soft:#dcc99c;          /* 第二色，稀用（深侧栏可读） */
+  --good:#3f6e55;--green:#3f6e55;--warn:#a3823f;--bad:#a24632;  /* 语义色，克制 */
+  --night:#1c2644;--night-2:#232f55;--night-paper:#e2dcd0;
+  /* —— 字号阶梯（high density · 承载多内容 / 表格 / 引用）—— */
+  --t-display:122px;--t-h1:82px;--t-h2:56px;--t-h3:40px;--t-h4:32px;
+  --t-lead:30px;--t-body:28px;--t-small:23px;--t-eyebrow:19px;
+  --pad-x:120px;--pad-y:84px;
+  /* 字体栈 · 标题过渡衬线（Source Serif 4 + 思源宋体）· 正文无衬线（DM Sans + 思源黑体）· 中文优先 */
+  --font-serif:"Source Serif 4","Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  --font-display:"Source Serif 4","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --font-sans:"DM Sans","Noto Sans SC","Source Han Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:"IBM Plex Mono","JetBrains Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55;
+}
+
+/* —— 页脚 chrome：细发丝线 + 段名 / 作者 · 页码（机构汇报坐标感）—— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:40px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:16px;letter-spacing:0.06em;color:var(--ink-4);padding-top:14px;border-top:1px solid var(--rule);text-transform:uppercase;}
+.chrome__l{display:flex;gap:24px;align-items:baseline;white-space:nowrap;}
+.chrome__seg{color:var(--ink-3);font-weight:500;}
+.chrome__r{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:0.1em;}
+/* —— runner：可选顶部页眉条（讲题 / 机构）—— */
+.runner{position:absolute;top:54px;left:var(--pad-x);right:var(--pad-x);display:flex;justify-content:space-between;align-items:center;font-family:var(--font-sans);font-size:18px;color:var(--ink-3);padding-bottom:14px;border-bottom:1px solid var(--rule);}
+.runner__r{font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;color:var(--ink-4);text-transform:uppercase;}
+
+/* —— 通用排版原子 —— */
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-eyebrow);letter-spacing:0.18em;color:var(--accent-2);text-transform:uppercase;font-weight:500;}
+.title{font-family:var(--font-display);font-weight:600;font-size:var(--t-h2);line-height:1.16;letter-spacing:-0.01em;color:var(--ink);margin:0;}
+.title--xl{font-size:104px;}.title--lg{font-size:80px;}.title--md{font-size:48px;}.title--sm{font-size:38px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.58;color:var(--ink-2);max-width:1480px;margin:0;font-weight:400;}
+.body{font-size:var(--t-body);line-height:1.68;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.62;color:var(--ink-3);}
+.num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
+.mark-v{color:var(--accent-2);}.mark-n{color:var(--accent-2);}.mark-g{color:var(--accent-2);}
+.key{color:var(--ink);font-weight:600;font-style:normal;}
+strong{font-weight:600;color:var(--ink);}                                       /* 机构：加粗 = 藏青墨，不抢色 */
+em{font-style:italic;color:var(--ink);font-family:var(--font-serif);}            /* 稳重：衬线斜体 = 术语 / 强调，克制 */
+.cite{font-family:var(--font-sans);font-size:0.7em;color:var(--ink-3);letter-spacing:0.01em;white-space:nowrap;font-style:normal;font-weight:400;}
+.head{margin-top:6px;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--rule);}  /* 机构：标题下发丝线 = 页眉感 */
+.head__eyebrow{margin-bottom:14px;}.head__title{margin:0 0 8px;}
+.head__sub{font-family:var(--font-sans);font-size:24px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.5;}
+.fill{flex:1;min-height:0;}
+.center{align-items:center;justify-content:center;text-align:center;}
+.center .lead{margin-left:auto;margin-right:auto;}
+.center .head{border-bottom:0;}
+
+/* —— cover 封面（浅米纸 · 金细印 · 藏青竖条引领）—— */
+.cover{background:var(--paper);justify-content:space-between;}
+.cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover__brand{font-family:var(--font-sans);font-size:22px;letter-spacing:0.02em;color:var(--ink-3);font-weight:500;}
+.cover__seal{font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;color:var(--accent-2);text-transform:uppercase;border:1px solid var(--accent);padding:8px 16px;border-radius:2px;}
+.cover__main{display:flex;flex-direction:column;gap:30px;border-left:3px solid var(--accent);padding-left:44px;}
+.cover__eyebrow{font-family:var(--font-mono);font-size:21px;letter-spacing:0.22em;color:var(--accent-2);text-transform:uppercase;font-weight:500;}
+.cover__title{font-family:var(--font-display);font-weight:700;font-size:100px;line-height:1.04;letter-spacing:-0.02em;color:var(--ink);margin:0;}
+.cover__title em{color:var(--accent-2);font-style:italic;font-weight:600;}
+.cover__sub{font-family:var(--font-sans);font-size:33px;color:var(--ink-2);max-width:1500px;font-weight:400;line-height:1.5;}
+.cover__meta{display:flex;gap:64px;font-family:var(--font-sans);color:var(--ink-3);padding-top:30px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:7px;}
+.cover__meta-k{font-family:var(--font-mono);color:var(--ink-4);font-size:14px;letter-spacing:0.12em;text-transform:uppercase;}
+.cover__meta-v{color:var(--ink);font-size:21px;font-weight:500;}
+
+/* —— section divider 段分隔（克制 · 衬线大字 + 金顶线 · --dark 用藏青满版）—— */
+.secdiv{background:var(--paper);justify-content:center;}
+.secdiv--dark{background:var(--night);color:var(--night-paper);}
+.secdiv--accent{background:var(--navy-2);color:var(--night-paper);}
+.secdiv__num{font-family:var(--font-mono);font-size:24px;font-weight:500;letter-spacing:0.18em;color:var(--accent-2);text-transform:uppercase;margin-bottom:22px;}
+.secdiv--dark .secdiv__num,.secdiv--accent .secdiv__num{color:var(--gold);}
+.secdiv__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--ink-3);text-transform:uppercase;margin-bottom:30px;font-weight:400;}
+.secdiv--dark .secdiv__eyebrow,.secdiv--accent .secdiv__eyebrow{color:rgba(226,220,208,0.65);}
+.secdiv__title{font-family:var(--font-display);font-weight:700;font-size:90px;line-height:1.08;letter-spacing:-0.02em;color:var(--ink);margin:0 0 32px;max-width:1500px;padding-top:30px;border-top:2px solid var(--accent);}
+.secdiv__title em{color:var(--accent-2);font-style:italic;font-weight:600;}
+.secdiv--dark .secdiv__title{color:var(--night-paper);border-top-color:var(--gold);}
+.secdiv--dark .secdiv__title em{color:var(--gold);}
+.secdiv--accent .secdiv__title{color:var(--night-paper);border-top-color:var(--gold);}
+.secdiv--accent .secdiv__title em{color:var(--gold);}
+.secdiv__lead{font-family:var(--font-sans);font-size:30px;line-height:1.58;color:var(--ink-2);max-width:1400px;margin:0;font-weight:400;}
+.secdiv--dark .secdiv__lead{color:rgba(226,220,208,0.78);}
+.secdiv--accent .secdiv__lead{color:rgba(226,220,208,0.82);}
+.secdiv__meta{font-family:var(--font-mono);font-size:17px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;padding-top:26px;margin-top:30px;border-top:1px solid var(--rule);display:flex;gap:36px;}
+.secdiv--dark .secdiv__meta,.secdiv--accent .secdiv__meta{color:rgba(226,220,208,0.55);border-top-color:var(--navy-2);}
+
+/* —— manifesto / insight 中心论断（机构：稳重衬线，不喊口号）—— */
+.manifesto,.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 140px;}
+.manifesto__eyebrow,.insight__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent-2);text-transform:uppercase;margin-bottom:46px;font-weight:500;}
+.manifesto__title,.insight__statement{font-family:var(--font-display);font-weight:600;font-size:82px;line-height:1.2;letter-spacing:-0.01em;color:var(--ink);margin:0;max-width:1640px;}
+.manifesto__title em,.insight__statement em{color:var(--accent-2);font-style:italic;}
+.manifesto__sub,.insight__sub{font-family:var(--font-sans);font-size:30px;color:var(--ink-3);margin:42px auto 0;max-width:1400px;line-height:1.58;font-weight:400;}
+.manifesto--dark,.insight--dark{background:var(--night);color:var(--night-paper);}
+.manifesto--dark .manifesto__eyebrow,.insight--dark .insight__eyebrow{color:var(--gold);}
+.manifesto--dark .manifesto__title,.insight--dark .insight__statement{color:var(--night-paper);}
+.manifesto--dark .manifesto__title em,.insight--dark .insight__statement em{color:var(--gold);}
+.manifesto--dark .manifesto__sub,.insight--dark .insight__sub{color:rgba(226,220,208,0.78);}
+
+/* —— bullets 论点清单（机构主力版式 · 金破折号引导 · 舒展）—— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:26px;}
+.bullets > li{font-family:var(--font-sans);font-size:30px;line-height:1.58;color:var(--ink-2);padding-left:46px;position:relative;}
+.bullets > li::before{content:"—";position:absolute;left:0;top:0;color:var(--accent);font-family:var(--font-mono);}
+.bullets li b,.bullets li strong{color:var(--ink);font-weight:600;}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:13px;}
+.bullets ul li{font-size:25px;color:var(--ink-3);padding-left:40px;position:relative;line-height:1.55;}
+.bullets ul li::before{content:"";position:absolute;left:8px;top:15px;width:9px;height:9px;border:1.5px solid var(--ink-4);border-radius:50%;}
+.bullets--lead > li{font-size:33px;}
+
+/* —— figure 图（机构：模型图 / 图表 + 编号图注）—— */
+.figure{display:flex;flex-direction:column;gap:18px;height:100%;}
+.figure__frame{flex:1;min-height:0;background:#FBF9F3;border:1px solid var(--rule);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+.figure__cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--accent-2);font-weight:500;margin-right:12px;text-transform:uppercase;}
+.figure__src{font-family:var(--font-sans);font-size:16px;color:var(--ink-4);}
+.figure--row{flex-direction:row;gap:36px;align-items:stretch;}
+
+/* —— 概念模型小零件（X→M→Y / 调节）· 给 figure 内联 SVG 用作参照 —— */
+.node{fill:#FBF9F3;stroke:var(--ink);stroke-width:2;}
+.node-accent{fill:var(--accent);}
+.path-arrow{stroke:var(--ink);stroke-width:2;fill:none;}
+.path-dash{stroke:var(--accent-2);stroke-width:2;stroke-dasharray:7 5;fill:none;}
+
+/* —— cards 卡片组（要点 / 贡献 · 金顶线 · 高密度可多列）—— */
+.cards{display:grid;gap:26px;grid-template-columns:repeat(3,1fr);}
+.cards--2{grid-template-columns:repeat(2,1fr);}
+.cards--4{grid-template-columns:repeat(4,1fr);}
+.cards--5{grid-template-columns:repeat(5,1fr);}
+.cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{background:#FBF9F3;padding:30px 28px;display:flex;flex-direction:column;gap:13px;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;}
+.card--v{border-top-color:var(--accent);}.card--n{border-top-color:var(--ink);}.card--g{border-top-color:var(--good);}
+.card--plain{background:transparent;border:0;border-top:1px solid var(--rule);border-radius:0;padding:24px 0;}
+.card__eyebrow{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent-2);font-weight:500;}
+.card__level{font-family:var(--font-display);font-size:54px;font-weight:700;line-height:0.95;color:var(--accent-2);}
+.card__title{font-family:var(--font-display);font-weight:600;font-size:31px;color:var(--ink);line-height:1.28;margin-top:6px;}
+.card__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.58;}
+.card__meta{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule);}
+
+/* —— numlist 编号清单（证据 / 步骤 · 衬线序号）—— */
+.numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule);}
+.numitem{display:grid;grid-template-columns:64px 1fr auto;align-items:baseline;gap:30px;padding:18px 0;border-bottom:1px solid var(--rule);}
+.numitem--tight{padding:12px 0;}
+.numitem__n{font-family:var(--font-display);font-size:32px;font-weight:700;color:var(--accent-2);line-height:1;}
+.numitem__main{display:flex;flex-direction:column;gap:6px;}
+.numitem__title{font-family:var(--font-display);font-weight:600;font-size:29px;color:var(--ink);line-height:1.28;}
+.numitem__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.58;}
+.numitem__tag{font-family:var(--font-mono);font-size:16px;letter-spacing:0.06em;color:var(--ink-4);padding-top:8px;text-transform:uppercase;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--accent-2);}
+.numlist--lg .numitem{padding:13px 0;gap:22px;grid-template-columns:60px 1fr auto;}
+.numlist--lg .numitem__n{font-size:30px;}.numlist--lg .numitem__title{font-size:24px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.5;}.numlist--lg .numitem__tag{font-size:15px;}
+
+/* —— terminal 终端 / prompt（藏青底 · 金 prompt 点）—— */
+.terminal{background:var(--night);color:#d6d0c4;padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.55;position:relative;border-radius:4px;border:1px solid var(--navy-2);}
+.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(214,208,196,0.5);margin-bottom:22px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--gold);}
+.terminal__user{color:#a9b6c8;}.terminal__system{color:#9ec3a8;}.terminal__hint{color:var(--gold);}.terminal__dim{color:rgba(214,208,196,0.45);}
+.terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
+
+/* —— compare 两栏对比 —— */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--rule);}
+.compare__col{padding:38px 40px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:16px;}
+.compare__col:last-child{border-right:0;}
+.compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
+.compare__col--good .compare__title{color:var(--accent-2);}
+.compare__label{font-family:var(--font-mono);font-size:17px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-4);}
+.compare__col--good .compare__label{color:var(--accent-2);}
+.compare__title{font-family:var(--font-display);font-weight:600;font-size:40px;color:var(--ink);line-height:1.2;margin-bottom:10px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:15px;}
+.compare__list li{font-family:var(--font-sans);font-size:22px;line-height:1.58;color:var(--ink-2);padding-left:26px;position:relative;}
+.compare__list li::before{content:"–";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--accent);}
+
+/* —— steps 流程 —— */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--rule);}
+.steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
+.step{padding:34px 28px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:12px;}
+.step:last-child{border-right:0;}
+.step__n{font-family:var(--font-mono);font-size:18px;font-weight:500;letter-spacing:0.1em;color:var(--accent-2);text-transform:uppercase;}
+.step__title{font-family:var(--font-display);font-weight:600;font-size:29px;color:var(--ink);line-height:1.25;}
+.step__desc{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.58;}
+
+/* —— table 表格（booktabs：上下粗线、无竖线 · 高密度承载）—— */
+.table-cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);margin-bottom:14px;}
+.table-cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--accent-2);font-weight:500;margin-right:12px;text-transform:uppercase;}
+.table{width:100%;border-collapse:collapse;font-family:var(--font-sans);font-size:22px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);}
+.table th,.table td{padding:15px 18px;text-align:left;vertical-align:top;line-height:1.5;}
+.table thead th{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent-2);border-bottom:1px solid var(--rule-strong);font-weight:500;}
+.table tbody tr{border-bottom:1px solid var(--rule);}
+.table tbody tr:last-child{border-bottom:0;}
+.table td.num{font-variant-numeric:tabular-nums;}
+.table td.bad{color:var(--ink-4);}.table td.good{color:var(--accent-2);font-weight:600;}
+.table tr.hl td{background:var(--accent-soft);}
+
+/* —— formula5 编号公式行 —— */
+.formula5{display:grid;grid-template-columns:80px 1fr 1.2fr;gap:0;border-top:2px solid var(--ink);}
+.formula5__row{display:contents;}
+.formula5__row > div{padding:22px 24px;border-bottom:1px solid var(--rule);}
+.formula5__n{font-family:var(--font-display);font-size:38px;font-weight:700;color:var(--accent-2);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--ink);}
+.formula5__v{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.58;}
+
+/* —— arch 分层堆栈 —— */
+.arch{display:flex;flex-direction:column;gap:6px;}
+.arch__layer{display:grid;grid-template-columns:60px 240px 1fr;gap:24px;align-items:center;padding:14px 24px;background:#FBF9F3;border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:2px;}
+.arch__layer--5{border-left-color:var(--accent);}
+.arch__layer--4{border-left-color:var(--accent-2);}
+.arch__layer--3{border-left-color:var(--good);}
+.arch__layer--2{border-left-color:var(--ink-3);}
+.arch__layer--1{border-left-color:var(--ink);}
+.arch__n{font-family:var(--font-display);font-size:30px;font-weight:700;color:var(--accent-2);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-4);letter-spacing:0.1em;margin-top:3px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-family:var(--font-sans);font-size:18px;color:var(--ink-2);line-height:1.5;}
+.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;text-align:right;}
+
+/* —— three-circle 三区 —— */
+.three-circle{display:flex;gap:30px;align-items:stretch;}
+.zone{flex:1;padding:34px 32px;background:#FBF9F3;border:1px solid var(--rule);border-top:5px solid;border-radius:3px;display:flex;flex-direction:column;gap:15px;}
+.zone--g{border-top-color:var(--good);}
+.zone--y{border-top-color:var(--accent);}
+.zone--r{border-top-color:var(--bad);}
+.zone__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-3);font-weight:500;}
+.zone__title{font-family:var(--font-display);font-size:38px;font-weight:600;color:var(--ink);}
+.zone--g .zone__title{color:var(--good);}.zone--y .zone__title{color:var(--accent-2);}.zone--r .zone__title{color:var(--bad);}
+.zone__test{font-family:var(--font-serif);font-size:22px;color:var(--ink-2);font-style:italic;}
+.zone__eg{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.58;}
+.zone__action{margin-top:auto;padding-top:15px;border-top:1px solid var(--rule);font-family:var(--font-sans);font-size:21px;font-weight:600;color:var(--accent-2);}
+
+/* —— bigq 装框大引用（衬线斜体 · 金竖条）—— */
+.bigq{background:var(--paper-soft);padding:40px 56px;border-left:4px solid var(--accent);border-radius:3px;text-align:left;}
+.bigq__t{font-family:var(--font-serif);font-size:48px;font-weight:400;font-style:italic;line-height:1.35;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--accent-2);}
+.bigq__sub{font-family:var(--font-sans);font-size:21px;color:var(--ink-3);margin-top:18px;font-style:normal;}
+
+/* —— matrix 矩阵 —— */
+.matrix{display:grid;grid-template-columns:260px repeat(3,1fr);border-top:2px solid var(--ink);border-left:1px solid var(--rule);}
+.matrix__h{padding:18px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent-2);background:var(--paper-soft);text-align:center;font-weight:500;}
+.matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;}
+.matrix__cell{padding:20px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-sans);font-size:18px;line-height:1.5;color:var(--ink-2);min-height:84px;}
+.matrix__cell strong{color:var(--ink);}
+
+/* —— bignum 关键数字（机构：克制 · 衬线古金大字）—— */
+.bignum{display:flex;flex-direction:column;gap:8px;padding:30px 30px;background:#FBF9F3;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;}
+.bignum__v{font-family:var(--font-display);font-size:84px;font-weight:700;line-height:0.98;color:var(--accent-2);letter-spacing:-0.02em;}
+.bignum__u{font-family:var(--font-sans);font-size:25px;color:var(--ink-2);font-weight:500;line-height:1.4;}
+.bignum__k{font-family:var(--font-mono);font-size:16px;color:var(--ink-4);margin-top:12px;letter-spacing:0.04em;text-transform:uppercase;}
+
+/* —— summary 总结三栏 —— */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+.sum-card{padding:34px 32px;background:#FBF9F3;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--accent);}.sum-card--n{border-top-color:var(--ink);}.sum-card--g{border-top-color:var(--good);}
+.sum-card__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;font-weight:500;}
+.sum-card__v{font-family:var(--font-display);font-weight:700;font-size:42px;color:var(--accent-2);line-height:1.15;}
+.sum-card--n .sum-card__v{color:var(--ink);}.sum-card--g .sum-card__v{color:var(--good);}
+.sum-card__hint{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.58;}
+
+/* —— refs 参考文献（编号 + 悬挂缩进 + 刊名斜体 · 两列）—— */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:14px 56px;counter-reset:ref;list-style:none;margin:0;padding:0;}
+.refs--1col{grid-template-columns:1fr;}
+.refs li{font-family:var(--font-sans);font-size:19px;line-height:1.5;color:var(--ink-2);padding-left:38px;position:relative;break-inside:avoid;}
+.refs li::before{counter-increment:ref;content:"["counter(ref)"]";position:absolute;left:0;top:0;font-family:var(--font-mono);font-size:16px;color:var(--accent-2);font-weight:500;}
+.refs li em,.refs li .jrnl{font-style:italic;color:var(--ink);}
+.refs--plain li::before{content:"";}
+.refs--plain li{padding-left:30px;text-indent:-30px;}
+.refs--dim li{color:var(--ink-4);}
+
+/* —— helpers —— */
+.callout{border-left:3px solid var(--accent);padding:18px 26px;background:var(--accent-soft);font-family:var(--font-sans);font-size:22px;line-height:1.58;color:var(--ink-2);border-radius:0 3px 3px 0;}
+.note-box{margin-top:24px;padding:20px 28px;background:var(--paper-soft);border-left:3px solid var(--accent-2);font-family:var(--font-sans);font-size:22px;line-height:1.58;color:var(--ink-2);border-radius:0 3px 3px 0;}
+.row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:34px;}.mt-l{margin-top:54px;}

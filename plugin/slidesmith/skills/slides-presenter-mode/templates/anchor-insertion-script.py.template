@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""
+============================================================
+ANCHOR INSERTION SCRIPT · 批量给讲稿 HTML 加细粒度锚点
+============================================================
+v0.2 新增工程化工具。
+
+用法：
+  1. 复制本文件 → 改名为你课程的脚本（如 add_my_anchors.py）
+  2. 修改 SCRIPT 常量指向你的讲稿 HTML 路径
+  3. 编辑 ANCHOR_PLAN · 列出所有要加的锚点
+  4. 运行：python3 add_my_anchors.py
+  5. 脚本会自带"行号 + 期望 tag"双重校验 · 任何不一致直接 abort 不写文件
+
+为什么用脚本而不是手 Edit：
+  - 70+ 锚点手插出错率极高（一个 typo · 一个串位 · 整套同步崩）
+  - 脚本带原子写入 · 全部校验通过才写盘
+  - 跑一次几秒钟 · 错了改 Plan 再跑 · 比手插快 10 倍
+
+ANCHOR_PLAN 怎么填：
+  每个元素 = (行号, 新锚点 id, 该行包含的 tag 字符串)
+  - 行号：在讲稿 HTML 中目标元素所在的行（用编辑器或 grep -n 查）
+  - 锚点 id：约定 sN-Mletter · 见 templates/slide-anchor-mapping.md
+  - tag 字符串：该行包含的精确 tag 文本（用于校验 + 定位插入点）
+============================================================
+"""
+import re
+from pathlib import Path
+
+# ============================================================
+# 配置 · 改成你的路径
+# ============================================================
+SCRIPT = Path('/path/to/your/讲稿合集.html')
+
+
+# ============================================================
+# 锚点计划 · 你要列全所有要加的锚点
+# 格式：(line_num, new_id, tag_pattern_to_match_on_that_line)
+# ============================================================
+ANCHOR_PLAN = [
+    # === 段 0 示例 ===
+    # 行号 · 新锚点 id · 该行包含的 tag（用于定位 + 校验）
+
+    # 在 blockquote 上加锚点
+    (707, 's0-2a', '<blockquote class="script">'),
+
+    # 在 golden div 上加锚点
+    (727, 's0-2b', '<div class="golden">'),
+
+    # 在 pre.prompt 上加锚点
+    (758, 's0-3a', '<pre class="prompt">'),
+
+    # 在 h4 上加锚点（最佳 · 自带标题语义）
+    (808, 's0-4a', '<h4>'),
+    (832, 's0-4b', '<h4>'),
+    (850, 's0-4c', '<h4>'),
+    (858, 's0-4d', '<h4>'),
+
+    # 在 interact 上加锚点
+    (942, 's0-6a', '<div class="interact">'),
+
+    # ... 你的全部锚点都列在这里 ...
+]
+
+
+# ============================================================
+# 不要改下面的代码（除非你想增强校验）
+# ============================================================
+
+def inject_id(line: str, tag: str, new_id: str) -> str:
+    """把 id="new_id" 注入到该行的目标 tag 上。
+
+    e.g. <h4>  →  <h4 id="...">
+         <div class="golden">  →  <div class="golden" id="...">
+    """
+    if tag not in line:
+        raise ValueError(f'Tag {tag!r} 在该行找不到: {line.rstrip()[:80]}')
+    # 在 tag 末尾的 > 前插入 id 属性
+    new_tag = tag[:-1] + f' id="{new_id}">'
+    return line.replace(tag, new_tag, 1)
+
+
+def main():
+    if not SCRIPT.exists():
+        print(f'⛔ 讲稿文件不存在: {SCRIPT}')
+        return 1
+
+    lines = SCRIPT.read_text().splitlines(keepends=True)
+    errors = []
+
+    # 1. 先校验所有计划项 · 任何不一致就不写文件
+    print(f'校验 {len(ANCHOR_PLAN)} 个锚点计划...')
+    for line_num, new_id, tag in ANCHOR_PLAN:
+        idx = line_num - 1  # 1-indexed → 0-indexed
+        if idx >= len(lines):
+            errors.append(f'行号 {line_num} 超出文件范围 (文件共 {len(lines)} 行)')
+            continue
+        if tag not in lines[idx]:
+            errors.append(
+                f'行 {line_num} · 期望 {tag!r} · 实际: {lines[idx].rstrip()[:80]}'
+            )
+        # 还要检查锚点 ID 是否已存在（避免重复加）
+        if f'id="{new_id}"' in lines[idx]:
+            errors.append(f'行 {line_num} · {new_id!r} 已经存在 · 跳过')
+
+    # 2. 检查 ANCHOR_PLAN 内部一致性：锚点 id 不能重复
+    from collections import Counter
+    ids = [new_id for _, new_id, _ in ANCHOR_PLAN]
+    dup_ids = [k for k, v in Counter(ids).items() if v > 1]
+    if dup_ids:
+        errors.append(f'锚点 id 在 ANCHOR_PLAN 中重复：{dup_ids}')
+
+    # 3. 报错 → abort
+    if errors:
+        print('⛔ 校验失败 · 不写入文件:')
+        for e in errors:
+            print(f'  - {e}')
+        return 1
+
+    # 4. 全部 OK · 应用修改
+    print(f'✓ 校验通过 · 开始注入 {len(ANCHOR_PLAN)} 个锚点')
+    for line_num, new_id, tag in ANCHOR_PLAN:
+        idx = line_num - 1
+        lines[idx] = inject_id(lines[idx], tag, new_id)
+
+    SCRIPT.write_text(''.join(lines))
+    print(f'✓ 写入完成 · {len(ANCHOR_PLAN)} 个锚点已加入 {SCRIPT.name}')
+
+    # 5. 二次校验 · 读回文件确认所有锚点都在
+    content = SCRIPT.read_text()
+    missing = []
+    for _, new_id, _ in ANCHOR_PLAN:
+        if f'id="{new_id}"' not in content:
+            missing.append(new_id)
+    if missing:
+        print(f'⚠ 写入后校验：缺少锚点 {missing}')
+        return 2
+    print(f'✓ 二次校验通过 · 所有 {len(ANCHOR_PLAN)} 个锚点已在文件中')
+    return 0
+
+
+if __name__ == '__main__':
+    exit(main())

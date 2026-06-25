@@ -1,0 +1,65 @@
+<!-- ① 封面 cover -->
+<section data-seg="0" data-segname="段 0 · 开场" class="slide cover">
+  <div class="cover__top">
+    <div class="cover__brand">{{BRAND}}</div>
+    <div class="cover__seal">题</div>
+  </div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">课程封面 · 段 0</div>
+    <h1 class="cover__title">主标题<br><em>关键词</em></h1>
+    <p class="cover__sub">一句副标题 · 点明这场讲什么、为谁讲。</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">SPEAKER</span><span class="cover__meta-v">讲者</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">OCCASION</span><span class="cover__meta-v">场合</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">DATE</span><span class="cover__meta-v">2026</span></div>
+  </div>
+</section>
+
+<!-- ② 大字宣言 manifesto（深色变体）-->
+<section data-seg="0" data-segname="段 0 · 开场" class="slide manifesto manifesto--dark">
+  <h2 class="manifesto__title">一句话<br><em>把人钉在椅子上</em></h2>
+  <p class="manifesto__sub">副句 · 解释或反问。</p>
+</section>
+
+<!-- ③ 内容页：标题 head + 卡片 cards -->
+<section data-seg="0" data-segname="段 0 · 开场" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">小节标签</div>
+    <h2 class="title head__title">本页<em>主标题</em></h2>
+    <p class="head__sub">一行副标题，补充说明。</p>
+  </div>
+  <div class="fill">
+    <div class="cards cards--3">
+      <div class="card card--v"><div class="card__eyebrow">A</div><div class="card__title">要点一</div><div class="card__desc">一句话解释。<span class="cite">[作者 年份]</span></div></div>
+      <div class="card card--n"><div class="card__eyebrow">B</div><div class="card__title">要点二</div><div class="card__desc">一句话解释。</div></div>
+      <div class="card card--g"><div class="card__eyebrow">C</div><div class="card__title">要点三</div><div class="card__desc">一句话解释。</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ④ 段分隔 secdiv（巨型幽灵数字）-->
+<section data-seg="1" data-segname="段 1 · 论证" class="slide secdiv secdiv--dark">
+  <div class="secdiv__num">01</div>
+  <div class="secdiv__eyebrow">第一章</div>
+  <h2 class="secdiv__title">这一章<br>要讲<em>什么</em></h2>
+  <p class="secdiv__lead">一两句话，给这一章定调。</p>
+</section>
+
+<!-- ⑤ 大数字冲击 bignum -->
+<section data-seg="1" data-segname="段 1 · 论证" class="slide center">
+  <div class="head center"><div class="eyebrow head__eyebrow">关键数据</div><h2 class="title head__title">一个<em>反直觉</em>的数</h2></div>
+  <div class="fill" style="justify-content:center;">
+    <div class="row" style="gap:40px;width:100%;">
+      <div class="bignum" style="flex:1;"><div class="bignum__v">−80%</div><div class="bignum__u">某指标的变化</div><div class="bignum__k">来源说明 · [作者 年份]</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">68%</div><div class="bignum__u">另一个数</div><div class="bignum__k">[作者 年份]</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ⑥ 洞见金句 insight -->
+<section data-seg="1" data-segname="段 1 · 论证" class="slide insight">
+  <div class="insight__eyebrow">本场核心</div>
+  <h2 class="insight__statement">一句<em>你想让全场记住</em>的话。</h2>
+  <p class="insight__sub">下面一行小字，把它接住。</p>
+</section>

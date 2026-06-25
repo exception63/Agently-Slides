@@ -5,8 +5,8 @@
     {
       "name": "slidesmith",
       "source": "./slidesmith",
-      "description": "Slidesmith — 浏览器 Studio 就地改 slides + Claude Code 桥接闭环（MCP: slidesmith_open / get_requests / apply_patch / status）。",
-      "keywords": ["slides", "presentation", "html", "studio"]
+      "description": "Slidesmith — HTML slides 一条龙：出片(editorial-slides) + 讲稿(transcripts_html) + 副屏同步(slides-presenter-mode) + 浏览器 Studio 就地改 + Claude Code 桥接闭环(MCP: slidesmith_open / get_requests / apply_patch / status)。",
+      "keywords": ["slides", "presentation", "html", "studio", "transcript", "presenter"]
     }
   ]
 }

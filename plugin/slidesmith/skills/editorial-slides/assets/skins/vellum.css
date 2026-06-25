@@ -1,0 +1,282 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:wght@300;400;500&family=Courier+Prime:wght@400;700&family=Noto+Serif+SC:wght@400;500;600&family=Noto+Sans+SC:wght@400;500&display=swap */
+/* skin: vellum · ported from beautiful-html-templates/vellum (MIT · © 2026 Zara Zhang) · 深色文艺学术/羊皮手稿 */
+/* ════════════════════════════════════════════════════════════════════
+   skin: vellum · 深色文艺学术风（深夜书房 · 羊皮手稿 · 思想史讲座）
+   DNA：scheme dark · formality high · density low ·
+        mood scholarly / literary / considered / quiet / intellectual。
+   气质：深靛蓝底（羊皮纸的"夜"）+ 暖金/羊皮色文字 + 衬线大标题（灵魂）·
+        极大留白 · 单一克制强调（青墨 teal 做线条/数字/眉标，亮金做 em 点睛）·
+        em = 文艺学术的强调（Cormorant 斜体 + 亮金）。
+   配色角色（依据 vellum/template.html 的 :root）：
+     --c-bg #2a3870（靛蓝底）→ --paper
+     --c-bg-alt #343f80（抬升面板）→ --paper-soft
+     --c-fg #E8D85C（羊皮金 · 全篇正文与标题主色）→ --ink
+     --c-accent #3a7878（青墨 teal · 引号/线条/眉标/数字的那个强调）→ --accent
+     --c-emphasis #F5E168（更亮的金 · <em> 点睛）→ em / --gold
+   深色皮坑：所有卡片/面板/secdiv/insight 底色用 --paper-soft 深面板，
+            文字用亮的 --ink（羊皮金），杜绝浅底浅字 / 深底深字。
+   换强调色 → 只改 :root 的 --accent / --accent-2 / --accent-soft。
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* —— 配色（靛蓝底 + 羊皮金字 + 青墨强调 · 改强调色只改 --accent 几个）—— */
+  --paper:#2A3870;--paper-soft:#343F80;--paper-warm:#3B468C;       /* slide 底 + 抬升面板 */
+  --rule:rgba(232,216,92,0.20);--rule-soft:rgba(232,216,92,0.12);--rule-strong:rgba(232,216,92,0.34);
+  --ink:#E8D85C;--ink-2:rgba(232,216,92,0.78);--ink-3:rgba(232,216,92,0.55);--ink-4:rgba(232,216,92,0.36);
+  --accent:#6FB6B6;--accent-2:#3A7878;--accent-soft:rgba(111,182,182,0.14);--accent-ui:#6FB6B6;
+  --navy:#9FB6E8;--gold:#F5E168;--green:#8FC9A6;                   /* 卡片/层级的稀用第二三色 */
+  --good:#8FC9A6;--warn:#F5E168;--bad:#E89C8C;
+  --night:#1F2858;--night-2:#222C66;--night-paper:#E8D85C;         /* terminal / compare 更深的靛 */
+  /* —— 字号阶梯（low density：大字 · 衬线标题 · 少而舒展）—— */
+  --t-display:160px;--t-h1:104px;--t-h2:72px;--t-h3:50px;--t-h4:38px;
+  --t-lead:36px;--t-body:31px;--t-small:25px;--t-eyebrow:19px;
+  --pad-x:128px;--pad-y:96px;
+  /* 字体栈 · 中文优先 · 衬线大标题（Cormorant Garamond + 思源宋体）· 正文 DM Sans · 引用斜体衬线 */
+  --font-display:"Cormorant Garamond","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --font-serif:"Cormorant Garamond","Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  --font-sans:"DM Sans","Noto Sans SC","Source Han Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:"Courier Prime","IBM Plex Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55;
+}
+
+/* —— 页脚 chrome / 顶部 runner（type-only · 细金发丝线 · 打字机眉标）—— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:44px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:15px;letter-spacing:0.10em;color:var(--ink-4);padding-top:14px;border-top:1px solid var(--rule-soft);}
+.chrome__l{display:flex;gap:26px;align-items:baseline;white-space:nowrap;}
+.chrome__seg{color:var(--ink-3);font-weight:400;}
+.chrome__r{font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:0.06em;}
+.runner{position:absolute;top:58px;left:var(--pad-x);right:var(--pad-x);display:flex;gap:18px;align-items:center;font-family:var(--font-mono);font-size:15px;letter-spacing:0.16em;color:var(--ink-4);text-transform:uppercase;}
+.runner::before{content:"";width:34px;height:1px;background:var(--accent);}
+
+/* —— 通用排版原子 —— */
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-eyebrow);letter-spacing:0.16em;color:var(--accent);text-transform:uppercase;font-weight:400;}
+.title{font-family:var(--font-display);font-weight:500;font-size:var(--t-h2);line-height:1.06;letter-spacing:-0.01em;color:var(--ink);margin:0;}
+.title--xl{font-size:140px;}.title--lg{font-size:104px;}.title--md{font-size:58px;}.title--sm{font-size:44px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.6;color:var(--ink-2);max-width:1500px;margin:0;font-weight:400;}
+.body{font-size:var(--t-body);line-height:1.65;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.6;color:var(--ink-3);}
+.num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
+.mark-v{color:var(--gold);}.mark-n{color:var(--navy);}.mark-g{color:var(--green);}
+.key{color:var(--gold);font-weight:500;font-style:normal;}
+strong{font-weight:500;color:var(--ink);}
+em{font-style:italic;color:var(--gold);font-family:var(--font-serif);}   /* vellum：强调 = Cormorant 斜体亮金，文艺点睛 */
+.cite{font-family:var(--font-mono);font-size:0.62em;letter-spacing:0.02em;color:var(--ink-4);vertical-align:0.12em;white-space:nowrap;font-style:normal;}
+.head{margin-top:8px;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--rule-soft);}
+.head__eyebrow{margin-bottom:16px;}.head__title{margin:0 0 10px;}
+.head__sub{font-family:var(--font-sans);font-size:25px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.5;}
+.fill{flex:1;min-height:0;}
+.center{align-items:center;justify-content:center;text-align:center;}
+.center .lead{margin-left:auto;margin-right:auto;}
+.center .head{border-bottom:0;}
+
+/* —— cover 封面（衬线大标题浮于靛蓝场 · 左下打字机签注感）—— */
+.cover{background:var(--paper);justify-content:space-between;}
+.cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover__brand{font-family:var(--font-mono);font-size:17px;letter-spacing:0.12em;color:var(--ink-3);text-transform:uppercase;}
+.cover__seal{font-family:var(--font-mono);font-size:14px;letter-spacing:0.14em;color:var(--accent);text-transform:uppercase;border:1px solid var(--accent);padding:8px 16px;border-radius:2px;}
+.cover__main{display:flex;flex-direction:column;gap:32px;}
+.cover__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;font-weight:400;}
+.cover__title{font-family:var(--font-display);font-weight:500;font-size:138px;line-height:1.0;letter-spacing:-0.015em;color:var(--ink);margin:0;}
+.cover__title em{color:var(--gold);font-style:italic;}
+.cover__sub{font-family:var(--font-sans);font-size:34px;color:var(--ink-2);max-width:1500px;font-weight:400;line-height:1.5;}
+.cover__meta{display:flex;gap:60px;font-family:var(--font-mono);color:var(--ink-3);padding-top:32px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:8px;}
+.cover__meta-k{color:var(--ink-4);font-size:13px;letter-spacing:0.12em;text-transform:uppercase;}
+.cover__meta-v{color:var(--ink);font-size:21px;font-weight:400;}
+
+/* —— section divider 段分隔（巨型幽灵衬线数字 · 深靛场）—— */
+.secdiv{background:var(--paper);justify-content:flex-end;padding-bottom:140px;}
+.secdiv--dark{background:var(--night);}
+.secdiv--accent,.secdiv--vermilion{background:var(--accent-2);color:var(--ink);}
+.secdiv__num{position:absolute;top:64px;right:var(--pad-x);font-family:var(--font-display);font-weight:500;font-size:480px;font-style:italic;line-height:0.8;letter-spacing:-0.04em;color:var(--ink);opacity:0.07;}
+.secdiv--accent .secdiv__num,.secdiv--vermilion .secdiv__num{color:var(--ink);opacity:0.14;}
+.secdiv__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;margin-bottom:32px;font-weight:400;}
+.secdiv--accent .secdiv__eyebrow,.secdiv--vermilion .secdiv__eyebrow{color:var(--ink-2);}
+.secdiv__title{font-family:var(--font-display);font-weight:500;font-size:128px;line-height:1.02;letter-spacing:-0.015em;color:var(--ink);margin:0 0 34px;max-width:1550px;position:relative;z-index:1;}
+.secdiv__title em{color:var(--gold);font-style:italic;}
+.secdiv--accent .secdiv__title,.secdiv--vermilion .secdiv__title{color:var(--ink);}
+.secdiv--accent .secdiv__title em,.secdiv--vermilion .secdiv__title em{color:var(--gold);}
+.secdiv__lead{font-family:var(--font-sans);font-size:33px;line-height:1.55;color:var(--ink-2);max-width:1450px;margin:0;font-weight:400;position:relative;z-index:1;}
+.secdiv--accent .secdiv__lead,.secdiv--vermilion .secdiv__lead{color:var(--ink-2);}
+.secdiv__meta{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;color:var(--ink-3);text-transform:uppercase;padding-top:28px;margin-top:30px;border-top:1px solid var(--rule);display:flex;gap:40px;}
+
+/* —— manifesto / insight 大字宣言（vellum 招牌：衬线斜体大字论断）—— */
+.manifesto,.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 140px;}
+.manifesto--dark{background:var(--night);}
+.manifesto__eyebrow,.insight__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;margin-bottom:52px;font-weight:400;}
+.manifesto__title,.insight__statement{font-family:var(--font-display);font-weight:500;font-size:118px;line-height:1.1;letter-spacing:-0.015em;color:var(--ink);margin:0;max-width:1700px;}
+.manifesto__title em,.insight__statement em{color:var(--gold);font-style:italic;}
+.manifesto__sub,.insight__sub{font-family:var(--font-sans);font-size:34px;color:var(--ink-3);margin:48px auto 0;max-width:1450px;line-height:1.55;font-weight:400;}
+
+/* —— cards 卡片组（抬升靛面板 + 强调顶边 · 文字亮金）—— */
+.cards{display:grid;gap:26px;grid-template-columns:repeat(3,1fr);}
+.cards--2{grid-template-columns:repeat(2,1fr);}
+.cards--4{grid-template-columns:repeat(4,1fr);}
+.cards--5{grid-template-columns:repeat(5,1fr);}
+.cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{background:var(--paper-soft);padding:32px 30px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--rule-soft);border-top:3px solid var(--accent);border-radius:4px;}
+.card--v{border-top-color:var(--accent);}.card--n{border-top-color:var(--navy);}.card--g{border-top-color:var(--green);}
+.card--plain{background:transparent;border:0;border-top:1px solid var(--rule);border-radius:0;padding:28px 0;}
+.card__eyebrow{font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);font-weight:400;}
+.card__level{font-family:var(--font-display);font-size:58px;font-weight:500;font-style:italic;line-height:0.92;color:var(--gold);letter-spacing:-0.02em;}
+.card--n .card__level{color:var(--navy);}.card--g .card__level{color:var(--green);}
+.card__title{font-family:var(--font-display);font-weight:500;font-size:34px;color:var(--ink);line-height:1.2;margin-top:6px;}
+.card__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.55;}
+.card__meta{font-family:var(--font-mono);font-size:14px;letter-spacing:0.10em;color:var(--ink-4);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule-soft);}
+
+/* —— numlist 编号清单（衬线斜体序号）—— */
+.numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule);}
+.numitem{display:grid;grid-template-columns:80px 1fr auto;align-items:baseline;gap:32px;padding:18px 0;border-bottom:1px solid var(--rule-soft);}
+.numitem--tight{padding:12px 0;}
+.numitem__n{font-family:var(--font-display);font-size:40px;font-weight:500;font-style:italic;color:var(--gold);line-height:1;}
+.numitem__main{display:flex;flex-direction:column;gap:6px;}
+.numitem__title{font-family:var(--font-display);font-weight:500;font-size:33px;color:var(--ink);line-height:1.2;}
+.numitem__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.55;}
+.numitem__tag{font-family:var(--font-mono);font-size:15px;letter-spacing:0.10em;text-transform:uppercase;color:var(--ink-4);padding-top:10px;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--gold);}
+.numlist--lg .numitem{padding:14px 0;gap:24px;grid-template-columns:72px 1fr auto;}
+.numlist--lg .numitem__n{font-size:36px;}.numlist--lg .numitem__title{font-size:27px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.45;}.numlist--lg .numitem__tag{font-size:14px;}
+
+/* —— bullets 论点清单（vellum 学术主力 · ≤6 条 · 舒展）—— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:26px;}
+.bullets > li{font-family:var(--font-sans);font-size:32px;line-height:1.55;color:var(--ink);padding-left:48px;position:relative;}
+.bullets > li::before{content:"";position:absolute;left:4px;top:18px;width:20px;height:2px;background:var(--accent);}
+.bullets li b,.bullets li strong{color:var(--gold);font-weight:500;}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.bullets ul li{font-size:26px;color:var(--ink-3);padding-left:40px;position:relative;line-height:1.5;}
+.bullets ul li::before{content:"";position:absolute;left:8px;top:15px;width:9px;height:9px;border:1.5px solid var(--accent);border-radius:50%;}
+.bullets--lead > li{font-size:36px;}
+
+/* —— figure 图（学术主力：模型图/图表 · 框靛面板承载内联 SVG）—— */
+.figure{display:flex;flex-direction:column;gap:18px;height:100%;}
+.figure__frame{flex:1;min-height:0;background:var(--paper-soft);border:1px solid var(--rule-soft);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.5;}
+.figure__cap b{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;color:var(--accent);font-weight:400;margin-right:12px;text-transform:uppercase;}
+.figure__src{font-family:var(--font-mono);font-size:14px;color:var(--ink-4);letter-spacing:0.02em;}
+.figure--row{flex-direction:row;gap:36px;align-items:stretch;}
+
+/* —— 概念模型小零件（X→M→Y / 调节）· 给 figure 内联 SVG 用作参照（深底版）—— */
+.node{fill:var(--paper-soft);stroke:var(--accent);stroke-width:2;}
+.node-accent{fill:var(--accent);}
+.path-arrow{stroke:var(--accent);stroke-width:2;fill:none;}
+.path-dash{stroke:var(--gold);stroke-width:2;stroke-dasharray:7 5;fill:none;}
+
+/* —— terminal 终端 / prompt（HCI / AI 演示 · 最深靛底）—— */
+.terminal{background:var(--night);color:var(--ink-2);padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.55;position:relative;border:1px solid var(--rule-soft);border-radius:6px;}
+.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:22px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--accent);}
+.terminal__user{color:var(--gold);}.terminal__system{color:var(--green);}.terminal__hint{color:var(--navy);}.terminal__dim{color:var(--ink-4);}
+.terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
+
+/* —— compare 两栏对比（vellum/template 的双靛纸版式）—— */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.compare__col{padding:42px 44px;border-right:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:16px;}
+.compare__col:last-child{border-right:0;}
+.compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
+.compare__col--good .compare__title{color:var(--ink);}
+.compare__label{font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;text-transform:uppercase;color:var(--accent);}
+.compare__title{font-family:var(--font-display);font-weight:500;font-size:46px;color:var(--ink);line-height:1.12;margin-bottom:12px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px;}
+.compare__list li{font-family:var(--font-sans);font-size:24px;line-height:1.5;color:var(--ink-2);padding-left:28px;position:relative;}
+.compare__list li::before{content:"—";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--accent);}
+
+/* —— steps 流程 —— */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
+.step{padding:38px 30px;border-right:1px solid var(--rule-soft);display:flex;flex-direction:column;gap:12px;}
+.step:last-child{border-right:0;}
+.step__n{font-family:var(--font-mono);font-size:18px;font-weight:400;letter-spacing:0.12em;color:var(--accent);text-transform:uppercase;}
+.step__title{font-family:var(--font-display);font-weight:500;font-size:33px;color:var(--ink);line-height:1.16;}
+.step__desc{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+
+/* —— table 表格（booktabs：上下金粗线、无竖线）—— */
+.table-cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);margin-bottom:14px;}
+.table-cap b{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;color:var(--accent);font-weight:400;margin-right:12px;text-transform:uppercase;}
+.table{width:100%;border-collapse:collapse;font-family:var(--font-sans);font-size:23px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);}
+.table th,.table td{padding:16px 18px;text-align:left;vertical-align:top;line-height:1.5;}
+.table thead th{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--rule-strong);font-weight:400;}
+.table tbody tr{border-bottom:1px solid var(--rule-soft);}
+.table tbody tr:last-child{border-bottom:0;}
+.table td.num{font-variant-numeric:tabular-nums;}
+.table td.bad{color:var(--ink-4);}.table td.good{color:var(--gold);font-weight:500;}
+.table tr.hl td{background:var(--accent-soft);}
+
+/* —— formula5 编号公式行 —— */
+.formula5{display:grid;grid-template-columns:90px 1fr 1.1fr;gap:0;border-top:2px solid var(--accent);}
+.formula5__row{display:contents;}
+.formula5__row > div{padding:24px 26px;border-bottom:1px solid var(--rule-soft);}
+.formula5__n{font-family:var(--font-display);font-size:44px;font-weight:500;font-style:italic;color:var(--gold);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:34px;font-weight:500;color:var(--ink);}
+.formula5__v{font-family:var(--font-sans);font-size:23px;color:var(--ink-2);line-height:1.55;}
+
+/* —— arch 分层堆栈 —— */
+.arch{display:flex;flex-direction:column;gap:6px;}
+.arch__layer{display:grid;grid-template-columns:64px 240px 1fr;gap:24px;align-items:center;padding:14px 24px;background:var(--paper-soft);border:1px solid var(--rule-soft);border-left:5px solid var(--accent);border-radius:3px;}
+.arch__layer--5{border-left-color:var(--accent);}
+.arch__layer--4{border-left-color:var(--navy);}
+.arch__layer--3{border-left-color:var(--green);}
+.arch__layer--2{border-left-color:var(--ink-3);}
+.arch__layer--1{border-left-color:var(--ink-4);}
+.arch__n{font-family:var(--font-display);font-size:34px;font-weight:500;font-style:italic;color:var(--gold);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:26px;font-weight:500;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-4);letter-spacing:0.08em;margin-top:3px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-family:var(--font-sans);font-size:18px;color:var(--ink-2);line-height:1.45;}
+.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;text-align:right;}
+
+/* —— three-circle 三区 —— */
+.three-circle{display:flex;gap:30px;align-items:stretch;}
+.zone{flex:1;padding:36px 32px;background:var(--paper-soft);border:1px solid var(--rule-soft);border-top:6px solid;border-radius:4px;display:flex;flex-direction:column;gap:16px;}
+.zone--g{border-top-color:var(--good);}
+.zone--y{border-top-color:var(--warn);}
+.zone--r{border-top-color:var(--bad);}
+.zone__k{font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);font-weight:400;}
+.zone__title{font-family:var(--font-display);font-size:44px;font-weight:500;color:var(--ink);}
+.zone--g .zone__title{color:var(--good);}.zone--y .zone__title{color:var(--warn);}.zone--r .zone__title{color:var(--bad);}
+.zone__test{font-family:var(--font-serif);font-size:23px;color:var(--ink-2);font-style:italic;}
+.zone__eg{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+.zone__action{margin-top:auto;padding-top:16px;border-top:1px solid var(--rule-soft);font-family:var(--font-sans);font-size:22px;font-weight:500;color:var(--ink);}
+
+/* —— bigq 装框大引用（vellum 灵魂版式：青墨引号 + 衬线斜体大字）—— */
+.bigq{background:var(--paper-soft);padding:44px 60px;border-left:4px solid var(--accent);border-radius:4px;text-align:left;position:relative;}
+.bigq__t{font-family:var(--font-serif);font-size:60px;font-weight:500;font-style:italic;line-height:1.22;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--gold);font-style:italic;}
+.bigq__sub{font-family:var(--font-mono);font-size:19px;letter-spacing:0.06em;color:var(--ink-3);margin-top:20px;text-transform:uppercase;font-style:normal;}
+
+/* —— matrix 矩阵 —— */
+.matrix{display:grid;grid-template-columns:260px repeat(3,1fr);border-top:2px solid var(--accent);border-left:1px solid var(--rule-soft);}
+.matrix__h{padding:18px 18px;border-right:1px solid var(--rule-soft);border-bottom:1px solid var(--rule-soft);font-family:var(--font-mono);font-size:14px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);background:var(--paper-soft);text-align:center;font-weight:400;}
+.matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:24px;font-weight:500;color:var(--ink);text-transform:none;letter-spacing:0;}
+.matrix__cell{padding:20px 18px;border-right:1px solid var(--rule-soft);border-bottom:1px solid var(--rule-soft);font-family:var(--font-sans);font-size:18px;line-height:1.45;color:var(--ink-2);min-height:84px;}
+.matrix__cell strong{color:var(--gold);}
+
+/* —— bignum 大数字（vellum：衬线斜体巨型亮金数字 · 文艺克制）—— */
+.bignum{display:flex;flex-direction:column;gap:10px;padding:34px 32px;background:var(--paper-soft);border:1px solid var(--rule-soft);border-top:4px solid var(--accent);border-radius:4px;}
+.bignum__v{font-family:var(--font-display);font-size:120px;font-weight:500;font-style:italic;line-height:0.9;color:var(--gold);letter-spacing:-0.02em;}
+.bignum__u{font-family:var(--font-sans);font-size:26px;color:var(--ink);font-weight:400;line-height:1.35;}
+.bignum__k{font-family:var(--font-mono);font-size:15px;letter-spacing:0.10em;color:var(--ink-4);text-transform:uppercase;margin-top:12px;}
+
+/* —— summary 总结三栏 —— */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+.sum-card{padding:36px 34px;background:var(--paper-soft);border:1px solid var(--rule-soft);border-top:3px solid var(--accent);border-radius:4px;display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--accent);}.sum-card--n{border-top-color:var(--navy);}.sum-card--g{border-top-color:var(--green);}
+.sum-card__k{font-family:var(--font-mono);font-size:15px;letter-spacing:0.12em;color:var(--ink-3);text-transform:uppercase;font-weight:400;}
+.sum-card__v{font-family:var(--font-display);font-weight:500;font-size:50px;color:var(--gold);line-height:1.06;}
+.sum-card--n .sum-card__v{color:var(--navy);}.sum-card--g .sum-card__v{color:var(--green);}
+.sum-card__hint{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+
+/* —— refs 参考文献（编号 + 悬挂缩进 + 刊名斜体 · 两列）—— */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:14px 56px;counter-reset:ref;list-style:none;margin:0;padding:0;}
+.refs--1col{grid-template-columns:1fr;}
+.refs li{font-family:var(--font-sans);font-size:19px;line-height:1.5;color:var(--ink-2);padding-left:38px;position:relative;break-inside:avoid;}
+.refs li::before{counter-increment:ref;content:"["counter(ref)"]";position:absolute;left:0;top:0;font-family:var(--font-mono);font-size:16px;color:var(--accent);font-weight:400;}
+.refs li em,.refs li .jrnl{font-style:italic;color:var(--ink);font-family:var(--font-serif);}
+.refs--plain li::before{content:"";}
+.refs--plain li{padding-left:30px;text-indent:-30px;}
+.refs--dim li{color:var(--ink-4);}
+
+/* —— helpers —— */
+.callout{border-left:3px solid var(--accent);padding:20px 28px;background:var(--accent-soft);font-family:var(--font-sans);font-size:24px;line-height:1.5;color:var(--ink);border-radius:0 4px 4px 0;}
+.note-box{margin-top:24px;padding:22px 30px;background:var(--paper-soft);border-left:3px solid var(--accent);font-family:var(--font-sans);font-size:23px;line-height:1.5;color:var(--ink-2);border-radius:0 4px 4px 0;}
+.row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:36px;}.mt-l{margin-top:56px;}

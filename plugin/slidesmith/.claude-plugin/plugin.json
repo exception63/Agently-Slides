@@ -2,10 +2,10 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "slidesmith",
   "displayName": "Slidesmith",
-  "version": "0.1.0",
-  "description": "在浏览器 Studio 里就地编辑契约 HTML slides，并让 Claude Code 通过本地桥接直接读取你的修改意见、按 data-id 精准回写。打开 deck → 你在 Studio 改 → 复杂改动一键发给 Claude → 当场看到结果。",
+  "version": "0.2.0",
+  "description": "HTML slides 一条龙：出片（/slidesmith:editorial-slides 多风格）→ 配讲稿（/slidesmith:transcripts_html）→ 副屏演讲者同步（/slidesmith:slides-presenter-mode）→ 浏览器 Studio 就地改 + Claude Code 桥接按 data-id 精准回写复杂改动。",
   "author": { "name": "Slidesmith" },
   "license": "MIT",
-  "keywords": ["slides", "presentation", "html", "studio", "editor", "keynote"],
+  "keywords": ["slides", "presentation", "html", "studio", "editor", "keynote", "transcript", "presenter"],
   "commands": ["./commands/slidesmith.md"]
 }

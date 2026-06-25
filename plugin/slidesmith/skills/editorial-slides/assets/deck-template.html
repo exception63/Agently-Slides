@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{DECK_TITLE}}</title>
+<!-- 在线时加载该皮肤的字体；离线时自动回退到系统字体（字体栈已含 fallback） -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* skin: editorial · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
+/* ════════════════════════════════════════════════════════════════════
+   _core.css · 与风格无关的骨架 + 引擎界面（topbar / 段导航 / 进度条 / 投屏态）
+   所有皮肤共用。它只用令牌，不定义令牌——令牌由各皮肤的 :root 提供：
+     必需：--paper --ink --accent --accent-2 --accent-soft --rule
+          --pad-x --pad-y --font-sans --font-display --font-mono --fit-scale
+   引擎周边的工具 UI（顶栏/侧栏）固定深色，只有强调色（进度条/当前态/缩略框）
+   跟随皮肤的 --accent，使工具一致、内容随皮变化。
+   ════════════════════════════════════════════════════════════════════ */
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:#2a2a2a;font-family:var(--font-sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+body{padding-left:0;padding-top:60px;transition:padding 0.2s;}
+.deck{display:flex;flex-direction:column;gap:32px;padding:32px 24px 60px 320px;align-items:center;}
+.slide-wrap{width:calc(1920px * var(--fit-scale));height:calc(1080px * var(--fit-scale));position:relative;flex-shrink:0;}
+.slide{width:1920px;height:1080px;background:var(--paper);color:var(--ink);padding:var(--pad-y) var(--pad-x);position:absolute;top:0;left:0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,0.4);transform:scale(var(--fit-scale));transform-origin:top left;}
+
+/* ============================ 顶部控制条 ============================ */
+.topbar{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(20,23,31,0.96);color:#F2EDE2;display:flex;align-items:center;gap:16px;padding:0 24px;z-index:1000;backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.08);}
+.topbar__brand{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:0.02em;color:#F2EDE2;}
+.topbar__sub{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;color:rgba(242,237,226,0.5);text-transform:uppercase;}
+.topbar__spacer{flex:1;}
+.topbar__btn{background:transparent;color:#F2EDE2;border:1px solid rgba(242,237,226,0.3);padding:7px 16px;border-radius:4px;font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;font-weight:500;}
+.topbar__btn:hover{background:rgba(242,237,226,0.1);border-color:rgba(242,237,226,0.6);}
+.topbar__btn--primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.topbar__btn--primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
+.topbar__btn--presenter{background:#2A2A2A;border-color:#2A2A2A;color:#F5E3B0;}
+.topbar__btn--presenter:hover{background:#3a3a3a;border-color:#B58530;color:#F5E3B0;}
+.topbar__btn--presenter.active{background:#B58530;border-color:#B58530;color:#fff;box-shadow:0 0 0 2px rgba(181,133,48,0.3);}
+.topbar__info{font-family:var(--font-mono);font-size:12px;color:rgba(242,237,226,0.7);letter-spacing:0.08em;}
+.topbar__info strong{color:#F2EDE2;font-weight:600;}
+
+/* ============================ 折叠式段导航 + 缩略图 ============================ */
+.segnav{position:fixed;left:0;top:60px;bottom:0;width:300px;background:rgba(20,23,31,0.94);border-right:1px solid rgba(255,255,255,0.08);z-index:999;overflow-y:auto;backdrop-filter:blur(8px);}
+.segnav::-webkit-scrollbar{width:6px;}
+.segnav::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);}
+.segnav::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+.segnav__seg{border-bottom:1px solid rgba(255,255,255,0.06);}
+.segnav__head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:transparent;border:0;color:rgba(242,237,226,0.78);width:100%;cursor:pointer;text-align:left;font-family:var(--font-sans);transition:background 0.15s;}
+.segnav__head:hover{background:rgba(255,255,255,0.04);color:#F2EDE2;}
+.segnav__seg--current > .segnav__head{background:var(--accent-soft);color:#F2EDE2;}
+.segnav__head-id{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--accent-ui,#C2A06B);text-transform:uppercase;font-weight:600;width:42px;flex-shrink:0;}
+.segnav__head-name{flex:1;font-size:13px;font-weight:500;line-height:1.3;}
+.segnav__head-meta{font-family:var(--font-mono);font-size:10px;color:rgba(242,237,226,0.4);letter-spacing:0.1em;}
+.segnav__head-arrow{font-size:10px;color:rgba(242,237,226,0.4);transition:transform 0.2s;flex-shrink:0;width:12px;text-align:center;}
+.segnav__seg--expanded .segnav__head-arrow{transform:rotate(90deg);}
+.segnav__thumbs{display:none;padding:8px 12px 14px;grid-template-columns:1fr 1fr;gap:8px;}
+.segnav__seg--expanded .segnav__thumbs{display:grid;}
+.thumb{width:126px;height:71px;background:var(--paper);cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden;transition:border-color 0.15s;flex-shrink:0;}
+.thumb:hover{border-color:var(--accent);}
+.thumb--active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
+.thumb__inner{width:1920px !important;height:1080px !important;transform:scale(0.0656) !important;transform-origin:top left !important;position:absolute !important;top:0 !important;left:0 !important;box-shadow:none !important;pointer-events:none !important;}
+/* 编号徽标固定深字 + 白底——所有皮通用（深色皮的 --ink 是浅色，不能用 var(--ink)，否则白底白字看不清）*/
+.thumb__num{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;color:#16181E;background:rgba(255,255,255,0.85);padding:1px 5px;border-radius:2px;z-index:2;font-weight:600;}
+
+/* —— 进度条 / 提示 —— */
+.progress{position:fixed;top:60px;left:300px;right:0;height:3px;background:rgba(255,255,255,0.08);z-index:998;}
+.progress__bar{height:100%;background:var(--accent);transition:width 0.2s;}
+.hint{position:fixed;bottom:16px;right:20px;font-family:var(--font-mono);font-size:11px;color:#888;pointer-events:none;z-index:1000;letter-spacing:0.1em;}
+body.present .hint,body:fullscreen .hint{color:rgba(255,255,255,0.3);}
+
+/* ============================ 投屏 / 全屏模式 ============================ */
+body.present{background:#000;padding:0;}
+body.present .topbar,body.present .segnav,body.present .progress{display:none;}
+body.present .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+body.present .slide-wrap{width:auto;height:auto;position:static;flex-shrink:0;}
+body.present .slide{display:none;position:static;transform:scale(var(--sc,1));transform-origin:center center;box-shadow:none;}
+body.present .slide.active{display:flex;}
+body.fullscreen{background:#000;}
+:fullscreen{background:#000;}
+:fullscreen .topbar,:fullscreen .segnav,:fullscreen .progress{display:none;}
+:fullscreen .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+:fullscreen .slide{box-shadow:none;}
+
+
+/* —— 皮肤 editorial —— */
+/* FONTS https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap */
+/* ════════════════════════════════════════════════════════════════════
+   skin: editorial · 杂志级风格（纸色 + 朱红 + 宋体大字 + 大数字冲击）
+   这是本 skill 的原始风格，抽成皮肤后外观不变。
+   换主题色 → 只改 :root 里的 --vermilion / --navy / --gold 等几个变量。
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* —— 配色令牌（改主题色只改这一组）—— */
+  --paper:#F2EDE2;--paper-soft:#EEE7D7;--paper-warm:#E8DFC9;
+  --rule:#D8CFB9;--rule-soft:#E4DCC8;
+  --ink:#131516;--ink-2:#2A2F36;--ink-3:#5C636F;--ink-4:#8E94A0;
+  --navy:#1B2B4F;--navy-soft:#2C3F6A;
+  --vermilion:#B8412A;--vermilion-2:#92301F;--vermilion-50:rgba(184,65,42,0.10);
+  --gold:#A07A3A;--gold-soft:#C2A06B;--green:#4E7549;
+  --night:#14171F;--night-2:#1E222D;--night-3:#2C313E;--night-paper:#E6E0D2;
+  /* —— 引擎界面用的强调别名（_core.css 读这些）—— */
+  --accent:var(--vermilion);--accent-2:var(--vermilion-2);--accent-soft:rgba(184,65,42,0.12);--accent-ui:#C2A06B;
+  /* —— 字号阶梯 —— */
+  --t-display:156px;--t-h1:96px;--t-h2:72px;--t-h3:52px;--t-h4:40px;
+  --t-lead:34px;--t-body:30px;--t-small:26px;--t-eyebrow:22px;
+  --pad-x:110px;--pad-y:84px;
+  /* 杂志级字体栈 · 西文 Playfair Display + 中文宋体 / 苹方 */
+  --font-serif:"Playfair Display","Cormorant Garamond","Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  --font-sans:"Inter","Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei","-apple-system",sans-serif;
+  --font-display:"Playfair Display","Cormorant Garamond","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --font-mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55; /* JS 动态设置 · 此为 fallback */
+}
+
+/* —— 页脚 chrome / 顶部 runner —— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:38px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;}
+.chrome__l{display:flex;gap:28px;align-items:baseline;white-space:nowrap;}
+.chrome__seg{color:var(--ink-3);font-weight:500;}
+.chrome__r{font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;}
+.runner{position:absolute;top:56px;left:var(--pad-x);right:var(--pad-x);display:flex;gap:18px;align-items:center;font-family:var(--font-mono);font-size:16px;letter-spacing:0.18em;color:var(--ink-3);text-transform:uppercase;}
+.runner::before{content:"";width:32px;height:1px;background:var(--ink-3);}
+
+/* —— 通用排版原子 —— */
+.eyebrow{font-family:var(--font-sans);font-size:var(--t-eyebrow);letter-spacing:0.22em;color:var(--vermilion);text-transform:uppercase;font-weight:600;}
+.title{font-family:var(--font-display);font-weight:700;font-size:80px;line-height:1.1;letter-spacing:-0.01em;color:var(--ink);margin:0;}
+.title--xl{font-size:140px;}.title--lg{font-size:108px;}.title--md{font-size:64px;}.title--sm{font-size:48px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.55;color:var(--ink-2);max-width:1500px;margin:0;}
+.body{font-size:var(--t-body);line-height:1.65;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.6;color:var(--ink-3);}
+.num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
+.mark-v{color:var(--vermilion);}.mark-n{color:var(--navy);}.mark-g{color:var(--gold);}
+strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--vermilion);font-family:var(--font-display);}
+.cite{font-family:var(--font-mono);font-size:0.62em;letter-spacing:0.04em;color:var(--ink-4);vertical-align:0.15em;white-space:nowrap;font-style:normal;}
+.head{margin-top:10px;margin-bottom:24px;}.head__eyebrow{margin-bottom:12px;}.head__title{margin:0 0 8px;}
+.head__sub{font-size:24px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.4;}
+.fill{flex:1;min-height:0;}
+.center{align-items:center;justify-content:center;text-align:center;}
+.center .lead{margin-left:auto;margin-right:auto;}
+
+/* —— cover 封面 —— */
+.cover{background:var(--paper);justify-content:space-between;}
+.cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover__brand{font-family:var(--font-display);font-size:24px;letter-spacing:0.06em;color:var(--ink-3);}
+.cover__seal{width:96px;height:96px;border:2px solid var(--vermilion);color:var(--vermilion);font-family:var(--font-display);font-weight:700;font-size:32px;display:grid;place-items:center;letter-spacing:0.1em;line-height:1;padding-top:4px;}
+.cover__main{display:flex;flex-direction:column;gap:36px;}
+.cover__eyebrow{font-size:24px;letter-spacing:0.3em;color:var(--vermilion);text-transform:uppercase;font-weight:600;}
+.cover__title{font-family:var(--font-display);font-weight:800;font-size:168px;line-height:1.02;letter-spacing:-0.02em;color:var(--ink);margin:0;}
+.cover__title em{color:var(--vermilion);font-style:normal;}
+.cover__sub{font-family:var(--font-display);font-style:italic;font-size:40px;color:var(--ink-2);max-width:1400px;font-weight:400;line-height:1.4;}
+.cover__meta{display:flex;gap:56px;font-family:var(--font-mono);font-size:18px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;padding-top:32px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:8px;}
+.cover__meta-k{color:var(--ink-4);font-size:14px;}
+.cover__meta-v{color:var(--ink);font-size:20px;font-weight:500;}
+
+/* —— section divider 段分隔（巨型幽灵数字）—— */
+.secdiv{background:var(--paper);justify-content:flex-end;padding-bottom:140px;}
+.secdiv--dark{background:var(--night);color:var(--night-paper);}
+.secdiv--vermilion{background:var(--vermilion-2);color:var(--paper);}
+.secdiv__num{position:absolute;top:80px;right:var(--pad-x);font-family:var(--font-display);font-weight:800;font-size:520px;line-height:0.85;letter-spacing:-0.04em;color:var(--ink);opacity:0.10;}
+.secdiv--dark .secdiv__num{color:var(--night-paper);opacity:0.08;}
+.secdiv--vermilion .secdiv__num{color:var(--paper);opacity:0.18;}
+.secdiv__eyebrow{font-family:var(--font-mono);font-size:20px;letter-spacing:0.3em;color:var(--vermilion);text-transform:uppercase;margin-bottom:36px;font-weight:600;}
+.secdiv--dark .secdiv__eyebrow{color:var(--gold-soft);}
+.secdiv--vermilion .secdiv__eyebrow{color:var(--paper);opacity:0.85;}
+.secdiv__title{font-family:var(--font-display);font-weight:800;font-size:132px;line-height:1.05;letter-spacing:-0.02em;color:var(--ink);margin:0 0 36px;max-width:1500px;position:relative;z-index:1;}
+.secdiv__title em{color:var(--vermilion);font-style:normal;}
+.secdiv--dark .secdiv__title{color:var(--night-paper);}
+.secdiv--vermilion .secdiv__title{color:var(--paper);}
+.secdiv__lead{font-family:var(--font-sans);font-size:32px;line-height:1.6;color:var(--ink-2);max-width:1400px;margin:0 0 56px;font-weight:400;position:relative;z-index:1;}
+.secdiv--dark .secdiv__lead{color:rgba(230,224,210,0.75);}
+.secdiv--vermilion .secdiv__lead{color:rgba(242,237,226,0.88);}
+.secdiv__meta{font-family:var(--font-mono);font-size:18px;letter-spacing:0.16em;color:var(--ink-3);text-transform:uppercase;padding-top:28px;border-top:1px solid var(--rule);display:flex;gap:40px;}
+
+/* —— manifesto 大字宣言 —— */
+.manifesto{align-items:center;justify-content:center;text-align:center;}
+.manifesto__eyebrow{margin-bottom:56px;font-family:var(--font-mono);font-size:22px;letter-spacing:0.32em;color:var(--vermilion);text-transform:uppercase;font-weight:600;}
+.manifesto__title{font-family:var(--font-display);font-weight:700;font-size:132px;line-height:1.08;letter-spacing:-0.02em;margin:0;max-width:1700px;}
+.manifesto__title em{color:var(--vermilion);font-style:normal;}
+.manifesto__sub{font-family:var(--font-sans);font-size:36px;color:var(--ink-2);margin:48px auto 0;max-width:1500px;line-height:1.55;font-weight:400;}
+.manifesto--dark{background:var(--night);color:var(--night-paper);}
+.manifesto--dark .manifesto__title{color:var(--night-paper);}
+.manifesto--dark .manifesto__sub{color:rgba(230,224,210,0.78);}
+
+/* —— insight 洞见金句 —— */
+.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 120px;}
+.insight__eyebrow{font-family:var(--font-mono);font-size:22px;letter-spacing:0.32em;color:var(--vermilion);text-transform:uppercase;margin-bottom:56px;font-weight:600;}
+.insight__statement{font-family:var(--font-display);font-weight:700;font-size:124px;line-height:1.1;letter-spacing:-0.02em;color:var(--ink);margin:0;max-width:1700px;}
+.insight__statement em{color:var(--vermilion);font-style:normal;}
+.insight__sub{font-family:var(--font-sans);font-size:32px;color:var(--ink-2);margin:56px auto 0;max-width:1500px;line-height:1.55;font-weight:400;}
+
+/* —— cards 卡片组 —— */
+.cards{display:grid;gap:28px;grid-template-columns:repeat(3,1fr);}
+.cards--2{grid-template-columns:repeat(2,1fr);}
+.cards--4{grid-template-columns:repeat(4,1fr);}
+.cards--5{grid-template-columns:repeat(5,1fr);}
+.cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{background:var(--paper-soft);padding:32px 28px;display:flex;flex-direction:column;gap:14px;border-top:3px solid var(--ink);}
+.card--v{border-top-color:var(--vermilion);background:#F3E9DE;}
+.card--n{border-top-color:var(--navy);background:#E6E9F0;}
+.card--g{border-top-color:var(--gold);background:#EFE7D2;}
+.card--plain{background:transparent;padding:32px 0;}
+.card__eyebrow{font-family:var(--font-mono);font-size:18px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-3);}
+.card__level{font-family:var(--font-display);font-size:64px;font-weight:700;line-height:0.9;color:var(--ink);letter-spacing:-0.02em;}
+.card--v .card__level{color:var(--vermilion);}.card--n .card__level{color:var(--navy);}.card--g .card__level{color:var(--gold);}
+.card__title{font-family:var(--font-display);font-weight:700;font-size:34px;color:var(--ink);line-height:1.25;margin-top:8px;}
+.card__desc{font-size:22px;color:var(--ink-2);line-height:1.5;}
+.card__meta{font-family:var(--font-mono);font-size:17px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule);}
+
+/* —— numlist 编号清单 —— */
+.numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule);}
+.numitem{display:grid;grid-template-columns:76px 1fr auto;align-items:baseline;gap:32px;padding:16px 0;border-bottom:1px solid var(--rule);}
+.numitem--tight{padding:11px 0;}
+.numitem__n{font-family:var(--font-display);font-size:36px;font-weight:600;color:var(--vermilion);line-height:1;}
+.numitem__main{display:flex;flex-direction:column;gap:6px;}
+.numitem__title{font-family:var(--font-display);font-weight:700;font-size:32px;color:var(--ink);line-height:1.25;}
+.numitem__desc{font-size:22px;color:var(--ink-2);line-height:1.5;}
+.numitem__tag{font-family:var(--font-mono);font-size:18px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-4);padding-top:12px;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--vermilion);}
+.numlist--lg .numitem{padding:14px 0;gap:24px;grid-template-columns:74px 1fr auto;}
+.numlist--lg .numitem__n{font-size:36px;}.numlist--lg .numitem__title{font-size:26px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.4;}.numlist--lg .numitem__tag{font-size:15px;}
+
+/* —— terminal 终端 / 代码 / prompt —— */
+.terminal{background:var(--night);color:#DDD8C9;padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.5;position:relative;}
+.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(221,216,201,0.5);margin-bottom:24px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--vermilion);}
+.terminal__user{color:#E8B95C;}.terminal__system{color:#A8D0A0;}.terminal__hint{color:#F5C97A;}.terminal__dim{color:rgba(221,216,201,0.45);}
+.terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
+
+/* —— compare 两栏对比 —— */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.compare__col{padding:40px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:16px;}
+.compare__col:last-child{border-right:0;}
+.compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
+.compare__col--good .compare__title{color:var(--vermilion);}
+.compare__label{font-family:var(--font-mono);font-size:18px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink-4);}
+.compare__title{font-family:var(--font-display);font-weight:700;font-size:44px;color:var(--ink);line-height:1.2;margin-bottom:12px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px;}
+.compare__list li{font-size:22px;line-height:1.5;color:var(--ink-2);padding-left:26px;position:relative;}
+.compare__list li::before{content:"—";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--vermilion);}
+
+/* —— steps 流程 —— */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
+.step{padding:36px 28px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:12px;}
+.step:last-child{border-right:0;}
+.step__n{font-family:var(--font-mono);font-size:22px;font-weight:600;letter-spacing:0.16em;color:var(--vermilion);}
+.step__title{font-family:var(--font-display);font-weight:700;font-size:32px;color:var(--ink);line-height:1.2;}
+.step__desc{font-size:20px;color:var(--ink-2);line-height:1.5;}
+
+/* —— table 表格 —— */
+.table{width:100%;border-collapse:collapse;font-size:22px;}
+.table th,.table td{padding:14px 16px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top;line-height:1.5;}
+.table th{font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);border-bottom:2px solid var(--ink);font-weight:600;}
+.table td.bad{color:var(--ink-3);}.table td.good{color:var(--vermilion);font-weight:600;}
+
+/* —— formula5 编号公式行 —— */
+.formula5{display:grid;grid-template-columns:90px 1fr 1fr;gap:0;border-top:2px solid var(--ink);}
+.formula5__row{display:contents;}
+.formula5__row > div{padding:22px 24px;border-bottom:1px solid var(--rule);}
+.formula5__n{font-family:var(--font-display);font-size:42px;font-weight:700;color:var(--vermilion);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:34px;font-weight:700;color:var(--ink);}
+.formula5__v{font-size:22px;color:var(--ink-2);line-height:1.5;font-style:italic;}
+
+/* —— arch 分层堆栈 —— */
+.arch{display:flex;flex-direction:column;gap:4px;}
+.arch__layer{display:grid;grid-template-columns:64px 220px 1fr;gap:24px;align-items:center;padding:12px 22px;background:var(--paper-soft);border-left:5px solid var(--ink);}
+.arch__layer--5{border-left-color:var(--vermilion);background:#F3E9DE;}
+.arch__layer--4{border-left-color:var(--navy);background:#E6E9F0;}
+.arch__layer--3{border-left-color:var(--gold);background:#EFE7D2;}
+.arch__layer--2{border-left-color:var(--green);background:#E3EBE0;}
+.arch__layer--1{border-left-color:var(--ink);background:var(--paper-warm);}
+.arch__n{font-family:var(--font-display);font-size:34px;font-weight:700;color:var(--ink);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-3);letter-spacing:0.12em;margin-top:2px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-size:17px;color:var(--ink-2);line-height:1.4;}
+.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.12em;color:var(--ink-3);text-transform:uppercase;text-align:right;}
+
+/* —— three-circle 三区（红绿灯 / 三分法）—— */
+.three-circle{display:flex;gap:32px;align-items:stretch;}
+.zone{flex:1;padding:36px 32px;border-top:6px solid;display:flex;flex-direction:column;gap:16px;}
+.zone--g{border-top-color:var(--green);background:rgba(78,117,73,0.08);}
+.zone--y{border-top-color:var(--gold);background:rgba(160,122,58,0.08);}
+.zone--r{border-top-color:var(--vermilion);background:rgba(184,65,42,0.08);}
+.zone__k{font-family:var(--font-mono);font-size:18px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-3);}
+.zone__title{font-family:var(--font-display);font-size:44px;font-weight:700;color:var(--ink);}
+.zone--g .zone__title{color:var(--green);}.zone--y .zone__title{color:var(--gold);}.zone--r .zone__title{color:var(--vermilion);}
+.zone__test{font-size:22px;color:var(--ink-2);font-style:italic;}
+.zone__eg{font-size:20px;color:var(--ink-2);line-height:1.5;}
+.zone__action{margin-top:auto;padding-top:16px;border-top:1px solid rgba(0,0,0,0.1);font-size:22px;font-weight:600;color:var(--ink);}
+
+/* —— bigq 装框大引用 —— */
+.bigq{background:linear-gradient(135deg,#FBF3DE 0%,#FAEBC2 100%);padding:36px 56px;border:3px solid var(--vermilion);border-radius:8px;text-align:center;}
+.bigq__t{font-family:var(--font-display);font-size:56px;font-weight:700;line-height:1.2;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--vermilion);font-style:normal;}
+.bigq__sub{font-size:22px;color:var(--ink-2);margin-top:16px;}
+
+/* —— matrix 矩阵 —— */
+.matrix{display:grid;grid-template-columns:240px repeat(3,1fr);border-top:2px solid var(--ink);border-left:1px solid var(--rule);}
+.matrix__h{padding:18px 16px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);background:var(--paper-warm);text-align:center;}
+.matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;}
+.matrix__cell{padding:20px 16px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-size:18px;line-height:1.4;color:var(--ink-2);min-height:84px;}
+.matrix__cell strong{color:var(--vermilion);}
+
+/* —— bignum 大数字 —— */
+.bignum{display:flex;flex-direction:column;gap:8px;padding:32px 28px;background:var(--paper-soft);border-top:4px solid var(--vermilion);}
+.bignum__v{font-family:var(--font-display);font-size:110px;font-weight:700;line-height:0.95;color:var(--vermilion);letter-spacing:-0.02em;}
+.bignum__u{font-family:var(--font-sans);font-size:26px;color:var(--ink-2);font-weight:500;}
+.bignum__k{font-family:var(--font-mono);font-size:17px;letter-spacing:0.16em;color:var(--ink-3);text-transform:uppercase;margin-top:12px;}
+
+/* —— summary 总结三栏 —— */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+.sum-card{padding:36px 32px;background:var(--paper-soft);border-top:3px solid var(--ink);display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--vermilion);}.sum-card--n{border-top-color:var(--navy);}.sum-card--g{border-top-color:var(--gold);}
+.sum-card__k{font-family:var(--font-mono);font-size:18px;letter-spacing:0.16em;color:var(--ink-3);text-transform:uppercase;}
+.sum-card__v{font-family:var(--font-display);font-weight:700;font-size:50px;color:var(--ink);line-height:1.1;}
+.sum-card--v .sum-card__v{color:var(--vermilion);}.sum-card--n .sum-card__v{color:var(--navy);}.sum-card--g .sum-card__v{color:var(--gold);}
+.sum-card__hint{font-size:20px;color:var(--ink-2);line-height:1.55;}
+
+/* —— helpers —— */
+.callout{border-left:3px solid var(--vermilion);padding:18px 24px;background:var(--vermilion-50);font-size:22px;line-height:1.55;color:var(--ink-2);}
+.note-box{margin-top:24px;padding:20px 28px;background:rgba(184,65,42,0.06);border-left:3px solid var(--vermilion);font-size:22px;line-height:1.5;color:var(--ink-2);}
+.row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:36px;}.mt-l{margin-top:56px;}
+
+/* —— figure 图（学术皮主用 · 杂志皮也可用）—— */
+.figure{display:flex;flex-direction:column;gap:14px;}
+.figure__frame{background:var(--paper-soft);border:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-size:20px;color:var(--ink-3);line-height:1.5;}
+.figure__cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--vermilion);font-weight:600;margin-right:10px;}
+.figure__src{font-family:var(--font-mono);font-size:15px;color:var(--ink-4);letter-spacing:0.04em;}
+
+/* —— bullets 论点清单（学术皮主用）—— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px;}
+.bullets li{font-size:30px;line-height:1.55;color:var(--ink-2);padding-left:42px;position:relative;}
+.bullets li::before{content:"";position:absolute;left:6px;top:16px;width:14px;height:2px;background:var(--accent);}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.bullets ul li{font-size:25px;color:var(--ink-3);padding-left:38px;}
+.bullets ul li::before{width:8px;background:var(--ink-4);top:15px;}
+
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__brand">{{BRAND}}</div>
+  <div class="topbar__sub">{{BRAND_SUB}}</div>
+  <div class="topbar__spacer"></div>
+  <span class="topbar__info">当前 <strong id="curSeg">段 0</strong> · <strong id="curIdx">1</strong> / <strong id="totalIdx">0</strong></span>
+  <button class="topbar__btn" id="prevBtn" title="上一页 ←">←</button>
+  <button class="topbar__btn" id="nextBtn" title="下一页 →">→</button>
+  <button class="topbar__btn topbar__btn--primary" id="playBtn" title="全屏播放（F 或 Enter）">▶ 全屏播放</button>
+  <button class="topbar__btn topbar__btn--presenter" id="presenterBtn" title="演讲者模式 · 副屏同步讲稿">🖥 演讲者</button>
+</header>
+
+<nav class="segnav" id="segnav"></nav>
+<div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
+<div class="hint">F 全屏播放 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
+
+<div class="deck" id="deck">
+
+<!-- ════════════════════════════════════════════════════════════════
+     ▼▼▼  你的 slides 写在这里  ▼▼▼
+     每张 = 一个 <section class="slide ...">，带 data-seg="段号"（从 0 起）
+            + data-segname="段 N · 段名"（同段每张写一样）
+            可选 data-title="副屏短标题"
+     版式 class 速查见 references/components.md
+     ════════════════════════════════════════════════════════════════ -->
+<section data-seg="0" data-segname="段 0 · 开场" class="slide cover">
+  <div class="cover__top"><div class="cover__brand">{{BRAND}}</div><div class="cover__seal">题</div></div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">副标签 · Subtitle</div>
+    <h1 class="cover__title">主标题<br><em>关键词</em></h1>
+    <p class="cover__sub">一句副标题 · 点明这场讲什么、为谁讲。</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Author</span><span class="cover__meta-v">讲者</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Venue</span><span class="cover__meta-v">场合</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Date</span><span class="cover__meta-v">2026</span></div>
+  </div>
+</section>
+
+
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   自配置引擎 · 与风格无关 · 所有皮肤共用 · 不用改这里
+   它会：① 从各 slide 的 data-seg 自动建段导航 + 缩略图 + 计数
+        ② 自动注入页脚 chrome（段名 + 页码）
+        ③ 自动取每张标题给副屏用
+        ④ 翻页广播给"演讲者模式.html"（配 slides-presenter-mode skill）
+   皮肤只通过 CSS（:root 令牌 + 组件样式）改外观，引擎逻辑不变。
+   ════════════════════════════════════════════════════════════════════ */
+(function () {
+  /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
+  const CONFIG = { channel: '{{CHANNEL}}', presenterFile: '演讲者模式.html' };
+
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll(':scope > .slide'));
+  const total = slides.length;
+  const body = document.body;
+  const segOf = s => parseInt(s.dataset.seg || '0', 10);
+
+  // —— 段名 / 计数 / 起始索引（全自动）——
+  const segName = [], segCount = [];
+  slides.forEach(s => {
+    const g = segOf(s);
+    if (segName[g] === undefined) segName[g] = s.dataset.segname || ('段 ' + g);
+    segCount[g] = (segCount[g] || 0) + 1;
+  });
+  const segShort = segName.map((n, g) => (n || ('段 ' + g)).replace(/^段\s*\d+\s*·?\s*/, '') || ('段 ' + g));
+  const segStarts = []; let _acc = 0; segCount.forEach((c, i) => { segStarts[i] = _acc; _acc += (c || 0); });
+
+  // —— 包 wrap + 注入 chrome 页脚 ——
+  slides.forEach((s, i) => {
+    s.dataset.globalIdx = i;
+    const wrap = document.createElement('div'); wrap.className = 'slide-wrap';
+    s.parentNode.insertBefore(wrap, s); wrap.appendChild(s);
+    if (!s.querySelector('.chrome')) {
+      const g = segOf(s);
+      const div = document.createElement('div'); div.className = 'chrome';
+      div.innerHTML = `<div class="chrome__l"><span class="chrome__seg">${s.dataset.segname || segName[g]}</span></div>`
+        + `<div class="chrome__r">${String(i + 1).padStart(3, '0')} / ${String(total).padStart(3, '0')}</div>`;
+      s.appendChild(div);
+    }
+  });
+
+  // —— 自动建段导航 ——
+  const segnav = document.getElementById('segnav');
+  segCount.forEach((c, g) => {
+    const seg = document.createElement('div'); seg.className = 'segnav__seg'; seg.dataset.seg = g;
+    seg.innerHTML = `<button class="segnav__head" type="button">`
+      + `<span class="segnav__head-id">段 ${g}</span>`
+      + `<span class="segnav__head-name">${segShort[g]}</span>`
+      + `<span class="segnav__head-meta">${c} 张</span>`
+      + `<span class="segnav__head-arrow">▸</span></button>`
+      + `<div class="segnav__thumbs" data-seg-thumbs="${g}"></div>`;
+    segnav.appendChild(seg);
+  });
+
+  // —— 缩略图（克隆 slide）——
+  slides.forEach((s, i) => {
+    const container = document.querySelector(`[data-seg-thumbs="${segOf(s)}"]`);
+    if (!container) return;
+    const thumb = document.createElement('div'); thumb.className = 'thumb'; thumb.dataset.idx = i;
+    const inner = s.cloneNode(true); inner.classList.add('thumb__inner'); inner.classList.remove('active');
+    const ch = inner.querySelector('.chrome'); if (ch) ch.remove();
+    thumb.appendChild(inner);
+    const num = document.createElement('div'); num.className = 'thumb__num'; num.textContent = (i + 1);
+    thumb.appendChild(num);
+    thumb.addEventListener('click', e => { e.stopPropagation(); setActive(i); });
+    container.appendChild(thumb);
+  });
+
+  // —— 段导航折叠 ——
+  document.querySelectorAll('.segnav__head').forEach(btn =>
+    btn.addEventListener('click', () => btn.closest('.segnav__seg').classList.toggle('segnav__seg--expanded')));
+  const firstSeg = document.querySelector('.segnav__seg'); if (firstSeg) firstSeg.classList.add('segnav__seg--expanded');
+
+  // —— 副屏标题（自动取标题文本，可被 data-title 覆盖）——
+  function deriveTitle(s) {
+    if (s.dataset.title) return s.dataset.title;
+    const el = s.querySelector('.cover__title,.secdiv__title,.manifesto__title,.insight__statement,.bigq__t,.head__title,.title,h1,h2,h3');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : ('slide ' + (slides.indexOf(s) + 1));
+  }
+  const SLIDE_TITLES = slides.map(deriveTitle);
+  // 副屏锚点：优先用全局 window.SLIDE_MAP（slides-presenter-mode 注入），否则自动 s{seg}-{段内序号}
+  const segRun = [];
+  const SLIDE_MAP = (window.SLIDE_MAP && window.SLIDE_MAP.length === total) ? window.SLIDE_MAP
+    : slides.map(s => { const g = segOf(s); segRun[g] = (segRun[g] || 0) + 1; return `s${g}-${segRun[g]}`; });
+
+  // —— 状态 + UI ——
+  const curSegEl = document.getElementById('curSeg'), curIdxEl = document.getElementById('curIdx'),
+        totalIdxEl = document.getElementById('totalIdx'), progressBar = document.getElementById('progressBar');
+  totalIdxEl.textContent = total;
+  let idx = 0, present = false;
+
+  // —— 演讲者模式广播（BroadcastChannel + localStorage 双通道）——
+  let channel = null; try { channel = new BroadcastChannel(CONFIG.channel); } catch (e) {}
+  let presenterWindow = null;
+  function broadcastPresenter(i) {
+    const p = { slideIdx: i, total, segment: segOf(slides[i]), anchor: SLIDE_MAP[i] || ('s0-1'),
+      title: SLIDE_TITLES[i] || '', prevTitle: i > 0 ? SLIDE_TITLES[i - 1] : '',
+      nextTitle: i < total - 1 ? SLIDE_TITLES[i + 1] : '', ts: Date.now(), source: 'slides' };
+    if (channel) { try { channel.postMessage(p); } catch (e) {} }
+    try { localStorage.setItem(CONFIG.channel + '-state', JSON.stringify(p)); } catch (e) {}
+  }
+  function handleReverseJump(p) {
+    if (!p || p.type !== 'jump-to-slide' || p.source !== 'presenter' || typeof p.slideIdx !== 'number') return;
+    const t = Math.max(0, Math.min(total - 1, p.slideIdx)); if (t !== idx) setActive(t);
+  }
+  if (channel) { channel.onmessage = e => { if (e && e.data && e.data.type === 'jump-to-slide') handleReverseJump(e.data); }; }
+  window.addEventListener('storage', e => { if (e.key === CONFIG.channel + '-jump' && e.newValue) { try { handleReverseJump(JSON.parse(e.newValue)); } catch (x) {} } });
+  function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); broadcastPresenter(idx); return; }
+    presenterWindow = window.open(CONFIG.presenterFile, 'presenter', 'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no');
+    if (!presenterWindow) { alert('副屏窗口被阻止 · 请允许弹窗后再试。\n（演讲者模式需先用 slides-presenter-mode skill 生成 ' + CONFIG.presenterFile + '）'); return; }
+    document.getElementById('presenterBtn').classList.add('active');
+    setTimeout(() => broadcastPresenter(idx), 400); setTimeout(() => broadcastPresenter(idx), 1200);
+    const t = setInterval(() => { if (!presenterWindow || presenterWindow.closed) { clearInterval(t); document.getElementById('presenterBtn').classList.remove('active'); presenterWindow = null; } }, 1000);
+  }
+
+  // —— 核心导航 ——
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    if (present) {
+      const sc = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 0.98;
+      slides[idx].style.setProperty('--sc', sc);
+    } else {
+      const wrap = slides[idx].parentNode; if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    updateUI(); broadcastPresenter(idx);
+  }
+  function updateUI() {
+    const g = segOf(slides[idx]);
+    curSegEl.textContent = '段 ' + g; curIdxEl.textContent = idx + 1;
+    progressBar.style.width = ((idx + 1) / total * 100).toFixed(2) + '%';
+    document.querySelectorAll('.segnav__seg').forEach(segEl => {
+      const cur = +segEl.dataset.seg === g;
+      segEl.classList.toggle('segnav__seg--current', cur); if (cur) segEl.classList.add('segnav__seg--expanded');
+    });
+    document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('thumb--active', +t.dataset.idx === idx));
+    const at = document.querySelector('.thumb--active');
+    if (at) { const nr = segnav.getBoundingClientRect(), tr = at.getBoundingClientRect();
+      if (tr.top < nr.top + 60 || tr.bottom > nr.bottom - 20) at.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
+  function next() { setActive(idx + 1); } function prev() { setActive(idx - 1); }
+  function goSeg(n) { setActive(segStarts[n] || 0); }
+
+  function togglePresent() {
+    present = !present; body.classList.toggle('present', present);
+    if (present) setActive(idx);
+    else { slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+      setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); }
+  }
+  function enterFullscreen() {
+    const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) req.call(el).then(() => { if (!present) togglePresent(); body.classList.add('fullscreen'); }).catch(() => { if (!present) togglePresent(); });
+    else if (!present) togglePresent();
+  }
+  function exitFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen; if (ex) ex.call(document);
+    }
+    body.classList.remove('fullscreen'); if (present) togglePresent();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) { body.classList.remove('fullscreen');
+      if (present) { present = false; body.classList.remove('present');
+        slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+        setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); } }
+  });
+
+  // —— 键盘 ——
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea, select')) return;
+    const k = e.key;
+    if (k === 'f' || k === 'F' || k === 'Enter') { (document.fullscreenElement || body.classList.contains('present')) ? exitFullscreen() : enterFullscreen(); e.preventDefault(); return; }
+    if (k === 'p' || k === 'P') { togglePresent(); e.preventDefault(); return; }
+    if (k === 's' || k === 'S') { if (!e.ctrlKey && !e.metaKey) { openPresenter(); e.preventDefault(); } return; }
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown') { next(); e.preventDefault(); return; }
+    if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') { prev(); e.preventDefault(); return; }
+    if (k === 'Escape') { if (document.fullscreenElement || body.classList.contains('present')) { exitFullscreen(); e.preventDefault(); } return; }
+    if (k === 'Home') { setActive(0); e.preventDefault(); return; }
+    if (k === 'End') { setActive(total - 1); e.preventDefault(); return; }
+    if (k >= '1' && k <= '9') { const n = +k - 1; if (n < segCount.length) { goSeg(n); e.preventDefault(); } return; }
+  });
+  // —— 投屏态点击翻页 ——
+  document.addEventListener('click', e => {
+    if (!present) return; if (e.target.closest('a, button, input, select, .topbar, .segnav')) return;
+    (e.clientX > window.innerWidth * 0.6) ? next() : (e.clientX < window.innerWidth * 0.4 ? prev() : 0);
+  });
+  document.getElementById('prevBtn').addEventListener('click', prev);
+  document.getElementById('nextBtn').addEventListener('click', next);
+  document.getElementById('playBtn').addEventListener('click', enterFullscreen);
+  document.getElementById('presenterBtn').addEventListener('click', openPresenter);
+
+  // —— 编辑态自适应缩放 + 滚动跟随 ——
+  function updateFitScale() {
+    const availW = window.innerWidth - 300 - 60, availH = window.innerHeight - 100;
+    const scale = Math.max(0.25, Math.min(0.7, availW / 1920, availH / 1080));
+    document.documentElement.style.setProperty('--fit-scale', scale.toFixed(4));
+  }
+  updateFitScale();
+  window.addEventListener('resize', () => { updateFitScale(); if (present) setActive(idx); });
+  let st = null;
+  window.addEventListener('scroll', () => {
+    if (present) return; if (st) clearTimeout(st);
+    st = setTimeout(() => {
+      const vc = window.scrollY + window.innerHeight / 2; let best = 0, bd = Infinity;
+      slides.forEach((s, i) => { const w = s.parentNode; if (!w) return; const r = w.getBoundingClientRect();
+        const c = r.top + window.scrollY + r.height / 2, d = Math.abs(c - vc); if (d < bd) { bd = d; best = i; } });
+      if (best !== idx) { idx = best; updateUI(); }
+    }, 100);
+  });
+
+  updateUI();
+  // 暴露给 slides-presenter-mode / 控制台调试
+  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
+})();
+
+</script>
+</body>
+</html>

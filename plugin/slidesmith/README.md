@@ -6,6 +6,12 @@ click, and watch them land on the slide.
 
 ## What it adds
 
+- **Bundled skills (the HTML-slides pipeline)** — auto-discovered from `skills/`, invoked
+  as `/slidesmith:<name>` and auto-triggered from natural language:
+  - `slidesmith:editorial-slides` — author multi-style HTML slides (杂志/学术/暗场主旨 + 移植皮).
+  - `slidesmith:transcripts_html` — a matching magazine-style HTML transcript (锚点对齐 slides).
+  - `slidesmith:slides-presenter-mode` — turn slides + transcript into a synced second-screen presenter view.
+  > Single source of truth: these live here now (previously standalone / under AutoCourses).
 - **MCP server `slidesmith`** (stdio) — runs the local bridge (HTTP + WebSocket) and
   exposes four tools to Claude Code:
   - `slidesmith_open({ deckPath })` — load a contract HTML deck, open the Studio in your

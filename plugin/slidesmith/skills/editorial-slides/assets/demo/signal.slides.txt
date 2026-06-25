@@ -1,0 +1,171 @@
+<!-- ① 封面 cover -->
+<section data-seg="0" data-segname="段 0 · 总览" class="slide cover">
+  <div class="cover__top">
+    <div class="cover__brand">{{BRAND}}</div>
+    <div class="cover__seal">Policy Brief · 2026</div>
+  </div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">Annual Review · 政策简报</div>
+    <h1 class="cover__title">把数字红利<br>沉到<em>县域</em>去</h1>
+    <p class="cover__sub">区域数字经济年度回顾与下一阶段行动框架（2025 年度 · 内部审议稿）</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">主办</span><span class="cover__meta-v">区域数字经济发展研究院</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">面向</span><span class="cover__meta-v">联席工作会议</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">密级</span><span class="cover__meta-v">内部 · 审议</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">日期</span><span class="cover__meta-v">2026.06</span></div>
+  </div>
+</section>
+
+<!-- ② 提纲 outline -->
+<section data-seg="0" data-segname="段 0 · 总览" data-title="简报提纲" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">Outline · 简报提纲</div>
+    <h2 class="title head__title">本次审议分四部分</h2>
+    <p class="head__sub">从年度成效，到结构短板，再到下一阶段的<em>资源配置</em>与可量化目标。</p>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets bullets--lead">
+      <li><b>年度成效</b>　数字基础设施、产业渗透与公共服务三条线的关键进展。</li>
+      <li><b>结构短板</b>　城乡之间、行业之间的<em>数字鸿沟</em>仍在扩大的三个信号。</li>
+      <li><b>行动框架</b>　六项重点工程与对应的牵头单位、时序与投入。</li>
+      <li><b>目标承诺</b>　到 2027 年的五项可量化、可问责指标。</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ③ 段分隔 secdiv（浅米）-->
+<section data-seg="1" data-segname="段 1 · 年度成效" class="slide secdiv">
+  <div class="secdiv__num">Part I</div>
+  <div class="secdiv__eyebrow">Annual Performance</div>
+  <h2 class="secdiv__title">一年来，<br>底座<em>更稳了</em></h2>
+  <p class="secdiv__lead">网络通达、平台下沉、政务上云——三项基础工程进入兑现期。先看一组可核验的数据。</p>
+  <div class="secdiv__meta"><span>统计口径 · 2025 全年</span><span>来源 · 区域统计公报</span></div>
+</section>
+
+<!-- ④ 关键指标 bignum -->
+<section data-seg="1" data-segname="段 1 · 年度成效" data-title="关键指标" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.1　Headline Metrics</div>
+    <h2 class="title head__title">三个数字看全年</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="row" style="gap:28px;width:100%;">
+      <div class="bignum" style="flex:1;"><div class="bignum__v">98.6%</div><div class="bignum__u">行政村<br>千兆光网通达率</div><div class="bignum__k">较上年 +4.2pt</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">2.3×</div><div class="bignum__u">县域电商<br>交易额增速</div><div class="bignum__k">对比全区平均</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">1,840万</div><div class="bignum__u">政务服务<br>"一网通办"办件</div><div class="bignum__k">网办率 87.5%</div></div>
+    </div>
+    <div class="callout mt-m">三条线同向发力：<em>网络通达</em>提供物理底座，<em>平台下沉</em>放大商业价值，<em>政务上云</em>沉淀公共信任——但增量并未均匀落到每个县。</div>
+  </div>
+</section>
+
+<!-- ⑤ 进展表格 table（booktabs）-->
+<section data-seg="1" data-segname="段 1 · 年度成效" data-title="分项进展" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.2　Progress by Track</div>
+    <h2 class="title head__title">六项重点工程进度</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="table-cap"><b>表 1</b>2025 年度重点工程完成情况（牵头单位 · 完成率 · 评级）</div>
+    <table class="table">
+      <thead><tr><th>工程</th><th>牵头单位</th><th class="num">投入（亿元）</th><th class="num">完成率</th><th>评级</th></tr></thead>
+      <tbody>
+        <tr><td>千兆光网下乡</td><td>通信管理局</td><td class="num">12.4</td><td class="num">102%</td><td class="good">超额</td></tr>
+        <tr class="hl"><td>县域电商集群</td><td>商务局</td><td class="num">8.7</td><td class="num">96%</td><td class="good">达标</td></tr>
+        <tr><td>政务云迁移</td><td>政务服务中心</td><td class="num">6.1</td><td class="num">91%</td><td>达标</td></tr>
+        <tr><td>智慧农业试点</td><td>农业农村局</td><td class="num">4.3</td><td class="num">78%</td><td class="bad">滞后</td></tr>
+        <tr><td>数字技能培训</td><td>人社局</td><td class="num">2.9</td><td class="num">73%</td><td class="bad">滞后</td></tr>
+        <tr><td>数据安全合规</td><td>网信办</td><td class="num">3.2</td><td class="num">88%</td><td>达标</td></tr>
+      </tbody>
+    </table>
+    <div class="note-box">两项<em>滞后</em>工程集中在"人"与"地"——技能培训覆盖不足、农业场景落地慢，正是城乡数字鸿沟的根因所在。</div>
+  </div>
+</section>
+
+<!-- ⑥ 段分隔 secdiv--dark（藏青满版）-->
+<section data-seg="2" data-segname="段 2 · 结构短板" class="slide secdiv secdiv--dark">
+  <div class="secdiv__num">Part II</div>
+  <div class="secdiv__eyebrow">Structural Gaps</div>
+  <h2 class="secdiv__title">底座之上，<br>差距仍在<em>拉大</em></h2>
+  <p class="secdiv__lead">通达不等于使用，接入不等于受益。三个被平均数掩盖的信号，值得本次会议正视。</p>
+  <div class="secdiv__meta"><span>口径 · 县级面板</span><span>样本 · 全区 47 县</span></div>
+</section>
+
+<!-- ⑦ 三个信号 numlist -->
+<section data-seg="2" data-segname="段 2 · 结构短板" data-title="三个信号" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.1　Three Signals</div>
+    <h2 class="title head__title">被平均数掩盖的三件事</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="numlist numlist--lg">
+      <div class="numitem numitem--accent"><div class="numitem__n">01</div><div class="numitem__main"><div class="numitem__title">"通而不用"——通达率高，活跃使用率却低。</div><div class="numitem__desc">后 10 个县的人均移动数据用量，仅为前 10 个县的 41%。</div></div><div class="numitem__tag">使用鸿沟</div></div>
+      <div class="numitem numitem--accent"><div class="numitem__n">02</div><div class="numitem__main"><div class="numitem__title">"接而不惠"——电商集群增长集中在少数头部县。</div><div class="numitem__desc">前 5 县贡献了全区电商增量的 63%，长尾县增长乏力。</div></div><div class="numitem__tag">价值鸿沟</div></div>
+      <div class="numitem numitem--accent"><div class="numitem__n">03</div><div class="numitem__main"><div class="numitem__title">"能而不会"——设备到位，但数字技能供给不足。</div><div class="numitem__desc">45 岁以上劳动者的数字技能达标率不足三成，培训缺口最大。</div></div><div class="numitem__tag">能力鸿沟</div></div>
+    </div>
+    <div class="callout mt-m">三个鸿沟环环相扣：<em>不会用</em>导致<em>用不上</em>，进而<em>得不到</em>价值——下一阶段的重心应从"铺网"转向"育人"。</div>
+  </div>
+</section>
+
+<!-- ⑧ 段分隔 + 行动框架 -->
+<section data-seg="3" data-segname="段 3 · 行动框架" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part III</div>
+  <div class="secdiv__eyebrow">Action Framework</div>
+  <h2 class="secdiv__title">把重心，<br>从"铺网"<em>转向"育人"</em></h2>
+  <p class="secdiv__lead">下一阶段三大主线，对应明确的牵头单位、时序与可问责的产出。</p>
+</section>
+
+<!-- ⑨ 三大主线 cards -->
+<section data-seg="3" data-segname="段 3 · 行动框架" data-title="三大主线" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§3.1　Three Pillars</div>
+    <h2 class="title head__title">下一阶段三大主线</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--3">
+      <div class="card card--v"><div class="card__eyebrow">育人</div><div class="card__title">数字技能普惠</div><div class="card__desc">面向中老年与新农人的分层培训，把"会用"指标纳入乡镇考核。</div><div class="card__meta">牵头 · 人社局</div></div>
+      <div class="card card--n"><div class="card__eyebrow">扶尾</div><div class="card__title">长尾县帮带</div><div class="card__desc">头部县与长尾县结对，建立电商供应链与流量的跨县共享机制。</div><div class="card__meta">牵头 · 商务局</div></div>
+      <div class="card card--g"><div class="card__eyebrow">兜底</div><div class="card__title">公共数字底座</div><div class="card__desc">政务云与数据安全合规先行，确保普惠不以牺牲安全为代价。</div><div class="card__meta">牵头 · 网信办</div></div>
+    </div>
+    <div class="note-box">三线并进、但<em>育人优先</em>：技能不补齐，基础设施投入的边际回报将持续递减。</div>
+  </div>
+</section>
+
+<!-- ⑩ 目标承诺 table -->
+<section data-seg="3" data-segname="段 3 · 行动框架" data-title="目标承诺" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§3.2　Targets to 2027</div>
+    <h2 class="title head__title">五项可问责指标</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="table-cap"><b>表 2</b>到 2027 年的可量化目标（基线 · 目标值 · 责任）</div>
+    <table class="table">
+      <thead><tr><th>指标</th><th class="num">2025 基线</th><th class="num">2027 目标</th><th>牵头单位</th></tr></thead>
+      <tbody>
+        <tr><td>后 10 县人均数据用量 / 前 10 县</td><td class="num">41%</td><td class="num good">≥ 65%</td><td>通信管理局</td></tr>
+        <tr class="hl"><td>45 岁以上数字技能达标率</td><td class="num">29%</td><td class="num good">≥ 55%</td><td>人社局</td></tr>
+        <tr><td>长尾县电商增量占比</td><td class="num">37%</td><td class="num good">≥ 50%</td><td>商务局</td></tr>
+        <tr><td>政务"一网通办"网办率</td><td class="num">87.5%</td><td class="num good">≥ 95%</td><td>政务服务中心</td></tr>
+        <tr><td>关键政务系统等保合规率</td><td class="num">88%</td><td class="num good">100%</td><td>网信办</td></tr>
+      </tbody>
+    </table>
+    <div class="callout mt-m">五项指标全部<em>对外公开、按年问责</em>——这是把"数字红利下沉"从口号变成承诺的关键一步。</div>
+  </div>
+</section>
+
+<!-- ⑪ 核心论断 insight -->
+<section data-seg="4" data-segname="段 4 · 收束" class="slide insight">
+  <div class="insight__eyebrow">Take-home Message</div>
+  <h2 class="insight__statement">数字经济的下半场，<br>较量的不是<em>带宽</em>，是<em>能力</em>。</h2>
+  <p class="insight__sub">把红利沉到县域，关键在人——让更多人会用、能用、用得上。</p>
+</section>
+
+<!-- ⑫ 收尾 end -->
+<section data-seg="4" data-segname="段 4 · 收束" data-title="致谢与联系" class="slide center">
+  <div class="fill center" style="gap:34px;">
+    <div class="eyebrow">区域数字经济发展研究院</div>
+    <h2 class="title title--lg">恳请审议 · 欢迎批评指正</h2>
+    <p class="lead" style="max-width:1100px;">本简报数据来源于区域统计公报与各牵头单位月报，目标值经联席工作组初步测算，提交本次会议审议后定稿。</p>
+    <p class="small">联系 · 研究院政策研究部　|　policy@example.gov　|　内部审议稿 · 请勿外传</p>
+  </div>
+</section>
