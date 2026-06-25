@@ -1,22 +1,34 @@
-# AGENTS.md — Slidesmith agent interface (v2, HTML-first)
+# AGENTS.md — Slidesmith agent interface (HTML-first + bridge/MCP)
 
 > Machine-facing contract for AI agents (Claude Code etc.). Read THIS file instead
 > of scanning the repo.
 
-## 1. What this project is (v2)
+## 1. What this project is
 
-Slidesmith is **HTML-first**: the *artifact* is a single-file **contract HTML deck**.
-The loop is:
+Slidesmith is a **highly AI-integrated HTML slides editor**. The *artifact* is a
+single-file **contract HTML deck**. Division of labor: the human does high-frequency
+fine edits themselves in the browser Studio (text, color, size, animation, move/delete
+element — instant, zero tokens); you handle the complex/fuzzy asks, which the human
+delegates as **per-slide comments** (and an optional deck-level ask). The loop:
 
 ```
-AI generates a contract HTML deck  →  human edits it visually in Studio
-(text / colors / fonts / animations, no AI)  →  for complex changes the human sends
-ONE slide back to AI (Submit-to-AI)  →  AI rewrites just that slide  →  export HTML/PDF
+you generate / open a contract HTML deck  →  human edits visually + leaves COMMENTS on
+slides  →  human hits 🚀 发送给 Claude  →  you read the comments, rewrite ONLY the named
+slides by data-id, write them back  →  pages flip to ✓ 已改 (human can ↩︎ 还原)
 ```
 
-Your two jobs as an agent:
-- **(A) Generate** a contract HTML deck the human can import into Studio (§2–§3).
-- **(B) Apply** a single-slide change request the human exports from Studio (§4).
+Your jobs as an agent:
+- **(A) Generate** a contract HTML deck the human can open in Studio (§2–§3).
+- **(B) Collaborate live via the bridge/MCP** — open a deck, read the human's comments,
+  apply patches by `data-id` (§4b — the primary path; this is what the plugin enables).
+- **(B-offline) Apply** a request file the human exported manually when not connected (§4).
+
+**The connected path (start here when the `slidesmith` MCP tools are available):**
+`slidesmith_open(deckPath)` opens the Studio in the human's browser (connected) →
+`slidesmith_get_requests()` returns their submitted comments → rewrite the slides →
+`slidesmith_apply_patch({sections})` lands them instantly. `slidesmith_status()` shows
+connection / deck / pending count. After `slidesmith_open`, poll `get_requests` (or wait
+for the human to say they sent) — the bridge does not push to you. Details in §4b.
 
 The canonical truth is the **HTML deck itself** (not a JSON IR). An older IR + CLI
 pipeline still exists as an optional, guard-railed path — see §6.
