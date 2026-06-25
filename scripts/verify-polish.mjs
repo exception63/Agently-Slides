@@ -57,15 +57,14 @@ try {
     return r && { count: r.count, hasS2: r.content.includes('s2'), hasS5: r.content.includes('s5'),
       hasInstr1: r.content.includes('金句版'), hasInstr2: r.content.includes('趋势示意图'),
       isPrompt: r.content.includes('给 AI 的 prompt') && r.content.includes('输出要求'),
-      tellsPatchFile: r.content.includes('.patch.html') && r.content.includes('从文件应用') };
+      tellsPatchFile: r.content.includes('.patch.html') && r.content.includes('slidesmith_apply_patch') };
   });
 
-  // (3) paste-apply a 2-page patch -> both replaced, others intact
+  // (3) apply a 2-page patch via the bridge channel (offline paste UI was removed) -> both replaced, others intact
   const apply = await page.evaluate(() => {
     const patch = '<section class="slide" data-id="s2"><h2 class="title">P2 已被AI替换</h2></section>\n'
       + '<section class="slide" data-id="s5"><h2 class="title">P5 已被AI替换</h2></section>';
-    document.getElementById('aiPaste').value = patch;
-    document.getElementById('aiApplyPaste').click();
+    window.__SM_APPLY_PATCH__(patch);
     return true;
   });
   await page.waitForFunction(() => {

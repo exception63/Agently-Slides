@@ -98,7 +98,14 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   const host = opts.host || '127.0.0.1';
   const port = opts.port ?? DEFAULT_PORT;
   const studioPath = opts.studioPath || DEFAULT_STUDIO;
-  const studioHtml = loadStudioHtml(studioPath);
+  let studioHtml = loadStudioHtml(studioPath); // startup copy (also the fallback)
+  // Re-read the built Studio fresh on each page load so a `npm run build:studio` shows
+  // up on a simple browser refresh — no bridge restart needed. Falls back to the
+  // startup copy if the file is briefly unreadable (e.g. mid-rebuild).
+  function currentStudioHtml(): string {
+    try { studioHtml = readFileSync(studioPath, 'utf8'); } catch { /* keep last good copy */ }
+    return studioHtml;
+  }
 
   const emitter = new EventEmitter();
   const sockets = new Set<WebSocket>();
@@ -116,7 +123,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return; }
     if (url === '/' || url === '/studio' || url === '/index.html') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', ...CORS });
-      res.end(studioHtml);
+      res.end(currentStudioHtml());
       return;
     }
     if (url === '/healthz' || url === '/status' || url === '/api/status') {

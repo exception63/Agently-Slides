@@ -154,6 +154,7 @@ interface HtmlSlide { id: string; title: string; seg: string; segName: string; v
 let htmlSlides: HtmlSlide[] = [];
 let htmlSelEl: Element | null = null; // currently selected element inside the edit iframe
 let htmlGotoAfterRender = -1; // restore this slide after a re-render (e.g. after applying a patch)
+let fxMode: 'auto' | 'manual' = 'auto'; // 动效播放模式：auto=进入页面即播 / manual=点击页面才播（写进导出的 <html data-smfx>）
 
 // ---- File System Access: a writable handle captured when the user opens a deck,
 // so "保存 HTML" can overwrite that exact file in place (one click, no re-pick).
@@ -490,6 +491,8 @@ function loadHtmlDeck(name: string, html: string): void {
   if (deckEl) { let seen = false; Array.from(doc.body.childNodes).forEach((n) => { if (n === deckEl) { seen = true; return; } (seen ? (trailing += nodeToHtml(n)) : (prelude += nodeToHtml(n))); }); }
   const mapM = html.match(/window\.SLIDE_MAP\s*=\s*(\[[^\]]*\])/);
   let slideMap: string[] | null = null; if (mapM) { try { slideMap = JSON.parse(mapM[1]); } catch { slideMap = null; } }
+  // recover the FX play mode if this deck was exported by us before (else default auto)
+  fxMode = /<html[^>]*\bdata-smfx=["']?manual/i.test(html) ? 'manual' : 'auto';
   const { base, themes } = parseTokens(doc.head.innerHTML);
 
   htmlSlides = secs.map((s, i) => {
@@ -524,7 +527,7 @@ function loadHtmlDeck(name: string, html: string): void {
   Object.keys(aiInstructions).forEach((k) => delete aiInstructions[k]); aiApplied.clear(); aiSent.clear(); Object.keys(aiBefore).forEach((k) => delete aiBefore[k]); aiCurId = ''; aiDeckInstruction = '';
   const aiBox = $('#aiInstruction') as HTMLTextAreaElement | null; if (aiBox) aiBox.value = '';
   const aiDeckBox = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (aiDeckBox) aiDeckBox.value = '';
-  const aiPaste = $('#aiPaste') as HTMLTextAreaElement | null; if (aiPaste) aiPaste.value = '';
+  const fxSel = $('#hFxMode') as HTMLSelectElement | null; if (fxSel) fxSel.value = fxMode; // reflect imported deck's play mode
   renderLeft(); setHtmlMode(true); refreshHtmlInspector(); renderHtmlEdit();
   toast('已导入 HTML deck：' + fileBase + '（' + htmlSlides.length + ' 页 · ' + new Set(htmlSlides.map((s) => s.seg)).size + ' 段）');
 }
@@ -553,13 +556,19 @@ function assembleDeck(forEdit = false): string {
       + '#deck .slide .sm-sel{outline:2px solid #3a86ff!important;outline-offset:2px}</style>'
     : '';
   const deckInner = htmlSlides.map((s) => s.html).join('\n');
-  // motion CSS is injected into EVERY assembled deck (preview + export) so data-motion
-  // effects actually play offline — the imported deck has no such rules of its own.
-  return `<!DOCTYPE html>\n<html ${htmlOpenTag()}>\n<head>\n${H.head}${MOTION_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n</body>\n</html>`;
+  // FX CSS+JS injected into EVERY assembled deck (preview + export) so entrance anims &
+  // motion play offline — the imported deck has no such rules of its own. data-smfx on
+  // <html> carries the auto/manual choice into the exported file.
+  return `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}">\n<head>\n${H.head}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n</body>\n</html>`;
 }
-// Continuous "motion" effects (data-motion) — ported from the runtime so they play in
-// any imported/exported deck. Respect prefers-reduced-motion.
-const MOTION_CSS = '<style id="sm-motion">'
+// FX: one-shot ENTRANCE animations (data-anim) + continuous MOTION (data-motion),
+// ported from the runtime so they play in any imported/exported deck (which has no
+// such rules of its own). Gated by FX_JS via slide classes so we get auto-on-show
+// vs click-to-play. Respect prefers-reduced-motion.
+//  - auto  (default): a slide gets .sm-play when it becomes active → entrance plays once, motion loops.
+//  - manual: a slide gets .sm-armed (entrance hidden, motion paused) until the viewer clicks → .sm-play.
+const FX_CSS = '<style id="sm-fx">'
+  // continuous MOTION — assigned always; auto runs immediately, manual stays paused until played
   + '#deck .slide [data-motion]{will-change:transform,opacity,filter}'
   + '#deck .slide [data-motion="glow"]{animation:sm-m-glow 3.2s ease-in-out infinite}'
   + '#deck .slide [data-motion="breathe"]{animation:sm-m-breathe 3.6s ease-in-out infinite;transform-origin:center}'
@@ -567,14 +576,62 @@ const MOTION_CSS = '<style id="sm-motion">'
   + '#deck .slide [data-motion="pulse"]{animation:sm-m-pulse 2s ease-in-out infinite}'
   + '#deck .slide [data-motion="neon"]{animation:sm-m-neon 5.5s linear infinite}'
   + '#deck .slide [data-motion="stress"]{animation:sm-m-stress 4.2s ease-in-out infinite;transform-origin:center}'
+  + 'html[data-smfx="manual"] #deck .slide [data-motion]{animation-play-state:paused}'
+  + 'html[data-smfx="manual"] #deck .slide.sm-play [data-motion]{animation-play-state:running}'
+  // one-shot ENTRANCE — element is normally visible; only hidden while armed/playing, then animates in
+  + '#deck .slide.sm-armed [data-anim]{opacity:0}'
+  + '#deck .slide.sm-play [data-anim]{opacity:0;animation-fill-mode:both;animation-duration:.55s;animation-timing-function:cubic-bezier(.16,1,.3,1)}'
+  + '#deck .slide.sm-play [data-anim="fade"]{animation-name:sm-a-fade;animation-duration:.5s}'
+  + '#deck .slide.sm-play [data-anim="rise"]{animation-name:sm-a-rise}'
+  + '#deck .slide.sm-play [data-anim="fade-up"]{animation-name:sm-a-rise}'
+  + '#deck .slide.sm-play [data-anim="pop"]{animation-name:sm-a-pop;animation-duration:.5s}'
+  + '#deck .slide.sm-play [data-anim="in-left"]{animation-name:sm-a-in-left}'
+  + '#deck .slide.sm-play [data-anim="in-right"]{animation-name:sm-a-in-right}'
+  + '#deck .slide.sm-play [data-anim="counter-up"]{animation-name:sm-a-fade;animation-duration:.5s}'
+  + '#deck .slide.sm-play [data-anim="morph"]{animation-name:sm-a-pop;animation-duration:.6s}'
+  // stagger-list — the list itself stays visible; its items rise one after another
+  + '#deck .slide.sm-armed [data-anim="stagger-list"]{opacity:1}'
+  + '#deck .slide.sm-play [data-anim="stagger-list"]{opacity:1;animation:none}'
+  + '#deck .slide.sm-armed [data-anim="stagger-list"]>li{opacity:0}'
+  + '#deck .slide.sm-play [data-anim="stagger-list"]>li{opacity:0;animation:sm-a-rise .5s cubic-bezier(.16,1,.3,1) both}'
+  + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(2){animation-delay:.07s}'
+  + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(3){animation-delay:.14s}'
+  + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(4){animation-delay:.21s}'
+  + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(5){animation-delay:.28s}'
+  + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(6){animation-delay:.35s}'
+  + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(n+7){animation-delay:.42s}'
+  // entrance keyframes
+  + '@keyframes sm-a-fade{from{opacity:0}to{opacity:1}}'
+  + '@keyframes sm-a-rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}'
+  + '@keyframes sm-a-pop{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}'
+  + '@keyframes sm-a-in-left{from{opacity:0;transform:translateX(-48px)}to{opacity:1;transform:none}}'
+  + '@keyframes sm-a-in-right{from{opacity:0;transform:translateX(48px)}to{opacity:1;transform:none}}'
+  // motion keyframes
   + '@keyframes sm-m-glow{0%,100%{filter:drop-shadow(0 0 1px transparent)}50%{filter:drop-shadow(0 0 16px var(--accent,#F4B73E))}}'
   + '@keyframes sm-m-breathe{0%,100%{transform:scale(1)}50%{transform:scale(1.035)}}'
   + '@keyframes sm-m-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}'
   + '@keyframes sm-m-pulse{0%,100%{opacity:1}50%{opacity:.55}}'
   + '@keyframes sm-m-neon{0%,16%,18%,55%,57%,100%{opacity:1}17%,56%{opacity:.7}80%,82%{opacity:.88}}'
   + '@keyframes sm-m-stress{0%,38%,100%{transform:scale(1)}45%{transform:scale(1.06)}}'
-  + '@media(prefers-reduced-motion:reduce){#deck .slide [data-motion]{animation:none!important}}'
+  + '@media(prefers-reduced-motion:reduce){#deck .slide [data-motion],#deck .slide [data-anim],#deck .slide [data-anim] *{animation:none!important;opacity:1!important}}'
   + '</style>';
+// FX driver — injected into preview + export. Watches which slide is active and, per
+// data-smfx mode, plays it (auto) or arms it for a click (manual). Exposes window hooks
+// so the Studio's ▶ button / mode switch can drive it live without a re-render.
+const FX_JS = '<script id="sm-fx-js">(function(){'
+  + 'var root=document.documentElement;var deck=document.getElementById("deck");if(!deck)return;'
+  + 'function mode(){return root.getAttribute("data-smfx")||"auto";}'
+  + 'function active(){return deck.querySelector(".slide.active")||deck.querySelector(".slide");}'
+  + 'function arm(s){if(!s)return;s.classList.remove("sm-play");s.classList.add("sm-armed");}'
+  + 'function play(s){if(!s)return;s.classList.remove("sm-play");s.classList.remove("sm-armed");void s.offsetWidth;s.classList.add("sm-play");}'
+  + 'function onShow(s){if(!s)return;if(mode()==="manual"){arm(s);}else{play(s);}}'
+  + 'window.__SM_FX_PLAY__=function(){play(active());};'
+  + 'window.__SM_FX_REARM__=function(){onShow(active());};'
+  + 'deck.addEventListener("click",function(){if(mode()!=="manual")return;var s=active();if(s&&s.classList.contains("sm-armed"))play(s);},true);'
+  + 'var last=null;function tick(){var s=active();if(s&&s!==last){last=s;onShow(s);}}'
+  + 'try{new MutationObserver(tick).observe(deck,{attributes:true,subtree:true,attributeFilter:["class"]});}catch(e){}'
+  + 'setTimeout(tick,60);setTimeout(tick,400);'
+  + '})();</scr' + 'ipt>';
 function isTextLeaf(el: Element): boolean {
   if (el.querySelector('div,section,ul,ol,li,figure,table,svg,img,canvas,iframe,p,h1,h2,h3,h4,h5,h6,blockquote')) return false;
   return (el.textContent || '').trim().length > 0;
@@ -674,6 +731,13 @@ function setHtmlMotion(val: string): void {
   if (!htmlSelEl) return;
   if (val && val !== 'none') htmlSelEl.setAttribute('data-motion', val); else htmlSelEl.removeAttribute('data-motion');
 }
+// drive the FX engine inside the live preview iframe (defined by FX_JS)
+function previewFrame(): HTMLIFrameElement | null { return document.getElementById('preview') as HTMLIFrameElement | null; }
+function previewFxCall(name: '__SM_FX_PLAY__' | '__SM_FX_REARM__'): void {
+  const w = previewFrame()?.contentWindow as unknown as Record<string, (() => void) | undefined> | undefined;
+  const fn = w && w[name]; if (typeof fn === 'function') fn();
+}
+function previewPlayFx(): void { previewFxCall('__SM_FX_PLAY__'); }
 // high-frequency direct edits on the selected element, straight in the live DOM
 // (no AI, no re-render). harvestAll() snapshots the change so export/patch keep it.
 function moveHtmlEl(dir: number): void {
@@ -870,7 +934,7 @@ ${FENCE}
 规则：
 1. **每改一页输出一个 \`<section>\`，且必须保留原来的 \`data-id\`**（Slidesmith 靠它精准替换对应页）。
 2. 不要输出 \`<html>\`/\`<head>\`、不要整份 deck、不要解释文字——文件里只有这些 \`<section>\`。
-3. 把这个 \`${fileBase}.patch.html\` 交回给用户；用户在 Slidesmith 点 **「② 从文件应用」**（或把内容粘进「应用粘贴」）即可把你的修改应用到对应页，其它页不受影响。
+3. 通常你（Claude Code）会直接用 \`slidesmith_apply_patch\` 把这些 \`<section>\` 回写到 Studio，当场只替换对应页、其它页不动。
 `;
 }
 // single page (the current target)
@@ -999,7 +1063,7 @@ function pdfPrintHtml(): string {
     + '.slide-wrap{width:1920px!important;height:1080px!important;margin:0!important}'
     + '.slide{position:relative!important;display:flex!important;transform:none!important;width:1920px!important;height:1080px!important;box-shadow:none!important;page-break-after:always;break-after:page}'
     + '.slide:last-child{page-break-after:auto;break-after:auto}'
-    + '.slide [data-anim]{opacity:1!important;animation:none!important}}</style>';
+    + '.slide [data-anim],.slide [data-anim] *,.slide [data-motion]{opacity:1!important;animation:none!important}}</style>';
   const full = mode === 'html' ? (harvestAll(), assembleDeck(false)) : renderDeckHtml(deck);
   return full.replace('</head>', printCss + '</head>');
 }
@@ -1289,6 +1353,10 @@ function buildUI(): void {
             <div class="field"><label>入场动画（播一次）</label><select id="hAnim"></select></div>
             <div class="field"><label>持续动效（一直循环）</label><select id="hMotion"></select></div>
           </div>
+          <div class="grid2">
+            <div class="field"><label>动效播放</label><select id="hFxMode"><option value="auto">自动（进入页面即播）</option><option value="manual">手动（点击页面才播）</option></select></div>
+            <div class="field"><label>预览</label><button id="hAnimPlay" title="在本页重新播放入场动画/动效">▶ 播放本页动效</button></div>
+          </div>
           <div class="oprow"><button id="hElUp" title="上移">↑ 上移</button><button id="hElDown" title="下移">↓ 下移</button><button id="hElDel" class="danger" title="删除这个元素">🗑 删除</button></div>
         </div>
 
@@ -1309,12 +1377,6 @@ function buildUI(): void {
         <h4 class="sub">全部任务</h4>
         <div id="aiQueue" class="aiqueue"></div>
         <div class="oprow"><button id="aiExportAll" class="primary-mini" disabled>📦 导出 0 个任务</button></div>
-
-        <h4 class="sub">手动应用 AI 返回（离线时用）</h4>
-        <div class="field"><textarea id="aiPaste" rows="2" placeholder="离线时：把 AI 返回的 &lt;section data-id&gt; 粘到这里…"></textarea></div>
-        <div class="oprow"><button id="aiApplyPaste">应用粘贴</button><button id="aiApply">从文件应用</button><button id="aiExportOne">仅导出本页</button></div>
-        <input id="aiPatchFile" type="file" accept=".html,.htm,.txt,.md" style="display:none">
-        <div class="hint">连上 Claude 时，发送 / 回写全自动；这一块只在离线手动搬文件时才用到。</div>
       </div>
     </div>
     <div class="tabs">
@@ -1405,34 +1467,27 @@ function buildUI(): void {
   onInput('#hColor', (v) => applyHtmlStyle('color', v));
   onChange('#hWeight', (v) => applyHtmlStyle('font-weight', v));
   onChange('#hAlign', (v) => applyHtmlStyle('text-align', v));
-  fillSel('#hAnim', meta.anims, ANIM_LABEL); onChange('#hAnim', (v) => setHtmlAnim(v));
-  fillSel('#hMotion', meta.motions, MOTION_LABEL); onChange('#hMotion', (v) => setHtmlMotion(v));
+  fillSel('#hAnim', meta.anims, ANIM_LABEL); onChange('#hAnim', (v) => { setHtmlAnim(v); previewPlayFx(); });
+  fillSel('#hMotion', meta.motions, MOTION_LABEL); onChange('#hMotion', (v) => { setHtmlMotion(v); previewPlayFx(); });
+  ($('#hFxMode') as HTMLSelectElement).value = fxMode;
+  onChange('#hFxMode', (v) => {
+    fxMode = v === 'manual' ? 'manual' : 'auto';
+    const d = previewFrame()?.contentDocument; if (d) d.documentElement.setAttribute('data-smfx', fxMode);
+    previewFxCall('__SM_FX_REARM__');
+  });
+  $('#hAnimPlay').addEventListener('click', previewPlayFx);
   $('#hElUp').addEventListener('click', () => moveHtmlEl(-1));
   $('#hElDown').addEventListener('click', () => moveHtmlEl(1));
   $('#hElDel').addEventListener('click', delHtmlEl);
 
-  // --- Submit-to-AI: per-page memory + batch export + apply (paste or file) ---
+  // --- Submit-to-AI: per-page memory + batch send (apply comes back over the bridge) ---
   ($('#aiInstruction') as HTMLTextAreaElement).addEventListener('input', onAiInput);
   ($('#aiDeckInstruction') as HTMLTextAreaElement).addEventListener('input', (e) => { aiDeckInstruction = (e.target as HTMLTextAreaElement).value; refreshAiCount(); });
   $('#aiExportAll').addEventListener('click', submitRequests);
-  $('#aiExportOne').addEventListener('click', () => {
-    saveAiInstruction(); const r = buildAiRequest(); if (!r) { toast('没有可提交的页', true); return; }
-    if (!aiInstructions[r.id]) { toast('先写下这一页想怎么改', true); return; }
-    download(r.name, r.content, 'text/markdown'); toast('已导出本页请求：' + r.name);
-  });
   $('#aiClearOne').addEventListener('click', () => {
     const box = $('#aiInstruction') as HTMLTextAreaElement; box.value = ''; onAiInput();
   });
   $('#aiRevertOne').addEventListener('click', () => { if (aiCurId) revertSlide(aiCurId); });
-  $('#aiApplyPaste').addEventListener('click', () => {
-    const t = ($('#aiPaste') as HTMLTextAreaElement).value.trim();
-    if (!t) { toast('先把 AI 返回的代码粘进来', true); return; }
-    applyAiPatch(t); ($('#aiPaste') as HTMLTextAreaElement).value = '';
-  });
-  $('#aiApply').addEventListener('click', () => $('#aiPatchFile').click());
-  ($('#aiPatchFile') as HTMLInputElement).addEventListener('change', (e) => {
-    const f = (e.target as HTMLInputElement).files?.[0]; if (f) f.text().then(applyAiPatch);
-  });
   $('#auditRun').addEventListener('click', () => renderAuditReport(auditImportedDeck()));
   $('#expPdf').addEventListener('click', exportPdf);
 
