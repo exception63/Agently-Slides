@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@slidesmith/ir": ["../ir/src/index.ts"],
+      "@slidesmith/themes": ["../themes/src/index.ts"],
+      "@slidesmith/runtime": ["../runtime/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"]
+}

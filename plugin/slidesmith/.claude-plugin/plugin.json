@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "slidesmith",
+  "displayName": "Slidesmith",
+  "version": "0.1.0",
+  "description": "在浏览器 Studio 里就地编辑契约 HTML slides，并让 Claude Code 通过本地桥接直接读取你的修改意见、按 data-id 精准回写。打开 deck → 你在 Studio 改 → 复杂改动一键发给 Claude → 当场看到结果。",
+  "author": { "name": "Slidesmith" },
+  "license": "MIT",
+  "keywords": ["slides", "presentation", "html", "studio", "editor", "keynote"],
+  "commands": ["./commands/slidesmith.md"]
+}

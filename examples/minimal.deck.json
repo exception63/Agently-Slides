@@ -1,0 +1,58 @@
+{
+  "ir_version": "1.0",
+  "theme": "editorial",
+  "metadata": { "title": "Slidesmith 最小样例", "author": "AI", "date": "2026-06-24" },
+  "defaults": { "transition": "fade", "layout": "bullets" },
+  "slides": [
+    {
+      "id": "s1",
+      "layout": "cover",
+      "slots": {
+        "main": [
+          { "id": "b0", "type": "text", "text": "SLIDESMITH · 演示系统", "style": { "color": "accent", "size": "small", "weight": "bold" } },
+          { "id": "b1", "type": "heading", "text": "演示即数据", "level": 1, "style": { "size": "display" } },
+          { "id": "b2", "type": "text", "text": "AI 生成，人类精修", "style": { "color": "muted" } }
+        ]
+      }
+    },
+    {
+      "id": "s2",
+      "layout": "bullets",
+      "slots": {
+        "main": [
+          { "id": "b3", "type": "heading", "text": "三个支柱", "level": 2 },
+          {
+            "id": "b4",
+            "type": "list",
+            "items": ["内容即数据，主题可替换", "单文件、离线、可移植", "讲稿与演讲者模式自动派生"],
+            "build": { "anim": "stagger-list", "mode": "by-item", "stagger": 80 }
+          }
+        ]
+      }
+    },
+    {
+      "id": "s3",
+      "layout": "two-col",
+      "slots": {
+        "left": [
+          { "id": "b5", "type": "heading", "text": "AI 负责", "level": 2, "style": { "color": "accent" } },
+          { "id": "b6", "type": "list", "items": ["秒级生成结构", "写结构化短文本", "声明式动画"] }
+        ],
+        "right": [
+          { "id": "b7", "type": "heading", "text": "人类负责", "level": 2 },
+          { "id": "b8", "type": "list", "items": ["可视化精修", "换主题与排版", "保存与复用"] }
+        ]
+      }
+    },
+    {
+      "id": "s4",
+      "layout": "end",
+      "slots": {
+        "main": [
+          { "id": "b9", "type": "heading", "text": "谢谢", "level": 1, "style": { "size": "display" } },
+          { "id": "b10", "type": "text", "text": "让 AI 生成，让人类精修。", "style": { "color": "muted" } }
+        ]
+      }
+    }
+  ]
+}

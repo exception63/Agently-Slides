@@ -1,0 +1,156 @@
+/* ===== Slidesmith theme: keynote-dark (flagship) =====
+   Theatrical dark keynote: near-black bg + massive light text + single amber
+   accent. Ported from the user's keynote-target.html (docs/style-reference).
+   Shares the same class contract as `editorial`, so any deck re-skins by
+   swapping this file — no content changes. Offline: system font fallbacks. */
+
+:root {
+  /* color */
+  --bg: #0C0D11;
+  --surface: #16181E;
+  --surface-2: #1C1F27;
+  --ink: #F5F6F8;
+  --ink-2: #C2C6D0;
+  --muted: #8B91A0;
+  --ink-4: #5E636F;
+  --accent: #F4B73E;
+  --accent-2: #D99828;
+  --accent-fg: #0C0D11;
+  --accent-soft: rgba(244, 183, 62, 0.15);
+  --navy: #5BC8DE;
+  --gold: #F4B73E;
+  --green: #5FD09A;
+  --bad: #FF6B5B;
+  --link: #5BC8DE;
+  --border: rgba(255, 255, 255, 0.12);
+  --rule-strong: rgba(255, 255, 255, 0.22);
+
+  /* fonts: display = Space Grotesk if present, else system; CJK-correct fallbacks; zero-download */
+  --font-display: "Space Grotesk", "Inter", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-body: "Inter", "Space Grotesk", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, "Noto Sans Mono CJK SC", monospace;
+  --font-serif: "Newsreader", "Noto Serif CJK SC", "Songti SC", "Source Han Serif SC", serif;
+
+  /* type scale (keynote: big + low-density) */
+  --fs-display: 168px;
+  --fs-h1: 108px;
+  --fs-h2: 76px;
+  --fs-h3: 52px;
+  --fs-body: 32px;
+  --fs-small: 26px;
+  --fs-caption: 20px;
+  --lh-cjk: 1.45;
+
+  --pad-x: 130px;
+  --pad-y: 96px;
+}
+
+/* ---- slide base ---- */
+.slide {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  text-autospace: normal;
+  text-spacing-trim: normal;
+  -webkit-font-smoothing: antialiased;
+}
+.slide__inner {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--pad-y) var(--pad-x);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+}
+
+/* ---- typography ---- */
+.slide h1, .slide h2, .slide h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.3em;
+  color: var(--ink);
+}
+.slide h1 { font-size: var(--fs-h1); }
+.slide h2 { font-size: var(--fs-h2); }
+.slide h3 { font-size: var(--fs-h3); color: var(--muted); font-weight: 600; letter-spacing: 0; }
+.slide p { font-size: var(--fs-body); line-height: 1.55; margin: 0 0 0.5em; color: var(--ink-2); }
+.slide strong { color: var(--ink); font-weight: 700; }
+.slide em { color: var(--accent); font-style: normal; font-family: inherit; }
+.slide a, .slide .c-link { color: var(--link); }
+
+/* bullets: amber dash markers (keynote motif) */
+.slide .list { font-size: var(--fs-body); line-height: 1.5; margin: 0; padding-left: 0; list-style: none; color: var(--ink-2); }
+.slide .list li { margin: 0.5em 0; padding-left: 1.5em; position: relative; }
+.slide .list li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 22px; height: 3px; background: var(--accent); }
+
+.slide .quote { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1.22; margin: 0; border: 0; color: var(--ink); }
+.slide .quote p { font-size: inherit; line-height: inherit; margin: 0; }
+.slide .quote cite { display: block; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--muted); font-style: normal; letter-spacing: 0.06em; margin-top: 0.7em; text-transform: uppercase; }
+.slide .quote cite::before { content: "— "; }
+
+.slide .code { font-family: var(--font-mono); font-size: var(--fs-small); background: var(--night, #05060A); color: var(--green); border: 1px solid var(--border); padding: 0.7em 0.9em; border-radius: 6px; overflow: auto; line-height: 1.5; }
+.slide .fig { margin: 0; display: flex; flex-direction: column; height: 100%; }
+.slide .fig img { width: 100%; height: 100%; min-height: 0; border: 1px solid var(--border); }
+.slide .fig img.fit-cover { object-fit: cover; }
+.slide .fig img.fit-contain { object-fit: contain; }
+.slide .fig figcaption { font-family: var(--font-mono); font-size: var(--fs-caption); color: var(--ink-4); margin-top: 0.5em; letter-spacing: 0.1em; text-transform: uppercase; }
+
+.slide .table { border-collapse: collapse; font-size: var(--fs-small); width: 100%; color: var(--ink-2); }
+.slide .table th, .slide .table td { border: 0; border-bottom: 1px solid var(--border); padding: 0.55em 0.9em; text-align: left; }
+.slide .table th { font-family: var(--font-mono); color: var(--accent); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 2px solid var(--accent); }
+
+.slide .group { display: flex; gap: 36px; }
+.slide .group-col { flex-direction: column; }
+.slide .group-row { flex-direction: row; }
+/* cards inside groups: elevated panel + accent top-border (keynote cards motif) */
+.slide .group-row > .blk, .slide .group-row > .group { background: var(--surface); border-top: 3px solid var(--accent); padding: 28px 32px; flex: 1; }
+
+/* ---- token utility classes (driven by block.style; always win) ---- */
+.c-bg { color: var(--bg) !important; }
+.c-surface { color: var(--surface) !important; }
+.c-ink { color: var(--ink) !important; }
+.c-muted { color: var(--muted) !important; }
+.c-accent { color: var(--accent) !important; }
+.c-accent-fg { color: var(--accent-fg) !important; }
+.c-link { color: var(--link) !important; }
+.c-border { color: var(--border) !important; }
+.fs-display { font-size: var(--fs-display) !important; line-height: 1.0; font-family: var(--font-display); letter-spacing: -0.03em; }
+.fs-h1 { font-size: var(--fs-h1) !important; }
+.fs-h2 { font-size: var(--fs-h2) !important; }
+.fs-h3 { font-size: var(--fs-h3) !important; }
+.fs-body { font-size: var(--fs-body) !important; }
+.fs-small { font-size: var(--fs-small) !important; }
+.fs-caption { font-size: var(--fs-caption) !important; }
+.al-start { text-align: start !important; }
+.al-center { text-align: center !important; }
+.al-end { text-align: end !important; }
+.w-normal { font-weight: 400 !important; }
+.w-medium { font-weight: 500 !important; }
+.w-bold { font-weight: 700 !important; }
+
+/* ---- layouts ---- */
+.slide__inner.layout-cover { justify-content: center; gap: 0.2em; }
+.slide__inner.layout-cover .slot-main { display: flex; flex-direction: column; gap: 0.18em; }
+
+.slide__inner.layout-section { justify-content: center; }
+.slide__inner.layout-section .slot-main { border-left: 4px solid var(--accent); padding-left: 0.55em; }
+
+.slide__inner.layout-statement { justify-content: center; }
+.slide__inner.layout-statement .slot-main { max-width: 24ch; }
+.slide__inner.layout-statement h1, .slide__inner.layout-statement h2 { font-size: 132px; line-height: 1.05; }
+
+.slide__inner.layout-bullets { justify-content: center; }
+
+.slide__inner.layout-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }
+.slide__inner.layout-two-col .slot { min-width: 0; }
+
+.slide__inner.layout-data-stat { justify-content: center; align-items: center; text-align: center; }
+.slide__inner.layout-data-stat .slot-main { display: flex; flex-direction: column; align-items: center; gap: 0.05em; }
+.slide__inner.layout-data-stat .list li::before { display: none; }
+
+.slide__inner.layout-quote { justify-content: center; }
+
+.slide__inner.layout-end { justify-content: center; align-items: center; text-align: center; }

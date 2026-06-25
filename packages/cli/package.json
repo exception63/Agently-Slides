@@ -1,0 +1,24 @@
+{
+  "name": "@slidesmith/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Slidesmith CLI: new / build / validate / lint / export (edit later).",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@slidesmith/bridge": "*",
+    "@slidesmith/editor": "*",
+    "@slidesmith/engine": "*",
+    "@slidesmith/ir": "*",
+    "@slidesmith/parser-md": "*",
+    "@slidesmith/qa": "*",
+    "commander": "^12.1.0",
+    "playwright-core": "^1.61.1"
+  }
+}

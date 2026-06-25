@@ -1,0 +1,139 @@
+/* ===== Slidesmith theme: editorial (magazine / CJK) =====
+   Tokens -> CSS custom properties. Content references semantic token NAMES;
+   this theme resolves them. Swap this file to re-skin without touching content. */
+
+:root {
+  /* color */
+  --bg: #F4EFE4;
+  --surface: #FBF8F0;
+  --ink: #16181A;
+  --muted: #6E6A5E;
+  --accent: #B5402A;
+  --accent-2: #8E2F1D;
+  --accent-fg: #FBF8F0;
+  --navy: #1B2B4F;
+  --gold: #A07A3A;
+  --link: #1B2B4F;
+  --border: #D9CFBA;
+
+  /* fonts: system stacks => zero-download, offline, CJK-correct (font subsetting comes later) */
+  --font-display: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "Noto Sans Mono CJK SC", monospace;
+
+  /* type scale */
+  --fs-display: 150px;
+  --fs-h1: 96px;
+  --fs-h2: 64px;
+  --fs-h3: 40px;
+  --fs-body: 30px;
+  --fs-small: 24px;
+  --fs-caption: 20px;
+  --lh-cjk: 1.5;
+
+  --pad-x: 110px;
+  --pad-y: 90px;
+}
+
+/* ---- slide base ---- */
+.slide {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  text-autospace: normal;       /* CJK <-> Latin/number auto spacing (progressive) */
+  text-spacing-trim: normal;
+}
+.slide__inner {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--pad-y) var(--pad-x);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+
+/* ---- typography ---- */
+.slide h1, .slide h2, .slide h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 0.35em;
+  color: var(--ink);
+}
+.slide h1 { font-size: var(--fs-h1); }
+.slide h2 { font-size: var(--fs-h2); }
+.slide h3 { font-size: var(--fs-h3); color: var(--muted); }
+.slide p { font-size: var(--fs-body); line-height: var(--lh-cjk); margin: 0 0 0.5em; }
+.slide strong { color: var(--accent); font-weight: 700; }
+.slide em { color: var(--accent); font-style: normal; }
+.slide a, .slide .c-link { color: var(--link); }
+
+.slide .list { font-size: var(--fs-body); line-height: var(--lh-cjk); margin: 0; padding-left: 1.1em; }
+.slide .list li { margin: 0.28em 0; }
+.slide .list li::marker { color: var(--accent); }
+
+.slide .quote { font-family: var(--font-display); font-size: var(--fs-h2); line-height: 1.25; margin: 0; border: 0; }
+.slide .quote p { font-size: inherit; line-height: inherit; margin: 0; }
+.slide .quote cite { display: block; font-family: var(--font-body); font-size: var(--fs-small); color: var(--muted); font-style: normal; margin-top: 0.6em; }
+.slide .quote cite::before { content: "— "; }
+
+.slide .code { font-family: var(--font-mono); font-size: var(--fs-small); background: var(--surface); border: 1px solid var(--border); padding: 0.6em 0.8em; border-radius: 8px; overflow: auto; line-height: 1.45; }
+.slide .fig { margin: 0; display: flex; flex-direction: column; height: 100%; }
+.slide .fig img { width: 100%; height: 100%; min-height: 0; }
+.slide .fig img.fit-cover { object-fit: cover; }
+.slide .fig img.fit-contain { object-fit: contain; }
+.slide .fig figcaption { font-size: var(--fs-caption); color: var(--muted); margin-top: 0.4em; }
+
+.slide .table { border-collapse: collapse; font-size: var(--fs-small); width: 100%; }
+.slide .table th, .slide .table td { border: 1px solid var(--border); padding: 0.5em 0.8em; text-align: left; }
+.slide .table th { background: var(--surface); font-weight: 700; }
+
+.slide .group { display: flex; gap: 32px; }
+.slide .group-col { flex-direction: column; }
+.slide .group-row { flex-direction: row; }
+
+/* ---- token utility classes (driven by block.style; always win over component rules) ---- */
+.c-bg { color: var(--bg) !important; }
+.c-surface { color: var(--surface) !important; }
+.c-ink { color: var(--ink) !important; }
+.c-muted { color: var(--muted) !important; }
+.c-accent { color: var(--accent) !important; }
+.c-accent-fg { color: var(--accent-fg) !important; }
+.c-link { color: var(--link) !important; }
+.c-border { color: var(--border) !important; }
+.fs-display { font-size: var(--fs-display) !important; line-height: 1.02; font-family: var(--font-display); }
+.fs-h1 { font-size: var(--fs-h1) !important; }
+.fs-h2 { font-size: var(--fs-h2) !important; }
+.fs-h3 { font-size: var(--fs-h3) !important; }
+.fs-body { font-size: var(--fs-body) !important; }
+.fs-small { font-size: var(--fs-small) !important; }
+.fs-caption { font-size: var(--fs-caption) !important; }
+.al-start { text-align: start !important; }
+.al-center { text-align: center !important; }
+.al-end { text-align: end !important; }
+.w-normal { font-weight: 400 !important; }
+.w-medium { font-weight: 500 !important; }
+.w-bold { font-weight: 700 !important; }
+
+/* ---- layouts (visual; slot containers) ---- */
+.slide__inner.layout-cover { justify-content: center; }
+.slide__inner.layout-cover .slot-main { display: flex; flex-direction: column; gap: 0.15em; }
+
+.slide__inner.layout-section { justify-content: center; }
+.slide__inner.layout-section .slot-main { border-left: 8px solid var(--accent); padding-left: 0.5em; }
+
+.slide__inner.layout-statement { justify-content: center; }
+.slide__inner.layout-statement .slot-main { max-width: 26ch; }
+
+.slide__inner.layout-bullets { justify-content: flex-start; }
+
+.slide__inner.layout-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.slide__inner.layout-two-col .slot { min-width: 0; }
+
+.slide__inner.layout-data-stat { justify-content: center; align-items: center; text-align: center; }
+.slide__inner.layout-data-stat .slot-main { display: flex; flex-direction: column; align-items: center; gap: 0.05em; }
+
+.slide__inner.layout-quote { justify-content: center; }
+
+.slide__inner.layout-end { justify-content: center; align-items: center; text-align: center; }

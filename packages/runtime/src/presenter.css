@@ -1,0 +1,78 @@
+/* ===== Slidesmith presenter view: dark second-screen chrome =====
+   Self-contained (no theme dependency). Hosts the transcript in an iframe and
+   shows current/next slide, a timer, and sync controls. */
+:root {
+  --p-bg: #14151A; --p-bg2: #1C1E24; --p-bg3: #262932; --p-line: #33363F;
+  --p-text: #ECEAE3; --p-soft: #A7A9B2; --p-faint: #6E707A;
+  --p-accent: #F4B73E; --p-on: #6FAA82; --p-on-d: #4D7A5C; --p-off: #C76B5B; --p-off-d: #8E4A3D;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body.smp {
+  background: var(--p-bg); color: var(--p-text);
+  font-family: "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif; font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+.smp-layout { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; position: relative; }
+
+/* header */
+.smp-head { background: linear-gradient(180deg, var(--p-bg2), var(--p-bg)); border-bottom: 2px solid var(--p-accent);
+  padding: 14px 22px; display: grid; grid-template-columns: 180px 1fr 190px 250px; gap: 22px; align-items: center;
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease; overflow: hidden; }
+.smp-label { font-size: 10px; letter-spacing: 0.22em; color: var(--p-faint); margin-bottom: 5px; font-weight: 700; }
+.smp-col--slide { border-right: 1px solid var(--p-line); padding-right: 20px; }
+.smp-num { font-family: "SF Mono", Menlo, monospace; font-size: 32px; font-weight: 700; line-height: 1; }
+.smp-num #smpCur { color: var(--p-accent); }
+.smp-seg { margin-top: 8px; font-size: 12px; color: var(--p-soft); }
+.smp-seg #smpSeg { display: inline-block; background: var(--p-accent); color: #14151A; padding: 1px 8px; border-radius: 3px; margin-right: 6px; font-weight: 700; }
+
+.smp-col--title { text-align: center; padding: 0 10px; min-width: 0; }
+.smp-tprev, .smp-tnext { font-size: 12px; color: var(--p-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-tcur { font-family: "Songti SC", "Source Han Serif SC", serif; font-size: 22px; font-weight: 700; color: var(--p-accent); line-height: 1.3; margin: 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.smp-col--timer { text-align: center; border-left: 1px solid var(--p-line); border-right: 1px solid var(--p-line); padding: 0 14px; }
+.smp-timer { font-family: "SF Mono", Menlo, monospace; font-size: 26px; font-weight: 700; color: var(--p-on); line-height: 1; letter-spacing: 1px; }
+.smp-timer.paused { color: var(--p-faint); }
+.smp-timer-btns { margin-top: 8px; display: flex; justify-content: center; gap: 8px; }
+.smp-timer-btns button { background: transparent; color: var(--p-soft); border: 1px solid var(--p-line); padding: 3px 12px; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; }
+.smp-timer-btns button:hover { background: var(--p-bg3); color: var(--p-text); }
+
+.smp-col--ctrl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.smp-btn { background: var(--p-bg3); color: var(--p-text); border: 1px solid var(--p-line); padding: 6px 8px; font-size: 12px; border-radius: 3px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.smp-btn:hover { background: var(--p-accent); border-color: var(--p-accent); color: #14151A; }
+.smp-zoom { display: flex; gap: 4px; }
+.smp-zoom .smp-btn { flex: 1; padding: 6px 4px; }
+.smp-btn.on { background: var(--p-on); border-color: var(--p-on-d); color: #112016; font-weight: 700; }
+.smp-btn.on:hover { background: var(--p-on-d); color: #fff; }
+.smp-btn.off { background: var(--p-off); border-color: var(--p-off-d); color: #2A1812; font-weight: 700; }
+.smp-btn.off:hover { background: var(--p-off-d); color: #fff; }
+
+/* status bar */
+.smp-status { background: var(--p-bg2); border-bottom: 1px solid var(--p-line); padding: 5px 22px; font-size: 11px;
+  color: var(--p-faint); display: flex; align-items: center; justify-content: space-between;
+  font-family: "SF Mono", Menlo, monospace; letter-spacing: 0.4px; transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease; overflow: hidden; }
+.smp-status.connected #smpConnText { color: var(--p-on); }
+.smp-status.waiting #smpConnText { color: var(--p-off); }
+.smp-status kbd { background: var(--p-bg3); border: 1px solid var(--p-line); padding: 1px 6px; border-radius: 3px; font-family: inherit; margin: 0 1px; color: var(--p-soft); }
+
+/* collapsed (H key) frees up transcript space */
+body.smp.collapsed .smp-head, body.smp.collapsed .smp-status { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-bottom-color: transparent; }
+.smp-hide { position: absolute; top: 7px; right: 9px; width: 30px; height: 30px; border-radius: 50%; background: rgba(20,21,26,0.6);
+  color: var(--p-text); border: 1px solid rgba(244,183,62,0.45); cursor: pointer; z-index: 30; font-size: 13px; line-height: 1; padding: 0; }
+.smp-hide:hover { background: rgba(20,21,26,0.92); border-color: var(--p-accent); }
+body.smp.collapsed .smp-hide { background: var(--p-accent); color: #14151A; }
+
+/* iframe */
+.smp-main { position: relative; overflow: hidden; background: #F4EFE4; }
+iframe#smpFrame { width: 100%; height: 100%; border: 0; background: #F4EFE4; }
+
+/* toast */
+.smp-toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: rgba(20,21,26,0.94);
+  color: var(--p-accent); padding: 10px 20px; border-radius: 5px; border: 1px solid var(--p-accent); font-size: 13px;
+  pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 40; }
+.smp-toast.show { opacity: 1; }
+
+@media (max-width: 1100px) {
+  .smp-head { grid-template-columns: 130px 1fr 150px 180px; gap: 14px; padding: 10px 14px; }
+  .smp-num { font-size: 26px; } .smp-tcur { font-size: 18px; } .smp-timer { font-size: 22px; }
+}

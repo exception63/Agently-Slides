@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slidesmith Markdown 演示 · 讲稿</title>
+<style>
+/* ===== Slidesmith theme: editorial (magazine / CJK) =====
+   Tokens -> CSS custom properties. Content references semantic token NAMES;
+   this theme resolves them. Swap this file to re-skin without touching content. */
+
+:root {
+  /* color */
+  --bg: #F4EFE4;
+  --surface: #FBF8F0;
+  --ink: #16181A;
+  --muted: #6E6A5E;
+  --accent: #B5402A;
+  --accent-2: #8E2F1D;
+  --accent-fg: #FBF8F0;
+  --navy: #1B2B4F;
+  --gold: #A07A3A;
+  --link: #1B2B4F;
+  --border: #D9CFBA;
+
+  /* fonts: system stacks => zero-download, offline, CJK-correct (font subsetting comes later) */
+  --font-display: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "Noto Sans Mono CJK SC", monospace;
+
+  /* type scale */
+  --fs-display: 150px;
+  --fs-h1: 96px;
+  --fs-h2: 64px;
+  --fs-h3: 40px;
+  --fs-body: 30px;
+  --fs-small: 24px;
+  --fs-caption: 20px;
+  --lh-cjk: 1.5;
+
+  --pad-x: 110px;
+  --pad-y: 90px;
+}
+
+/* ---- slide base ---- */
+.slide {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  text-autospace: normal;       /* CJK <-> Latin/number auto spacing (progressive) */
+  text-spacing-trim: normal;
+}
+.slide__inner {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--pad-y) var(--pad-x);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+
+/* ---- typography ---- */
+.slide h1, .slide h2, .slide h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 0.35em;
+  color: var(--ink);
+}
+.slide h1 { font-size: var(--fs-h1); }
+.slide h2 { font-size: var(--fs-h2); }
+.slide h3 { font-size: var(--fs-h3); color: var(--muted); }
+.slide p { font-size: var(--fs-body); line-height: var(--lh-cjk); margin: 0 0 0.5em; }
+.slide strong { color: var(--accent); font-weight: 700; }
+.slide em { color: var(--accent); font-style: normal; }
+.slide a, .slide .c-link { color: var(--link); }
+
+.slide .list { font-size: var(--fs-body); line-height: var(--lh-cjk); margin: 0; padding-left: 1.1em; }
+.slide .list li { margin: 0.28em 0; }
+.slide .list li::marker { color: var(--accent); }
+
+.slide .quote { font-family: var(--font-display); font-size: var(--fs-h2); line-height: 1.25; margin: 0; border: 0; }
+.slide .quote p { font-size: inherit; line-height: inherit; margin: 0; }
+.slide .quote cite { display: block; font-family: var(--font-body); font-size: var(--fs-small); color: var(--muted); font-style: normal; margin-top: 0.6em; }
+.slide .quote cite::before { content: "— "; }
+
+.slide .code { font-family: var(--font-mono); font-size: var(--fs-small); background: var(--surface); border: 1px solid var(--border); padding: 0.6em 0.8em; border-radius: 8px; overflow: auto; line-height: 1.45; }
+.slide .fig { margin: 0; display: flex; flex-direction: column; height: 100%; }
+.slide .fig img { width: 100%; height: 100%; min-height: 0; }
+.slide .fig img.fit-cover { object-fit: cover; }
+.slide .fig img.fit-contain { object-fit: contain; }
+.slide .fig figcaption { font-size: var(--fs-caption); color: var(--muted); margin-top: 0.4em; }
+
+.slide .table { border-collapse: collapse; font-size: var(--fs-small); width: 100%; }
+.slide .table th, .slide .table td { border: 1px solid var(--border); padding: 0.5em 0.8em; text-align: left; }
+.slide .table th { background: var(--surface); font-weight: 700; }
+
+.slide .group { display: flex; gap: 32px; }
+.slide .group-col { flex-direction: column; }
+.slide .group-row { flex-direction: row; }
+
+/* ---- token utility classes (driven by block.style; always win over component rules) ---- */
+.c-bg { color: var(--bg) !important; }
+.c-surface { color: var(--surface) !important; }
+.c-ink { color: var(--ink) !important; }
+.c-muted { color: var(--muted) !important; }
+.c-accent { color: var(--accent) !important; }
+.c-accent-fg { color: var(--accent-fg) !important; }
+.c-link { color: var(--link) !important; }
+.c-border { color: var(--border) !important; }
+.fs-display { font-size: var(--fs-display) !important; line-height: 1.02; font-family: var(--font-display); }
+.fs-h1 { font-size: var(--fs-h1) !important; }
+.fs-h2 { font-size: var(--fs-h2) !important; }
+.fs-h3 { font-size: var(--fs-h3) !important; }
+.fs-body { font-size: var(--fs-body) !important; }
+.fs-small { font-size: var(--fs-small) !important; }
+.fs-caption { font-size: var(--fs-caption) !important; }
+.al-start { text-align: start !important; }
+.al-center { text-align: center !important; }
+.al-end { text-align: end !important; }
+.w-normal { font-weight: 400 !important; }
+.w-medium { font-weight: 500 !important; }
+.w-bold { font-weight: 700 !important; }
+
+/* ---- layouts (visual; slot containers) ---- */
+.slide__inner.layout-cover { justify-content: center; }
+.slide__inner.layout-cover .slot-main { display: flex; flex-direction: column; gap: 0.15em; }
+
+.slide__inner.layout-section { justify-content: center; }
+.slide__inner.layout-section .slot-main { border-left: 8px solid var(--accent); padding-left: 0.5em; }
+
+.slide__inner.layout-statement { justify-content: center; }
+.slide__inner.layout-statement .slot-main { max-width: 26ch; }
+
+.slide__inner.layout-bullets { justify-content: flex-start; }
+
+.slide__inner.layout-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.slide__inner.layout-two-col .slot { min-width: 0; }
+
+.slide__inner.layout-data-stat { justify-content: center; align-items: center; text-align: center; }
+.slide__inner.layout-data-stat .slot-main { display: flex; flex-direction: column; align-items: center; gap: 0.05em; }
+
+.slide__inner.layout-quote { justify-content: center; }
+
+.slide__inner.layout-end { justify-content: center; align-items: center; text-align: center; }
+
+/* ===== Slidesmith transcript: magazine-style reading document =====
+   Reuses the active theme's :root tokens (--bg / --ink / --accent / fonts ...)
+   inlined alongside this file. The deck's `.slide`-scoped rules don't apply
+   here; this is plain document flow tuned for reading the spoken script. */
+
+html, body { margin: 0; }
+body.smt {
+  background: var(--bg, #F4EFE4);
+  color: var(--ink, #16181A);
+  font-family: var(--font-body, system-ui, sans-serif);
+  line-height: var(--lh-cjk, 1.65);
+  text-autospace: normal;
+  text-spacing-trim: normal;
+  -webkit-font-smoothing: antialiased;
+}
+.smt-wrap { max-width: 880px; margin: 0 auto; padding: 56px 32px 160px; }
+
+/* cover */
+.smt-cover { border-bottom: 3px solid var(--accent, #B5402A); padding-bottom: 28px; margin-bottom: 14px; }
+.smt-kicker { font-size: 14px; letter-spacing: 0.32em; color: var(--accent, #B5402A); font-weight: 700; }
+.smt-title { font-family: var(--font-display, serif); font-size: 56px; line-height: 1.12; margin: 14px 0 10px; color: var(--ink); }
+.smt-meta { font-size: 15px; color: var(--muted, #6E6A5E); }
+
+/* table of contents */
+.smt-toc { margin: 26px 0 8px; padding: 18px 22px; background: var(--surface, #FBF8F0); border: 1px solid var(--border, #D9CFBA); border-radius: 10px; }
+.smt-toc h2 { font-size: 13px; letter-spacing: 0.22em; color: var(--muted); margin: 0 0 12px; font-weight: 700; }
+.smt-toc ol { margin: 0; padding: 0; list-style: none; counter-reset: toc; columns: 2; column-gap: 36px; }
+.smt-toc li { break-inside: avoid; margin: 4px 0; }
+.smt-toc a { color: var(--ink); text-decoration: none; font-size: 15px; display: flex; gap: 10px; padding: 3px 6px; border-radius: 6px; }
+.smt-toc a:hover { background: rgba(181,64,42,0.08); color: var(--accent); }
+.smt-toc a .n { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 700; min-width: 2.2em; }
+.smt-toc a.seg { font-weight: 700; color: var(--accent-2, #8E2F1D); }
+
+/* segment cover */
+.smt-segcover {
+  margin: 52px 0 8px; padding: 10px 0 10px 18px;
+  border-left: 8px solid var(--accent, #B5402A);
+  font-family: var(--font-display, serif); font-size: 30px; color: var(--ink);
+}
+
+/* per-slide script article (this IS the highlight unit / anchor target) */
+.smt-slide {
+  position: relative; scroll-margin-top: 24px;
+  padding: 18px 20px; margin: 14px 0; border-radius: 10px;
+  transition: background-color 0.4s ease-out, box-shadow 0.4s ease-out;
+}
+.smt-slide-head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+.smt-num { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent, #B5402A); font-size: 15px; letter-spacing: 0.04em; padding-top: 4px; }
+.smt-slide-title { font-family: var(--font-display, serif); font-size: 27px; line-height: 1.25; color: var(--ink); }
+.smt-script { font-size: 20px; line-height: 1.78; margin: 4px 0; white-space: pre-wrap; }
+.smt-script.empty { color: var(--muted); font-style: italic; opacity: 0.7; }
+.smt-slide strong { color: var(--accent, #B5402A); font-weight: 700; }
+.smt-slide em { color: var(--accent, #B5402A); font-style: normal; }
+
+/* structured transcript blocks: cue / golden / data */
+.smt-note { margin: 12px 0; padding: 12px 16px; border-radius: 8px; font-size: 17px; line-height: 1.6; }
+.smt-note .smt-note-tag { display: inline-block; font-size: 12px; letter-spacing: 0.14em; font-weight: 700; margin-right: 10px; padding: 1px 8px; border-radius: 4px; vertical-align: 1px; }
+.smt-note--cue { background: rgba(110,106,94,0.10); border-left: 4px solid var(--muted, #6E6A5E); color: var(--muted); }
+.smt-note--cue .smt-note-tag { background: var(--muted, #6E6A5E); color: var(--surface, #FBF8F0); }
+.smt-note--golden { background: linear-gradient(180deg, rgba(160,122,58,0.16), rgba(160,122,58,0.06)); border-left: 5px solid var(--gold, #A07A3A); color: var(--ink); font-family: var(--font-display, serif); font-size: 21px; }
+.smt-note--golden .smt-note-tag { background: var(--gold, #A07A3A); color: #fff; font-family: var(--font-body); }
+.smt-note--data { background: rgba(27,43,79,0.07); border-left: 4px solid var(--navy, #1B2B4F); color: var(--ink); font-variant-numeric: tabular-nums; }
+.smt-note--data .smt-note-tag { background: var(--navy, #1B2B4F); color: #fff; }
+
+/* ===== presenter "整块高亮": the current slide's whole script block ===== */
+.smt-slide.smt-current {
+  background-color: rgba(181, 64, 42, 0.09);
+  box-shadow: -10px 0 0 -4px var(--accent, #B5402A);
+}
+/* keyword prompting (cue): only highlight <strong> inside the active block */
+body.smt.cue-on .smt-slide.smt-current strong {
+  background: rgba(244, 183, 62, 0.42);
+  border-radius: 3px; padding: 0 3px; box-decoration-break: clone;
+}
+
+/* embedded-in-presenter tweaks (slightly tighter, no double background) */
+body.smt.embedded .smt-wrap { padding-top: 32px; }
+
+</style>
+</head>
+<body class="smt">
+<div class="smt-wrap">
+<header class="smt-cover">
+  <div class="smt-kicker">逐字稿 · TRANSCRIPT</div>
+  <h1 class="smt-title">Slidesmith Markdown 演示</h1>
+  <div class="smt-meta">AI · 5 张幻灯片 · 2 段</div>
+</header>
+<nav class="smt-toc"><h2>目录</h2><ol>
+<li><a href="#s1"><span class="n">01</span>用 Markdown 写演示</a></li>
+<li><a class="seg" href="#s2"><span class="n">§</span>段1 · 概念</a></li>
+<li><a href="#s2"><span class="n">02</span>三个支柱</a></li>
+<li><a href="#s3"><span class="n">03</span>AI 负责</a></li>
+<li><a class="seg" href="#s4"><span class="n">§</span>段2 · 收尾</a></li>
+<li><a href="#s4"><span class="n">04</span>让 AI 生成，让人类精修。</a></li>
+<li><a href="#s5"><span class="n">05</span>谢谢</a></li>
+</ol></nav>
+<main class="smt-flow">
+<article class="smt-slide" id="s1" data-idx="0">
+<div class="smt-slide-head"><span class="smt-num">01</span><span class="smt-slide-title">用 Markdown 写演示</span></div>
+<div class="smt-script">封面讲稿：用 <strong>一句话</strong> 点题，停顿两秒。</div><div class="smt-note smt-note--cue"><span class="smt-note-tag">讲法</span>开场不要急，先扫视全场再开口。</div><div class="smt-note smt-note--golden"><span class="smt-note-tag">金句</span>让 AI 生成，让人类精修。</div>
+</article>
+<div class="smt-segcover">段1 · 概念</div>
+<article class="smt-slide" id="s2" data-idx="1">
+<div class="smt-slide-head"><span class="smt-num">02</span><span class="smt-slide-title">三个支柱</span></div>
+<div class="smt-script">逐条讲，强调 <strong>数据</strong> 与 <strong>主题</strong> 分离。</div><div class="smt-note smt-note--data"><span class="smt-note-tag">数据</span>单文件目标 &lt; 400KB（不含大图）。</div>
+</article>
+<article class="smt-slide" id="s3" data-idx="2">
+<div class="smt-slide-head"><span class="smt-num">03</span><span class="smt-slide-title">AI 负责</span></div>
+<div class="smt-script">左右对比，落到&quot;分工&quot;。</div>
+</article>
+<div class="smt-segcover">段2 · 收尾</div>
+<article class="smt-slide" id="s4" data-idx="3">
+<div class="smt-slide-head"><span class="smt-num">04</span><span class="smt-slide-title">让 AI 生成，让人类精修。</span></div>
+<div class="smt-script">金句收尾，留白三秒。</div>
+</article>
+<article class="smt-slide" id="s5" data-idx="4">
+<div class="smt-slide-head"><span class="smt-num">05</span><span class="smt-slide-title">谢谢</span></div>
+<div class="smt-script empty">（本页暂无讲稿）</div>
+</article>
+</main>
+</div>
+<script>
+/* Slidesmith transcript runtime.
+   Standalone: a readable script document (TOC anchors work natively).
+   Embedded in presenter (iframe): also reacts to postMessage from the parent
+   to scroll + whole-block highlight the current slide, toggle keyword cueing,
+   and answer "what slide am I looking at" queries. Cross-window messaging uses
+   postMessage only (works across file:// opaque origins). No dependencies. */
+(function () {
+  'use strict';
+  var MSG = 'sm';
+  var embedded = false;
+  try { embedded = window.parent && window.parent !== window; } catch (e) { embedded = true; }
+  if (embedded) document.body.classList.add('embedded');
+
+  var slides = [].slice.call(document.querySelectorAll('.smt-slide'));
+  var current = null;
+
+  function byId(id) {
+    if (!id) return null;
+    // ids may contain chars not valid in CSS selectors; use getElementById
+    return document.getElementById(id);
+  }
+
+  function clearHighlight() {
+    if (current) { current.classList.remove('smt-current'); current = null; }
+  }
+
+  function highlight(el) {
+    if (!el) return;
+    if (current === el) return;
+    clearHighlight();
+    el.classList.add('smt-current');
+    current = el;
+  }
+
+  function scrollToAnchor(anchor, smooth) {
+    var el = byId(anchor);
+    if (!el) return;
+    highlight(el);
+    try { el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' }); }
+    catch (e) { el.scrollIntoView(); }
+  }
+
+  // which slide article currently sits at the top of the viewport
+  function currentAnchor() {
+    var best = null;
+    var bestTop = -Infinity;
+    for (var i = 0; i < slides.length; i++) {
+      var top = slides[i].getBoundingClientRect().top;
+      if (top <= 120 && top > bestTop) { bestTop = top; best = slides[i]; }
+    }
+    if (!best && slides.length) best = slides[0];
+    return best ? best.id : '';
+  }
+
+  function send(msg) {
+    if (!embedded) return;
+    try { window.parent.postMessage(msg, '*'); } catch (e) {}
+  }
+
+  // --- receive from presenter parent ---
+  window.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (!d || typeof d !== 'object') return;
+    if (d.type === MSG + ':scroll') { scrollToAnchor(d.anchor, true); }
+    else if (d.type === MSG + ':cue') { document.body.classList.toggle('cue-on', !!d.on); }
+    else if (d.type === MSG + ':query') { send({ type: MSG + ':anchor', anchor: currentAnchor() }); }
+  });
+
+  // --- TOC clicks: let native hash scroll happen, but tell the presenter ---
+  var toc = document.querySelector('.smt-toc');
+  if (toc) {
+    toc.addEventListener('click', function (e) {
+      var a = e.target && e.target.closest ? e.target.closest('a[href^="#"]') : null;
+      if (!a) return;
+      var anchor = a.getAttribute('href').slice(1);
+      if (embedded) send({ type: MSG + ':toc', anchor: anchor });
+    });
+  }
+
+  // --- forward navigation keys to the presenter when embedded ---
+  if (embedded) {
+    document.addEventListener('keydown', function (e) {
+      var k = e.key;
+      if (k === 'ArrowRight' || k === 'ArrowLeft' || k === 'ArrowUp' || k === 'ArrowDown' ||
+          k === 'PageUp' || k === 'PageDown' || k === ' ') {
+        send({ type: MSG + ':key', key: k });
+        e.preventDefault();
+      }
+    });
+    // announce readiness so the presenter can push the initial state
+    send({ type: MSG + ':ready' });
+  }
+
+  // initial hash (standalone deep-link)
+  if (location.hash.length > 1) scrollToAnchor(location.hash.slice(1), false);
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,1697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>人机共生时代的消费行为研究</title>
+<!-- 在线时加载该皮肤的字体；离线时自动回退到系统字体（字体栈已含 fallback） -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* skin: keynote-dark · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
+/* ════════════════════════════════════════════════════════════════════
+   _core.css · 与风格无关的骨架 + 引擎界面（topbar / 段导航 / 进度条 / 投屏态）
+   所有皮肤共用。它只用令牌，不定义令牌——令牌由各皮肤的 :root 提供：
+     必需：--paper --ink --accent --accent-2 --accent-soft --rule
+          --pad-x --pad-y --font-sans --font-display --font-mono --fit-scale
+   引擎周边的工具 UI（顶栏/侧栏）固定深色，只有强调色（进度条/当前态/缩略框）
+   跟随皮肤的 --accent，使工具一致、内容随皮变化。
+   ════════════════════════════════════════════════════════════════════ */
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:#2a2a2a;font-family:var(--font-sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+body{padding-left:0;padding-top:60px;transition:padding 0.2s;}
+.deck{display:flex;flex-direction:column;gap:32px;padding:32px 24px 60px 320px;align-items:center;}
+.slide-wrap{width:calc(1920px * var(--fit-scale));height:calc(1080px * var(--fit-scale));position:relative;flex-shrink:0;}
+.slide{width:1920px;height:1080px;background:var(--paper);color:var(--ink);padding:var(--pad-y) var(--pad-x);position:absolute;top:0;left:0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,0.4);transform:scale(var(--fit-scale));transform-origin:top left;}
+
+/* ============================ 顶部控制条 ============================ */
+.topbar{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(20,23,31,0.96);color:#F2EDE2;display:flex;align-items:center;gap:16px;padding:0 24px;z-index:1000;backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.08);}
+.topbar__brand{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:0.02em;color:#F2EDE2;}
+.topbar__sub{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;color:rgba(242,237,226,0.5);text-transform:uppercase;}
+.topbar__spacer{flex:1;}
+.topbar__btn{background:transparent;color:#F2EDE2;border:1px solid rgba(242,237,226,0.3);padding:7px 16px;border-radius:4px;font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;font-weight:500;}
+.topbar__btn:hover{background:rgba(242,237,226,0.1);border-color:rgba(242,237,226,0.6);}
+.topbar__btn--primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.topbar__btn--primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
+.topbar__btn--presenter{background:#2A2A2A;border-color:#2A2A2A;color:#F5E3B0;}
+.topbar__btn--presenter:hover{background:#3a3a3a;border-color:#B58530;color:#F5E3B0;}
+.topbar__btn--presenter.active{background:#B58530;border-color:#B58530;color:#fff;box-shadow:0 0 0 2px rgba(181,133,48,0.3);}
+.topbar__info{font-family:var(--font-mono);font-size:12px;color:rgba(242,237,226,0.7);letter-spacing:0.08em;}
+.topbar__info strong{color:#F2EDE2;font-weight:600;}
+
+/* ============================ 折叠式段导航 + 缩略图 ============================ */
+.segnav{position:fixed;left:0;top:60px;bottom:0;width:300px;background:rgba(20,23,31,0.94);border-right:1px solid rgba(255,255,255,0.08);z-index:999;overflow-y:auto;backdrop-filter:blur(8px);}
+.segnav::-webkit-scrollbar{width:6px;}
+.segnav::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);}
+.segnav::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+.segnav__seg{border-bottom:1px solid rgba(255,255,255,0.06);}
+.segnav__head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:transparent;border:0;color:rgba(242,237,226,0.78);width:100%;cursor:pointer;text-align:left;font-family:var(--font-sans);transition:background 0.15s;}
+.segnav__head:hover{background:rgba(255,255,255,0.04);color:#F2EDE2;}
+.segnav__seg--current > .segnav__head{background:var(--accent-soft);color:#F2EDE2;}
+.segnav__head-id{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--accent-ui,#C2A06B);text-transform:uppercase;font-weight:600;width:42px;flex-shrink:0;}
+.segnav__head-name{flex:1;font-size:13px;font-weight:500;line-height:1.3;}
+.segnav__head-meta{font-family:var(--font-mono);font-size:10px;color:rgba(242,237,226,0.4);letter-spacing:0.1em;}
+.segnav__head-arrow{font-size:10px;color:rgba(242,237,226,0.4);transition:transform 0.2s;flex-shrink:0;width:12px;text-align:center;}
+.segnav__seg--expanded .segnav__head-arrow{transform:rotate(90deg);}
+.segnav__thumbs{display:none;padding:8px 12px 14px;grid-template-columns:1fr 1fr;gap:8px;}
+.segnav__seg--expanded .segnav__thumbs{display:grid;}
+.thumb{width:126px;height:71px;background:var(--paper);cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden;transition:border-color 0.15s;flex-shrink:0;}
+.thumb:hover{border-color:var(--accent);}
+.thumb--active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
+.thumb__inner{width:1920px !important;height:1080px !important;transform:scale(0.0656) !important;transform-origin:top left !important;position:absolute !important;top:0 !important;left:0 !important;box-shadow:none !important;pointer-events:none !important;}
+/* 编号徽标固定深字 + 白底——所有皮通用（深色皮的 --ink 是浅色，不能用 var(--ink)，否则白底白字看不清）*/
+.thumb__num{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;color:#16181E;background:rgba(255,255,255,0.85);padding:1px 5px;border-radius:2px;z-index:2;font-weight:600;}
+
+/* —— 进度条 / 提示 —— */
+.progress{position:fixed;top:60px;left:300px;right:0;height:3px;background:rgba(255,255,255,0.08);z-index:998;}
+.progress__bar{height:100%;background:var(--accent);transition:width 0.2s;}
+.hint{position:fixed;bottom:16px;right:20px;font-family:var(--font-mono);font-size:11px;color:#888;pointer-events:none;z-index:1000;letter-spacing:0.1em;}
+body.present .hint,body:fullscreen .hint{color:rgba(255,255,255,0.3);}
+
+/* ============================ 投屏 / 全屏模式 ============================ */
+body.present{background:#000;padding:0;}
+body.present .topbar,body.present .segnav,body.present .progress{display:none;}
+body.present .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+body.present .slide-wrap{width:auto;height:auto;position:static;flex-shrink:0;}
+body.present .slide{display:none;position:static;transform:scale(var(--sc,1));transform-origin:center center;box-shadow:none;}
+body.present .slide.active{display:flex;}
+body.fullscreen{background:#000;}
+:fullscreen{background:#000;}
+:fullscreen .topbar,:fullscreen .segnav,:fullscreen .progress{display:none;}
+:fullscreen .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+:fullscreen .slide{box-shadow:none;}
+
+
+/* —— 皮肤 keynote-dark —— */
+/* FONTS https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap */
+/* ════════════════════════════════════════════════════════════════════
+   skin: keynote-dark · 暗场主旨风（大场子 · 戏剧反转 · Apple-keynote 感）
+   气质：近黑底 + 巨大白字 + 单一暖琥珀强调 + 极少字/页 + 大留白。
+   适合：主旨演讲、发布会感、reveal 多的讲、想要"舞台聚光灯"那种张力。
+   换强调色 → 只改 :root 的 --accent / --accent-2 / --accent-soft。
+   依据：ui-ux-pro-max typography #3 Tech Startup（Space Grotesk）+ dark-mode 风格族。
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* —— 配色（近黑底 + 近白字 + 琥珀强调 · 改强调色只改 --accent 几个）—— */
+  --paper:#0C0D11;--paper-soft:#16181E;--paper-warm:#1C1F27;     /* slide 底 + 抬升面板 */
+  --rule:rgba(255,255,255,0.10);--rule-soft:rgba(255,255,255,0.06);--rule-strong:rgba(255,255,255,0.20);
+  --ink:#F5F6F8;--ink-2:#C2C6D0;--ink-3:#8B91A0;--ink-4:#5E636F;
+  --accent:#F4B73E;--accent-2:#D99828;--accent-soft:rgba(244,183,62,0.15);--accent-ui:#F4B73E;
+  --navy:#5BC8DE;--gold:#F4B73E;--green:#5FD09A;                 /* 卡片/层级的稀用第二三色 */
+  --good:#5FD09A;--warn:#F4B73E;--bad:#FF6B5B;
+  --night:#05060A;--night-2:#0E0F13;--night-paper:#F5F6F8;       /* terminal 更深 */
+  /* —— 字号阶梯（keynote：比谁都大，字越少越好）—— */
+  --t-display:168px;--t-h1:108px;--t-h2:76px;--t-h3:52px;--t-h4:40px;
+  --t-lead:38px;--t-body:32px;--t-small:26px;--t-eyebrow:20px;
+  --pad-x:130px;--pad-y:96px;
+  /* 字体栈 · 西文 Space Grotesk（标题）/ Inter（正文）· 中文思源黑体 heavy 出大字气势 · 引用用 Newsreader 斜体 */
+  --font-display:"Space Grotesk","Inter","Noto Sans SC","Source Han Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+  --font-sans:"Inter","Space Grotesk","Noto Sans SC","Source Han Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-serif:"Newsreader","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --font-mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55;
+}
+
+/* —— 页脚 chrome / 顶部 runner —— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:46px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;color:var(--ink-4);text-transform:uppercase;}
+.chrome__l{display:flex;gap:26px;align-items:baseline;white-space:nowrap;}
+.chrome__seg{color:var(--ink-3);font-weight:500;}
+.chrome__r{font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;}
+.runner{position:absolute;top:60px;left:var(--pad-x);right:var(--pad-x);display:flex;gap:18px;align-items:center;font-family:var(--font-mono);font-size:15px;letter-spacing:0.2em;color:var(--ink-4);text-transform:uppercase;}
+.runner::before{content:"";width:34px;height:1px;background:var(--accent);}
+
+/* —— 通用排版原子 —— */
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-eyebrow);letter-spacing:0.26em;color:var(--accent);text-transform:uppercase;font-weight:600;}
+.title{font-family:var(--font-display);font-weight:700;font-size:var(--t-h2);line-height:1.08;letter-spacing:-0.02em;color:var(--ink);margin:0;}
+.title--xl{font-size:148px;}.title--lg{font-size:108px;}.title--md{font-size:60px;}.title--sm{font-size:46px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.5;color:var(--ink-2);max-width:1500px;margin:0;font-weight:400;}
+.body{font-size:var(--t-body);line-height:1.6;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.6;color:var(--ink-3);}
+.num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
+.mark-v{color:var(--accent);}.mark-n{color:var(--navy);}.mark-g{color:var(--green);}
+.key{color:var(--accent);font-weight:600;font-style:normal;}
+strong{font-weight:700;color:var(--ink);}
+em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote：强调 = 琥珀点睛词，不斜不变体 */
+.cite{font-family:var(--font-mono);font-size:0.6em;letter-spacing:0.04em;color:var(--ink-4);vertical-align:0.15em;white-space:nowrap;font-style:normal;}
+.head{margin-top:8px;margin-bottom:30px;}.head__eyebrow{margin-bottom:16px;}.head__title{margin:0 0 10px;}
+.head__sub{font-family:var(--font-sans);font-size:26px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.45;}
+.fill{flex:1;min-height:0;}
+.center{align-items:center;justify-content:center;text-align:center;}
+.center .lead{margin-left:auto;margin-right:auto;}
+
+/* —— cover 封面 —— */
+.cover{background:var(--paper);justify-content:space-between;}
+.cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover__brand{font-family:var(--font-mono);font-size:18px;letter-spacing:0.2em;color:var(--ink-3);text-transform:uppercase;}
+.cover__seal{font-family:var(--font-mono);font-size:15px;letter-spacing:0.16em;color:var(--accent);text-transform:uppercase;border:1px solid var(--accent);padding:8px 16px;border-radius:2px;}
+.cover__main{display:flex;flex-direction:column;gap:34px;}
+.cover__eyebrow{font-family:var(--font-mono);font-size:20px;letter-spacing:0.3em;color:var(--accent);text-transform:uppercase;font-weight:600;}
+.cover__title{font-family:var(--font-display);font-weight:700;font-size:150px;line-height:1.0;letter-spacing:-0.03em;color:var(--ink);margin:0;}
+.cover__title em{color:var(--accent);}
+.cover__sub{font-family:var(--font-sans);font-size:36px;color:var(--ink-2);max-width:1500px;font-weight:400;line-height:1.45;}
+.cover__meta{display:flex;gap:60px;font-family:var(--font-mono);color:var(--ink-3);padding-top:32px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:8px;}
+.cover__meta-k{color:var(--ink-4);font-size:13px;letter-spacing:0.14em;text-transform:uppercase;}
+.cover__meta-v{color:var(--ink);font-size:21px;font-weight:500;}
+
+/* —— section divider 段分隔（巨型幽灵数字 · 暗场版）—— */
+.secdiv{background:var(--paper);justify-content:flex-end;padding-bottom:150px;}
+.secdiv--dark{background:var(--night);}
+.secdiv--accent,.secdiv--vermilion{background:var(--accent);color:var(--night);}
+.secdiv__num{position:absolute;top:70px;right:var(--pad-x);font-family:var(--font-display);font-weight:700;font-size:500px;line-height:0.8;letter-spacing:-0.05em;color:var(--ink);opacity:0.06;}
+.secdiv--accent .secdiv__num,.secdiv--vermilion .secdiv__num{color:var(--night);opacity:0.16;}
+.secdiv__eyebrow{font-family:var(--font-mono);font-size:20px;letter-spacing:0.3em;color:var(--accent);text-transform:uppercase;margin-bottom:34px;font-weight:600;}
+.secdiv--accent .secdiv__eyebrow,.secdiv--vermilion .secdiv__eyebrow{color:var(--night);opacity:0.7;}
+.secdiv__title{font-family:var(--font-display);font-weight:700;font-size:136px;line-height:1.02;letter-spacing:-0.03em;color:var(--ink);margin:0 0 34px;max-width:1550px;position:relative;z-index:1;}
+.secdiv__title em{color:var(--accent);}
+.secdiv--accent .secdiv__title,.secdiv--vermilion .secdiv__title{color:var(--night);}
+.secdiv--accent .secdiv__title em,.secdiv--vermilion .secdiv__title em{color:var(--night);}
+.secdiv__lead{font-family:var(--font-sans);font-size:34px;line-height:1.5;color:var(--ink-2);max-width:1450px;margin:0;font-weight:400;position:relative;z-index:1;}
+.secdiv--accent .secdiv__lead,.secdiv--vermilion .secdiv__lead{color:rgba(12,13,17,0.82);}
+.secdiv__meta{font-family:var(--font-mono);font-size:17px;letter-spacing:0.16em;color:var(--ink-3);text-transform:uppercase;padding-top:28px;margin-top:30px;border-top:1px solid var(--rule);display:flex;gap:40px;}
+
+/* —— manifesto / insight 大字宣言（keynote 的招牌版式）—— */
+.manifesto,.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 130px;}
+.manifesto--dark{background:var(--night);}
+.manifesto__eyebrow,.insight__eyebrow{font-family:var(--font-mono);font-size:20px;letter-spacing:0.3em;color:var(--accent);text-transform:uppercase;margin-bottom:54px;font-weight:600;}
+.manifesto__title,.insight__statement{font-family:var(--font-display);font-weight:700;font-size:132px;line-height:1.06;letter-spacing:-0.03em;color:var(--ink);margin:0;max-width:1700px;}
+.manifesto__title em,.insight__statement em{color:var(--accent);}
+.manifesto__sub,.insight__sub{font-family:var(--font-sans);font-size:36px;color:var(--ink-3);margin:50px auto 0;max-width:1450px;line-height:1.5;font-weight:400;}
+
+/* —— cards 卡片组（抬升暗面板 + 强调顶边）—— */
+.cards{display:grid;gap:26px;grid-template-columns:repeat(3,1fr);}
+.cards--2{grid-template-columns:repeat(2,1fr);}
+.cards--4{grid-template-columns:repeat(4,1fr);}
+.cards--5{grid-template-columns:repeat(5,1fr);}
+.cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{background:var(--paper-soft);padding:32px 30px;display:flex;flex-direction:column;gap:14px;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:4px;}
+.card--v{border-top-color:var(--accent);}.card--n{border-top-color:var(--navy);}.card--g{border-top-color:var(--green);}
+.card--plain{background:transparent;border:0;border-top:1px solid var(--rule);border-radius:0;padding:28px 0;}
+.card__eyebrow{font-family:var(--font-mono);font-size:16px;letter-spacing:0.16em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+.card__level{font-family:var(--font-display);font-size:60px;font-weight:700;line-height:0.92;color:var(--accent);letter-spacing:-0.02em;}
+.card--n .card__level{color:var(--navy);}.card--g .card__level{color:var(--green);}
+.card__title{font-family:var(--font-display);font-weight:600;font-size:33px;color:var(--ink);line-height:1.22;margin-top:6px;}
+.card__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.55;}
+.card__meta{font-family:var(--font-mono);font-size:15px;letter-spacing:0.12em;color:var(--ink-4);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule);}
+
+/* —— numlist 编号清单 —— */
+.numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule);}
+.numitem{display:grid;grid-template-columns:80px 1fr auto;align-items:baseline;gap:32px;padding:18px 0;border-bottom:1px solid var(--rule);}
+.numitem--tight{padding:12px 0;}
+.numitem__n{font-family:var(--font-display);font-size:38px;font-weight:700;color:var(--accent);line-height:1;}
+.numitem__main{display:flex;flex-direction:column;gap:6px;}
+.numitem__title{font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);line-height:1.22;}
+.numitem__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.55;}
+.numitem__tag{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-4);padding-top:10px;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--accent);}
+.numlist--lg .numitem{padding:14px 0;gap:24px;grid-template-columns:72px 1fr auto;}
+.numlist--lg .numitem__n{font-size:34px;}.numlist--lg .numitem__title{font-size:26px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.45;}.numlist--lg .numitem__tag{font-size:14px;}
+
+/* —— bullets 论点清单 —— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:26px;}
+.bullets > li{font-family:var(--font-sans);font-size:34px;line-height:1.45;color:var(--ink);padding-left:48px;position:relative;}
+.bullets > li::before{content:"";position:absolute;left:4px;top:18px;width:20px;height:3px;background:var(--accent);}
+.bullets li b,.bullets li strong{color:var(--accent);font-weight:600;}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.bullets ul li{font-size:27px;color:var(--ink-3);padding-left:40px;position:relative;line-height:1.5;}
+.bullets ul li::before{content:"";position:absolute;left:8px;top:16px;width:10px;height:10px;border:2px solid var(--ink-4);border-radius:50%;}
+.bullets--lead > li{font-size:38px;}
+
+/* —— terminal 终端 / prompt（AI 演示）—— */
+.terminal{background:var(--night);color:#DDE2E8;padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.55;position:relative;border:1px solid var(--rule);border-radius:6px;}
+.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.16em;text-transform:uppercase;color:rgba(221,226,232,0.5);margin-bottom:22px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--accent);}
+.terminal__user{color:#F4B73E;}.terminal__system{color:#5FD09A;}.terminal__hint{color:#9FB3D1;}.terminal__dim{color:rgba(221,226,232,0.45);}
+.terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
+
+/* —— compare 两栏对比 —— */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.compare__col{padding:42px 44px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:16px;}
+.compare__col:last-child{border-right:0;}
+.compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
+.compare__col--good .compare__title{color:var(--accent);}
+.compare__label{font-family:var(--font-mono);font-size:16px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-4);}
+.compare__title{font-family:var(--font-display);font-weight:700;font-size:46px;color:var(--ink);line-height:1.15;margin-bottom:12px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px;}
+.compare__list li{font-family:var(--font-sans);font-size:24px;line-height:1.5;color:var(--ink-2);padding-left:28px;position:relative;}
+.compare__list li::before{content:"—";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--accent);}
+
+/* —— steps 流程 —— */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
+.step{padding:38px 30px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:12px;}
+.step:last-child{border-right:0;}
+.step__n{font-family:var(--font-mono);font-size:20px;font-weight:600;letter-spacing:0.14em;color:var(--accent);text-transform:uppercase;}
+.step__title{font-family:var(--font-display);font-weight:600;font-size:32px;color:var(--ink);line-height:1.18;}
+.step__desc{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+
+/* —— table 表格 —— */
+.table-cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);margin-bottom:14px;}
+.table-cap b{font-family:var(--font-mono);font-size:15px;letter-spacing:0.1em;color:var(--accent);font-weight:600;margin-right:12px;text-transform:uppercase;}
+.table{width:100%;border-collapse:collapse;font-family:var(--font-sans);font-size:23px;}
+.table th,.table td{padding:16px 18px;text-align:left;vertical-align:top;line-height:1.5;border-bottom:1px solid var(--rule);}
+.table th{font-family:var(--font-mono);font-size:15px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);border-bottom:2px solid var(--rule-strong);font-weight:600;}
+.table td.num{font-variant-numeric:tabular-nums;}
+.table td.bad{color:var(--ink-4);}.table td.good{color:var(--accent);font-weight:600;}
+.table tr.hl td{background:var(--accent-soft);}
+
+/* —— formula5 编号公式行 —— */
+.formula5{display:grid;grid-template-columns:90px 1fr 1.1fr;gap:0;border-top:2px solid var(--accent);}
+.formula5__row{display:contents;}
+.formula5__row > div{padding:24px 26px;border-bottom:1px solid var(--rule);}
+.formula5__n{font-family:var(--font-display);font-size:44px;font-weight:700;color:var(--accent);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:34px;font-weight:600;color:var(--ink);}
+.formula5__v{font-family:var(--font-sans);font-size:23px;color:var(--ink-2);line-height:1.55;}
+
+/* —— arch 分层堆栈 —— */
+.arch{display:flex;flex-direction:column;gap:6px;}
+.arch__layer{display:grid;grid-template-columns:64px 240px 1fr;gap:24px;align-items:center;padding:14px 24px;background:var(--paper-soft);border:1px solid var(--rule);border-left:5px solid var(--accent);border-radius:3px;}
+.arch__layer--5{border-left-color:var(--accent);}
+.arch__layer--4{border-left-color:var(--navy);}
+.arch__layer--3{border-left-color:var(--green);}
+.arch__layer--2{border-left-color:var(--ink-3);}
+.arch__layer--1{border-left-color:var(--ink-4);}
+.arch__n{font-family:var(--font-display);font-size:34px;font-weight:700;color:var(--accent);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:25px;font-weight:600;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-4);letter-spacing:0.1em;margin-top:3px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-family:var(--font-sans);font-size:18px;color:var(--ink-2);line-height:1.45;}
+.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.1em;color:var(--ink-4);text-transform:uppercase;text-align:right;}
+
+/* —— three-circle 三区 —— */
+.three-circle{display:flex;gap:30px;align-items:stretch;}
+.zone{flex:1;padding:36px 32px;background:var(--paper-soft);border:1px solid var(--rule);border-top:6px solid;border-radius:4px;display:flex;flex-direction:column;gap:16px;}
+.zone--g{border-top-color:var(--good);}
+.zone--y{border-top-color:var(--warn);}
+.zone--r{border-top-color:var(--bad);}
+.zone__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.16em;text-transform:uppercase;color:var(--ink-3);font-weight:600;}
+.zone__title{font-family:var(--font-display);font-size:42px;font-weight:700;color:var(--ink);}
+.zone--g .zone__title{color:var(--good);}.zone--y .zone__title{color:var(--warn);}.zone--r .zone__title{color:var(--bad);}
+.zone__test{font-family:var(--font-serif);font-size:23px;color:var(--ink-2);font-style:italic;}
+.zone__eg{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+.zone__action{margin-top:auto;padding-top:16px;border-top:1px solid var(--rule);font-family:var(--font-sans);font-size:22px;font-weight:600;color:var(--ink);}
+
+/* —— bigq 装框大引用（暗场里用衬线斜体做对比）—— */
+.bigq{background:var(--paper-soft);padding:44px 60px;border-left:4px solid var(--accent);border-radius:4px;text-align:left;}
+.bigq__t{font-family:var(--font-serif);font-size:58px;font-weight:500;font-style:italic;line-height:1.25;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--accent);font-style:italic;}
+.bigq__sub{font-family:var(--font-mono);font-size:20px;letter-spacing:0.08em;color:var(--ink-3);margin-top:20px;text-transform:uppercase;font-style:normal;}
+
+/* —— matrix 矩阵 —— */
+.matrix{display:grid;grid-template-columns:260px repeat(3,1fr);border-top:2px solid var(--accent);border-left:1px solid var(--rule);}
+.matrix__h{padding:18px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-mono);font-size:15px;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);background:var(--paper-soft);text-align:center;font-weight:600;}
+.matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:23px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;}
+.matrix__cell{padding:20px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-sans);font-size:18px;line-height:1.45;color:var(--ink-2);min-height:84px;}
+.matrix__cell strong{color:var(--accent);}
+
+/* —— bignum 大数字（暗场最抓眼的武器 · 巨型琥珀数字）—— */
+.bignum{display:flex;flex-direction:column;gap:10px;padding:34px 32px;background:var(--paper-soft);border:1px solid var(--rule);border-top:4px solid var(--accent);border-radius:4px;}
+.bignum__v{font-family:var(--font-display);font-size:128px;font-weight:700;line-height:0.92;color:var(--accent);letter-spacing:-0.04em;}
+.bignum__u{font-family:var(--font-sans);font-size:27px;color:var(--ink);font-weight:500;line-height:1.35;}
+.bignum__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;color:var(--ink-4);text-transform:uppercase;margin-top:12px;}
+
+/* —— summary 总结三栏 —— */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+.sum-card{padding:36px 34px;background:var(--paper-soft);border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:4px;display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--accent);}.sum-card--n{border-top-color:var(--navy);}.sum-card--g{border-top-color:var(--green);}
+.sum-card__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;color:var(--ink-3);text-transform:uppercase;font-weight:600;}
+.sum-card__v{font-family:var(--font-display);font-weight:700;font-size:48px;color:var(--accent);line-height:1.08;}
+.sum-card--n .sum-card__v{color:var(--navy);}.sum-card--g .sum-card__v{color:var(--green);}
+.sum-card__hint{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+
+/* —— figure 图（暗场版 · 框白底以承载图表/截图）—— */
+.figure{display:flex;flex-direction:column;gap:16px;height:100%;}
+.figure__frame{flex:1;min-height:0;background:var(--paper-soft);border:1px solid var(--rule);border-radius:4px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.5;}
+.figure__cap b{font-family:var(--font-mono);font-size:15px;letter-spacing:0.1em;color:var(--accent);font-weight:600;margin-right:12px;text-transform:uppercase;}
+.figure__src{font-family:var(--font-mono);font-size:14px;color:var(--ink-4);letter-spacing:0.04em;}
+.figure--row{flex-direction:row;gap:36px;align-items:stretch;}
+
+/* —— refs 参考文献 —— */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:14px 56px;counter-reset:ref;list-style:none;margin:0;padding:0;}
+.refs--1col{grid-template-columns:1fr;}
+.refs li{font-family:var(--font-sans);font-size:19px;line-height:1.5;color:var(--ink-2);padding-left:38px;position:relative;}
+.refs li::before{counter-increment:ref;content:"["counter(ref)"]";position:absolute;left:0;top:0;font-family:var(--font-mono);font-size:16px;color:var(--accent);font-weight:600;}
+.refs li em,.refs li .jrnl{font-style:italic;color:var(--ink);}
+
+/* —— helpers —— */
+.callout{border-left:3px solid var(--accent);padding:20px 28px;background:var(--accent-soft);font-family:var(--font-sans);font-size:24px;line-height:1.5;color:var(--ink);border-radius:0 4px 4px 0;}
+.note-box{margin-top:24px;padding:22px 30px;background:var(--paper-soft);border-left:3px solid var(--accent);font-family:var(--font-sans);font-size:23px;line-height:1.5;color:var(--ink-2);border-radius:0 4px 4px 0;}
+.row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:36px;}.mt-l{margin-top:56px;}
+
+
+/* ===== 3 主题令牌（暗场 / 学术浅色 / 高对比） · 通过 data-theme 切换 ===== */
+html[data-theme="dark"]{
+  --paper:#0C0D11;--paper-soft:#191B22;--paper-warm:#1C1F27;
+  --rule:rgba(255,255,255,0.16);--rule-soft:rgba(255,255,255,0.09);--rule-strong:rgba(255,255,255,0.30);
+  --ink:#F7F8FA;--ink-2:#DDE0E6;--ink-3:#AAB0BC;--ink-4:#767C8A;
+  --accent:#F4B73E;--accent-2:#E0A52E;--accent-soft:rgba(244,183,62,0.18);--accent-ui:#F4B73E;
+  --navy:#6FD2E6;--gold:#F4B73E;--green:#5FD09A;--good:#5FD09A;--warn:#F4B73E;--bad:#FF6B5B;
+  --night:#0C0D11;--night-2:#16181E;--night-paper:#F5F6F8;
+}
+html[data-theme="light"]{
+  --paper:#F7F5EF;--paper-soft:#FFFFFF;--paper-warm:#F0ECE2;
+  --rule:rgba(27,35,48,0.18);--rule-soft:rgba(27,35,48,0.10);--rule-strong:rgba(27,35,48,0.34);
+  --ink:#1B2330;--ink-2:#33404F;--ink-3:#586475;--ink-4:#8089;
+  --ink-4:#828B98;
+  --accent:#27406B;--accent-2:#1A2C49;--accent-soft:rgba(39,64,107,0.10);--accent-ui:#27406B;
+  --navy:#2F6E7E;--gold:#9A6E2E;--green:#3E7D5A;--good:#3E7D5A;--warn:#9A6E2E;--bad:#A23B30;
+  --night:#EAE5DB;--night-2:#F0ECE2;--night-paper:#1B2330;
+}
+html[data-theme="contrast"]{
+  --paper:#FFFFFF;--paper-soft:#F3F4F6;--paper-warm:#EAECEF;
+  --rule:rgba(0,0,0,0.20);--rule-soft:rgba(0,0,0,0.11);--rule-strong:rgba(0,0,0,0.40);
+  --ink:#0A0C10;--ink-2:#23282F;--ink-3:#454B54;--ink-4:#6B7079;
+  --accent:#B4540A;--accent-2:#8A3F06;--accent-soft:rgba(180,84,10,0.13);--accent-ui:#B4540A;
+  --navy:#1F5673;--gold:#9A6E2E;--green:#1E7A4D;--good:#1E7A4D;--warn:#B4540A;--bad:#B3241B;
+  --night:#EAECEF;--night-2:#F3F4F6;--night-paper:#0A0C10;
+}
+/* 让 .fill 成为 flex 列容器：使各页 justify-content:center 真正生效（内容垂直居中、填满版心） */
+.fill{display:flex;flex-direction:column;}
+/* ===== 大会场可读性：字号整体放大 + 引用与正文同大、强调色醒目 ===== */
+.cite{font-size:0.92em;color:var(--accent);font-weight:600;letter-spacing:0;vertical-align:baseline;white-space:normal;}
+.card__title{font-size:32px;line-height:1.26;}
+.card__desc{font-size:25px;line-height:1.5;color:var(--ink-2);}
+.card__eyebrow{font-size:20px;}
+.bullets > li{font-size:41px;line-height:1.4;}
+.bullets ul li{font-size:31px;}
+.callout{font-size:32px;line-height:1.5;}
+/* ===== 关键句：浅蓝方框底 + 克制呼吸灯；演讲者按键后【打字机逐字】显现（仅播放态隐藏待触发）。关键词琥珀强调。长句 .keyline--sm；insight 页居中 ===== */
+.keyline{align-self:stretch;margin-top:30px;padding:20px 30px;background:rgba(111,179,222,0.12);border:1.5px solid rgba(111,179,222,0.5);border-radius:12px;font-family:var(--font-sans);font-size:38px;line-height:1.5;font-weight:700;color:var(--ink);}
+.keyline em{color:var(--accent);font-style:normal;}
+.keyline--sm{font-size:28px;line-height:1.6;font-weight:600;}
+.insight .keyline{align-self:center;max-width:1500px;margin:34px auto 0;text-align:center;font-size:40px;}
+.keyline .kc{display:inline;}
+body.present .keyline{opacity:0;transition:opacity .35s ease;}
+body.present .keyline .kc{opacity:0;}
+body.present .slide.active .keyline.kl-typed{opacity:1;animation:kl-breathe 3.2s ease-in-out .6s infinite;}
+body.present .slide.active .keyline.kl-typed .kc{opacity:1;transition:opacity .02s linear;transition-delay:calc(.32s + var(--ci) * 0.028s);}
+@keyframes kl-breathe{0%,100%{box-shadow:0 0 10px 0 rgba(111,179,222,0.22);border-color:rgba(111,179,222,0.55);background-color:rgba(111,179,222,0.10);}50%{box-shadow:0 0 42px 7px rgba(111,179,222,0.62);border-color:rgba(111,179,222,1);background-color:rgba(111,179,222,0.22);}}
+@media (prefers-reduced-motion: reduce){ body.present .keyline,body.present .keyline .kc{opacity:1 !important;} }
+.note-box{font-size:29px;}
+.numitem__title{font-size:34px;}
+.numitem__desc{font-size:26px;}
+.figure__cap{font-size:30px;color:var(--ink-2);}
+.figure__src{font-size:20px;}
+.head__eyebrow{font-size:22px;}
+.head__sub{font-size:31px;}
+.body{font-size:37px;color:var(--ink-2);}
+.small{font-size:26px;}
+.lead{color:var(--ink-2);}
+.cover__sub{font-size:42px;}
+.insight__sub,.manifesto__sub{font-size:33px;}
+.refs li{font-size:18px;line-height:1.5;}
+/* ===== s10 边界舞台（高端动画演示：人 vs 机器·工具，一条清楚的边界） ===== */
+.bd-stage{ position:relative; flex:1; display:grid; grid-template-columns:1fr 3px 1fr; align-items:center; min-height:0; }
+.bd-side{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; padding:0 70px; position:relative; }
+.bd-glyph{ font-family:var(--font-display); font-weight:700; font-size:158px; line-height:1; letter-spacing:-.02em; position:relative; z-index:1; }
+.bd-human .bd-glyph{ color:var(--accent); text-shadow:0 0 26px var(--accent-soft); }
+.bd-glyph--m{ font-size:64px; color:var(--ink-3); letter-spacing:0; }
+.bd-cap{ font-family:var(--font-sans); font-size:27px; color:var(--ink-2); text-align:center; line-height:1.5; position:relative; z-index:1; }
+.bd-cap span{ display:block; font-family:var(--font-mono); font-size:17px; color:var(--ink-4); letter-spacing:.1em; margin-top:10px; text-transform:uppercase; }
+.bd-aura{ position:absolute; width:380px; height:380px; border-radius:50%; background:radial-gradient(circle, var(--accent-soft) 0%, transparent 68%); z-index:0; }
+.bd-line{ position:relative; width:3px; height:66%; justify-self:center; background:linear-gradient(180deg, transparent, var(--accent) 18%, var(--accent) 82%, transparent); box-shadow:0 0 16px var(--accent); border-radius:3px; }
+.bd-line-label{ position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); white-space:nowrap; font-family:var(--font-mono); font-size:16px; letter-spacing:.16em; color:var(--accent); background:var(--paper); padding:8px 16px; border:1px solid var(--accent); border-radius:24px; box-shadow:0 0 18px var(--accent-soft); }
+.bd-prompt{ text-align:center; margin-top:24px; font-family:var(--font-sans); font-size:31px; color:var(--ink-2); }
+.bd-prompt em{ color:var(--accent); font-weight:600; }
+/* 溶解层：实线之上的虚线孔洞，平时隐形；播放态下实线先立稳，再「溶解」为向下流动的孔洞 */
+.bd-line__diss{ position:absolute; inset:-2px 0; border-radius:3px; opacity:0; pointer-events:none;
+  background:repeating-linear-gradient(180deg, var(--accent) 0 4px, transparent 4px 15px);
+  box-shadow:0 0 12px var(--accent-soft); }
+/* 动画：仅全屏播放态 · 边界描下→两侧入场→灯气呼吸→开口提示→边界溶解 */
+@keyframes bd-draw{ from{ height:0; opacity:.2; } to{ height:66%; opacity:1; } }
+@keyframes bd-in-left{ from{ opacity:0; transform:translateX(-26px); } to{ opacity:1; transform:none; } }
+@keyframes bd-in-right{ from{ opacity:0; transform:translateX(26px); } to{ opacity:1; transform:none; } }
+@keyframes bd-aura{ 0%,100%{ opacity:.65; transform:scale(1); } 50%{ opacity:1; transform:scale(1.07); } }
+@keyframes bd-solid-fade{ from{ opacity:1; filter:none; } to{ opacity:.15; filter:blur(.5px); } }       /* 实线渐隐为余痕 */
+@keyframes bd-diss-in{ from{ opacity:0; } to{ opacity:.92; } }                                            /* 孔洞虚线浮现 */
+@keyframes bd-diss-drift{ from{ background-position-y:0; } to{ background-position-y:19px; } }            /* 19=一个孔洞周期(4+15)·无缝下流 */
+@keyframes bd-label-soft{ from{ opacity:1; } to{ opacity:.35; transform:translate(-50%,-50%) scale(.96); } }  /* 「清楚」二字一并淡去 */
+body.present .slide.active.is-anim .bd-line{ animation:bd-draw .9s var(--a-ease) both, bd-solid-fade 1.6s var(--a-ease) 2.8s forwards; }
+body.present .slide.active.is-anim .bd-line__diss{ animation:bd-diss-in 1.6s var(--a-ease) 2.8s forwards, bd-diss-drift 2.2s linear 3.1s infinite; }
+body.present .slide.active.is-anim .bd-line-label{ animation:a-fade-in .5s var(--a-ease) .85s both, bd-label-soft 1.6s var(--a-ease) 2.8s forwards; }
+body.present .slide.active.is-anim .bd-human{ animation:bd-in-left .7s var(--a-ease) .5s both; }
+body.present .slide.active.is-anim .bd-machine{ animation:bd-in-right .7s var(--a-ease) .66s both; }
+body.present .slide.active.is-anim .bd-aura{ animation:bd-aura 3.6s ease-in-out 1.2s infinite; }
+body.present .slide.active.is-anim .bd-prompt{ animation:a-fade-up .6s var(--a-ease) 1.25s both; }
+@media (prefers-reduced-motion:reduce){ .bd-line__diss{ animation:none !important; opacity:0 !important; } }
+
+/* ===== 玻璃管霓虹：第三类追问「我还是人吗」（s26） =====
+   玻璃质感 = 字面用渐变内芯(顶部透光高光→琥珀灯气→底部反光) + 细管壁描边 + 多层 drop-shadow 辉光 */
+.manifesto__title em.neon{
+  background:linear-gradient(176deg,#FFFEF6 0%,#FFF0BE 34%,#F6BC44 52%,#E8A52E 66%,#FFF7DC 100%);
+  -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; color:transparent;
+  -webkit-text-stroke:0.55px rgba(255,238,180,0.42);                 /* 玻璃管壁 */
+  filter:
+    drop-shadow(0 0 1px rgba(255,255,255,0.95))                      /* 内芯亮线 */
+    drop-shadow(0 0 6px rgba(255,240,190,0.9))
+    drop-shadow(0 0 16px var(--accent))
+    drop-shadow(0 0 34px var(--accent))
+    drop-shadow(0 0 66px var(--accent-2));                           /* 外晕 */
+}
+/* 浅色主题：玻璃琥珀在白底不可读 → 改实色强光，仍像点亮的灯管 */
+html[data-theme="light"] .manifesto__title em.neon,
+html[data-theme="contrast"] .manifesto__title em.neon{
+  background:none; -webkit-background-clip:border-box; background-clip:border-box;
+  -webkit-text-fill-color:var(--accent); color:var(--accent); -webkit-text-stroke:0;
+  filter:drop-shadow(0 0 5px var(--accent-soft)) drop-shadow(0 0 13px var(--accent)) drop-shadow(0 0 26px var(--accent));
+}
+@keyframes neon-flicker{ 0%,16%,18%,55%,57%,100%{opacity:1;} 17%,56%{opacity:.7;} 80%,82%{opacity:.88;} }   /* 灯气微闪 */
+body.present .manifesto__title em.neon{ animation:neon-flicker 5.5s linear infinite; }   /* 仅全屏播放态 */
+@media (prefers-reduced-motion:reduce){ .manifesto__title em.neon{ animation:none !important; } }
+
+/* ===== 主题切换器（右下角 · 演播态也可见） ===== */
+.theme-switch{position:fixed;right:18px;bottom:16px;z-index:99999;display:flex;gap:6px;font-family:var(--font-mono);}
+.theme-switch button{font:inherit;font-size:13px;letter-spacing:.06em;padding:7px 13px;border-radius:7px;border:1px solid var(--rule-strong);background:var(--paper-soft);color:var(--ink-3);cursor:pointer;opacity:.55;transition:opacity .15s;}
+.theme-switch:hover button{opacity:1;}
+.theme-switch button.on{background:var(--accent);color:var(--paper);border-color:var(--accent);font-weight:600;opacity:1;}
+
+
+/* ==== anim.css ==== */
+/* ════════════════════════════════════════════════════════════════════════
+   anim.css — keynote deck 的进场/转场动画层（v2 · 仅全屏播放态生效）
+   ------------------------------------------------------------------------
+   触发：anim.js 在「某页变 active 且处于 body.present 播放态」时给该 .slide 加 .is-anim
+        （编辑/预览态不加 → 无动画，直接终态；缩略图无 .active → 永远终态）
+   只动 transform / opacity / stroke-dashoffset —— 不碰颜色（随 3 主题令牌）
+   ⚠ 不在 .slide 自身上动 transform（它带演播缩放 scale(var(--sc))）→ 页面转场只用 opacity
+   ════════════════════════════════════════════════════════════════════════ */
+.slide{
+  --a-ease: cubic-bezier(.22,.61,.36,1);
+  --a-dur:  .52s;
+  --a-shift: 22px;
+  --a-step: 95ms;
+}
+
+/* —— 进场原语 —— */
+@keyframes a-fade-up{ from{opacity:0;transform:translateY(var(--a-shift));} to{opacity:1;transform:none;} }
+@keyframes a-fade-in{ from{opacity:0;} to{opacity:1;} }
+@keyframes a-rise{    from{opacity:0;transform:translateY(var(--a-shift)) scale(.985);} to{opacity:1;transform:none;} }
+@keyframes a-num-pop{ from{opacity:0;transform:scale(.94);} to{opacity:1;transform:none;} }
+@keyframes a-card-in{ from{opacity:0;transform:translateY(var(--a-shift));} to{opacity:1;transform:none;} }
+@keyframes a-page-in{ from{opacity:0;} to{opacity:1;} }   /* 页面转场：整页淡入（只动 opacity，安全） */
+
+/* —— 0 · 页面转场：当前页整体淡入 —— */
+.slide.active.is-anim{ animation:a-page-in .40s var(--a-ease) both; }
+
+/* —— 1 · 标题块 head —— */
+.slide.active.is-anim .head__eyebrow{ animation:a-fade-up var(--a-dur) var(--a-ease) .06s both; }
+.slide.active.is-anim .head__title  { animation:a-fade-up var(--a-dur) var(--a-ease) .16s both; }
+.slide.active.is-anim .head__sub    { animation:a-fade-up var(--a-dur) var(--a-ease) .28s both; }
+
+/* —— 2 · cover 封面：自上而下逐层 —— */
+.slide.active.is-anim .cover__top    { animation:a-fade-in var(--a-dur) var(--a-ease) both; }
+.slide.active.is-anim .cover__eyebrow{ animation:a-fade-up var(--a-dur) var(--a-ease) .12s both; }
+.slide.active.is-anim .cover__title  { animation:a-rise   .64s        var(--a-ease) .22s both; }
+.slide.active.is-anim .cover__sub    { animation:a-fade-up var(--a-dur) var(--a-ease) .40s both; }
+.slide.active.is-anim .cover__meta-item{ animation:a-fade-up var(--a-dur) var(--a-ease) both; }
+.slide.active.is-anim .cover__meta-item:nth-child(1){ animation-delay:.52s; }
+.slide.active.is-anim .cover__meta-item:nth-child(2){ animation-delay:.62s; }
+.slide.active.is-anim .cover__meta-item:nth-child(3){ animation-delay:.72s; }
+
+/* —— 3 · manifesto / insight 大字：整体升起 —— */
+.slide.active.is-anim .manifesto__eyebrow,
+.slide.active.is-anim .insight__eyebrow  { animation:a-fade-up var(--a-dur) var(--a-ease) .06s both; }
+.slide.active.is-anim .manifesto__title,
+.slide.active.is-anim .insight__statement{ animation:a-rise .66s var(--a-ease) .18s both; }
+.slide.active.is-anim .manifesto__sub,
+.slide.active.is-anim .insight__sub      { animation:a-fade-up var(--a-dur) var(--a-ease) .40s both; }
+
+/* —— 4 · secdiv 章节巨数 —— */
+.slide.active.is-anim .secdiv__num   { animation:a-num-pop .60s var(--a-ease) both; }
+.slide.active.is-anim .secdiv__eyebrow{ animation:a-fade-up var(--a-dur) var(--a-ease) .16s both; }
+.slide.active.is-anim .secdiv__title { animation:a-fade-up var(--a-dur) var(--a-ease) .26s both; }
+.slide.active.is-anim .secdiv__lead  { animation:a-fade-up var(--a-dur) var(--a-ease) .40s both; }
+.slide.active.is-anim .secdiv__meta  { animation:a-fade-up var(--a-dur) var(--a-ease) .52s both; }
+
+/* —— 5 · cards 卡片：stagger 交错 —— */
+.slide.active.is-anim .cards > .card{ animation:a-card-in var(--a-dur) var(--a-ease) both; }
+.slide.active.is-anim .cards > .card:nth-child(1){ animation-delay:.30s; }
+.slide.active.is-anim .cards > .card:nth-child(2){ animation-delay:calc(.30s + var(--a-step)); }
+.slide.active.is-anim .cards > .card:nth-child(3){ animation-delay:calc(.30s + var(--a-step) * 2); }
+.slide.active.is-anim .cards > .card:nth-child(4){ animation-delay:calc(.30s + var(--a-step) * 3); }
+.slide.active.is-anim .cards > .card:nth-child(5){ animation-delay:calc(.30s + var(--a-step) * 4); }
+.slide.active.is-anim .cards > .card:nth-child(6){ animation-delay:calc(.30s + var(--a-step) * 5); }
+.slide.active.is-anim .callout{ animation:a-fade-up var(--a-dur) var(--a-ease) .42s both; }
+
+/* —— 6 · bullets / numlist 逐条 —— */
+.slide.active.is-anim .bullets > li,
+.slide.active.is-anim .numlist > .numitem{ animation:a-fade-up var(--a-dur) var(--a-ease) both; }
+.slide.active.is-anim .bullets > li:nth-child(1),
+.slide.active.is-anim .numlist > .numitem:nth-child(1){ animation-delay:.26s; }
+.slide.active.is-anim .bullets > li:nth-child(2),
+.slide.active.is-anim .numlist > .numitem:nth-child(2){ animation-delay:calc(.26s + var(--a-step)); }
+.slide.active.is-anim .bullets > li:nth-child(3),
+.slide.active.is-anim .numlist > .numitem:nth-child(3){ animation-delay:calc(.26s + var(--a-step) * 2); }
+.slide.active.is-anim .bullets > li:nth-child(4),
+.slide.active.is-anim .numlist > .numitem:nth-child(4){ animation-delay:calc(.26s + var(--a-step) * 3); }
+.slide.active.is-anim .bullets > li:nth-child(5),
+.slide.active.is-anim .numlist > .numitem:nth-child(5){ animation-delay:calc(.26s + var(--a-step) * 4); }
+.slide.active.is-anim .bullets > li:nth-child(n+6),
+.slide.active.is-anim .numlist > .numitem:nth-child(n+6){ animation-delay:calc(.26s + var(--a-step) * 5); }
+.slide.active.is-anim .note-box{ animation:a-fade-up var(--a-dur) var(--a-ease) .18s both; }
+
+/* —— 7 · figure 概念图：图框淡入；图注随后；SVG 内部由 anim.js 分步 —— */
+.slide.active.is-anim .figure__frame{ animation:a-fade-in .46s var(--a-ease) both; }
+.slide.active.is-anim .figure__cap  { animation:a-fade-up var(--a-dur) var(--a-ease) .60s both; }
+.slide.active.is-anim .figure__src  { animation:a-fade-up var(--a-dur) var(--a-ease) .70s both; }
+
+/* —— SVG 分步：全部门控在 body.present（全屏播放态）；编辑态这些规则不生效 → 直接终态、零动画 —— */
+@keyframes a-gap-pop{ 0%{opacity:0;transform:scale(.88);} 62%{opacity:1;transform:scale(1.05);} 100%{opacity:1;transform:scale(1);} }
+@keyframes a-gap-breathe{ 0%,100%{opacity:1;} 50%{opacity:.78;} }
+@keyframes a-glow-pulse{ 0%,100%{opacity:1;} 50%{opacity:.60;} }
+
+body.present .concept-svg [data-a-hide]{ opacity:0; }
+body.present .concept-svg [data-a-show]{ opacity:1; transition:opacity .42s var(--a-ease,ease-out); }
+/* 纸片「雪花飘落」入格：从上方带横向摆动 + 旋转飘下，落定到各自微旋 --rot */
+@keyframes a-snow{
+  0%  { opacity:0;   transform:translate(8px,-82px) rotate(-34deg); }
+  35% { opacity:.95; transform:translate(-7px,-46px) rotate(22deg); }
+  68% { opacity:.95; transform:translate(5px,-18px) rotate(-12deg); }
+  100%{ opacity:.92; transform:translate(0,0) rotate(var(--rot,0deg)); }
+}
+body.present .concept-svg [data-a-dot]{ transform-box:fill-box; transform-origin:center; opacity:0; }
+body.present .concept-svg [data-a-dot].a-dot-in{ opacity:.92; animation:a-snow .95s var(--a-ease,ease-out) both; }
+/* 描边（grid 线 / 边界线 / 箭头） */
+body.present .concept-svg [data-a-draw]{ transition:stroke-dashoffset .9s var(--a-ease,ease-out); }
+/* 内容专属①：空格高亮（帧4）pop 进场 + 持续轻微呼吸（强调"机会"） */
+body.present .concept-svg rect[data-a-gap]{ transform-box:fill-box; transform-origin:center; opacity:0; transform:scale(.88); }
+body.present .concept-svg rect[data-a-gap].a-gap-in{ animation:a-gap-pop .56s var(--a-ease) both, a-gap-breathe 2.8s ease-in-out .7s infinite; }
+/* 内容专属②：第三问「我还是人吗」发光呼吸（帧5） */
+body.present .concept-svg text.a-glow{ animation:a-glow-pulse 2.4s ease-in-out infinite; }
+
+/* —— 8 · refs 参考文献：整页淡入 —— */
+.slide.active.is-anim .refs{ animation:a-fade-in .5s var(--a-ease) both; }
+
+/* ════════════════════════════════════════════════════════════════════════
+   舞台增强 V3.3 —— ① 箭头反转(演讲者 cue) · ③ 空格「0」呼吸 · 冷开场强调 · s4 左右汇聚
+   ════════════════════════════════════════════════════════════════════════ */
+/* ① 帧3 反转组（他人「去人性化↓」）：初始隐藏；演讲者按键 → 翻入 + 一记亮闪顿挫 */
+@keyframes a-flip-in{ 0%{opacity:0;transform:translateY(-18px) scaleY(.35);} 56%{opacity:1;transform:translateY(4px) scaleY(1.07);} 100%{opacity:1;transform:none;} }
+@keyframes a-flip-flash{ 0%{filter:brightness(1);} 16%{filter:brightness(2.2);} 100%{filter:brightness(1);} }
+body.present .concept-svg [data-a-flip]{ opacity:0; }
+body.present .concept-svg [data-a-flip].a-flip-on{ opacity:1; transform-box:fill-box; transform-origin:center top; animation:a-flip-in .52s var(--a-ease) both; }
+body.present .concept-svg.cd-flashed{ animation:a-flip-flash .5s ease-out; }
+/* 演讲者「待按键」提示：右下角一记轻脉冲箭头（仅该页有 build 时显示） */
+.build-cue{ position:absolute; right:60px; bottom:96px; z-index:6; pointer-events:none;
+  font-family:var(--font-mono,monospace); font-size:26px; color:var(--accent); opacity:.5; }
+.slide.active.is-anim .build-cue{ opacity:0; }
+.slide.active.is-anim.has-pending-build .build-cue{ opacity:1; animation:a-cue-pulse 1.5s ease-in-out .8s infinite; }
+@keyframes a-cue-pulse{ 0%,100%{opacity:.30;transform:translateX(0);} 50%{opacity:.85;transform:translateX(5px);} }
+
+/* ③ 帧2 空格「0」：显现后轻微「呼吸」——让"缺席"被看见 */
+@keyframes a-empty-breathe{ 0%,100%{opacity:.95;} 50%{opacity:.40;} }
+body.present .concept-svg .a-empty-breathe{ animation:a-empty-breathe 3.2s ease-in-out infinite; }
+
+/* 冷开场：manifesto 的 em（AI / 是否依然清晰）额外一记强调脉冲 */
+@keyframes a-em-stress{ 0%{transform:none;} 42%{transform:scale(1.07);} 100%{transform:none;} }
+.slide.active.is-anim.manifesto .manifesto__title em{ display:inline-block; transform-origin:center bottom; animation:a-em-stress .72s var(--a-ease) 1.0s both; }
+
+/* s4 两项实证：两卡从左右入场 + 中间浮起一枚连接节点（表面相反·深层相通） */
+@keyframes a-in-left{ from{opacity:0;transform:translateX(-48px);} to{opacity:1;transform:none;} }
+@keyframes a-in-right{ from{opacity:0;transform:translateX(48px);} to{opacity:1;transform:none;} }
+@keyframes a-link-in{ 0%{opacity:0;transform:translate(-50%,-50%) scale(.3);} 100%{opacity:1;transform:translate(-50%,-50%) scale(1);} }
+.slide.active.is-anim.s-converge .cards--2{ position:relative; }
+.slide.active.is-anim.s-converge .cards--2 > .card:nth-child(1){ animation:a-in-left .62s var(--a-ease) .18s both; }
+.slide.active.is-anim.s-converge .cards--2 > .card:nth-child(2){ animation:a-in-right .62s var(--a-ease) .18s both; }
+.slide.active.is-anim.s-converge .cards--2::after{
+  content:""; position:absolute; left:50%; top:50%; width:30px; height:30px; border-radius:50%;
+  transform:translate(-50%,-50%);
+  background:radial-gradient(circle, var(--accent) 0 28%, var(--accent-soft) 38%, transparent 66%);
+  box-shadow:0 0 18px var(--accent-soft); pointer-events:none;
+  animation:a-link-in .5s var(--a-ease) .92s both;
+}
+
+/* ── 「问」字开场涌现（slide 002 · 演讲者按键 build step） ──────────────────
+   读完设问 → 按一下翻页器 → 问句逐渐模糊隐退；「问」缓缓放大、点亮，并带不规则微颤，
+   像一颗"活过来"的心智。结构：.char 负责放大，内层 .glyph 负责点燃(立体)＋颤动，
+   两层各管一个 transform，互不打架。纯 CSS；仅 body.present 由 anim.js 加 .ask-erupt
+   （reduced-motion 下 advanceBuild 不触发 → 永不 erupt）。 */
+.ask-seed{ display:inline-block; vertical-align:baseline; position:relative; z-index:6; transform-origin:center center; will-change:transform; }
+.ask-seed__g{ display:inline-block; will-change:transform,text-shadow; }
+.ask-rest{ display:inline; will-change:opacity,filter; }
+.slide.ask-erupt .ask-seed{ animation:ask-seed-grow 3.2s cubic-bezier(.5,.06,.5,1) forwards; }
+.slide.ask-erupt .ask-seed__g{ color:var(--accent); animation:ask-ignite 3.2s ease-out forwards, ask-alive 6s ease-in-out 3.2s infinite, ask-seed-breathe 4s ease-in-out 3.2s infinite; }
+/* 其余文字（含另一个“问”）被挤开、退成一层淡淡的影子；须盖过入场动画的 fill → 高特异性 + animation */
+body.present .slide.active.is-anim.ask-erupt .ask-rest{ animation:ask-rest-out 1.8s ease forwards; }
+body.present .slide.active.is-anim.ask-erupt .manifesto__eyebrow,
+body.present .slide.active.is-anim.ask-erupt .manifesto__sub{ animation:ask-recede 2.6s ease forwards; }
+@keyframes ask-seed-grow{ from{ transform:scale(1); } to{ transform:scale(4.76); } }
+/* 呼吸灯：辉光一呼一吸地脉动（只动 text-shadow，放在动画串最后→压过微颤的发光、与微颤的位移互不打架）*/
+@keyframes ask-seed-breathe{
+  0%,100%{ text-shadow:0 3px 0 rgba(122,70,12,.6), 0 6px 0 rgba(104,60,10,.5), 0 9px 2px rgba(80,46,8,.42),
+                       0 0 38px var(--accent), 0 0 92px var(--accent-soft), 0 0 170px var(--accent-soft); }
+  50%{     text-shadow:0 3px 0 rgba(122,70,12,.6), 0 6px 0 rgba(104,60,10,.5), 0 9px 2px rgba(80,46,8,.42),
+                       0 0 92px var(--accent), 0 0 196px var(--accent-soft), 0 0 340px var(--accent-soft); } }
+@keyframes ask-rest-out{ from{ opacity:1; filter:blur(0); } to{ opacity:.16; filter:blur(1px); } }
+@keyframes ask-recede{ from{ opacity:1; filter:blur(0); }      to{ opacity:.08; filter:blur(4px); } }
+@keyframes ask-ignite{
+  0%{   text-shadow:0 0 0 rgba(122,70,12,0), 0 0 0 rgba(104,60,10,0), 0 0 0 rgba(80,46,8,0),
+                    0 0 0 rgba(244,183,62,0), 0 0 0 rgba(244,183,62,0), 0 0 0 rgba(244,183,62,0); }
+  100%{ text-shadow:0 3px 0 rgba(122,70,12,.6), 0 6px 0 rgba(104,60,10,.5), 0 9px 2px rgba(80,46,8,.42),
+                    0 0 48px var(--accent), 0 0 120px var(--accent-soft), 0 0 220px var(--accent-soft); } }
+@keyframes ask-alive{
+  0%,100%{ transform:translate(0,0) rotate(0deg) scale(1);
+           text-shadow:0 3px 0 rgba(122,70,12,.6), 0 6px 0 rgba(104,60,10,.5), 0 9px 2px rgba(80,46,8,.42),
+                       0 0 48px var(--accent), 0 0 120px var(--accent-soft), 0 0 220px var(--accent-soft); }
+  12%{ transform:translate(-3px,2px)  rotate(-0.25deg) scale(1.004); }
+  26%{ transform:translate(2px,-3px)  rotate(0.20deg)  scale(1.000); }
+  39%{ transform:translate(-2px,-2px) rotate(0.28deg)  scale(1.008);
+       text-shadow:0 3px 0 rgba(122,70,12,.6), 0 6px 0 rgba(104,60,10,.5), 0 9px 2px rgba(80,46,8,.42),
+                   0 0 74px var(--accent), 0 0 156px var(--accent-soft), 0 0 270px var(--accent-soft); }
+  53%{ transform:translate(3px,2px)   rotate(-0.15deg) scale(1.002); }
+  67%{ transform:translate(-1px,3px)  rotate(0.24deg)  scale(1.006); }
+  79%{ transform:translate(2px,-2px)  rotate(-0.30deg) scale(1.000);
+       text-shadow:0 3px 0 rgba(122,70,12,.6), 0 6px 0 rgba(104,60,10,.5), 0 9px 2px rgba(80,46,8,.42),
+                   0 0 56px var(--accent), 0 0 132px var(--accent-soft), 0 0 232px var(--accent-soft); }
+  90%{ transform:translate(-2px,1px)  rotate(0.12deg)  scale(1.003); } }
+
+/* ── S3「拧巴」：人↔AI 双向互塑（演讲者按键 build step） ────────────────────
+   初态：一条干净的线（你以为的实体边界）。按键 → 线绞成两股反向流动、彼此缠绕的辫子：
+   人股(ink)往右流、AI股(accent)往左流，边流边把对方拧变形；两端清楚、中段挑不出线头。
+   结构：.braid-weave 用 scaleY(.02)→1 从中线"弹开"；两股 stroke-dashoffset 反向流 = 双向。
+   纯 CSS；仅 body.present 由 anim.js 加 .braid-live；reduced-motion 直接显静态辫子。 */
+.braid-svg{ display:block; width:1160px; height:auto; margin:46px auto 0; overflow:visible; }
+.braid-pole{ font-family:var(--font-display); font-weight:700; font-size:66px; fill:var(--ink); }
+.braid-clean{ stroke:var(--accent); stroke-width:3; opacity:.92; }
+.braid-weave{ opacity:0; transform:scaleY(.02); transform-box:fill-box; transform-origin:center; }
+.braid-strand{ fill:none; stroke-width:6; stroke-linecap:round; }
+.braid-strand--h{  stroke:var(--ink); }
+.braid-strand--ai{ stroke:var(--accent); }
+.braid-knots circle{ fill:var(--accent); opacity:0; }
+.slide.braid-live .braid-clean{ animation:braid-clean-out .55s ease forwards; }
+.slide.braid-live .braid-weave{ animation:braid-open 1.5s cubic-bezier(.34,1.25,.5,1) forwards; }
+.slide.braid-live .braid-strand{ stroke-dasharray:18 16; }
+.slide.braid-live .braid-strand--h{  animation:braid-flow-fwd 2.4s linear .9s infinite; }
+.slide.braid-live .braid-strand--ai{ animation:braid-flow-rev 2.4s linear .9s infinite; }
+.slide.braid-live .braid-knots circle{ animation:braid-knot 3s ease-in-out infinite; }
+.slide.braid-live .braid-knots circle:nth-child(1){ animation-delay:1.0s; }
+.slide.braid-live .braid-knots circle:nth-child(2){ animation-delay:1.25s; }
+.slide.braid-live .braid-knots circle:nth-child(3){ animation-delay:1.5s; }
+.slide.braid-live .braid-knots circle:nth-child(4){ animation-delay:1.75s; }
+.slide.braid-live .braid-knots circle:nth-child(5){ animation-delay:2.0s; }
+@keyframes braid-clean-out{ to{ opacity:0; } }
+@keyframes braid-open{ 0%{ opacity:0; transform:scaleY(.02); } 26%{ opacity:1; } 100%{ opacity:1; transform:scaleY(1); } }
+@keyframes braid-flow-fwd{ to{ stroke-dashoffset:-340; } }   /* 人 → AI */
+@keyframes braid-flow-rev{ to{ stroke-dashoffset: 340; } }   /* AI → 人（反向）*/
+@keyframes braid-knot{ 0%,100%{ opacity:0; } 50%{ opacity:.85; filter:drop-shadow(0 0 10px var(--accent)); } }
+
+/* —— S19「界面耦合：过载渗漏」+「时间纵深」（演讲者按键 · 慢 · 浸润 · 仅 data-title=尚待探索区域）——
+   couple-live：两条耦合箭头持续流动 + 他人行→自我行先后被琥珀「洇」满（blur 软边=浸润感）。
+   time-live：时间影子框缓慢「长出纵深」+ 标签提亮。reduced-motion 下 build 不触发→不动。 */
+.cd-wash{ pointer-events:none; filter:blur(7px); }
+.slide.couple-live .cd-couple{ filter:drop-shadow(0 0 7px var(--accent-soft)); }
+.slide.couple-live .cd-couple path{ animation:cd-flow 2.8s linear infinite; }
+.slide.couple-live .cd-wash-o{ transform-box:fill-box; transform-origin:left center; animation:cd-seep 3.6s ease-out .5s forwards; }
+.slide.couple-live .cd-wash-s{ transform-box:fill-box; transform-origin:left center; animation:cd-seep 4.0s ease-out 3.0s forwards; }
+@keyframes cd-flow{ to{ stroke-dashoffset:-72; } }
+@keyframes cd-seep{ 0%{ opacity:0; transform:scaleX(.02); } 100%{ opacity:.14; transform:scaleX(1); } }
+/* 时间纵深 = 4 张「快照」便笺像树叶飘落、错峰叠成纵深：不透明真实纸感(无淡入)；旧快照纯色只露右下薄边；绿色卡自带纸纹+手绘六格+手写数字一起飘落落定。慢、顺滑、左右摇摆。 */
+.cd-sheet{ opacity:0; transform-box:fill-box; transform-origin:50% 40%; filter:drop-shadow(0 14px 22px rgba(0,0,0,.45)); will-change:transform; }
+.slide.time-live .cd-sheet{ animation:cd-leaf-fall 2.7s cubic-bezier(.42,.05,.32,1) forwards; }
+.slide.time-live .cd-s1{ animation-delay:.2s; } .slide.time-live .cd-s2{ animation-delay:1.5s; }
+.slide.time-live .cd-s3{ animation-delay:2.8s; } .slide.time-live .cd-s4{ animation-delay:4.1s; }
+@keyframes cd-leaf-fall{
+ 0%{ opacity:1; transform:translate(-540px,-380px) rotate(-16deg) scale(.95); }
+ 22%{ transform:translate(-300px,-238px) rotate(13deg) scale(.96); }
+ 42%{ transform:translate(-356px,-120px) rotate(-11deg) scale(.972); }
+ 62%{ transform:translate(-150px,-44px) rotate(9deg) scale(.99); }
+ 80%{ transform:translate(-44px,4px) rotate(-5deg) scale(1.006); }
+ 100%{ opacity:1; transform:translate(var(--tx),var(--ty)) rotate(var(--rot)) scale(1); }
+}
+
+/* —— S24 时间轨迹：陌生人→熟人→朋友→伙伴，边界沿关系「一格一格地塌」（演讲者按键 · 慢 · 浸润）—— */
+.traj-svg{ display:block; width:1140px; height:auto; margin:26px auto 4px; overflow:visible; }
+.tj-bar{ stroke:var(--accent); stroke-width:5; stroke-linecap:round; }
+.tj-token{ fill:var(--accent); opacity:0; filter:drop-shadow(0 0 8px var(--accent)); }
+.slide.traj-live .tj-token{ animation:tj-walk 8.4s ease-in-out forwards; }
+.slide.traj-live .tj-b0{ transform-box:fill-box; transform-origin:bottom; animation:tj-fall0 2.6s ease-in 1.0s forwards; }
+.slide.traj-live .tj-b1{ transform-box:fill-box; transform-origin:bottom; animation:tj-fall1 2.6s ease-in 3.0s forwards; }
+.slide.traj-live .tj-b2{ transform-box:fill-box; transform-origin:bottom; animation:tj-fall2 2.6s ease-in 5.0s forwards; }
+.slide.traj-live .tj-b3{ transform-box:fill-box; transform-origin:bottom; animation:tj-fall3 2.6s ease-in 6.8s forwards; }
+@keyframes tj-walk{ 0%{ opacity:0; } 5%{ opacity:1; } 100%{ opacity:1; transform:translateX(900px); } }
+@keyframes tj-fall0{ to{ transform:scaleY(.82); opacity:.78; } }
+@keyframes tj-fall1{ to{ transform:scaleY(.55); opacity:.58; } }
+@keyframes tj-fall2{ to{ transform:scaleY(.32); opacity:.40; } }
+@keyframes tj-fall3{ to{ transform:scaleY(.12); opacity:.24; } }
+
+@media (prefers-reduced-motion: reduce){
+  .braid-clean{ opacity:0; }
+  .braid-weave{ opacity:1; transform:scaleY(1); animation:none; }
+  .braid-strand{ animation:none !important; }
+  .braid-knots circle{ opacity:.6; animation:none !important; }
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+   reduced-motion：全部关闭，立即终态
+   ════════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce){
+  .slide.active.is-anim, .slide.active.is-anim *,
+  .concept-svg, .concept-svg *{ animation:none !important; transition:none !important; }
+  body.present .concept-svg [data-a-hide]{ opacity:1 !important; }
+  body.present .concept-svg [data-a-dot]{ opacity:.92 !important; transform:none !important; }
+  body.present .concept-svg rect[data-a-gap]{ opacity:1 !important; transform:none !important; }
+  body.present .concept-svg [data-a-draw]{ stroke-dashoffset:0 !important; }
+  body.present .concept-svg [data-a-flip]{ opacity:1 !important; }   /* 反转组直接全显 */
+  .slide.active.is-anim .build-cue{ opacity:0 !important; }          /* 无障碍模式无需 cue */
+}
+
+</style>
+<script>(function(){var t='dark';try{t=localStorage.getItem('deckTheme')||'dark';}catch(e){}document.documentElement.setAttribute('data-theme',t);})();</script>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__brand">周立影 · 贵州财经大学</div>
+  <div class="topbar__sub">2026 工作坊 · 主旨报告</div>
+  <div class="topbar__spacer"></div>
+  <span class="topbar__info">当前 <strong id="curSeg">段 0</strong> · <strong id="curIdx">1</strong> / <strong id="totalIdx">0</strong></span>
+  <button class="topbar__btn" id="prevBtn" title="上一页 ←">←</button>
+  <button class="topbar__btn" id="nextBtn" title="下一页 →">→</button>
+  <button class="topbar__btn topbar__btn--primary" id="playBtn" title="全屏播放（F 或 Enter）">▶ 全屏播放</button>
+  <button class="topbar__btn topbar__btn--presenter" id="presenterBtn" title="演讲者模式 · 副屏同步讲稿">🖥 演讲者</button>
+</header>
+
+<nav class="segnav" id="segnav"></nav>
+<div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
+<div class="hint">F 全屏播放 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
+
+<div class="deck" id="deck">
+
+<section data-seg="0" data-segname="段 0 · 引入" data-title="标题" class="slide cover">
+  <div class="cover__top"><div class="cover__brand">2026 工作坊 · 主旨报告</div><div class="cover__seal">报告</div></div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">Consumer Behavior in the Age of Human–AI Symbiosis</div>
+    <h1 class="cover__title">人机共生时代的<br><em>消费行为研究</em></h1>
+    <p class="cover__sub">一个基于「心智知觉」的分析框架：理论脉络、研究现状与未来方向。</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">报告人</span><span class="cover__meta-v">周立影 · 贵州财经大学</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">文献基础</span><span class="cover__meta-v">近五年 8 本顶刊实证</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">场合</span><span class="cover__meta-v">2026 · 主旨报告</span></div>
+  </div>
+</section>
+
+<section data-seg="0" data-segname="段 0 · 引入" data-title="一个日常现象" class="slide manifesto">
+  <div class="manifesto__eyebrow">从一个日常现象说起</div>
+  <h2 class="manifesto__title" style="font-size:84px;"><span class="ask-rest">在过去一个月里，你有多少次，<br>是先</span><span class="ask-seed"><span class="ask-seed__g">问</span></span><span class="ask-rest">了 <em>AI</em>，<br>再去问同事或学生？</span></h2>
+  <p class="manifesto__sub">这一行为上的细微变化，正是本报告的出发点。</p>
+</section>
+
+<section data-seg="0" data-segname="段 0 · 引入" data-title="界线是否清晰" class="slide manifesto">
+  <div class="manifesto__eyebrow">一个随之而来的问题</div>
+  <h2 class="manifesto__title" style="font-size:76px;">在那一刻，「人」与「AI」<br>之间的界线，<em>是否依然清晰</em>？</h2>
+  <svg class="braid-svg" viewBox="0 0 1200 360" width="1160" aria-hidden="true">
+    <text class="braid-pole" x="64" y="200" text-anchor="middle">人</text>
+    <text class="braid-pole" x="1136" y="200" text-anchor="middle">AI</text>
+    <line class="braid-clean" x1="150" y1="180" x2="1050" y2="180"/>
+    <g class="braid-weave">
+      <path class="braid-strand braid-strand--h"  d="M150,180 Q225,52 300,180 Q375,308 450,180 Q525,52 600,180 Q675,308 750,180 Q825,52 900,180 Q975,308 1050,180"/>
+      <path class="braid-strand braid-strand--ai" d="M150,180 Q225,308 300,180 Q375,52 450,180 Q525,308 600,180 Q675,52 750,180 Q825,308 900,180 Q975,52 1050,180"/>
+    </g>
+    <g class="braid-knots">
+      <circle cx="300" cy="180" r="8"/>
+      <circle cx="450" cy="180" r="8"/>
+      <circle cx="600" cy="180" r="11"/>
+      <circle cx="750" cy="180" r="8"/>
+      <circle cx="900" cy="180" r="8"/>
+    </g>
+  </svg>
+</section>
+
+<section data-seg="0" data-segname="段 0 · 引入" data-title="两项近期实证" class="slide s-converge">
+  <div class="head"><div class="eyebrow head__eyebrow">两项近期实证，指向同一方向</div><h2 class="title head__title">机器，正被放到原本属于「人」的位置上。</h2></div>
+  <div class="fill" style="justify-content:center;gap:34px;">
+    <div class="cards cards--2" style="gap:34px;">
+      <div class="card card--v"><div class="card__eyebrow">发现一 · 情感慰藉</div><div class="card__title">向 AI 倾诉可在短期内显著缓解孤独</div><div class="card__desc">其缓解效应量，与向真人倾诉大致相当。<span class="cite">[De Freitas et al. 2025, JCR]</span></div></div>
+      <div class="card card--n"><div class="card__eyebrow">发现二 · 规避评判</div><div class="card__title">部分消费者更愿由机器、而非真人提供服务</div><div class="card__desc">原因在于：与机器互动，可以规避「被他人评判」的顾虑。<span class="cite">[Sun et al. 2023, JMR]</span></div></div>
+    </div>
+    <div class="callout">在这两种情境中，机器都承担了过去只由「人」承担的角色——情感的对象，或评判的他者。</div>
+  </div>
+</section>
+
+<section data-seg="0" data-segname="段 0 · 引入" data-title="一个共同前提" class="slide insight">
+  <div class="insight__eyebrow">一个共同的前提问题</div>
+  <h2 class="insight__statement" style="font-size:70px;">这两项发现共同指向一个更基础的问题：<br>「<em>心智</em>」，是否仍是人的专属？</h2>
+  <p class="insight__sub" style="font-size:44px;line-height:1.5;">抑或，它本就是一种在关系中<span style="color:var(--accent)">被识别、被赋予、被实践</span>出来的<span style="color:var(--accent);font-weight:700">社会位置</span>？</p>
+  <div class="keyline">当一个系统，在社会互动中持续地承担着「<em>有心智者</em>」的功能，我们还能不能简简单单地说一句——<em>心智，只属于人</em>？</div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 理论脉络" data-title="一 · 理论脉络" class="slide secdiv">
+  <div class="secdiv__num">Ⅰ</div><div class="secdiv__eyebrow">Part Ⅰ</div>
+  <h2 class="secdiv__title">理论<em>脉络</em></h2>
+  <p class="secdiv__lead">从「AI 作为工具」到「AI 作为类人对象」的范式变迁，以及一套用以丈量「人」的概念工具。</p>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 理论脉络" data-title="范式一·工具" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">范式之一 · AI 作为工具</div><h2 class="title head__title">在相当长的时间里，AI 主要被作为一种<em>工具</em>来研究。</h2></div>
+  <div class="fill" style="justify-content:center;gap:30px;">
+    <div class="cards cards--4">
+      <div class="card"><div class="card__title">定价</div><div class="card__desc">个性化定价与定向</div></div>
+      <div class="card"><div class="card__title">排序</div><div class="card__desc">推荐排序与福利</div></div>
+      <div class="card"><div class="card__title">推荐</div><div class="card__desc">浏览与转化</div></div>
+      <div class="card"><div class="card__title">优化</div><div class="card__desc">投放与效率</div></div>
+    </div>
+    <div class="callout">这一范式中，AI 是「提升效率的手段」。本报告关注的，是它逐渐被作为<em>类人对象</em>看待的另一面。<span class="cite">[Smith et al. 2023, MS · Donnelly et al. 2023, MS · Peng & Liang 2023, MISQ]</span></div>
+    <div class="keyline">两脉的分界，也许不在「AI 多强」，而在它在我们眼里是「<em>什么</em>」。</div>
+  </div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 理论脉络" data-title="范式二·社会行动者" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">范式之二 · AI 作为社会行动者</div><h2 class="title head__title">人会以社会规则对待机器——这一点已有充分积累。</h2></div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets">
+      <li>「计算机作为社会行动者（CASA）」与拟人化研究表明：人会把人际规范，自发地迁移到机器之上。<span class="cite">[Nass et al. 1994 · Reeves & Nass 1996]</span></li>
+      <li>在服务情境中，对聊天机器人的「人性化」处理，会系统性地改变消费者的反应与评价。<span class="cite">[Schanke et al. 2021, ISR]</span></li>
+    </ul>
+    <div class="keyline keyline--sm">今天我们面对的生成式 AI，给的已经不是线索，而是<em>持续在扮演一个角色</em>。当机器能够连续、动态、个性化地把一个本属于人的社会位置一直演下去，我们恐怕就不该再简单地把人的反应叫作一次「误归因」了。也许我们该把叙事从「无心的社会反应」，往前挪到「<em>有意的策略性使用</em>」。</div>
+  </div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 理论脉络" data-title="基础问题·心智" class="slide insight">
+  <div class="insight__eyebrow">由此引出的基础问题</div>
+  <h2 class="insight__statement" style="font-size:84px;">机器，是否被知觉为<br>拥有「<em>心智</em>」？</h2>
+  <p class="insight__sub">这一问题，把讨论从「行为」层面，推进到了「心智归属」层面。<span class="cite">[Epley, Waytz & Cacioppo 2007, Psych. Review]</span></p>
+  <div class="keyline">在什么时候、出于什么<em>动机</em>、用什么<em>方式</em>，会去把 AI 当成一个<em>有心的存在</em>来对待？</div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 理论脉络" data-title="概念工具·两维" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">概念工具 · 心智知觉的两个维度</div><h2 class="title head__title">能动（Agency）与体验（Experience）。</h2></div>
+  <div class="fill" style="justify-content:center;gap:30px;">
+    <div class="cards cards--2">
+      <div class="card card--v"><div class="card__eyebrow">Agency · 能动「做」</div><div class="card__title">计划、行动与控制</div><div class="card__desc">即智力与行动的维度。在此维度上，AI 已被知觉为<em>接近甚至超越</em>人。</div></div>
+      <div class="card card--n"><div class="card__eyebrow">Experience · 体验「感」</div><div class="card__title">感受、情绪与意识</div><div class="card__desc">即主观体验的维度。在此维度上，AI 仍被知觉为<em>明显不及</em>人。</div></div>
+    </div>
+    <div class="callout">本报告借用这两个维度，作为组织既有研究的坐标。<span class="cite">[Gray, Gray & Wegner 2007, Science]</span></div>
+    <div class="keyline">我们对「机器没有体验」的那份<em>笃定</em>，到底是一个<em>观察</em>，还是一个<em>我们需要它成立</em>的结论？</div>
+  </div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 理论脉络" data-title="框架起点 · 一条清楚的边界" class="slide">
+  <div class="head" style="margin-bottom:8px;"><div class="eyebrow head__eyebrow">图 1 · 分析框架 · 起点</div><h2 class="title head__title" style="font-size:50px;">长期以来，「人」是一条<em>清楚的边界</em>。</h2></div>
+  <div class="fill" style="min-height:0;">
+    <div class="bd-stage">
+      <div class="bd-side bd-human">
+        <div class="bd-aura"></div>
+        <div class="bd-glyph">人</div>
+        <div class="bd-cap">被默认拥有完整的「心智」<span>能动 · 体验 · 意识</span></div>
+      </div>
+      <div class="bd-line"><i class="bd-line__diss" aria-hidden="true"></i><span class="bd-line-label">一条清楚的边界</span></div>
+      <div class="bd-side bd-machine">
+        <div class="bd-glyph bd-glyph--m">机器 · 工具</div>
+        <div class="bd-cap">被视为「无心」的它者<span>定价 · 排序 · 推荐 · 优化</span></div>
+      </div>
+    </div>
+    <div class="bd-prompt">今天，我想把这条边界，<em>重新打开来看一看 →</em></div>
+  </div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 理论脉络" data-title="框架(二)·六单元" class="slide">
+  <div class="head" style="margin-bottom:14px;"><div class="eyebrow head__eyebrow">图 1 · 分析框架（二）</div><h2 class="title head__title" style="font-size:54px;">三类对象 × 两个维度，构成六个分析单元。</h2></div>
+  <div class="fill" style="min-height:0;"><div class="figure"><div class="figure__frame"><svg class="concept-svg" viewBox="0 0 1400 740" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"><defs><filter id="cdGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="cdGlowSoft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><text x="540" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">能动 · AGENCY</text><text x="540" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「做」智力 / 行动</text><text x="1020" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">体验 · EXPERIENCE</text><text x="1020" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「感」情感 / 意识</text><text x="20" y="184" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">机器</text><text x="22" y="218" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">它是人吗?</text><text x="20" y="380" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">他人</text><text x="22" y="414" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">他还是人吗?</text><text x="20" y="576" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">自我</text><text x="22" y="610" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">我还是人吗?</text><g stroke="var(--rule-strong)" stroke-width="1.2"><line x1="300" y1="92" x2="1260" y2="92"/><line x1="300" y1="288" x2="1260" y2="288"/><line x1="300" y1="484" x2="1260" y2="484"/><line x1="300" y1="680" x2="1260" y2="680"/><line x1="300" y1="92" x2="300" y2="680"/><line x1="780" y1="92" x2="780" y2="680"/><line x1="1260" y1="92" x2="1260" y2="680"/></g><line x1="300" y1="92" x2="1260" y2="92" stroke="var(--accent)" stroke-width="2.5"/></svg></div><div class="figure__cap"><b>图</b>三类对象——机器、他人、自我；两个维度——能动与体验。既有研究的注意力，高度集中于其中一类对象。</div></div></div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 研究现状" data-title="二 · 研究现状" class="slide secdiv">
+  <div class="secdiv__num">Ⅱ</div><div class="secdiv__eyebrow">Part Ⅱ</div>
+  <h2 class="secdiv__title">研究<em>现状</em></h2>
+  <p class="secdiv__lead">将近五年的相关实证逐一归入这一框架后，可以看到一个相对集中的分布，以及若干尚不一致的结论。</p>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 研究现状" data-title="文献分布" class="slide">
+  <div class="head" style="margin-bottom:14px;"><div class="eyebrow head__eyebrow">图 2 · 文献在框架中的分布</div><h2 class="title head__title" style="font-size:54px;">现有研究高度集中于「机器 × 能动」。</h2></div>
+  <div class="fill" style="min-height:0;"><div class="figure"><div class="figure__frame"><svg class="concept-svg" viewBox="0 0 1400 740" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"><defs><filter id="cdGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="cdGlowSoft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><text x="540" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">能动 · AGENCY</text><text x="540" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「做」智力 / 行动</text><text x="1020" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">体验 · EXPERIENCE</text><text x="1020" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「感」情感 / 意识</text><text x="20" y="184" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">机器</text><text x="22" y="218" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">它是人吗?</text><text x="20" y="380" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">他人</text><text x="22" y="414" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">他还是人吗?</text><text x="20" y="576" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">自我</text><text x="22" y="610" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">我还是人吗?</text><g stroke="var(--rule-strong)" stroke-width="1.2"><line x1="300" y1="92" x2="1260" y2="92"/><line x1="300" y1="288" x2="1260" y2="288"/><line x1="300" y1="484" x2="1260" y2="484"/><line x1="300" y1="680" x2="1260" y2="680"/><line x1="300" y1="92" x2="300" y2="680"/><line x1="780" y1="92" x2="780" y2="680"/><line x1="1260" y1="92" x2="1260" y2="680"/></g><line x1="300" y1="92" x2="1260" y2="92" stroke="var(--accent)" stroke-width="2.5"/><rect x="305" y="97" width="470" height="186" rx="7" fill="var(--accent)" opacity="0.07"/><text x="754" y="154" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="72" fill="var(--accent)" opacity="1">22</text><g opacity="0.92"><rect class="pd" x="486.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-9.6deg" transform="rotate(-9.6 492.5 195.5)"/><rect class="pd" x="505.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-7.2deg" transform="rotate(-7.2 511.5 195.5)"/><rect class="pd" x="524.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-4.8deg" transform="rotate(-4.8 530.5 195.5)"/><rect class="pd" x="543.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-2.4deg" transform="rotate(-2.4 549.5 195.5)"/><rect class="pd" x="562.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:0.0deg" transform="rotate(0.0 568.5 195.5)"/><rect class="pd" x="581.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:2.4deg" transform="rotate(2.4 587.5 195.5)"/><rect class="pd" x="486.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:4.8deg" transform="rotate(4.8 492.5 214.5)"/><rect class="pd" x="505.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:7.2deg" transform="rotate(7.2 511.5 214.5)"/><rect class="pd" x="524.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:9.6deg" transform="rotate(9.6 530.5 214.5)"/><rect class="pd" x="543.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-9.6deg" transform="rotate(-9.6 549.5 214.5)"/><rect class="pd" x="562.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-7.2deg" transform="rotate(-7.2 568.5 214.5)"/><rect class="pd" x="581.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-4.8deg" transform="rotate(-4.8 587.5 214.5)"/><rect class="pd" x="486.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-2.4deg" transform="rotate(-2.4 492.5 233.5)"/><rect class="pd" x="505.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:0.0deg" transform="rotate(0.0 511.5 233.5)"/><rect class="pd" x="524.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:2.4deg" transform="rotate(2.4 530.5 233.5)"/><rect class="pd" x="543.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:4.8deg" transform="rotate(4.8 549.5 233.5)"/><rect class="pd" x="562.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:7.2deg" transform="rotate(7.2 568.5 233.5)"/><rect class="pd" x="581.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:9.6deg" transform="rotate(9.6 587.5 233.5)"/><rect class="pd" x="505.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-9.6deg" transform="rotate(-9.6 511.5 252.5)"/><rect class="pd" x="524.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-7.2deg" transform="rotate(-7.2 530.5 252.5)"/><rect class="pd" x="543.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-4.8deg" transform="rotate(-4.8 549.5 252.5)"/><rect class="pd" x="562.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-2.4deg" transform="rotate(-2.4 568.5 252.5)"/></g><text x="1234" y="154" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-2)" opacity="1">14</text><g opacity="0.92"><rect class="pd" x="966.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 972.5 205.0)"/><rect class="pd" x="985.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-7.2deg" transform="rotate(-7.2 991.5 205.0)"/><rect class="pd" x="1004.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-4.8deg" transform="rotate(-4.8 1010.5 205.0)"/><rect class="pd" x="1023.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-2.4deg" transform="rotate(-2.4 1029.5 205.0)"/><rect class="pd" x="1042.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:0.0deg" transform="rotate(0.0 1048.5 205.0)"/><rect class="pd" x="1061.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:2.4deg" transform="rotate(2.4 1067.5 205.0)"/><rect class="pd" x="966.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:4.8deg" transform="rotate(4.8 972.5 224.0)"/><rect class="pd" x="985.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:7.2deg" transform="rotate(7.2 991.5 224.0)"/><rect class="pd" x="1004.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:9.6deg" transform="rotate(9.6 1010.5 224.0)"/><rect class="pd" x="1023.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 1029.5 224.0)"/><rect class="pd" x="1042.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-7.2deg" transform="rotate(-7.2 1048.5 224.0)"/><rect class="pd" x="1061.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-4.8deg" transform="rotate(-4.8 1067.5 224.0)"/><rect class="pd" x="1004.0" y="235.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-2.4deg" transform="rotate(-2.4 1010.5 243.0)"/><rect class="pd" x="1023.0" y="235.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:0.0deg" transform="rotate(0.0 1029.5 243.0)"/></g><text x="754" y="350" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-2)" opacity="1">1</text><g opacity="0.92"><rect class="pd" x="533.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 540.0 420.0)"/></g><text x="1234" y="350" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-2)" opacity="1">3</text><g opacity="0.92"><rect class="pd" x="994.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 1001.0 420.0)"/><rect class="pd" x="1013.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-7.2deg" transform="rotate(-7.2 1020.0 420.0)"/><rect class="pd" x="1032.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-4.8deg" transform="rotate(-4.8 1039.0 420.0)"/></g><text x="754" y="546" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-2)" opacity="1">6</text><g opacity="0.92"><rect class="pd" x="486.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 492.5 616.0)"/><rect class="pd" x="505.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-7.2deg" transform="rotate(-7.2 511.5 616.0)"/><rect class="pd" x="524.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-4.8deg" transform="rotate(-4.8 530.5 616.0)"/><rect class="pd" x="543.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-2.4deg" transform="rotate(-2.4 549.5 616.0)"/><rect class="pd" x="562.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:0.0deg" transform="rotate(0.0 568.5 616.0)"/><rect class="pd" x="581.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:2.4deg" transform="rotate(2.4 587.5 616.0)"/></g><circle cx="1020" cy="592" r="34" fill="none" stroke="var(--ink-4)" stroke-width="1.6" stroke-dasharray="5 7"/><text x="1020" y="604" text-anchor="middle" font-family="Space Grotesk,monospace" font-weight="700" font-size="46" fill="var(--ink-4)">0</text></svg></div><div class="figure__cap"><b>图</b>机器×能动约 22 项、机器×体验约 14 项；「他人」一列研究很少；「自我 × 体验」近乎空白。</div><div class="figure__src">注：计数为本报告对近五年 8 本顶刊相关实证的归类，非穷尽统计。</div></div></div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 研究现状" data-title="机器×能动" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">机器 × 能动 · 既有积累较为充分</div><h2 class="title head__title">围绕「机器能否像人一样行动」，研究已相当丰富。</h2></div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--4">
+      <div class="card"><div class="card__eyebrow">判断采纳</div><div class="card__title">算法厌恶与算法欣赏</div><div class="card__desc">人何时回避、何时偏好算法判断。<span class="cite">[Dietvorst et al. 2015 · Logg et al. 2019]</span></div></div>
+      <div class="card"><div class="card__eyebrow">能力</div><div class="card__title">协商与谈判</div><div class="card__desc">拟人化 AI 谈判者的表现与被接受度。<span class="cite">[Chaudhuri & De Bruyn 2026, JMR]</span></div></div>
+      <div class="card"><div class="card__eyebrow">权力</div><div class="card__title">支配与领导</div><div class="card__desc">人可接受机器「会做」，却抗拒其「主导」。<span class="cite">[Shanks et al. 2025, JAMS]</span></div></div>
+      <div class="card"><div class="card__eyebrow">整体</div><div class="card__title">两项元分析</div><div class="card__desc">自动化与人工代理的总体差异。<span class="cite">[Gelbrich et al. 2026 · Li et al. 2025, JM]</span></div></div>
+    </div>
+    <div class="callout">既有研究在这一单元已较为充分；相对而言，它也最被反复探讨。</div>
+  </div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 研究现状" data-title="机器×体验" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">机器 × 体验 · 结论尚不一致</div><h2 class="title head__title">围绕「机器能否具有体验」，已有研究呈现三类不同结论。</h2></div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--3">
+      <div class="card card--g"><div class="card__eyebrow">其一 · 可补足</div><div class="card__title">人工共情能补足情感缺口</div><div class="card__desc">在部分情境下，机器可提供接近人际的情感价值。<span class="cite">[Liu-Thompkins et al. 2022, JAMS · De Freitas et al. 2025, JCR]</span></div></div>
+      <div class="card card--v"><div class="card__eyebrow">其二 · 有代价</div><div class="card__title">「无体验」会带来代价</div><div class="card__desc">AI 在场可降低奢侈品价值知觉；机器无体验亦可削弱消费者的预期内疚。<span class="cite">[Xu & Mehta 2022 · Kim et al. 2022, JAMS]</span></div></div>
+      <div class="card card--n"><div class="card__eyebrow">其三 · 反成优势</div><div class="card__title">「无体验」有时反而是优势</div><div class="card__desc">机器不作评判，可缓解尴尬情境下的购买顾虑。<span class="cite">[Holthöwer & van Doorn 2023, JAMS · Jin et al. 2025, JCP]</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 研究现状" data-title="一种整合" class="slide insight">
+  <div class="insight__eyebrow">一种可能的整合</div>
+  <h2 class="insight__statement" style="font-size:72px;">这些结论未必矛盾：「体验」这一维度的门槛<br>尚未被跨越，且其作用<em>高度依赖情境</em>。</h2>
+  <p class="insight__sub">这是我对该单元现有证据的一个初步判断，仍有待更多研究检验。</p>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 研究现状" data-title="双向过程" class="slide">
+  <div class="head" style="margin-bottom:14px;"><div class="eyebrow head__eyebrow">图 3 · 一个值得注意的方向</div><h2 class="title head__title" style="font-size:54px;">这一过程，可能是双向的。</h2></div>
+  <div class="fill" style="min-height:0;"><div class="figure"><div class="figure__frame"><svg class="concept-svg" viewBox="0 0 1400 740" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"><defs><filter id="cdGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="cdGlowSoft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><text x="540" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">能动 · AGENCY</text><text x="540" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「做」智力 / 行动</text><text x="1020" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">体验 · EXPERIENCE</text><text x="1020" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「感」情感 / 意识</text><text x="20" y="184" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">机器</text><text x="22" y="218" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">它是人吗?</text><text x="20" y="380" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">他人</text><text x="22" y="414" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">他还是人吗?</text><text x="20" y="576" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">自我</text><text x="22" y="610" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">我还是人吗?</text><g stroke="var(--rule-strong)" stroke-width="1.2"><line x1="300" y1="92" x2="1260" y2="92"/><line x1="300" y1="288" x2="1260" y2="288"/><line x1="300" y1="484" x2="1260" y2="484"/><line x1="300" y1="680" x2="1260" y2="680"/><line x1="300" y1="92" x2="300" y2="680"/><line x1="780" y1="92" x2="780" y2="680"/><line x1="1260" y1="92" x2="1260" y2="680"/></g><line x1="300" y1="92" x2="1260" y2="92" stroke="var(--accent)" stroke-width="2.5"/><rect x="305" y="97" width="470" height="186" rx="7" fill="var(--accent)" opacity="0.07"/><text x="754" y="154" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="72" fill="var(--accent)" opacity="1">22</text><g opacity="0.92"><rect class="pd" x="486.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-9.6deg" transform="rotate(-9.6 492.5 195.5)"/><rect class="pd" x="505.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-7.2deg" transform="rotate(-7.2 511.5 195.5)"/><rect class="pd" x="524.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-4.8deg" transform="rotate(-4.8 530.5 195.5)"/><rect class="pd" x="543.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-2.4deg" transform="rotate(-2.4 549.5 195.5)"/><rect class="pd" x="562.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:0.0deg" transform="rotate(0.0 568.5 195.5)"/><rect class="pd" x="581.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:2.4deg" transform="rotate(2.4 587.5 195.5)"/><rect class="pd" x="486.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:4.8deg" transform="rotate(4.8 492.5 214.5)"/><rect class="pd" x="505.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:7.2deg" transform="rotate(7.2 511.5 214.5)"/><rect class="pd" x="524.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:9.6deg" transform="rotate(9.6 530.5 214.5)"/><rect class="pd" x="543.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-9.6deg" transform="rotate(-9.6 549.5 214.5)"/><rect class="pd" x="562.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-7.2deg" transform="rotate(-7.2 568.5 214.5)"/><rect class="pd" x="581.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-4.8deg" transform="rotate(-4.8 587.5 214.5)"/><rect class="pd" x="486.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-2.4deg" transform="rotate(-2.4 492.5 233.5)"/><rect class="pd" x="505.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:0.0deg" transform="rotate(0.0 511.5 233.5)"/><rect class="pd" x="524.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:2.4deg" transform="rotate(2.4 530.5 233.5)"/><rect class="pd" x="543.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:4.8deg" transform="rotate(4.8 549.5 233.5)"/><rect class="pd" x="562.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:7.2deg" transform="rotate(7.2 568.5 233.5)"/><rect class="pd" x="581.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:9.6deg" transform="rotate(9.6 587.5 233.5)"/><rect class="pd" x="505.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-9.6deg" transform="rotate(-9.6 511.5 252.5)"/><rect class="pd" x="524.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-7.2deg" transform="rotate(-7.2 530.5 252.5)"/><rect class="pd" x="543.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-4.8deg" transform="rotate(-4.8 549.5 252.5)"/><rect class="pd" x="562.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--accent)" style="--rot:-2.4deg" transform="rotate(-2.4 568.5 252.5)"/></g><text x="1234" y="154" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-2)" opacity="1">14</text><g opacity="0.92"><rect class="pd" x="966.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 972.5 205.0)"/><rect class="pd" x="985.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-7.2deg" transform="rotate(-7.2 991.5 205.0)"/><rect class="pd" x="1004.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-4.8deg" transform="rotate(-4.8 1010.5 205.0)"/><rect class="pd" x="1023.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-2.4deg" transform="rotate(-2.4 1029.5 205.0)"/><rect class="pd" x="1042.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:0.0deg" transform="rotate(0.0 1048.5 205.0)"/><rect class="pd" x="1061.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:2.4deg" transform="rotate(2.4 1067.5 205.0)"/><rect class="pd" x="966.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:4.8deg" transform="rotate(4.8 972.5 224.0)"/><rect class="pd" x="985.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:7.2deg" transform="rotate(7.2 991.5 224.0)"/><rect class="pd" x="1004.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:9.6deg" transform="rotate(9.6 1010.5 224.0)"/><rect class="pd" x="1023.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 1029.5 224.0)"/><rect class="pd" x="1042.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-7.2deg" transform="rotate(-7.2 1048.5 224.0)"/><rect class="pd" x="1061.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-4.8deg" transform="rotate(-4.8 1067.5 224.0)"/><rect class="pd" x="1004.0" y="235.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-2.4deg" transform="rotate(-2.4 1010.5 243.0)"/><rect class="pd" x="1023.0" y="235.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:0.0deg" transform="rotate(0.0 1029.5 243.0)"/></g><text x="754" y="350" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-2)" opacity="1">1</text><g opacity="0.92"><rect class="pd" x="533.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 540.0 420.0)"/></g><text x="1234" y="350" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-2)" opacity="1">3</text><g opacity="0.92"><rect class="pd" x="994.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 1001.0 420.0)"/><rect class="pd" x="1013.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-7.2deg" transform="rotate(-7.2 1020.0 420.0)"/><rect class="pd" x="1032.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-4.8deg" transform="rotate(-4.8 1039.0 420.0)"/></g><text x="754" y="546" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-2)" opacity="1">6</text><g opacity="0.92"><rect class="pd" x="486.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-9.6deg" transform="rotate(-9.6 492.5 616.0)"/><rect class="pd" x="505.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-7.2deg" transform="rotate(-7.2 511.5 616.0)"/><rect class="pd" x="524.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-4.8deg" transform="rotate(-4.8 530.5 616.0)"/><rect class="pd" x="543.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:-2.4deg" transform="rotate(-2.4 549.5 616.0)"/><rect class="pd" x="562.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:0.0deg" transform="rotate(0.0 568.5 616.0)"/><rect class="pd" x="581.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-3)" style="--rot:2.4deg" transform="rotate(2.4 587.5 616.0)"/></g><circle cx="1020" cy="592" r="34" fill="none" stroke="var(--ink-4)" stroke-width="1.6" stroke-dasharray="5 7"/><text x="1020" y="604" text-anchor="middle" font-family="Space Grotesk,monospace" font-weight="700" font-size="46" fill="var(--ink-4)">0</text><g><line x1="178" y1="262" x2="178" y2="118" stroke="var(--accent)" stroke-width="4"/><polygon points="178,102 167,128 189,128" fill="var(--accent)"/><text x="178" y="294" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="23" font-weight="600" fill="var(--accent)">拟人化 ↑</text><text x="178" y="320" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="14" fill="var(--ink-4)" letter-spacing="1">机器被当人</text></g><g><path d="M 1322 350 L 1322 610" stroke="var(--navy)" stroke-width="4" fill="none"/><polygon points="1322,628 1311,600 1333,600" fill="var(--navy)"/><path d="M 1322 626 q 44 -8 44 -78" stroke="var(--accent)" stroke-width="3" fill="none" stroke-dasharray="2 6" opacity="0.9"/><polygon points="1366,540 1356,566 1376,566" fill="var(--accent)" opacity="0.9"/><text x="1328" y="332" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="23" font-weight="600" fill="var(--navy)">去人性化 ↓</text><text x="1328" y="358" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="14" fill="var(--ink-4)" letter-spacing="1">人被当机器</text><text x="1352" y="678" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="15" fill="var(--accent)" opacity="0.9">↺ 当场回头</text></g></svg></div><div class="figure__cap"><b>图</b>机器被赋予人性（拟人化）的同时，人也可能在某些情境下被以机器看待（去人格化）。</div><div class="figure__src">去人格化方向的相关证据见 [Sun et al. 2023, JMR]。</div></div></div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 研究现状" data-title="被忽视的部分" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">相对而言被忽视的部分</div><h2 class="title head__title">「他人」与「自我」两类对象，受到的关注明显不足。</h2></div>
+  <div class="fill" style="justify-content:center;">
+    <ul class="bullets">
+      <li><b>他人 × 能动 / 体验</b>：AI 如何改变我们对「他人」的知觉与对待，相关实证很少（经验空白）。</li>
+      <li><b>自我 × 体验</b>：当 AI 参与决策时，个体的体验、意义与主体感如何变化，几乎尚无直接研究（空白）。</li>
+      <li>这并非偶然——它与「研究多从机器侧切入」的路径有关。</li>
+    </ul>
+  </div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 研究现状" data-title="小结" class="slide insight">
+  <div class="insight__eyebrow">本节小结</div>
+  <h2 class="insight__statement" style="font-size:80px;">也正因如此，这两类对象<br>留下了较大的、尚未系统探索的<em>空间</em>。</h2>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 未来方向" data-title="三 · 未来方向" class="slide secdiv">
+  <div class="secdiv__num">Ⅲ</div><div class="secdiv__eyebrow">Part Ⅲ</div>
+  <h2 class="secdiv__title">未来<em>方向</em></h2>
+  <p class="secdiv__lead">以下是我个人在这一框架下觉得值得探索的方向，以及几个我自己也很想去做的具体问题——均为初步设想，恳请指正。</p>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 未来方向" data-title="尚待探索区域" class="slide">
+  <div class="head" style="margin-bottom:14px;"><div class="eyebrow head__eyebrow">图 4 · 尚待探索的区域</div><h2 class="title head__title" style="font-size:54px;">若沿这一框架来看，有几类问题或许值得继续追问。</h2></div>
+  <div class="fill" style="min-height:0;"><div class="figure"><div class="figure__frame"><svg class="concept-svg" viewBox="0 0 1400 740" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"><defs><filter id="cdGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="cdGlowSoft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="paperGrain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.78" numOctaves="2" stitchTiles="stitch" seed="7"/><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.55 0"/></filter><filter id="handDrawn"><feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves="2" seed="4" result="w"/><feDisplacementMap in="SourceGraphic" in2="w" scale="7" xChannelSelector="R" yChannelSelector="G"/></filter><filter id="paperShadow" x="-12%" y="-12%" width="124%" height="130%"><feDropShadow dx="0" dy="9" stdDeviation="13" flood-color="#000" flood-opacity="0.42"/></filter></defs><text x="540" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">能动 · AGENCY</text><text x="540" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「做」智力 / 行动</text><text x="1020" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">体验 · EXPERIENCE</text><text x="1020" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「感」情感 / 意识</text><text x="20" y="184" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">机器</text><text x="22" y="218" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">它是人吗?</text><text x="20" y="380" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">他人</text><text x="22" y="414" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">他还是人吗?</text><text x="20" y="576" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">自我</text><text x="22" y="610" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">我还是人吗?</text><g stroke="var(--rule-strong)" stroke-width="1.2"><line x1="300" y1="92" x2="1260" y2="92"/><line x1="300" y1="288" x2="1260" y2="288"/><line x1="300" y1="484" x2="1260" y2="484"/><line x1="300" y1="680" x2="1260" y2="680"/><line x1="300" y1="92" x2="300" y2="680"/><line x1="780" y1="92" x2="780" y2="680"/><line x1="1260" y1="92" x2="1260" y2="680"/></g><line x1="300" y1="92" x2="1260" y2="92" stroke="var(--accent)" stroke-width="2.5"/><text class="cd-num" x="754" y="154" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="72" fill="var(--ink-4)" opacity="0.45">22</text><g opacity="0.4"><rect class="pd" x="486.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 492.5 195.5)"/><rect class="pd" x="505.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 511.5 195.5)"/><rect class="pd" x="524.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 530.5 195.5)"/><rect class="pd" x="543.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 549.5 195.5)"/><rect class="pd" x="562.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 568.5 195.5)"/><rect class="pd" x="581.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:2.4deg" transform="rotate(2.4 587.5 195.5)"/><rect class="pd" x="486.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:4.8deg" transform="rotate(4.8 492.5 214.5)"/><rect class="pd" x="505.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:7.2deg" transform="rotate(7.2 511.5 214.5)"/><rect class="pd" x="524.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:9.6deg" transform="rotate(9.6 530.5 214.5)"/><rect class="pd" x="543.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 549.5 214.5)"/><rect class="pd" x="562.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 568.5 214.5)"/><rect class="pd" x="581.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 587.5 214.5)"/><rect class="pd" x="486.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 492.5 233.5)"/><rect class="pd" x="505.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 511.5 233.5)"/><rect class="pd" x="524.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:2.4deg" transform="rotate(2.4 530.5 233.5)"/><rect class="pd" x="543.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:4.8deg" transform="rotate(4.8 549.5 233.5)"/><rect class="pd" x="562.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:7.2deg" transform="rotate(7.2 568.5 233.5)"/><rect class="pd" x="581.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:9.6deg" transform="rotate(9.6 587.5 233.5)"/><rect class="pd" x="505.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 511.5 252.5)"/><rect class="pd" x="524.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 530.5 252.5)"/><rect class="pd" x="543.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 549.5 252.5)"/><rect class="pd" x="562.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 568.5 252.5)"/></g><text class="cd-num" x="1234" y="154" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-4)" opacity="0.45">14</text><g opacity="0.4"><rect class="pd" x="966.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 972.5 205.0)"/><rect class="pd" x="985.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 991.5 205.0)"/><rect class="pd" x="1004.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 1010.5 205.0)"/><rect class="pd" x="1023.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 1029.5 205.0)"/><rect class="pd" x="1042.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 1048.5 205.0)"/><rect class="pd" x="1061.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:2.4deg" transform="rotate(2.4 1067.5 205.0)"/><rect class="pd" x="966.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:4.8deg" transform="rotate(4.8 972.5 224.0)"/><rect class="pd" x="985.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:7.2deg" transform="rotate(7.2 991.5 224.0)"/><rect class="pd" x="1004.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:9.6deg" transform="rotate(9.6 1010.5 224.0)"/><rect class="pd" x="1023.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 1029.5 224.0)"/><rect class="pd" x="1042.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 1048.5 224.0)"/><rect class="pd" x="1061.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 1067.5 224.0)"/><rect class="pd" x="1004.0" y="235.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 1010.5 243.0)"/><rect class="pd" x="1023.0" y="235.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 1029.5 243.0)"/></g><text class="cd-num" x="754" y="350" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-4)" opacity="0.45">1</text><g opacity="0.4"><rect class="pd" x="533.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 540.0 420.0)"/></g><text class="cd-num" x="1234" y="350" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-4)" opacity="0.45">3</text><g opacity="0.4"><rect class="pd" x="994.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 1001.0 420.0)"/><rect class="pd" x="1013.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 1020.0 420.0)"/><rect class="pd" x="1032.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 1039.0 420.0)"/></g><text class="cd-num" x="754" y="546" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-4)" opacity="0.45">6</text><g opacity="0.4"><rect class="pd" x="486.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 492.5 616.0)"/><rect class="pd" x="505.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 511.5 616.0)"/><rect class="pd" x="524.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 530.5 616.0)"/><rect class="pd" x="543.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 549.5 616.0)"/><rect class="pd" x="562.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 568.5 616.0)"/><rect class="pd" x="581.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:2.4deg" transform="rotate(2.4 587.5 616.0)"/></g><circle class="cd-fade" cx="1020" cy="592" r="34" fill="none" stroke="var(--ink-4)" stroke-width="1.6" stroke-dasharray="5 7"/><text class="cd-num" x="1020" y="604" text-anchor="middle" font-family="Space Grotesk,monospace" font-weight="700" font-size="46" fill="var(--ink-4)">0</text><g class="cd-fade"><rect x="786" y="490" width="468" height="184" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2.4" rx="4" filter="url(#cdGlowSoft)"/><text x="1238" y="662" text-anchor="end" font-family="Noto Sans SC,sans-serif" font-size="19" font-weight="600" fill="var(--accent)">↳ 经验空白</text><rect x="306" y="294" width="468" height="184" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2.4" rx="4" filter="url(#cdGlowSoft)"/><text x="758" y="466" text-anchor="end" font-family="Noto Sans SC,sans-serif" font-size="19" font-weight="600" fill="var(--accent)">↳ 经验空白</text><rect x="786" y="294" width="468" height="184" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5" rx="4" filter="url(#cdGlowSoft)"/><text x="1238" y="466" text-anchor="end" font-family="Noto Sans SC,sans-serif" font-size="19" font-weight="600" fill="var(--accent)">↳ 薄</text></g><rect class="cd-wash cd-wash-o" x="300" y="288" width="960" height="196" fill="var(--accent)" opacity="0"/><rect class="cd-wash cd-wash-s" x="300" y="484" width="960" height="196" fill="var(--accent)" opacity="0"/><g class="cd-couple" stroke="var(--accent)" stroke-width="2.4" fill="none" stroke-dasharray="3 6" opacity="0.9"><path d="M 256 230 C 222 300, 222 326, 256 360"/><path d="M 256 240 C 184 386, 184 552, 256 556"/></g><text x="170" y="386" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="18" fill="var(--accent)" transform="rotate(-90 170 386)">界面耦合 · 金矿</text><text class="cd-time-label" x="1260" y="718" text-anchor="end" font-family="Noto Sans SC,sans-serif" font-size="18" fill="var(--ink-3)">＋ 时间纵深：初次 ⟶ 长期</text><g class="cd-sheet cd-s1" style="--tx:24px;--ty:20px;--rot:1.6deg"><rect x="294" y="86" width="972" height="600" rx="18" fill="#D8B26A"/><rect x="294" y="86" width="972" height="600" rx="18" fill="#000" opacity="0.06"/></g><g class="cd-sheet cd-s2" style="--tx:16px;--ty:13px;--rot:-1.1deg"><rect x="294" y="86" width="972" height="600" rx="18" fill="#C98A95"/><rect x="294" y="86" width="972" height="600" rx="18" fill="#000" opacity="0.06"/></g><g class="cd-sheet cd-s3" style="--tx:8px;--ty:6px;--rot:0.9deg"><rect x="294" y="86" width="972" height="600" rx="18" fill="#7FA6C7"/><rect x="294" y="86" width="972" height="600" rx="18" fill="#000" opacity="0.06"/></g><g class="cd-sheet cd-s4" style="--tx:0px;--ty:0px;--rot:-0.7deg"><rect x="294" y="86" width="972" height="600" rx="18" fill="#AECB86"/><rect x="294" y="86" width="972" height="600" rx="18" fill="#000" filter="url(#paperGrain)" opacity="0.5"/><g filter="url(#handDrawn)" stroke="#2B2A20" fill="none" stroke-linecap="round" opacity="0.6"><rect x="320" y="112" width="920" height="548" rx="10" stroke-width="2.6"/><line x1="780" y1="120" x2="780" y2="652" stroke-width="2.3"/><line x1="328" y1="288" x2="1232" y2="288" stroke-width="2.3"/><line x1="328" y1="484" x2="1232" y2="484" stroke-width="2.3"/></g><text x="540" y="214" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="80" fill="#2B2A20">22</text><text x="1020" y="214" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">14</text><text x="540" y="410" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">1</text><text x="1020" y="410" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">3</text><text x="540" y="606" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">6</text><text x="1020" y="606" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">0</text><text x="540" y="452" text-anchor="middle" style="font-family:'Hannotate SC','Xingkai SC','Kaiti SC','STKaiti',cursive;" font-size="27" fill="#46422F">经验空白</text><text x="1020" y="452" text-anchor="middle" style="font-family:'Hannotate SC','Xingkai SC','Kaiti SC','STKaiti',cursive;" font-size="27" fill="#46422F">薄</text><text x="1020" y="648" text-anchor="middle" style="font-family:'Hannotate SC','Xingkai SC','Kaiti SC','STKaiti',cursive;" font-size="27" fill="#46422F">经验空白</text></g></svg></div><div class="figure__cap"><b>图</b>空白或单薄的单元、对象之间的相互影响，以及一个贯穿性的时间维度。</div></div></div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 未来方向" data-title="方向一·两类对象" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">方向一 · 两类被忽视的对象</div><h2 class="title head__title">「他人」与「自我 × 体验」，是较为明显的空白。</h2></div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--2">
+      <div class="card card--v"><div class="card__eyebrow">他人</div><div class="card__title">AI 如何改变我们对「他人」的知觉与对待</div><div class="card__desc">当 AI 频繁居间，我们看待真人的方式是否被改写。这一界面目前几近空白。<span class="cite">[Sun et al. 2023, JMR]</span></div></div>
+      <div class="card card--n"><div class="card__eyebrow">自我 × 体验</div><div class="card__title">AI 参与决策时，「我」还剩下什么</div><div class="card__desc">个体的情感、意义与主体感如何变化——这一单元目前几乎没有直接研究。</div></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 未来方向" data-title="方向二·对象间耦合" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">方向二 · 对象之间的相互影响</div><h2 class="title head__title">既有研究多在单一对象内展开；<br>而在共生情境下，对象之间可能<em>相互影响</em>。</h2></div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--2">
+      <div class="card card--v"><div class="card__eyebrow">机器 → 他人</div><div class="card__title">与 AI 的互动，是否外溢到人际？</div><div class="card__desc">长期与 AI 交互后，我们对真人的期待与对待是否随之改变。<span class="cite">[Tsekouras et al. 2024 · Uysal et al. 2022, JAMS]</span></div></div>
+      <div class="card card--n"><div class="card__eyebrow">机器 → 自我</div><div class="card__title">被 AI 代理后，我们如何看待自己？</div><div class="card__desc">是替代还是补充，对自我认知与能力感有何长期影响。<span class="cite">[De Freitas et al. 2025 · Cillo & Rubera 2025, JAMS]</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 未来方向" data-title="贯穿维度·时间" class="slide insight">
+  <div class="insight__eyebrow">方向三 · 一个贯穿性的维度 · 时间</div>
+  <h2 class="insight__statement" style="font-size:58px;">几乎每个问题，都还可以再追加一问：<br><em>初次接触</em>与<em>长期使用</em>，结论是否一致？</h2>
+  <svg class="traj-svg" viewBox="0 0 1400 300" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><line class="tj-base" x1="170" y1="232" x2="1230" y2="232" stroke="var(--rule-strong)" stroke-width="1.5"/><polygon points="1248,232 1226,223 1226,241" fill="var(--rule-strong)"/><text x="150" y="262" text-anchor="start" font-family="IBM Plex Mono,monospace" font-size="19" fill="var(--ink-4)">初次接触</text><text x="1248" y="262" text-anchor="end" font-family="IBM Plex Mono,monospace" font-size="19" fill="var(--ink-4)">长期使用</text><line class="tj-bar tj-b0" x1="280" y1="86" x2="280" y2="210"/><line class="tj-bar tj-b1" x1="600" y1="86" x2="600" y2="210"/><line class="tj-bar tj-b2" x1="920" y1="86" x2="920" y2="210"/><line class="tj-bar tj-b3" x1="1180" y1="86" x2="1180" y2="210"/><g fill="var(--ink-3)" font-family="Noto Sans SC,sans-serif" font-size="24" font-weight="600" text-anchor="middle"><text x="280" y="278">陌生人</text><text x="600" y="278">熟人</text><text x="920" y="278">朋友</text><text x="1180" y="278">伙伴</text></g><g fill="var(--rule-strong)"><circle cx="280" cy="232" r="5"/><circle cx="600" cy="232" r="5"/><circle cx="920" cy="232" r="5"/><circle cx="1180" cy="232" r="5"/></g><circle class="tj-token" cx="280" cy="232" r="11"/></svg>
+  <p class="insight__sub"><span class="cite">[Noble & Mende 2023 · Cillo & Rubera 2025, JAMS]</span></p>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 未来方向" data-title="大问题 1-3" class="slide">
+  <div class="head" style="margin-bottom:18px;"><div class="eyebrow head__eyebrow">我个人最关心的几个问题（1 / 2）</div><h2 class="title head__title" style="font-size:50px;">由这六个单元，可以追问的几个大问题</h2><p class="head__sub">这一框架下，我个人最想追问的，是下面这几个大问题——目前都还没有答案，权作抛砖引玉，恳请指正。</p></div>
+  <div class="fill" style="min-height:0;justify-content:center;"><div class="cards cards--3" style="gap:28px;align-content:center;"><div class="card" style="border-top:4px solid var(--accent);background:var(--paper-soft);padding:40px 36px;gap:20px;justify-content:flex-start;"><div class="card__eyebrow" style="font-size:21px;">自我 × 体验</div><div class="card__title" style="font-size:35px;line-height:1.34;">当越来越多的选择交由 AI，「拥有一段属于自己的体验、并从中获得意义」本身，会被如何改变？</div></div><div class="card" style="border-top:4px solid var(--accent);background:var(--paper-soft);padding:40px 36px;gap:20px;justify-content:flex-start;"><div class="card__eyebrow" style="font-size:21px;">自我 × 能动 × 时间</div><div class="card__title" style="font-size:35px;line-height:1.34;">长期把判断与决策交给 AI，会不会逐渐重塑、乃至削弱我们作为「决策主体」的能力与自主？</div></div><div class="card" style="border-top:4px solid var(--accent);background:var(--paper-soft);padding:40px 36px;gap:20px;justify-content:flex-start;"><div class="card__eyebrow" style="font-size:21px;">他人 × 体验</div><div class="card__title" style="font-size:35px;line-height:1.34;">当 AI 频繁地代为表达与回应，「被一个真实的人理解与关心」，还意味着什么？</div></div></div></div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 未来方向" data-title="大问题 4-6" class="slide">
+  <div class="head" style="margin-bottom:18px;"><div class="eyebrow head__eyebrow">我个人最关心的几个问题（2 / 2）</div><h2 class="title head__title" style="font-size:50px;">由这六个单元，可以追问的几个大问题</h2></div>
+  <div class="fill" style="min-height:0;justify-content:center;"><div class="cards cards--3" style="gap:28px;align-content:center;"><div class="card" style="border-top:4px solid var(--accent);background:var(--paper-soft);padding:40px 36px;gap:20px;justify-content:flex-start;"><div class="card__eyebrow" style="font-size:21px;">他人 × 能动</div><div class="card__title" style="font-size:35px;line-height:1.34;">在习惯了 AI 的「无所不能」之后，我们会如何重新评价、对待身边真实的人？</div></div><div class="card" style="border-top:4px solid var(--accent);background:var(--paper-soft);padding:40px 36px;gap:20px;justify-content:flex-start;"><div class="card__eyebrow" style="font-size:21px;">机器 → 自我 · 界面耦合</div><div class="card__title" style="font-size:35px;line-height:1.34;">长期与「类人却无心」的 AI 共处，会怎样改变我们对「自己是谁」的理解？</div></div><div class="card" style="border-top:4px solid var(--accent);background:var(--paper-soft);padding:40px 36px;gap:20px;justify-content:flex-start;"><div class="card__eyebrow" style="font-size:21px;">机器 → 他人 · 界面耦合</div><div class="card__title" style="font-size:35px;line-height:1.34;">AI 重设的互动规范——即时、顺从、无摩擦——会不会外溢，重塑我们对人际关系的期待？</div></div></div></div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 未来方向" data-title="框架总览" class="slide">
+  <div class="head" style="margin-bottom:14px;"><div class="eyebrow head__eyebrow">图 5 · 框架总览</div><h2 class="title head__title" style="font-size:54px;">空白单元、对象之间的耦合，以及时间维度。</h2></div>
+  <div class="fill" style="min-height:0;"><div class="figure"><div class="figure__frame"><svg class="concept-svg" viewBox="0 0 1400 740" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"><defs><filter id="cdGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="cdGlowSoft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="paperGrain" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.78" numOctaves="2" stitchTiles="stitch" seed="7"/><feColorMatrix type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.55 0"/></filter><filter id="handDrawn"><feTurbulence type="fractalNoise" baseFrequency="0.014" numOctaves="2" seed="4" result="w"/><feDisplacementMap in="SourceGraphic" in2="w" scale="7" xChannelSelector="R" yChannelSelector="G"/></filter><filter id="paperShadow" x="-12%" y="-12%" width="124%" height="130%"><feDropShadow dx="0" dy="9" stdDeviation="13" flood-color="#000" flood-opacity="0.42"/></filter></defs><text x="540" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">能动 · AGENCY</text><text x="540" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「做」智力 / 行动</text><text x="1020" y="46" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-size="24" font-weight="600" fill="var(--accent)" letter-spacing="3">体验 · EXPERIENCE</text><text x="1020" y="76" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="20" fill="var(--ink-3)">「感」情感 / 意识</text><text x="20" y="184" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">机器</text><text x="22" y="218" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">它是人吗?</text><text x="20" y="380" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">他人</text><text x="22" y="414" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">他还是人吗?</text><text x="20" y="576" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="40" fill="var(--ink)">自我</text><text x="22" y="610" font-family="Noto Sans SC,sans-serif" font-size="21" fill="var(--ink-4)">我还是人吗?</text><g stroke="var(--rule-strong)" stroke-width="1.2"><line x1="300" y1="92" x2="1260" y2="92"/><line x1="300" y1="288" x2="1260" y2="288"/><line x1="300" y1="484" x2="1260" y2="484"/><line x1="300" y1="680" x2="1260" y2="680"/><line x1="300" y1="92" x2="300" y2="680"/><line x1="780" y1="92" x2="780" y2="680"/><line x1="1260" y1="92" x2="1260" y2="680"/></g><line x1="300" y1="92" x2="1260" y2="92" stroke="var(--accent)" stroke-width="2.5"/><text class="cd-num" x="754" y="154" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="72" fill="var(--ink-4)" opacity="0.45">22</text><g opacity="0.4"><rect class="pd" x="486.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 492.5 195.5)"/><rect class="pd" x="505.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 511.5 195.5)"/><rect class="pd" x="524.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 530.5 195.5)"/><rect class="pd" x="543.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 549.5 195.5)"/><rect class="pd" x="562.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 568.5 195.5)"/><rect class="pd" x="581.0" y="187.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:2.4deg" transform="rotate(2.4 587.5 195.5)"/><rect class="pd" x="486.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:4.8deg" transform="rotate(4.8 492.5 214.5)"/><rect class="pd" x="505.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:7.2deg" transform="rotate(7.2 511.5 214.5)"/><rect class="pd" x="524.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:9.6deg" transform="rotate(9.6 530.5 214.5)"/><rect class="pd" x="543.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 549.5 214.5)"/><rect class="pd" x="562.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 568.5 214.5)"/><rect class="pd" x="581.0" y="206.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 587.5 214.5)"/><rect class="pd" x="486.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 492.5 233.5)"/><rect class="pd" x="505.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 511.5 233.5)"/><rect class="pd" x="524.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:2.4deg" transform="rotate(2.4 530.5 233.5)"/><rect class="pd" x="543.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:4.8deg" transform="rotate(4.8 549.5 233.5)"/><rect class="pd" x="562.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:7.2deg" transform="rotate(7.2 568.5 233.5)"/><rect class="pd" x="581.0" y="225.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:9.6deg" transform="rotate(9.6 587.5 233.5)"/><rect class="pd" x="505.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 511.5 252.5)"/><rect class="pd" x="524.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 530.5 252.5)"/><rect class="pd" x="543.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 549.5 252.5)"/><rect class="pd" x="562.0" y="244.5" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 568.5 252.5)"/></g><text class="cd-num" x="1234" y="154" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-4)" opacity="0.45">14</text><g opacity="0.4"><rect class="pd" x="966.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 972.5 205.0)"/><rect class="pd" x="985.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 991.5 205.0)"/><rect class="pd" x="1004.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 1010.5 205.0)"/><rect class="pd" x="1023.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 1029.5 205.0)"/><rect class="pd" x="1042.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 1048.5 205.0)"/><rect class="pd" x="1061.0" y="197.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:2.4deg" transform="rotate(2.4 1067.5 205.0)"/><rect class="pd" x="966.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:4.8deg" transform="rotate(4.8 972.5 224.0)"/><rect class="pd" x="985.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:7.2deg" transform="rotate(7.2 991.5 224.0)"/><rect class="pd" x="1004.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:9.6deg" transform="rotate(9.6 1010.5 224.0)"/><rect class="pd" x="1023.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 1029.5 224.0)"/><rect class="pd" x="1042.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 1048.5 224.0)"/><rect class="pd" x="1061.0" y="216.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 1067.5 224.0)"/><rect class="pd" x="1004.0" y="235.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 1010.5 243.0)"/><rect class="pd" x="1023.0" y="235.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 1029.5 243.0)"/></g><text class="cd-num" x="754" y="350" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-4)" opacity="0.45">1</text><g opacity="0.4"><rect class="pd" x="533.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 540.0 420.0)"/></g><text class="cd-num" x="1234" y="350" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-4)" opacity="0.45">3</text><g opacity="0.4"><rect class="pd" x="994.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 1001.0 420.0)"/><rect class="pd" x="1013.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 1020.0 420.0)"/><rect class="pd" x="1032.5" y="412.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 1039.0 420.0)"/></g><text class="cd-num" x="754" y="546" text-anchor="end" font-family="Space Grotesk,monospace" font-weight="700" font-size="54" fill="var(--ink-4)" opacity="0.45">6</text><g opacity="0.4"><rect class="pd" x="486.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-9.6deg" transform="rotate(-9.6 492.5 616.0)"/><rect class="pd" x="505.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-7.2deg" transform="rotate(-7.2 511.5 616.0)"/><rect class="pd" x="524.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-4.8deg" transform="rotate(-4.8 530.5 616.0)"/><rect class="pd" x="543.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:-2.4deg" transform="rotate(-2.4 549.5 616.0)"/><rect class="pd" x="562.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:0.0deg" transform="rotate(0.0 568.5 616.0)"/><rect class="pd" x="581.0" y="608.0" width="13" height="16" rx="2.4" fill="var(--ink-4)" style="--rot:2.4deg" transform="rotate(2.4 587.5 616.0)"/></g><circle class="cd-fade" cx="1020" cy="592" r="34" fill="none" stroke="var(--ink-4)" stroke-width="1.6" stroke-dasharray="5 7"/><text class="cd-num" x="1020" y="604" text-anchor="middle" font-family="Space Grotesk,monospace" font-weight="700" font-size="46" fill="var(--ink-4)">0</text><g class="cd-fade"><rect x="786" y="490" width="468" height="184" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2.4" rx="4" filter="url(#cdGlowSoft)"/><text x="1238" y="662" text-anchor="end" font-family="Noto Sans SC,sans-serif" font-size="19" font-weight="600" fill="var(--accent)">↳ 经验空白</text><rect x="306" y="294" width="468" height="184" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2.4" rx="4" filter="url(#cdGlowSoft)"/><text x="758" y="466" text-anchor="end" font-family="Noto Sans SC,sans-serif" font-size="19" font-weight="600" fill="var(--accent)">↳ 经验空白</text><rect x="786" y="294" width="468" height="184" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5" rx="4" filter="url(#cdGlowSoft)"/><text x="1238" y="466" text-anchor="end" font-family="Noto Sans SC,sans-serif" font-size="19" font-weight="600" fill="var(--accent)">↳ 薄</text></g><rect class="cd-wash cd-wash-o" x="300" y="288" width="960" height="196" fill="var(--accent)" opacity="0"/><rect class="cd-wash cd-wash-s" x="300" y="484" width="960" height="196" fill="var(--accent)" opacity="0"/><g class="cd-couple" stroke="var(--accent)" stroke-width="2.4" fill="none" stroke-dasharray="3 6" opacity="0.9"><path d="M 256 230 C 222 300, 222 326, 256 360"/><path d="M 256 240 C 184 386, 184 552, 256 556"/></g><text x="170" y="386" text-anchor="middle" font-family="Noto Sans SC,sans-serif" font-size="18" fill="var(--accent)" transform="rotate(-90 170 386)">界面耦合 · 金矿</text><text class="cd-time-label" x="1260" y="718" text-anchor="end" font-family="Noto Sans SC,sans-serif" font-size="18" fill="var(--ink-3)">＋ 时间纵深：初次 ⟶ 长期</text><g class="cd-sheet cd-s1" style="--tx:24px;--ty:20px;--rot:1.6deg"><rect x="294" y="86" width="972" height="600" rx="18" fill="#D8B26A"/><rect x="294" y="86" width="972" height="600" rx="18" fill="#000" opacity="0.06"/></g><g class="cd-sheet cd-s2" style="--tx:16px;--ty:13px;--rot:-1.1deg"><rect x="294" y="86" width="972" height="600" rx="18" fill="#C98A95"/><rect x="294" y="86" width="972" height="600" rx="18" fill="#000" opacity="0.06"/></g><g class="cd-sheet cd-s3" style="--tx:8px;--ty:6px;--rot:0.9deg"><rect x="294" y="86" width="972" height="600" rx="18" fill="#7FA6C7"/><rect x="294" y="86" width="972" height="600" rx="18" fill="#000" opacity="0.06"/></g><g class="cd-sheet cd-s4" style="--tx:0px;--ty:0px;--rot:-0.7deg"><rect x="294" y="86" width="972" height="600" rx="18" fill="#AECB86"/><rect x="294" y="86" width="972" height="600" rx="18" fill="#000" filter="url(#paperGrain)" opacity="0.5"/><g filter="url(#handDrawn)" stroke="#2B2A20" fill="none" stroke-linecap="round" opacity="0.6"><rect x="320" y="112" width="920" height="548" rx="10" stroke-width="2.6"/><line x1="780" y1="120" x2="780" y2="652" stroke-width="2.3"/><line x1="328" y1="288" x2="1232" y2="288" stroke-width="2.3"/><line x1="328" y1="484" x2="1232" y2="484" stroke-width="2.3"/></g><text x="540" y="214" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="80" fill="#2B2A20">22</text><text x="1020" y="214" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">14</text><text x="540" y="410" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">1</text><text x="1020" y="410" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">3</text><text x="540" y="606" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">6</text><text x="1020" y="606" text-anchor="middle" style="font-family:'Marker Felt','Bradley Hand','Chalkboard SE',cursive;" font-size="66" fill="#2B2A20">0</text><text x="540" y="452" text-anchor="middle" style="font-family:'Hannotate SC','Xingkai SC','Kaiti SC','STKaiti',cursive;" font-size="27" fill="#46422F">经验空白</text><text x="1020" y="452" text-anchor="middle" style="font-family:'Hannotate SC','Xingkai SC','Kaiti SC','STKaiti',cursive;" font-size="27" fill="#46422F">薄</text><text x="1020" y="648" text-anchor="middle" style="font-family:'Hannotate SC','Xingkai SC','Kaiti SC','STKaiti',cursive;" font-size="27" fill="#46422F">经验空白</text></g></svg></div><div class="figure__cap"><b>图</b>把以上方向放回同一张框架图：它们标示的，是这一领域中目前讨论相对较少的区域。</div></div></div>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 结语" data-title="三类追问" class="slide manifesto">
+  <div class="manifesto__eyebrow">回到最初的三类追问</div>
+  <h2 class="manifesto__title" style="font-size:100px;">机器：它是人吗<br>他人：他还是人吗<br>自我：<em class="neon">我还是人吗</em></h2>
+  <p class="manifesto__sub">其中，关于「自我」的追问，目前研究最少，却可能最为根本。</p>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 结语" data-title="一个个人判断" class="slide">
+  <div class="head" style="margin-bottom:14px;"><div class="eyebrow head__eyebrow">图 6 · 一个个人的判断</div><h2 class="title head__title" style="font-size:54px;">在「人」的边界逐渐模糊时，或许值得追问的是——</h2></div>
+  <div class="fill" style="min-height:0;"><div class="figure"><div class="figure__frame"><svg class="concept-svg" viewBox="0 0 1400 740" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%"><defs><filter id="cdGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter><filter id="cdGlowSoft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g transform="translate(35,0)"><text x="360" y="180" text-anchor="start" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="72" fill="var(--ink-4)" letter-spacing="2">它是人吗<tspan font-size="34" fill="var(--ink-4)" dx="22" dy="-6">?</tspan></text><text x="362" y="224" font-family="IBM Plex Mono,monospace" font-size="20" fill="var(--ink-4)" letter-spacing="6">THE MACHINE · 机器</text><text x="360" y="360" text-anchor="start" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="72" fill="var(--ink-4)" letter-spacing="2">他还是人吗<tspan font-size="34" fill="var(--ink-4)" dx="22" dy="-6">?</tspan></text><text x="362" y="404" font-family="IBM Plex Mono,monospace" font-size="20" fill="var(--ink-4)" letter-spacing="6">THE OTHER · 他人</text><text x="360" y="540" text-anchor="start" font-family="Space Grotesk,Noto Sans SC,sans-serif" font-weight="700" font-size="86" fill="var(--accent)" filter="url(#cdGlow)" letter-spacing="2">我还是人吗<tspan font-size="34" fill="var(--accent-2)" dx="22" dy="-6">?</tspan></text><text x="362" y="584" font-family="IBM Plex Mono,monospace" font-size="20" fill="var(--accent-2)" letter-spacing="6">THE SELF · 自我</text></g></svg></div><div class="figure__cap"><b>图</b>有什么，仍然本质地属于「人」？这未必有现成答案；但我个人认为，它值得我们共同关注。</div><div class="keyline"><em>代价</em>，可能恰恰就是<em>价值</em>本身。</div></div></div>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 结语" data-title="结语" class="slide insight">
+  <div class="insight__eyebrow">一点收尾的思考</div>
+  <h2 class="insight__statement" style="font-size:84px;">「人，究竟是什么」——这个古老的问题，<br>或许会因 AI，而<em>重新变得迫切</em>。</h2>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 结语" data-title="致谢 · 文献清单" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">文献清单 · 致谢</div><h2 class="title head__title">恳请各位批评指正。</h2></div>
+  <div class="fill" style="justify-content:center;">
+    <div class="row" style="gap:60px;align-items:center;">
+      <div style="background:#FFFFFF;padding:20px;border-radius:14px;flex:0 0 auto;"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAhwAAAIcAQMAAACHMOU/AAAABlBMVEUMDRH19viAHwDRAAAAAnRSTlP//8i138cAAAAJcEhZcwAACxIAAAsSAdLdfvwAAALQSURBVHic7dhRjuQwCEVRduD979I7YLrK8MCZ0nRLPX9cFEWOY598IXDM/0MYCAgICAjIzxFTrBj7fl9fr5Z/DV7zj6ttAQGZi6xMpHXtOoO4+3tgBWoLCMhk5PE20lCxIzfj1bq2gICAhJCPpe0AhYOAgDxnsuU7g8g7NYFnHgQE5B+NX5Yq9XtqCJWquRcEZCqiaGu+udoWEJCxSI+g8sRkrXKZUvIZICBzkSv7Mqpa5dsAz9vcBQIyFqmM68ellm7lnOiPICCTkV6q/Do0HSEmVcgyNzNAQOYiH7aseNSriJ6b8QMcBGQoosWRWedtlrBeqiR0DQRkLGL5E7tvfGjXfP/iAgGZjkQa5uXZB571mvSrbPkjAUFARiHariyL7e0Pg75S3/rY+IGAjEJ6g2dWaZidnmWdsixwUc4iK0FA5iLeGj/f966TYzortcT01viBgMxELDs9y2avHnViarKtzoKADEU0H1NZtqQVu54DEJDpiJnufveBtaA9VlYuEJDRyCt2W+DX4SgScFvXNAMCMhbR3lqZtSzmlXF6tVW5QECmI2aVd0KUdO53abPKTRCQuUjr9PQorbbnJ2JQ8yAgQxFbbdk7VK3OSq2vZGwDEJCxyLX+ZF/uVQ7WGtW19k0QkKGItrRk7JTlKcnyDPUhAUFABiK7Casdi+RnVvZusAYgIFORvkyI5l3/HO4CF4MFAjIYySNSxKlfVntr7C31Mm1BQEYjeVf2eTslee8APT7hFSAgcxE5kWt5ZXm6Nl55ukBA5iI9arF+zVmVqoutMQjIUMQUK6lVrWDvCUvufSAIyFjk3vtXfr2jNYQqZyAgICf7LP8weGZZLN7xNgaZremAgIC0BQJ3NH4nzoxfvyNAQEC8rzezq0jlxscCEJDJyIkj6LIsXhX5IX0OBGQ00ta84gjvcDV+dsmxIL4OAjIU+XWAgICAgID8MP4Aht8ZtcQI8wwAAAAASUVORK5CYII=" alt="文献清单二维码" style="width:280px;height:280px;display:block;"></div>
+      <div class="col" style="flex:1;gap:24px;">
+        <div class="body" style="font-size:30px;color:var(--ink);line-height:1.5;">以上是我个人的一些初步梳理与思考，难免疏漏，<em>恳请各位批评指正</em>。</div>
+        <div class="eyebrow">周立影 · 贵州财经大学 · 2026</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="5" data-segname="段 5 · 参考文献" data-title="参考文献 1/4" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">参考文献 · 完整清单与 DOI 见文末二维码</div><h2 class="title head__title" style="font-size:44px;">参考文献 <em>1 / 4</em></h2></div>
+  <div class="fill" style="min-height:0;"><ol class="refs" style="font-size:15px;gap:9px 48px;">
+<li>Dietvorst, B. J., Simmons, J. P., &amp; Massey, C. (2015). Algorithm aversion: People erroneously avoid algorithms after seeing them err. <em>Journal of Experimental Psychology: General</em>, 144(1), 114–126.</li>
+<li>Epley, N., Waytz, A., &amp; Cacioppo, J. T. (2007). On seeing human: A three-factor theory of anthropomorphism. <em>Psychological Review</em>, 114(4), 864–886.</li>
+<li>Gray, H. M., Gray, K., &amp; Wegner, D. M. (2007). Dimensions of mind perception. <em>Science</em>, 315(5812), 619.</li>
+<li>Logg, J. M., Minson, J. A., &amp; Moore, D. A. (2019). Algorithm appreciation: People prefer algorithmic to human judgment. <em>Organizational Behavior and Human Decision Processes</em>, 151, 90–103.</li>
+<li>Nass, C., Steuer, J., &amp; Tauber, E. R. (1994). Computers are social actors. <em>Proceedings of the SIGCHI Conference on Human Factors in Computing Systems (CHI &#x27;94)</em>, 72–78.</li>
+<li>Reeves, B., &amp; Nass, C. (1996). <em>The media equation: How people treat computers, television, and new media like real people and places.</em> Cambridge University Press / CSLI Publications.</li>
+<li>Chaudhuri, R., &amp; De Bruyn, A. (2026). AI super-bargainers: Negotiating with anthropomorphic AI agents. <em>Journal of Marketing Research</em>, 63(2), 234–256.</li>
+<li>Chen, B., &amp; Huang, S. (2023). Robots vs. humans for disaster response: How media salience of robotic rescue shapes prosocial behavior. <em>Journal of Consumer Psychology</em>, 33(2), 432–440.</li>
+<li>Crolic, C., Thomaz, F., Hadi, R., &amp; Stephen, A. T. (2022). Blame the bot: Anthropomorphism and anger in customer–chatbot interactions. <em>Journal of Marketing</em>, 86(1), 132–148.</li>
+<li>De Freitas, J., Uğuralp, A. K., Oğuz-Uğuralp, Z., &amp; Puntoni, S. (2024). Chatbots and mental health: Insights into the safety of generative AI. <em>Journal of Consumer Psychology</em>, 34(3), 481–491.</li>
+<li>Epp, A. M., &amp; Humphreys, A. (2025). Collaborating with generative AI in consumer culture theory research. <em>Journal of Consumer Research</em>, 52(1), 32–48.</li>
+<li>Gelbrich, K., Roschk, H., Miederer, S., &amp; Kerath, A. (2026). Automated versus human agents: A meta-analysis. <em>Journal of Marketing</em>, 90(2), 1–26.</li>
+<li>Guha, A., Grewal, D., Atlas, S., et al. (2022). Artificiality versus intelligence in voice assistants: Two paths driving evaluation. <em>Journal of the Academy of Marketing Science</em>, 51(4), 843–866.</li>
+<li>Huang, M.-H., &amp; Rust, R. T. (2025). The generative AI future of consumer research. <em>Journal of Consumer Research</em>, 52.</li>
+<li>Huang, Y., Chen, Y., &amp; Chan, K. W. (2024). Pairing up with anthropomorphized artificial agents: Leveraging employee creativity in service encounters. <em>Journal of the Academy of Marketing Science</em>.</li>
+<li>Li, X., Lai, P. Y., &amp; Wang, X. (2025). From tools to agents: A meta-analysis of AI adoption. <em>Journal of Marketing</em>, 90(3), 13–33.</li>
+  </ol></div>
+</section>
+
+<section data-seg="5" data-segname="段 5 · 参考文献" data-title="参考文献 2/4" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">参考文献 · 完整清单与 DOI 见文末二维码</div><h2 class="title head__title" style="font-size:44px;">参考文献 <em>2 / 4</em></h2></div>
+  <div class="fill" style="min-height:0;"><ol class="refs" style="font-size:15px;gap:9px 48px;">
+<li>Longoni, C., &amp; Cian, L. (2022). Artificial intelligence in utilitarian vs. hedonic contexts: The &quot;word-of-machine&quot; effect. <em>Journal of Marketing</em>, 86(1), 91–108.</li>
+<li>Patil, K., Rice, D. H., &amp; Janiszewski, C. (2026). Human–AI partnerships: A typology and research agenda. <em>Journal of Consumer Psychology</em>.</li>
+<li>Reich, T., Kaju, A., &amp; Maglio, S. J. (2022). How to overcome algorithm aversion: Learning from errors. <em>Journal of Consumer Psychology</em>, 33(2), 285–302.</li>
+<li>Schanke, S., Burtch, G., &amp; Ray, G. (2021). Estimating the impact of &quot;humanizing&quot; customer service chatbots. <em>Information Systems Research</em>, 32(3), 736–751.</li>
+<li>Schmitt, B. (2025). Are we the last generation of consumer researchers? Reflections on generative AI. <em>Journal of Consumer Research</em>, 52.</li>
+<li>Shanks, M., et al. (2025). Cobotic service teams and power dynamics: When the robot leads. <em>Journal of the Academy of Marketing Science</em>, 53(2), 463–489.</li>
+<li>Srinivasan, R., &amp; Sarial-Abi, G. (2021). When algorithms fail: Consumers&#x27; responses to brand harm crises caused by algorithm errors. <em>Journal of Marketing</em>, 85(5), 74–91.</li>
+<li>Tully, S. M., Longoni, C., &amp; Appel, G. (2025). Lower artificial intelligence literacy predicts greater AI receptivity. <em>Journal of Marketing</em>, 89(5), 1–20.</li>
+<li>Yu, S., Xiong, J., &amp; Shen, H. (2023). When the chatbot rejects your request: Consumer evaluations of service request rejection. <em>Journal of Consumer Psychology</em>, 34(1), 35–48.</li>
+<li>Burnap, A., Hauser, J. R., &amp; Timoshenko, A. (2023). Product aesthetic design: A machine learning augmentation. <em>Marketing Science</em>.</li>
+<li>De Freitas, J., Uğuralp, A. K., Oğuz-Uğuralp, Z., &amp; Stein, G. (2025). AI companions reduce loneliness. <em>Journal of Consumer Research</em>.</li>
+<li>Han, X., Yin, C., &amp; Zhang, J. (2023). Bots with feelings: Should AI agents express positive emotions in customer service? <em>Information Systems Research</em>, 34(3), 1296–1311.</li>
+<li>Holthöwer, J., &amp; van Doorn, J. (2023). Robots do not judge: Service robots can alleviate embarrassment in service encounters. <em>Journal of the Academy of Marketing Science</em>, 51(4), 767–784.</li>
+<li>Jin, S. V., Walker, K., &amp; Reczek, R. W. (2025). Avoiding embarrassment online: Response to ambiguous- vs. explicit-identity chatbots. <em>Journal of Consumer Psychology</em>, 35(2), 185–202.</li>
+<li>Kim, T. W., Duhachek, A., et al. (2022). AI increases unethical consumer behavior due to reduced anticipatory guilt. <em>Journal of the Academy of Marketing Science</em>, 51(4), 785–801.</li>
+<li>Liu-Thompkins, Y., Okazaki, S., &amp; Li, H. (2022). Artificial empathy in marketing interactions: Bridging the human–AI gap in affective and social customer experience. <em>Journal of the Academy of Marketing Science</em>, 50(6), 1198–1218.</li>
+  </ol></div>
+</section>
+
+<section data-seg="5" data-segname="段 5 · 参考文献" data-title="参考文献 3/4" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">参考文献 · 完整清单与 DOI 见文末二维码</div><h2 class="title head__title" style="font-size:44px;">参考文献 <em>3 / 4</em></h2></div>
+  <div class="fill" style="min-height:0;"><ol class="refs" style="font-size:15px;gap:9px 48px;">
+<li>Tsekouras, D., Gutt, D., &amp; Heimbach, I. (2024). The robo bias in conversational reviews. <em>Journal of the Academy of Marketing Science</em>.</li>
+<li>Xu, L., &amp; Mehta, R. (2022). Does the presence of artificial intelligence devalue luxury? <em>Journal of the Academy of Marketing Science</em>, 50(6), 1135–1152.</li>
+<li>Carney, T. J., Riveros, R., &amp; Tully, S. M. (2026). Made with AI: How disclosure of generative AI content reduces engagement. <em>Journal of Consumer Research</em>.</li>
+<li>Gnewuch, U., Morana, S., Hinz, O., Kellner, R., &amp; Maedche, A. (2024). More than a bot? The impact of disclosing human involvement on customer interactions with hybrid service agents. <em>Information Systems Research</em>, 35(3), 936–955.</li>
+<li>Sun, M., Wang, M., Hoegg, J., &amp; Dahl, D. W. (2023). Embarrassing service encounters: A dehumanization perspective. <em>Journal of Marketing Research</em>, 60(4), 646–664.</li>
+<li>Cillo, P., &amp; Rubera, G. (2025). Generative AI in innovation and marketing: A research roadmap. <em>Journal of the Academy of Marketing Science</em>, 53(3), 684–701.</li>
+<li>de Bellis, E., Johar, G. V., &amp; Poletti, N. (2023). Meaning of manual labor impedes consumer adoption of autonomous products. <em>Journal of Marketing</em>, 87(6), 949–965.</li>
+<li>Hou, J., Yang, X., Xiong, G., &amp; Pavlou, P. A. (2026). Enhancing AI-assisted purchase decisions through a sense of autonomy. <em>MIS Quarterly</em>, 50(2), 589–614.</li>
+<li>Jiang, Z., et al. (2025). The cognitive miser problem: How AI lowering search costs can harm decision quality. <em>Information Systems Research</em>, 36(3), 1780–1798.</li>
+<li>Uysal, E., Alavi, S., &amp; Bezençon, V. (2022). Trojan horse or useful helper? A relationship perspective on artificial intelligence assistants with humanlike features. <em>Journal of the Academy of Marketing Science</em>, 50(6), 1153–1175.</li>
+<li>von Zahn, M., Bauer, K., Mihale-Wilson, C., Jagow, J., Speicher, M., &amp; Hinz, O. (2024). Smart green nudging: Reducing product returns through digital nudges and causal machine learning. <em>Marketing Science</em>, 44(4), 954–969.</li>
+<li>Wang, X., et al. (2025). The impact of an AI shopping assistant on livestreaming commerce: Field evidence. <em>Information Systems Research</em>.</li>
+<li>Adomavicius, G., Bockstedt, J., Curley, S. P., &amp; Zhang, J. (2022). Effects of online recommendation framing on consumers&#x27; preference formation. <em>MIS Quarterly</em>, 46(1), 627–644.</li>
+<li>Chen, P., Gong, X., Keil, M., Liu, L., &amp; Lu, X. (2024). Understanding the usability of voice-interaction systems: A multidimensional measurement. <em>MIS Quarterly</em>, 48(3), 1009–1046.</li>
+<li>Dang, A., Kwan, C. M. C., Jia, H., &amp; Shi, Z. (2025). When words meet visuals: The effect of text–image ratio on social media engagement. <em>Journal of Marketing Research</em>.</li>
+<li>Donnelly, R., Kanodia, A., &amp; Morozov, I. (2023). Welfare effects of personalized rankings. <em>Marketing Science</em>.</li>
+  </ol></div>
+</section>
+
+<section data-seg="5" data-segname="段 5 · 参考文献" data-title="参考文献 4/4" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">参考文献 · 完整清单与 DOI 见文末二维码</div><h2 class="title head__title" style="font-size:44px;">参考文献 <em>4 / 4</em></h2></div>
+  <div class="fill" style="min-height:0;"><ol class="refs" style="font-size:15px;gap:9px 48px;">
+<li>Grewal, D., Satornino, C. B., Davenport, T., &amp; Guha, A. (2025). How generative AI is shaping marketing. <em>Journal of the Academy of Marketing Science</em>, 53(3), 702–722.</li>
+<li>Han, S., Yin, C., &amp; Zhang, J. (2026). Bots with empathy: How customer service chatbots&#x27; empathy triggers psychological reactance. <em>MIS Quarterly</em>.</li>
+<li>Hotz-Behofsits, C., Wlömert, N., &amp; Abou Nabout, N. (2025). NADE: Using emojis to infer fine-grained emotions. <em>Journal of Marketing</em>.</li>
+<li>Longoni, C., Cian, L., &amp; Kyung, E. J. (2023). Algorithmic transference: People overgeneralize failures of AI systems. <em>Journal of Marketing Research</em>, 60(1), 170–188.</li>
+<li>Luo, X. (2025). 2024 Gary Lilien ISMS-MSI practice prize report. <em>Marketing Science</em>, 44(2), 478–481.</li>
+<li>Ma, S., Jin, L., &amp; Dai, X. (2026). Keeping it real: How artificial intelligence (vs. human) authentication affects luxury consumption. <em>Journal of the Academy of Marketing Science</em>.</li>
+<li>Mohammadi, B., Malik, N., Derdenger, T., &amp; Srinivasan, K. (2025). Regulating explainable AI (XAI) may harm consumers. <em>Marketing Science</em>, 44(3), 711–724.</li>
+<li>Noble, S. M., &amp; Mende, M. (2023). The future of artificial intelligence and robotics in the retail and service sector: Sketching the field of consumer–robot–experiences. <em>Journal of the Academy of Marketing Science</em>.</li>
+<li>Paul, J., Mohanty, S., Wadhwa, S., &amp; Parker, J. R. (2025). Conservatives are more receptive to AI recommendations. <em>Journal of Consumer Psychology</em>, 36(1), 3–17.</li>
+<li>Peng, J., &amp; Liang, C. (2023). View-based vs. purchase-based recommender systems: Effects on browsing and sales. <em>MIS Quarterly</em>, 47(2), 875–900.</li>
+<li>Puntoni, S., Reczek, R. W., Giesler, M., &amp; Botti, S. (2021). Consumers and artificial intelligence: An experiential perspective. <em>Journal of Marketing</em>, 85(1), 131–151.</li>
+<li>Smith, A. N., Seiler, S., &amp; Aggarwal, I. (2023). Optimal price targeting. <em>Marketing Science</em>, 42(3), 476–499.</li>
+<li>Son, Y., Oh, W., &amp; Im, I. (2023). The voice of commerce: How smart speakers reshape consumer spending. <em>MIS Quarterly</em>, 47(2), 857–874.</li>
+<li>Zhou, N., et al. (2025). Multihoming in AI ecosystems and firm internationalization. <em>Journal of International Business Studies</em>, 56, 1188–1196.</li>
+  </ol></div>
+</section>
+</div>
+
+<script>window.SLIDE_MAP=["s1", "s2", "s3", "s4", "s5", "sec1", "s6", "s7", "s8", "s9", "s10", "s11", "sec2", "s12", "s13", "s14", "s15", "s16", "s17", "s18", "sec3", "s19", "s20", "s21", "s24", "s22a", "s22b", "s25", "s26", "s27", "s28", "s29", "ref1", "ref2", "ref3", "ref4"];</script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   自配置引擎 · 与风格无关 · 所有皮肤共用 · 不用改这里
+   它会：① 从各 slide 的 data-seg 自动建段导航 + 缩略图 + 计数
+        ② 自动注入页脚 chrome（段名 + 页码）
+        ③ 自动取每张标题给副屏用
+        ④ 翻页广播给"演讲者模式.html"（配 slides-presenter-mode skill）
+   皮肤只通过 CSS（:root 令牌 + 组件样式）改外观，引擎逻辑不变。
+   ════════════════════════════════════════════════════════════════════ */
+(function () {
+  /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
+  const CONFIG = { channel: 'renji-symbiosis-2026', presenterFile: '演讲者模式.html' };
+
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll(':scope > .slide'));
+  const total = slides.length;
+  const body = document.body;
+  const segOf = s => parseInt(s.dataset.seg || '0', 10);
+
+  // —— 段名 / 计数 / 起始索引（全自动）——
+  const segName = [], segCount = [];
+  slides.forEach(s => {
+    const g = segOf(s);
+    if (segName[g] === undefined) segName[g] = s.dataset.segname || ('段 ' + g);
+    segCount[g] = (segCount[g] || 0) + 1;
+  });
+  const segShort = segName.map((n, g) => (n || ('段 ' + g)).replace(/^段\s*\d+\s*·?\s*/, '') || ('段 ' + g));
+  const segStarts = []; let _acc = 0; segCount.forEach((c, i) => { segStarts[i] = _acc; _acc += (c || 0); });
+
+  // —— 包 wrap + 注入 chrome 页脚 ——
+  slides.forEach((s, i) => {
+    s.dataset.globalIdx = i;
+    const wrap = document.createElement('div'); wrap.className = 'slide-wrap';
+    s.parentNode.insertBefore(wrap, s); wrap.appendChild(s);
+    if (!s.querySelector('.chrome')) {
+      const g = segOf(s);
+      const div = document.createElement('div'); div.className = 'chrome';
+      div.innerHTML = `<div class="chrome__l"><span class="chrome__seg">${s.dataset.segname || segName[g]}</span></div>`
+        + `<div class="chrome__r">${String(i + 1).padStart(3, '0')} / ${String(total).padStart(3, '0')}</div>`;
+      s.appendChild(div);
+    }
+  });
+
+  // —— 自动建段导航 ——
+  const segnav = document.getElementById('segnav');
+  segCount.forEach((c, g) => {
+    const seg = document.createElement('div'); seg.className = 'segnav__seg'; seg.dataset.seg = g;
+    seg.innerHTML = `<button class="segnav__head" type="button">`
+      + `<span class="segnav__head-id">段 ${g}</span>`
+      + `<span class="segnav__head-name">${segShort[g]}</span>`
+      + `<span class="segnav__head-meta">${c} 张</span>`
+      + `<span class="segnav__head-arrow">▸</span></button>`
+      + `<div class="segnav__thumbs" data-seg-thumbs="${g}"></div>`;
+    segnav.appendChild(seg);
+  });
+
+  // —— 缩略图（克隆 slide）——
+  slides.forEach((s, i) => {
+    const container = document.querySelector(`[data-seg-thumbs="${segOf(s)}"]`);
+    if (!container) return;
+    const thumb = document.createElement('div'); thumb.className = 'thumb'; thumb.dataset.idx = i;
+    const inner = s.cloneNode(true); inner.classList.add('thumb__inner'); inner.classList.remove('active');
+    const ch = inner.querySelector('.chrome'); if (ch) ch.remove();
+    thumb.appendChild(inner);
+    const num = document.createElement('div'); num.className = 'thumb__num'; num.textContent = (i + 1);
+    thumb.appendChild(num);
+    thumb.addEventListener('click', e => { e.stopPropagation(); setActive(i); });
+    container.appendChild(thumb);
+  });
+
+  // —— 段导航折叠 ——
+  document.querySelectorAll('.segnav__head').forEach(btn =>
+    btn.addEventListener('click', () => btn.closest('.segnav__seg').classList.toggle('segnav__seg--expanded')));
+  const firstSeg = document.querySelector('.segnav__seg'); if (firstSeg) firstSeg.classList.add('segnav__seg--expanded');
+
+  // —— 副屏标题（自动取标题文本，可被 data-title 覆盖）——
+  function deriveTitle(s) {
+    if (s.dataset.title) return s.dataset.title;
+    const el = s.querySelector('.cover__title,.secdiv__title,.manifesto__title,.insight__statement,.bigq__t,.head__title,.title,h1,h2,h3');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : ('slide ' + (slides.indexOf(s) + 1));
+  }
+  const SLIDE_TITLES = slides.map(deriveTitle);
+  // 副屏锚点：优先用全局 window.SLIDE_MAP（slides-presenter-mode 注入），否则自动 s{seg}-{段内序号}
+  const segRun = [];
+  const SLIDE_MAP = (window.SLIDE_MAP && window.SLIDE_MAP.length === total) ? window.SLIDE_MAP
+    : slides.map(s => { const g = segOf(s); segRun[g] = (segRun[g] || 0) + 1; return `s${g}-${segRun[g]}`; });
+
+  // —— 状态 + UI ——
+  const curSegEl = document.getElementById('curSeg'), curIdxEl = document.getElementById('curIdx'),
+        totalIdxEl = document.getElementById('totalIdx'), progressBar = document.getElementById('progressBar');
+  totalIdxEl.textContent = total;
+  let idx = 0, present = false;
+
+  // —— 演讲者模式广播（BroadcastChannel + localStorage 双通道）——
+  let channel = null; try { channel = new BroadcastChannel(CONFIG.channel); } catch (e) {}
+  let presenterWindow = null;
+  function broadcastPresenter(i) {
+    const p = { slideIdx: i, total, segment: segOf(slides[i]), anchor: SLIDE_MAP[i] || ('s0-1'),
+      title: SLIDE_TITLES[i] || '', prevTitle: i > 0 ? SLIDE_TITLES[i - 1] : '',
+      nextTitle: i < total - 1 ? SLIDE_TITLES[i + 1] : '', ts: Date.now(), source: 'slides' };
+    if (channel) { try { channel.postMessage(p); } catch (e) {} }
+    try { localStorage.setItem(CONFIG.channel + '-state', JSON.stringify(p)); } catch (e) {}
+  }
+  function handleReverseJump(p) {
+    if (!p || p.type !== 'jump-to-slide' || p.source !== 'presenter' || typeof p.slideIdx !== 'number') return;
+    const t = Math.max(0, Math.min(total - 1, p.slideIdx)); if (t !== idx) setActive(t);
+  }
+  if (channel) { channel.onmessage = e => { if (e && e.data && e.data.type === 'jump-to-slide') handleReverseJump(e.data); }; }
+  window.addEventListener('storage', e => { if (e.key === CONFIG.channel + '-jump' && e.newValue) { try { handleReverseJump(JSON.parse(e.newValue)); } catch (x) {} } });
+  function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); broadcastPresenter(idx); return; }
+    presenterWindow = window.open(CONFIG.presenterFile, 'presenter', 'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no');
+    if (!presenterWindow) { alert('副屏窗口被阻止 · 请允许弹窗后再试。\n（演讲者模式需先用 slides-presenter-mode skill 生成 ' + CONFIG.presenterFile + '）'); return; }
+    document.getElementById('presenterBtn').classList.add('active');
+    setTimeout(() => broadcastPresenter(idx), 400); setTimeout(() => broadcastPresenter(idx), 1200);
+    const t = setInterval(() => { if (!presenterWindow || presenterWindow.closed) { clearInterval(t); document.getElementById('presenterBtn').classList.remove('active'); presenterWindow = null; } }, 1000);
+  }
+
+  // —— 核心导航 ——
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    if (present) {
+      const sc = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 0.98;
+      slides[idx].style.setProperty('--sc', sc);
+    } else {
+      const wrap = slides[idx].parentNode; if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    updateUI(); broadcastPresenter(idx);
+  }
+  function updateUI() {
+    const g = segOf(slides[idx]);
+    curSegEl.textContent = '段 ' + g; curIdxEl.textContent = idx + 1;
+    progressBar.style.width = ((idx + 1) / total * 100).toFixed(2) + '%';
+    document.querySelectorAll('.segnav__seg').forEach(segEl => {
+      const cur = +segEl.dataset.seg === g;
+      segEl.classList.toggle('segnav__seg--current', cur); if (cur) segEl.classList.add('segnav__seg--expanded');
+    });
+    document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('thumb--active', +t.dataset.idx === idx));
+    const at = document.querySelector('.thumb--active');
+    if (at) { const nr = segnav.getBoundingClientRect(), tr = at.getBoundingClientRect();
+      if (tr.top < nr.top + 60 || tr.bottom > nr.bottom - 20) at.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
+  function next() { setActive(idx + 1); } function prev() { setActive(idx - 1); }
+  function goSeg(n) { setActive(segStarts[n] || 0); }
+
+  function togglePresent() {
+    present = !present; body.classList.toggle('present', present);
+    if (present) setActive(idx);
+    else { slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+      setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); }
+  }
+  function enterFullscreen() {
+    const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) req.call(el).then(() => { if (!present) togglePresent(); body.classList.add('fullscreen'); }).catch(() => { if (!present) togglePresent(); });
+    else if (!present) togglePresent();
+  }
+  function exitFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen; if (ex) ex.call(document);
+    }
+    body.classList.remove('fullscreen'); if (present) togglePresent();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) { body.classList.remove('fullscreen');
+      if (present) { present = false; body.classList.remove('present');
+        slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+        setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); } }
+  });
+
+  // —— 键盘 ——
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, textarea, select')) return;
+    const k = e.key;
+    if (k === 'f' || k === 'F' || k === 'Enter') { (document.fullscreenElement || body.classList.contains('present')) ? exitFullscreen() : enterFullscreen(); e.preventDefault(); return; }
+    if (k === 'p' || k === 'P') { togglePresent(); e.preventDefault(); return; }
+    if (k === 's' || k === 'S') { if (!e.ctrlKey && !e.metaKey) { openPresenter(); e.preventDefault(); } return; }
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown') { next(); e.preventDefault(); return; }
+    if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') { prev(); e.preventDefault(); return; }
+    if (k === 'Escape') { if (document.fullscreenElement || body.classList.contains('present')) { exitFullscreen(); e.preventDefault(); } return; }
+    if (k === 'Home') { setActive(0); e.preventDefault(); return; }
+    if (k === 'End') { setActive(total - 1); e.preventDefault(); return; }
+    if (k >= '1' && k <= '9') { const n = +k - 1; if (n < segCount.length) { goSeg(n); e.preventDefault(); } return; }
+  });
+  // —— 投屏态点击翻页 ——
+  document.addEventListener('click', e => {
+    if (!present) return; if (e.target.closest('a, button, input, select, .topbar, .segnav')) return;
+    (e.clientX > window.innerWidth * 0.6) ? next() : (e.clientX < window.innerWidth * 0.4 ? prev() : 0);
+  });
+  document.getElementById('prevBtn').addEventListener('click', prev);
+  document.getElementById('nextBtn').addEventListener('click', next);
+  document.getElementById('playBtn').addEventListener('click', enterFullscreen);
+  document.getElementById('presenterBtn').addEventListener('click', openPresenter);
+
+  // —— 编辑态自适应缩放 + 滚动跟随 ——
+  function updateFitScale() {
+    const availW = window.innerWidth - 300 - 60, availH = window.innerHeight - 100;
+    const scale = Math.max(0.25, Math.min(0.7, availW / 1920, availH / 1080));
+    document.documentElement.style.setProperty('--fit-scale', scale.toFixed(4));
+  }
+  updateFitScale();
+  window.addEventListener('resize', () => { updateFitScale(); if (present) setActive(idx); });
+  let st = null;
+  window.addEventListener('scroll', () => {
+    if (present) return; if (st) clearTimeout(st);
+    st = setTimeout(() => {
+      const vc = window.scrollY + window.innerHeight / 2; let best = 0, bd = Infinity;
+      slides.forEach((s, i) => { const w = s.parentNode; if (!w) return; const r = w.getBoundingClientRect();
+        const c = r.top + window.scrollY + r.height / 2, d = Math.abs(c - vc); if (d < bd) { bd = d; best = i; } });
+      if (best !== idx) { idx = best; updateUI(); }
+    }, 100);
+  });
+
+  updateUI();
+  // 暴露给 slides-presenter-mode / 控制台调试
+  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
+})();
+
+</script>
+<div class="theme-switch" id="themeSwitch" title="显示主题（暗场 / 学术 / 高对比）· 按 T 循环">
+  <button data-t="dark">暗场</button><button data-t="light">学术</button><button data-t="contrast">高对比</button>
+</div>
+<script>(function(){var sw=document.getElementById('themeSwitch');var order=['dark','light','contrast'];
+function set(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('deckTheme',t);}catch(e){}
+Array.prototype.forEach.call(sw.children,function(b){b.classList.toggle('on',b.getAttribute('data-t')===t);});}
+set(document.documentElement.getAttribute('data-theme')||'dark');
+Array.prototype.forEach.call(sw.children,function(b){b.addEventListener('click',function(){set(b.getAttribute('data-t'));});});
+document.addEventListener('keydown',function(e){if(e.key==='t'||e.key==='T'){var c=document.documentElement.getAttribute('data-theme');set(order[(order.indexOf(c)+1)%order.length]);}});})();</script>
+
+<script>/* ==== anim.js ==== */
+/* ════════════════════════════════════════════════════════════════════════
+   anim.js — keynote deck 进场/转场动画引擎（v2）
+   ------------------------------------------------------------------------
+   修复 v1：v1 hook window.deckAPI.setActive，但引擎键盘/按钮翻页走内部闭包，
+           hook 拦不到 → 真实翻页零动画。v2 改用 MutationObserver 监听 .active
+           （任何翻页方式都能捕捉），并只在 body.present（全屏播放态）下播放。
+   职责：① 监听某页变 active（observer）；② 仅播放态触发：页面转场 + 元素入场重放
+        ③ 概念图 SVG 分步（边界描出 / 网格描出 / 数字滚动 / 圆点落入 / 箭头描边
+           / 空格 pop 高亮 / 第三问发光呼吸）；④ 编辑态 / reduced-motion → 直接终态。
+   只动 transform / opacity / stroke-dashoffset，不碰颜色。
+   ════════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var REDUCED = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function reflow(el) { void el.offsetWidth; }
+  function $all(r, s) { return Array.prototype.slice.call(r.querySelectorAll(s)); }
+  function nextFrame(cb) { var d = false; function run() { if (d) return; d = true; cb(); } requestAnimationFrame(run); setTimeout(run, 32); }
+  function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+  function playing() { return document.body.classList.contains('present'); }   // 全屏播放态
+
+  /* —— 数字 count-up —— */
+  function countUp(el, to, dur) {
+    if (REDUCED || to === 0) { el.textContent = String(to); return; }
+    dur = dur || 880; var start = null;
+    function tick(now) {
+      if (start === null) start = now;
+      var t = Math.min(1, (now - start) / dur);
+      el.textContent = String(Math.round(to * easeOutCubic(t)));
+      if (t < 1) requestAnimationFrame(tick); else el.textContent = String(to);
+    }
+    requestAnimationFrame(tick);
+  }
+
+  /* —— 概念图帧识别（结构签名，与 gen.js 输出一一对应）—— */
+  function classifyFrame(svg) {
+    var hasGrid = !!svg.querySelector('g[stroke="var(--rule-strong)"]');
+    var hasDots = svg.querySelectorAll('g[opacity] rect.pd').length > 0;
+    var hasNavyArrow = !!svg.querySelector('path[stroke="var(--navy)"]');
+    var hasGapRect = !!svg.querySelector('rect[fill="var(--accent-soft)"]');
+    var hasGlow = !!svg.querySelector('text[filter="url(#cdGlow)"]');
+    if (!hasGrid) return hasGlow ? 'spine-lit' : 'spine';   // frame5 : frame0
+    if (hasGapRect) return 'map';                            // frame4
+    if (hasNavyArrow) return 'arrow';                        // frame3
+    if (hasDots) return 'fill';                              // frame2
+    return 'grid';                                           // frame1
+  }
+  function bigNumberTexts(svg) {
+    return $all(svg, 'text').filter(function (t) {
+      var txt = (t.textContent || '').trim();
+      return /^\d+$/.test(txt) && parseFloat(t.getAttribute('font-size') || '0') >= 40;
+    });
+  }
+  function prepDraw(el) {
+    var len = 0;
+    try { len = (el.getTotalLength && el.getTotalLength()) || 0; } catch (e) { len = 0; }
+    if (!len) {
+      var x1 = +el.getAttribute('x1'), y1 = +el.getAttribute('y1'), x2 = +el.getAttribute('x2'), y2 = +el.getAttribute('y2');
+      if (!isNaN(x1) && !isNaN(x2)) len = Math.hypot(x2 - x1, y2 - y1);
+    }
+    len = Math.ceil(len || 1200);
+    el.setAttribute('data-a-draw', '');
+    el.style.strokeDasharray = len; el.style.strokeDashoffset = len; el.__drawLen = len;
+  }
+
+  /* —— 首次激活：标注 SVG 子元素 + 初始隐藏态（只做一次）—— */
+  function annotateSVG(svg, kind) {
+    if (svg.__animKind) return; svg.__animKind = kind;
+    if (kind === 'spine' || kind === 'spine-lit') { return; }  // spine 处理全放 playSVG（每次重放重新 query，鲁棒）
+    var gridGroup = svg.querySelector('g[stroke="var(--rule-strong)"]');
+    if (gridGroup) $all(gridGroup, 'line').forEach(prepDraw);
+    var topLine = svg.querySelector('line[stroke="var(--accent)"]');
+    if (topLine) prepDraw(topLine);
+    $all(svg, 'text').forEach(function (t) {
+      var txt = (t.textContent || '').trim();
+      var isBigNum = /^\d+$/.test(txt) && parseFloat(t.getAttribute('font-size') || '0') >= 40;
+      if (!isBigNum) t.setAttribute('data-a-hide', '');
+    });
+    if (kind === 'fill' || kind === 'arrow' || kind === 'map') {
+      $all(svg, 'g[opacity] rect.pd').forEach(function (c) { c.setAttribute('data-a-dot', ''); });
+      $all(svg, 'circle[stroke-dasharray]').forEach(function (c) { c.setAttribute('data-a-hide', ''); c.removeAttribute('data-a-dot'); });
+    }
+    if (kind === 'arrow') {
+      $all(svg, 'line[stroke="var(--accent)"], path[stroke="var(--accent)"], path[stroke="var(--navy)"], line[stroke="var(--navy)"]').forEach(function (el) {
+        if (!el.hasAttribute('data-a-draw')) prepDraw(el);
+      });
+      $all(svg, 'polygon').forEach(function (p) { p.setAttribute('data-a-hide', ''); });
+      // 反转组：他人「去人性化↓」= navy 箭头 + 回头虚线 + 对应 polygon + 对应文字 → data-a-flip（留作演讲者 cue 的 build step）
+      $all(svg, 'path[stroke="var(--navy)"], line[stroke="var(--navy)"], polygon[fill="var(--navy)"], path[stroke="var(--accent)"][stroke-dasharray], polygon[fill="var(--accent)"][opacity]').forEach(function (el) { el.setAttribute('data-a-flip', ''); });
+      $all(svg, 'text').forEach(function (t) { if (/去人性化|人被当机器|当场回头/.test(t.textContent || '')) t.setAttribute('data-a-flip', ''); });
+    }
+    if (kind === 'map') $all(svg, 'rect[fill="var(--accent-soft)"]').forEach(function (r) { r.setAttribute('data-a-gap', ''); });
+  }
+
+  /* —— 显现助手 —— */
+  function delayShow(el, ms) { setTimeout(function () { el.removeAttribute('data-a-hide'); el.setAttribute('data-a-show', ''); }, ms); }
+  function resetHidden(svg) { $all(svg, '[data-a-show]').forEach(function (el) { el.removeAttribute('data-a-show'); el.setAttribute('data-a-hide', ''); }); }
+  function resetDots(svg) { $all(svg, '[data-a-dot]').forEach(function (c) { c.classList.remove('a-dot-in'); }); }
+  function resetGaps(svg) { $all(svg, 'rect[data-a-gap]').forEach(function (r) { r.classList.remove('a-gap-in'); }); }
+  function resetDraw(svg) { $all(svg, '[data-a-draw]').forEach(function (el) { if (el.__drawLen) el.style.strokeDashoffset = el.__drawLen; }); }
+  function showAllSVG(svg) {
+    $all(svg, '[data-a-hide]').forEach(function (el) { el.removeAttribute('data-a-hide'); el.setAttribute('data-a-show', ''); });
+    $all(svg, '[data-a-dot]').forEach(function (c) { c.classList.add('a-dot-in'); });
+    $all(svg, 'rect[data-a-gap]').forEach(function (r) { r.classList.add('a-gap-in'); });
+    $all(svg, '[data-a-draw]').forEach(function (el) { el.style.strokeDashoffset = '0'; });
+    bigNumberTexts(svg).forEach(function (t) { var to = parseInt((t.textContent || '0').trim(), 10); if (!isNaN(to)) t.textContent = String(to); });
+    if (svg.__glowText) svg.__glowText.classList.remove('a-glow');
+  }
+
+  /* —— 每次激活：重跑该 SVG 的显现时序 —— */
+  function playSVG(svg) {
+    var kind = svg.__animKind;
+    if (REDUCED) { showAllSVG(svg); return; }
+
+    if (kind === 'spine' || kind === 'spine-lit') {
+      // 边界线（frame0）：描出（重新 query，不依赖 annotate）
+      var bl = svg.querySelector('line[stroke="var(--accent)"]');
+      if (bl) {
+        if (!bl.__drawLen) prepDraw(bl);
+        else { bl.style.strokeDasharray = bl.__drawLen; bl.style.strokeDashoffset = bl.__drawLen; }
+        nextFrame(function () { bl.style.strokeDashoffset = '0'; });
+      }
+      // 三问句逐行：先全隐藏 → reflow → stagger 显现
+      var texts = $all(svg, 'text');
+      texts.forEach(function (t) { t.removeAttribute('data-a-show'); t.setAttribute('data-a-hide', ''); });
+      reflow(svg);
+      texts.forEach(function (t, i) { delayShow(t, 240 + Math.floor(i / 2) * 230 + (i % 2) * 70); });
+      // frame5 第三问：显现后开始发光呼吸（重新 query）
+      var glow = svg.querySelector('text[filter="url(#cdGlow)"]');
+      if (glow) {
+        glow.classList.remove('a-glow');
+        setTimeout(function () { glow.classList.add('a-glow'); }, 240 + 2 * 230 + 560);
+      }
+      return;
+    }
+
+    resetHidden(svg); resetDots(svg); resetGaps(svg); resetDraw(svg);
+    // 1) 网格描边（反转组留到 cue）
+    nextFrame(function () { $all(svg, '[data-a-draw]:not([data-a-flip])').forEach(function (el) { el.style.strokeDashoffset = '0'; }); });
+    // 2) 行/列标签淡入（反转组留到 cue）
+    $all(svg, 'text[data-a-hide]:not([data-a-flip])').forEach(function (t, i) { delayShow(t, 260 + i * 35); });
+    // 3) 大数字 count-up + 4) 圆点逐颗落入（网格画好后）
+    var GRID_DONE = 620;
+    bigNumberTexts(svg).forEach(function (t, i) {
+      var to = parseInt((t.textContent || '0').trim(), 10) || 0;
+      t.__bigTo = to;                                   // 存真值，编辑态可恢复
+      setTimeout(function () { countUp(t, to, 850); }, GRID_DONE + i * 70);
+    });
+    $all(svg, '[data-a-dot]').forEach(function (c, i) { setTimeout(function () { c.classList.add('a-dot-in'); }, GRID_DONE + 130 + i * 22); });
+    $all(svg, 'circle[data-a-hide]').forEach(function (c) { delayShow(c, GRID_DONE + 220); });
+    // ③ 帧2 空格「0」：显现后开始轻微呼吸（让"缺席"被看见）
+    if (kind === 'fill') setTimeout(function () {
+      $all(svg, 'circle[stroke-dasharray]').forEach(function (c) { c.classList.add('a-empty-breathe'); });
+      $all(svg, 'text').forEach(function (t) { if ((t.textContent || '').trim() === '0') t.classList.add('a-empty-breathe'); });
+    }, GRID_DONE + 950);
+    // 5) 箭头描边 / polygon 淡入（帧3）
+    if (kind === 'arrow') {
+      // 机器「拟人化↑」组先到位；反转组(data-a-flip)不在此显，留作演讲者 cue
+      var ARROW_AT = GRID_DONE + 720;
+      $all(svg, 'polygon[data-a-hide]:not([data-a-flip])').forEach(function (p, i) { delayShow(p, ARROW_AT + 220 + i * 60); });
+      // 存反转函数：演讲者按键 → 他人「去人性化↓」翻入 + 全图一记亮闪顿挫
+      svg.__flip = function () {
+        svg.classList.remove('cd-flashed'); reflow(svg); svg.classList.add('cd-flashed');
+        $all(svg, '[data-a-flip]').forEach(function (el) {
+          if (el.style) { el.style.transition = 'none'; el.style.strokeDashoffset = '0'; }
+          el.classList.add('a-flip-on');
+        });
+      };
+    }
+    // 6) 空格高亮 pop（帧4）
+    if (kind === 'map') $all(svg, 'rect[data-a-gap]').forEach(function (r, i) { setTimeout(function () { r.classList.add('a-gap-in'); }, GRID_DONE + 520 + i * 140); });
+  }
+
+  /* ────────────────────────────────────────────────────────────────────
+     激活一页：仅播放态做动画；否则直接终态
+     ──────────────────────────────────────────────────────────────────── */
+  /* —— 关键句打字机：把文字拆成逐字 <span class="kc">（保留 <em> 强调），--ci 为序号，CSS 按序错峰显现；只拆一次 —— */
+  function splitKeylineChars(kl) {
+    if (!kl || kl.dataset.tw) return;
+    var i = 0;
+    (function walk(node) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (ch) {
+        if (ch.nodeType === 3) {
+          var frag = document.createDocumentFragment();
+          (ch.textContent || '').split('').forEach(function (c) {
+            var sp = document.createElement('span'); sp.className = 'kc';
+            sp.style.setProperty('--ci', i++); sp.textContent = c; frag.appendChild(sp);
+          });
+          node.replaceChild(frag, ch);
+        } else if (ch.nodeType === 1) { walk(ch); }
+      });
+    })(kl);
+    kl.dataset.tw = '1';
+  }
+
+  function activate(slide) {
+    if (!slide || !slide.classList.contains('active')) return;
+    var svgs = $all(slide, 'svg.concept-svg');
+    slide.classList.remove('ask-erupt');                 // 重置「问」涌现，便于重访重放
+    slide.classList.remove('braid-live');                // 重置 S3「拧巴」辫子
+    slide.classList.remove('couple-live'); slide.classList.remove('time-live'); slide.classList.remove('traj-live');  // 重置 S19/S24 动效
+    $all(slide, '.keyline').forEach(function (k) { k.classList.remove('kl-typed'); });  // 重置关键句打字机，便于重访重放
+
+    if (!playing() || REDUCED) {                    // 编辑/预览态：CSS 门控已不隐藏 → 直接终态；仅恢复被改过的大数字 + 撤发光
+      slide.classList.remove('is-anim', 'has-pending-build');
+      slide.__buildQueue = []; slide.__buildStep = 0;
+      svgs.forEach(function (svg) {
+        bigNumberTexts(svg).forEach(function (t) { if (t.__bigTo != null) t.textContent = String(t.__bigTo); });
+        $all(svg, 'text.a-glow').forEach(function (t) { t.classList.remove('a-glow'); });
+      });
+      return;
+    }
+    // 播放态：页面转场 + 元素入场重放
+    slide.classList.remove('is-anim'); reflow(slide); slide.classList.add('is-anim');
+    var queue = [];
+    svgs.forEach(function (svg) {
+      var kind = svg.__animKind || classifyFrame(svg);
+      annotateSVG(svg, kind);
+      if (kind === 'arrow') queue.push(function () { if (svg.__flip) svg.__flip(); });   // 反转 = 演讲者 cue 的 build step
+      nextFrame(function () { playSVG(svg); });
+    });
+    $all(slide, '.secdiv__num').forEach(function (el) {
+      var txt = (el.textContent || '').trim();
+      if (/^\d+$/.test(txt)) { if (!el.__rawNum) el.__rawNum = parseInt(txt, 10); countUp(el, el.__rawNum, 800); }
+    });
+    // 「问」涌现（slide 002）：先读问句 → 按键 → 那个普通的「问」放大发光、溢出画面
+    if (slide.querySelector('.ask-seed')) queue.push(function () { slide.classList.add('ask-erupt'); });
+    // S3「拧巴」：干净的线 → 按键当场绞成双向互塑的辫子
+    if (slide.querySelector('.braid-svg')) queue.push(function () { slide.classList.add('braid-live'); });
+    // S19 界面耦合+时间纵深：两记按键（过载渗漏 → 长出纵深）
+    if (slide.getAttribute('data-title') === '尚待探索区域') {
+      queue.push(function () { slide.classList.add('couple-live'); });
+      queue.push(function () { slide.classList.add('time-live'); });
+    }
+    // S24 时间轨迹：边界沿关系一格一格地塌
+    if (slide.getAttribute('data-title') === '贯穿维度·时间') {
+      queue.push(function () { slide.classList.add('traj-live'); });
+    }
+    // 关键句：演讲者按 →/空格 → 浅蓝方框出现 + 打字机逐字显现（拆字 lazy 一次）
+    var kl = slide.querySelector('.keyline');
+    if (kl) { splitKeylineChars(kl); queue.push(function () { kl.classList.add('kl-typed'); }); }
+    // —— build steps（演讲者按键逐步展开 · 帧3 反转 / 「问」涌现 / S3「拧巴」/ S19 耦合时间 / S24 时间轨迹 用到）——
+    slide.__buildQueue = queue; slide.__buildStep = 0;
+    if (queue.length) {
+      var cue = slide.querySelector('.build-cue');
+      if (!cue) { cue = document.createElement('div'); cue.className = 'build-cue'; cue.textContent = '▸'; slide.appendChild(cue); }
+      slide.classList.add('has-pending-build');
+    } else { slide.classList.remove('has-pending-build'); }
+  }
+
+  /* ────────────────────────────────────────────────────────────────────
+     触发：MutationObserver 监听 .active（任何翻页方式都捕捉）+ 播放态切换重放
+     ──────────────────────────────────────────────────────────────────── */
+  function curSlide() { return document.querySelector('.deck > .slide-wrap > .slide.active') || document.querySelector('.slide.active'); }
+  var curActive = null;
+  function onActiveChange() {
+    var s = curSlide();
+    if (!s || s === curActive) return;
+    curActive = s;
+    nextFrame(function () { activate(s); });
+  }
+
+  /* ────────────────────────────────────────────────────────────────────
+     build steps —— 演讲者按 →/空格 时，若当前页有未展开的 build，先展开它、
+     拦住翻页（捕获阶段，stopImmediatePropagation 不让 shell 的 next() 触发）。
+     安全：step 先自增再执行，单步失败也不会卡住（下一按键即翻页）；换页 activate 重置；
+     副屏反向跳转走 setActive 不经此处 → 不受影响；非演播/reduced 无 build。
+     ──────────────────────────────────────────────────────────────────── */
+  function advanceBuild() {
+    var s = curActive;
+    if (!playing() || REDUCED || !s || !s.__buildQueue || s.__buildStep >= s.__buildQueue.length) return false;
+    var fn = s.__buildQueue[s.__buildStep];
+    s.__buildStep++;                                              // 先自增（防卡死）
+    if (s.__buildStep >= s.__buildQueue.length) s.classList.remove('has-pending-build');
+    try { fn(); } catch (e) {}
+    return true;
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.target && e.target.matches && e.target.matches('input,textarea,select')) return;
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown') {
+      if (advanceBuild()) { e.preventDefault(); e.stopImmediatePropagation(); }
+    }
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (!playing()) return;
+    if (e.target.closest && e.target.closest('a,button,input,select,.topbar,.segnav,.theme-switch')) return;
+    if (e.clientX > window.innerWidth * 0.6) { if (advanceBuild()) { e.preventDefault(); e.stopImmediatePropagation(); } }
+  }, true);
+
+  function start() {
+    var deck = document.getElementById('deck') || document.querySelector('.deck');
+    if (deck) {
+      new MutationObserver(function (muts) {
+        for (var i = 0; i < muts.length; i++) {
+          var t = muts[i].target;
+          if (t.classList && t.classList.contains('slide') && t.classList.contains('active')) { onActiveChange(); return; }
+        }
+      }).observe(deck, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    }
+    // body.present 切换（进入/退出全屏播放）→ 重放当前页
+    var lastPresent = playing();
+    new MutationObserver(function () {
+      var p = playing();
+      if (p !== lastPresent) { lastPresent = p; curActive = null; onActiveChange(); }
+    }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    // 首次（若已是播放态）
+    onActiveChange();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
+  else start();
+})();
+
+</script>
+</body>
+</html>

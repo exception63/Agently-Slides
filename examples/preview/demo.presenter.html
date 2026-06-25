@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Slidesmith Markdown 演示 · 演讲者视图</title>
+<style>
+/* ===== Slidesmith presenter view: dark second-screen chrome =====
+   Self-contained (no theme dependency). Hosts the transcript in an iframe and
+   shows current/next slide, a timer, and sync controls. */
+:root {
+  --p-bg: #14151A; --p-bg2: #1C1E24; --p-bg3: #262932; --p-line: #33363F;
+  --p-text: #ECEAE3; --p-soft: #A7A9B2; --p-faint: #6E707A;
+  --p-accent: #F4B73E; --p-on: #6FAA82; --p-on-d: #4D7A5C; --p-off: #C76B5B; --p-off-d: #8E4A3D;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body.smp {
+  background: var(--p-bg); color: var(--p-text);
+  font-family: "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif; font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+.smp-layout { display: grid; grid-template-rows: auto auto 1fr; height: 100vh; position: relative; }
+
+/* header */
+.smp-head { background: linear-gradient(180deg, var(--p-bg2), var(--p-bg)); border-bottom: 2px solid var(--p-accent);
+  padding: 14px 22px; display: grid; grid-template-columns: 180px 1fr 190px 250px; gap: 22px; align-items: center;
+  transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease; overflow: hidden; }
+.smp-label { font-size: 10px; letter-spacing: 0.22em; color: var(--p-faint); margin-bottom: 5px; font-weight: 700; }
+.smp-col--slide { border-right: 1px solid var(--p-line); padding-right: 20px; }
+.smp-num { font-family: "SF Mono", Menlo, monospace; font-size: 32px; font-weight: 700; line-height: 1; }
+.smp-num #smpCur { color: var(--p-accent); }
+.smp-seg { margin-top: 8px; font-size: 12px; color: var(--p-soft); }
+.smp-seg #smpSeg { display: inline-block; background: var(--p-accent); color: #14151A; padding: 1px 8px; border-radius: 3px; margin-right: 6px; font-weight: 700; }
+
+.smp-col--title { text-align: center; padding: 0 10px; min-width: 0; }
+.smp-tprev, .smp-tnext { font-size: 12px; color: var(--p-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.smp-tcur { font-family: "Songti SC", "Source Han Serif SC", serif; font-size: 22px; font-weight: 700; color: var(--p-accent); line-height: 1.3; margin: 6px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.smp-col--timer { text-align: center; border-left: 1px solid var(--p-line); border-right: 1px solid var(--p-line); padding: 0 14px; }
+.smp-timer { font-family: "SF Mono", Menlo, monospace; font-size: 26px; font-weight: 700; color: var(--p-on); line-height: 1; letter-spacing: 1px; }
+.smp-timer.paused { color: var(--p-faint); }
+.smp-timer-btns { margin-top: 8px; display: flex; justify-content: center; gap: 8px; }
+.smp-timer-btns button { background: transparent; color: var(--p-soft); border: 1px solid var(--p-line); padding: 3px 12px; font-size: 11px; border-radius: 3px; cursor: pointer; font-family: inherit; }
+.smp-timer-btns button:hover { background: var(--p-bg3); color: var(--p-text); }
+
+.smp-col--ctrl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.smp-btn { background: var(--p-bg3); color: var(--p-text); border: 1px solid var(--p-line); padding: 6px 8px; font-size: 12px; border-radius: 3px; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+.smp-btn:hover { background: var(--p-accent); border-color: var(--p-accent); color: #14151A; }
+.smp-zoom { display: flex; gap: 4px; }
+.smp-zoom .smp-btn { flex: 1; padding: 6px 4px; }
+.smp-btn.on { background: var(--p-on); border-color: var(--p-on-d); color: #112016; font-weight: 700; }
+.smp-btn.on:hover { background: var(--p-on-d); color: #fff; }
+.smp-btn.off { background: var(--p-off); border-color: var(--p-off-d); color: #2A1812; font-weight: 700; }
+.smp-btn.off:hover { background: var(--p-off-d); color: #fff; }
+
+/* status bar */
+.smp-status { background: var(--p-bg2); border-bottom: 1px solid var(--p-line); padding: 5px 22px; font-size: 11px;
+  color: var(--p-faint); display: flex; align-items: center; justify-content: space-between;
+  font-family: "SF Mono", Menlo, monospace; letter-spacing: 0.4px; transition: max-height 0.3s ease, opacity 0.3s ease, padding 0.3s ease; overflow: hidden; }
+.smp-status.connected #smpConnText { color: var(--p-on); }
+.smp-status.waiting #smpConnText { color: var(--p-off); }
+.smp-status kbd { background: var(--p-bg3); border: 1px solid var(--p-line); padding: 1px 6px; border-radius: 3px; font-family: inherit; margin: 0 1px; color: var(--p-soft); }
+
+/* collapsed (H key) frees up transcript space */
+body.smp.collapsed .smp-head, body.smp.collapsed .smp-status { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; border-bottom-color: transparent; }
+.smp-hide { position: absolute; top: 7px; right: 9px; width: 30px; height: 30px; border-radius: 50%; background: rgba(20,21,26,0.6);
+  color: var(--p-text); border: 1px solid rgba(244,183,62,0.45); cursor: pointer; z-index: 30; font-size: 13px; line-height: 1; padding: 0; }
+.smp-hide:hover { background: rgba(20,21,26,0.92); border-color: var(--p-accent); }
+body.smp.collapsed .smp-hide { background: var(--p-accent); color: #14151A; }
+
+/* iframe */
+.smp-main { position: relative; overflow: hidden; background: #F4EFE4; }
+iframe#smpFrame { width: 100%; height: 100%; border: 0; background: #F4EFE4; }
+
+/* toast */
+.smp-toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: rgba(20,21,26,0.94);
+  color: var(--p-accent); padding: 10px 20px; border-radius: 5px; border: 1px solid var(--p-accent); font-size: 13px;
+  pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 40; }
+.smp-toast.show { opacity: 1; }
+
+@media (max-width: 1100px) {
+  .smp-head { grid-template-columns: 130px 1fr 150px 180px; gap: 14px; padding: 10px 14px; }
+  .smp-num { font-size: 26px; } .smp-tcur { font-size: 18px; } .smp-timer { font-size: 22px; }
+}
+
+</style>
+</head>
+<body class="smp">
+<div class="smp-layout">
+  <header class="smp-head">
+    <div class="smp-col smp-col--slide">
+      <div class="smp-label">SLIDE</div>
+      <div class="smp-num"><span id="smpCur">—</span>/<span id="smpTotal">?</span></div>
+      <div class="smp-seg"><span id="smpSeg">—</span><span id="smpSegName"></span></div>
+    </div>
+    <div class="smp-col smp-col--title">
+      <div class="smp-tprev">‹ 上一张：<span id="smpTprev">—</span></div>
+      <div class="smp-tcur" id="smpTcur">演讲者视图 · 等待主屏连接</div>
+      <div class="smp-tnext">› 下一张：<span id="smpTnext">—</span></div>
+    </div>
+    <div class="smp-col smp-col--timer">
+      <div class="smp-label">⏱ 演讲计时</div>
+      <div class="smp-timer" id="smpTimer">00:00:00</div>
+      <div class="smp-timer-btns"><button id="smpTimerToggle">暂停</button><button id="smpTimerReset">↻</button></div>
+    </div>
+    <div class="smp-col smp-col--ctrl">
+      <button id="smpFwd" class="smp-btn" title="L · 正向跟随：主屏翻页 → 讲稿滚动">→ 跟随</button>
+      <button id="smpRev" class="smp-btn" title="J · 反向跟随：本视图按键 → 主屏翻页">← 跟随</button>
+      <button id="smpFwdSync" class="smp-btn" title="S · 把讲稿跳到主屏当前页">→ 同步</button>
+      <button id="smpRevSync" class="smp-btn" title="D · 把主屏跳到讲稿当前位置">← 同步</button>
+      <div class="smp-zoom"><button id="smpZoomOut" class="smp-btn" title="缩小讲稿">A−</button><button id="smpZoomIn" class="smp-btn" title="放大讲稿">A＋</button></div>
+      <button id="smpCue" class="smp-btn" title="K · 高亮当前块的关键词（提词）">✦ 提词</button>
+      <button id="smpFull" class="smp-btn" title="F · 第二屏全屏">⛶ 全屏</button>
+    </div>
+  </header>
+  <div class="smp-status" id="smpConn">
+    <span id="smpConnText">⚪ 等待主屏连接 …</span>
+    <span class="smp-status-right"><kbd>←→</kbd>翻页 · <kbd>L/J</kbd>正/反跟随 · <kbd>S/D</kbd>正/反同步 · <kbd>K</kbd>提词 · <kbd>+/−</kbd>缩放 · <kbd>F</kbd>全屏 · <kbd>H</kbd>收起栏</span>
+  </div>
+  <main class="smp-main"><iframe id="smpFrame" title="讲稿"></iframe></main>
+  <button id="smpHide" class="smp-hide" title="H · 收起顶栏，释放讲稿空间">👁</button>
+  <div class="smp-toast" id="smpToast"></div>
+</div>
+<script>window.__SMP__={"anchors":["s1","s2","s3","s4","s5"],"titles":["用 Markdown 写演示","三个支柱","AI 负责","让 AI 生成，让人类精修。","谢谢"],"segs":["","1","1","2",""],"segNames":["","段1 · 概念","","段2 · 收尾",""],"total":5,"channel":"deck-slidesmith-markdown","transcriptUrl":"demo.transcript.html"};</script>
+<script>
+/* Slidesmith presenter runtime (second screen).
+   PRIMARY sync channel = window.opener <-> child-window postMessage + ~1s
+   heartbeat. This works across file:// opaque origins where BroadcastChannel /
+   localStorage events do NOT (the correction over the legacy skill). The deck
+   pushes state via its saved child-window reference; the presenter talks back
+   via window.opener. The embedded transcript is driven through the iframe's
+   contentWindow. Source fields guard against echo. No dependencies. */
+(function () {
+  'use strict';
+  var MSG = 'sm';
+  var boot = window.__SMP__ || {};
+  var anchors = boot.anchors || [];
+  var titles = boot.titles || [];
+  var segs = boot.segs || [];
+  var segNames = boot.segNames || [];
+  var total = boot.total || anchors.length;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var iframe = $('smpFrame');
+
+  var lastIdx = -1, lastAnchor = '';
+  var forwardFollow = true, reverseFollow = true, cueOn = false;
+  var zoom = 1;
+  var lastBeat = 0;
+
+  // ---------- toast ----------
+  var toastTimer = null;
+  function toast(msg, ms) {
+    var el = $('smpToast'); el.textContent = msg; el.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.classList.remove('show'); }, ms || 1600);
+  }
+
+  // ---------- talk to the deck (opener) ----------
+  function toDeck(msg) {
+    msg.source = 'presenter';
+    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); } catch (e) {}
+  }
+  // ---------- talk to the transcript (iframe) ----------
+  function toScript(msg) { try { iframe.contentWindow.postMessage(msg, '*'); } catch (e) {} }
+
+  function scrollScript(anchor) { if (anchor) toScript({ type: MSG + ':scroll', anchor: anchor }); }
+
+  // ---------- apply state pushed from the deck ----------
+  function applyState(s) {
+    if (!s || typeof s.idx !== 'number') return;
+    if (s.source === 'presenter') return;       // echo guard
+    lastBeat = beatNow();
+    lastIdx = s.idx;
+    var anchor = s.anchor || anchors[s.idx] || '';
+
+    $('smpCur').textContent = s.idx + 1;
+    $('smpTotal').textContent = s.total || total;
+    var seg = s.seg != null ? s.seg : (segs[s.idx] || '');
+    var segName = s.segName != null ? s.segName : (segNames[s.idx] || '');
+    $('smpSeg').textContent = seg ? ('段 ' + seg) : '—';
+    $('smpSegName').textContent = segName || '';
+    $('smpTcur').textContent = s.title || titles[s.idx] || '—';
+    $('smpTprev').textContent = (s.idx > 0) ? (titles[s.idx - 1] || '—') : '—';
+    $('smpTnext').textContent = (s.idx < (total - 1)) ? (titles[s.idx + 1] || '—') : '—';
+
+    setConn(true);
+    if (forwardFollow && anchor && anchor !== lastAnchor) { scrollScript(anchor); lastAnchor = anchor; }
+  }
+
+  function setConn(connected) {
+    var el = $('smpConn');
+    el.classList.toggle('connected', connected && forwardFollow);
+    el.classList.toggle('waiting', !connected);
+    $('smpConnText').textContent = !connected
+      ? '⚪ 等待主屏连接 …（在主屏按 P 打开本视图）'
+      : (forwardFollow
+        ? '🟢 已连接 · 跟随翻页中 · 第 ' + (lastIdx + 1) + '/' + total + ' 张'
+        : '⏸ 已连接 · 正向跟随关 · 可自由滚动讲稿');
+  }
+
+  // ---------- receive ----------
+  window.addEventListener('message', function (e) {
+    var d = e && e.data; if (!d || typeof d !== 'object') return;
+    if (d.type === MSG + ':state') { applyState(d); }
+    else if (d.type === MSG + ':ping') { lastBeat = beatNow(); setConn(true); }
+    else if (d.type === MSG + ':anchor') {           // transcript answered a query
+      var i = anchors.indexOf(d.anchor);
+      if (i >= 0) { reverseJump(i); toast('← 同步：主屏跳到第 ' + (i + 1) + ' 张'); }
+      else toast('← 同步：讲稿当前位置无对应幻灯片');
+    }
+    else if (d.type === MSG + ':toc') {              // TOC click inside transcript
+      var j = anchors.indexOf(d.anchor); if (j >= 0 && j !== lastIdx) reverseJump(j);
+    }
+    else if (d.type === MSG + ':key') { handleKey(d.key); }
+    else if (d.type === MSG + ':ready') { applyCue(); if (lastAnchor) scrollScript(lastAnchor); }
+  });
+
+  // ---------- reverse: drive the deck ----------
+  function reverseJump(idx) {
+    idx = Math.max(0, Math.min(total - 1, idx));
+    toDeck({ type: MSG + ':jump', idx: idx });
+    lastIdx = idx;
+  }
+  function reverseNav(dir) {
+    if (!hasDeck()) { toast('未连接主屏 · 仅滚动讲稿'); scrollBy(dir); return; }
+    reverseJump(lastIdx < 0 ? 0 : lastIdx + dir);
+  }
+  function hasDeck() { try { return window.opener && !window.opener.closed; } catch (e) { return false; } }
+  function scrollBy(dir) { try { iframe.contentWindow.scrollBy(0, dir * iframe.clientHeight * 0.85); } catch (e) {} }
+
+  function forwardSync() {
+    if (lastIdx < 0) { toast('尚未收到主屏状态'); return; }
+    var a = anchors[lastIdx] || anchors[0]; scrollScript(a); lastAnchor = a;
+    toast('→ 同步：讲稿跳到第 ' + (lastIdx + 1) + ' 张');
+  }
+  function reverseSync() { toScript({ type: MSG + ':query' }); }
+
+  // ---------- timer ----------
+  var tRunning = true, tStart = 0, tElapsed = 0, beatBase = 0;
+  // Date.now-free monotonic-ish clock via performance.now
+  function beatNow() { return (window.performance && performance.now) ? performance.now() : 0; }
+  function nowSec() { return Math.floor(beatNow() / 1000); }
+  function fmt(s) {
+    var h = String(Math.floor(s / 3600)).padStart(2, '0');
+    var m = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+    var x = String(s % 60).padStart(2, '0'); return h + ':' + m + ':' + x;
+  }
+  function tick() {
+    var t = tElapsed + (tRunning ? (nowSec() - tStart) : 0);
+    $('smpTimer').textContent = fmt(Math.max(0, t));
+    // heartbeat watchdog: no beat for 3.5s -> show waiting
+    if (lastBeat && beatNow() - lastBeat > 3500) setConn(false);
+  }
+  tStart = nowSec();
+  setInterval(tick, 1000);
+  function toggleTimer() {
+    if (tRunning) { tElapsed += nowSec() - tStart; tRunning = false; $('smpTimerToggle').textContent = '继续'; $('smpTimer').classList.add('paused'); toast('⏸ 计时暂停'); }
+    else { tStart = nowSec(); tRunning = true; $('smpTimerToggle').textContent = '暂停'; $('smpTimer').classList.remove('paused'); toast('▶ 计时继续'); }
+  }
+  function resetTimer() { tElapsed = 0; tStart = nowSec(); tRunning = true; $('smpTimerToggle').textContent = '暂停'; $('smpTimer').classList.remove('paused'); tick(); toast('↻ 计时重置'); }
+
+  // ---------- zoom ----------
+  function zoomIn() { zoom = Math.min(2, zoom + 0.1); iframe.style.zoom = zoom; toast('字号 ' + Math.round(zoom * 100) + '%'); }
+  function zoomOut() { zoom = Math.max(0.6, zoom - 0.1); iframe.style.zoom = zoom; toast('字号 ' + Math.round(zoom * 100) + '%'); }
+
+  // ---------- toggles ----------
+  function paintToggle(btn, on, labelOn, labelOff) { btn.classList.toggle('on', on); btn.classList.toggle('off', !on); btn.textContent = on ? labelOn : labelOff; }
+  function refreshToggles() {
+    paintToggle($('smpFwd'), forwardFollow, '→ 跟随 开', '→ 跟随 关');
+    paintToggle($('smpRev'), reverseFollow, '← 跟随 开', '← 跟随 关');
+    paintToggle($('smpCue'), cueOn, '✦ 提词 开', '✦ 提词 关');
+  }
+  function toggleFwd() { forwardFollow = !forwardFollow; refreshToggles(); setConn(hasBeat()); toast(forwardFollow ? '→ 正向跟随 开' : '→ 正向跟随 关 · 可自由滚动讲稿'); if (forwardFollow && lastIdx >= 0) { var a = anchors[lastIdx]; if (a) { scrollScript(a); lastAnchor = a; } } }
+  function toggleRev() { reverseFollow = !reverseFollow; refreshToggles(); toast(reverseFollow ? '← 反向跟随 开 · 按键联动主屏' : '← 反向跟随 关 · 按键仅滚讲稿'); }
+  function applyCue() { paintToggle($('smpCue'), cueOn, '✦ 提词 开', '✦ 提词 关'); toScript({ type: MSG + ':cue', on: cueOn }); }
+  function toggleCue() { cueOn = !cueOn; applyCue(); toast(cueOn ? '✦ 关键词提词 开 · 当前块的强调词会亮' : '✦ 关键词提词 关'); }
+  function hasBeat() { return lastBeat && beatNow() - lastBeat < 3500; }
+
+  // ---------- collapse ----------
+  var collapsed = false;
+  function toggleCollapse() { collapsed = !collapsed; document.body.classList.toggle('collapsed', collapsed); $('smpHide').textContent = collapsed ? '☰' : '👁'; }
+
+  // ---------- fullscreen on second screen (best effort) ----------
+  function goFullscreen() {
+    var el = document.documentElement;
+    if (window.getScreenDetails) {
+      window.getScreenDetails().then(function (sd) {
+        var other = sd.screens.filter(function (s) { return s !== sd.currentScreen; })[0] || sd.currentScreen;
+        try { el.requestFullscreen({ screen: other }); } catch (e) { try { el.requestFullscreen(); } catch (e2) {} }
+      }).catch(function () { try { el.requestFullscreen(); } catch (e) {} });
+    } else { try { el.requestFullscreen(); } catch (e) {} }
+  }
+
+  // ---------- keyboard ----------
+  function handleKey(key) {
+    if (key === 'ArrowRight' || key === 'ArrowDown' || key === 'PageDown' || key === ' ') {
+      if (reverseFollow) reverseNav(1); else scrollBy(1); return true;
+    }
+    if (key === 'ArrowLeft' || key === 'ArrowUp' || key === 'PageUp') {
+      if (reverseFollow) reverseNav(-1); else scrollBy(-1); return true;
+    }
+    var k = (key || '').toLowerCase();
+    if (k === 'l') { toggleFwd(); return true; }
+    if (k === 'j') { toggleRev(); return true; }
+    if (k === 's') { forwardSync(); return true; }
+    if (k === 'd') { reverseSync(); return true; }
+    if (k === 'k') { toggleCue(); return true; }
+    if (k === 'h') { toggleCollapse(); return true; }
+    if (k === 'f') { goFullscreen(); return true; }
+    if (k === 'r') { resetTimer(); return true; }
+    if (k === '=' || k === '+') { zoomIn(); return true; }
+    if (k === '-' || k === '_') { zoomOut(); return true; }
+    return false;
+  }
+  document.addEventListener('keydown', function (e) {
+    if (e.target && e.target.matches && e.target.matches('input,textarea,select')) return;
+    if (handleKey(e.key)) e.preventDefault();
+  });
+
+  // ---------- wire buttons ----------
+  function on(id, fn) { var el = $(id); if (el) el.addEventListener('click', fn); }
+  on('smpFwd', toggleFwd); on('smpRev', toggleRev); on('smpCue', toggleCue);
+  on('smpFwdSync', forwardSync); on('smpRevSync', reverseSync);
+  on('smpZoomIn', zoomIn); on('smpZoomOut', zoomOut);
+  on('smpFull', goFullscreen); on('smpHide', toggleCollapse);
+  on('smpTimerToggle', toggleTimer); on('smpTimerReset', resetTimer);
+  refreshToggles();
+
+  // ---------- boot ----------
+  $('smpTotal').textContent = total;
+  // resolve transcript URL: explicit boot value, else convention from our own path
+  var transcriptUrl = boot.transcriptUrl || location.href.replace(/\.presenter\.html?(\?|#|$)/i, '.transcript.html$1');
+  iframe.setAttribute('src', transcriptUrl);
+  iframe.addEventListener('load', function () { applyCue(); if (lastAnchor) scrollScript(lastAnchor); });
+  // ask the deck for the current state right away (handshake)
+  toDeck({ type: MSG + ':hello' });
+  setConn(false);
+  setTimeout(function () { if (lastIdx < 0) toast('💡 在主屏按 P 打开，或翻一页即可同步', 3000); }, 1400);
+})();
+
+</script>
+</body>
+</html>

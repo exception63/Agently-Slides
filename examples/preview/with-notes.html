@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>带讲稿样例</title>
+<style>
+/* ===== Slidesmith runtime: structural mechanics (theme-agnostic) ===== */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body.sm { overflow: hidden; background: #202022; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
+
+/* top bar */
+.sm-topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 46px; z-index: 50;
+  display: flex; align-items: center; gap: 14px; padding: 0 16px;
+  background: #1b1b1d; color: #e9e9e9; font-size: 13px;
+}
+.sm-progress { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #333; }
+.sm-progress__bar { height: 100%; width: 0; background: #B5402A; transition: width 0.2s ease; }
+.sm-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.92; }
+.sm-counter { font-variant-numeric: tabular-nums; opacity: 0.8; }
+
+/* sidebar */
+.sm-sidebar {
+  position: fixed; top: 46px; left: 0; bottom: 0; width: 248px; z-index: 40;
+  background: #161618; color: #c8c8c8; overflow: auto; padding: 12px;
+}
+.sm-segnav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.sm-seg {
+  text-align: left; background: transparent; border: 0; color: #bcbcbc;
+  padding: 7px 9px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px;
+  border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sm-seg:hover { background: #232325; }
+.sm-seg.active { color: #fff; background: #232325; border-left-color: #B5402A; }
+.sm-thumbs { display: flex; flex-direction: column; gap: 9px; }
+.sm-thumb {
+  width: 222px; height: 124px; overflow: hidden; position: relative;
+  border: 2px solid #2a2a2c; border-radius: 5px; cursor: pointer; background: #000;
+}
+.sm-thumb.active { border-color: #B5402A; }
+.sm-thumb .slide {
+  position: absolute; top: 0; left: 0; display: block !important;
+  transform: scale(0.11354); transform-origin: top left; box-shadow: none;
+}
+.sm-thumb-num {
+  position: absolute; bottom: 3px; right: 5px; font-size: 10px; color: #fff;
+  background: rgba(0,0,0,0.55); padding: 0 5px; border-radius: 3px; line-height: 15px;
+}
+
+/* stage */
+.sm-stage {
+  position: absolute; top: 46px; left: 248px; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 18px;
+}
+.slide {
+  width: 1920px; height: 1080px; flex: 0 0 auto; display: none;
+  transform: scale(var(--sm-scale, 1)); transform-origin: center center;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.5); overflow: hidden;
+}
+.slide.active { display: block; }
+
+/* floating nav buttons */
+.sm-nav { position: fixed; bottom: 18px; right: 18px; display: flex; gap: 8px; z-index: 60; }
+.sm-btn {
+  background: #2a2a2c; color: #ececec; border: 1px solid #3a3a3c; border-radius: 7px;
+  padding: 6px 12px; cursor: pointer; font-size: 16px; line-height: 1;
+}
+.sm-btn:hover { background: #343437; }
+
+/* present / fullscreen mode hides chrome */
+body.sm.present .sm-topbar,
+body.sm.present .sm-sidebar { display: none; }
+body.sm.present .sm-stage { top: 0; left: 0; padding: 0; }
+body.sm.present .slide { box-shadow: none; }
+
+/* ===== declarative animations (opt-in via block.build -> [data-anim*]) =====
+   Hidden initial state applies ONLY to the active stage slide (not thumbnail
+   clones) and only when animations are enabled (body.anim). The `B` key drops
+   body.anim to disable; reduced-motion never adds it. Per-element / per-item
+   delays are set inline by the runtime; keyframes live here. */
+/* expoOut easing (huashu "anti-cheap" curve): fast start, slow settle */
+body.sm.anim .sm-deck > .slide.active [data-anim] { opacity: 0; animation-fill-mode: both; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="fade"] { animation-name: sm-fade; animation-duration: 0.5s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="rise"] { animation-name: sm-rise; animation-duration: 0.55s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="fade-up"] { animation-name: sm-rise; animation-duration: 0.55s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="pop"] { animation-name: sm-pop; animation-duration: 0.5s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="in-left"] { animation-name: sm-in-left; animation-duration: 0.55s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="in-right"] { animation-name: sm-in-right; animation-duration: 0.55s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="counter-up"] { animation-name: sm-fade; animation-duration: 0.5s; }
+/* stagger-list: container shows immediately, its items rise one by one */
+body.sm.anim .sm-deck > .slide.active [data-anim="stagger-list"] { opacity: 1; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="stagger-list"] li { opacity: 0; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="stagger-list"] li { animation: sm-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes sm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sm-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes sm-pop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes sm-in-left { from { opacity: 0; transform: translateX(-48px); } to { opacity: 1; transform: none; } }
+@keyframes sm-in-right { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+
+/* ===== continuous MOTION effects (block.build.motion -> [data-motion]) =====
+   Ambient loops ported from keynote.html (glow=kl-breathe 呼吸灯, neon, stress)
+   + huashu (breathe, float, pulse). Run while shown; honor B-toggle + reduced-
+   motion. A growing library: add a name in IR MOTION_NAMES + a keyframe here. */
+body.sm.anim .sm-deck > .slide [data-motion] { will-change: transform, opacity, filter; }
+body.sm.anim .sm-deck > .slide [data-motion="glow"] { animation: sm-m-glow 3.2s ease-in-out infinite; }
+body.sm.anim .sm-deck > .slide [data-motion="breathe"] { animation: sm-m-breathe 3.6s ease-in-out infinite; transform-origin: center; }
+body.sm.anim .sm-deck > .slide [data-motion="float"] { animation: sm-m-float 3.4s ease-in-out infinite; }
+body.sm.anim .sm-deck > .slide [data-motion="pulse"] { animation: sm-m-pulse 2s ease-in-out infinite; }
+body.sm.anim .sm-deck > .slide [data-motion="neon"] { animation: sm-m-neon 5.5s linear infinite; }
+body.sm.anim .sm-deck > .slide [data-motion="stress"] { animation: sm-m-stress 4.2s ease-in-out infinite; transform-origin: center; }
+@keyframes sm-m-glow { 0%, 100% { filter: drop-shadow(0 0 1px transparent); } 50% { filter: drop-shadow(0 0 16px var(--accent, #F4B73E)); } }
+@keyframes sm-m-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes sm-m-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@keyframes sm-m-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes sm-m-neon { 0%, 16%, 18%, 55%, 57%, 100% { opacity: 1; } 17%, 56% { opacity: 0.7; } 80%, 82% { opacity: 0.88; } }
+@keyframes sm-m-stress { 0%, 38%, 100% { transform: scale(1); } 45% { transform: scale(1.06); } }
+
+@media (prefers-reduced-motion: reduce) {
+  body.sm .sm-deck > .slide [data-anim],
+  body.sm .sm-deck > .slide [data-anim="stagger-list"] li { opacity: 1 !important; animation: none !important; }
+  body.sm .sm-deck > .slide [data-motion] { animation: none !important; }
+}
+
+/* ===== print / PDF export: one slide per page at full 1920x1080 ===== */
+@media print {
+  @page { size: 1920px 1080px; margin: 0; }
+  html, body.sm { overflow: visible; height: auto; background: #fff; }
+  .sm-topbar, .sm-sidebar, .sm-nav { display: none !important; }
+  .sm-stage { position: static; top: 0; left: 0; right: 0; bottom: auto; padding: 0; display: block; overflow: visible; }
+  .sm-deck { display: block; }
+  .slide {
+    display: block !important; position: relative; width: 1920px; height: 1080px;
+    transform: none !important; box-shadow: none; overflow: hidden;
+    page-break-after: always; break-after: page;
+  }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  /* never hide animated blocks in print/export */
+  body.sm .slide [data-anim],
+  body.sm .slide [data-anim="stagger-list"] li { opacity: 1 !important; animation: none !important; }
+}
+
+</style>
+<style data-sm-theme="keynote-dark" media="not all">
+/* ===== Slidesmith theme: keynote-dark (flagship) =====
+   Theatrical dark keynote: near-black bg + massive light text + single amber
+   accent. Ported from the user's keynote-target.html (docs/style-reference).
+   Shares the same class contract as `editorial`, so any deck re-skins by
+   swapping this file — no content changes. Offline: system font fallbacks. */
+
+:root {
+  /* color */
+  --bg: #0C0D11;
+  --surface: #16181E;
+  --surface-2: #1C1F27;
+  --ink: #F5F6F8;
+  --ink-2: #C2C6D0;
+  --muted: #8B91A0;
+  --ink-4: #5E636F;
+  --accent: #F4B73E;
+  --accent-2: #D99828;
+  --accent-fg: #0C0D11;
+  --accent-soft: rgba(244, 183, 62, 0.15);
+  --navy: #5BC8DE;
+  --gold: #F4B73E;
+  --green: #5FD09A;
+  --bad: #FF6B5B;
+  --link: #5BC8DE;
+  --border: rgba(255, 255, 255, 0.12);
+  --rule-strong: rgba(255, 255, 255, 0.22);
+
+  /* fonts: display = Space Grotesk if present, else system; CJK-correct fallbacks; zero-download */
+  --font-display: "Space Grotesk", "Inter", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-body: "Inter", "Space Grotesk", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, "Noto Sans Mono CJK SC", monospace;
+  --font-serif: "Newsreader", "Noto Serif CJK SC", "Songti SC", "Source Han Serif SC", serif;
+
+  /* type scale (keynote: big + low-density) */
+  --fs-display: 168px;
+  --fs-h1: 108px;
+  --fs-h2: 76px;
+  --fs-h3: 52px;
+  --fs-body: 32px;
+  --fs-small: 26px;
+  --fs-caption: 20px;
+  --lh-cjk: 1.45;
+
+  --pad-x: 130px;
+  --pad-y: 96px;
+}
+
+/* ---- slide base ---- */
+.slide {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  text-autospace: normal;
+  text-spacing-trim: normal;
+  -webkit-font-smoothing: antialiased;
+}
+.slide__inner {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--pad-y) var(--pad-x);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+}
+
+/* ---- typography ---- */
+.slide h1, .slide h2, .slide h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.06;
+  letter-spacing: -0.02em;
+  margin: 0 0 0.3em;
+  color: var(--ink);
+}
+.slide h1 { font-size: var(--fs-h1); }
+.slide h2 { font-size: var(--fs-h2); }
+.slide h3 { font-size: var(--fs-h3); color: var(--muted); font-weight: 600; letter-spacing: 0; }
+.slide p { font-size: var(--fs-body); line-height: 1.55; margin: 0 0 0.5em; color: var(--ink-2); }
+.slide strong { color: var(--ink); font-weight: 700; }
+.slide em { color: var(--accent); font-style: normal; font-family: inherit; }
+.slide a, .slide .c-link { color: var(--link); }
+
+/* bullets: amber dash markers (keynote motif) */
+.slide .list { font-size: var(--fs-body); line-height: 1.5; margin: 0; padding-left: 0; list-style: none; color: var(--ink-2); }
+.slide .list li { margin: 0.5em 0; padding-left: 1.5em; position: relative; }
+.slide .list li::before { content: ""; position: absolute; left: 0; top: 0.62em; width: 22px; height: 3px; background: var(--accent); }
+
+.slide .quote { font-family: var(--font-serif); font-size: var(--fs-h2); line-height: 1.22; margin: 0; border: 0; color: var(--ink); }
+.slide .quote p { font-size: inherit; line-height: inherit; margin: 0; }
+.slide .quote cite { display: block; font-family: var(--font-mono); font-size: var(--fs-small); color: var(--muted); font-style: normal; letter-spacing: 0.06em; margin-top: 0.7em; text-transform: uppercase; }
+.slide .quote cite::before { content: "— "; }
+
+.slide .code { font-family: var(--font-mono); font-size: var(--fs-small); background: var(--night, #05060A); color: var(--green); border: 1px solid var(--border); padding: 0.7em 0.9em; border-radius: 6px; overflow: auto; line-height: 1.5; }
+.slide .fig { margin: 0; display: flex; flex-direction: column; height: 100%; }
+.slide .fig img { width: 100%; height: 100%; min-height: 0; border: 1px solid var(--border); }
+.slide .fig img.fit-cover { object-fit: cover; }
+.slide .fig img.fit-contain { object-fit: contain; }
+.slide .fig figcaption { font-family: var(--font-mono); font-size: var(--fs-caption); color: var(--ink-4); margin-top: 0.5em; letter-spacing: 0.1em; text-transform: uppercase; }
+
+.slide .table { border-collapse: collapse; font-size: var(--fs-small); width: 100%; color: var(--ink-2); }
+.slide .table th, .slide .table td { border: 0; border-bottom: 1px solid var(--border); padding: 0.55em 0.9em; text-align: left; }
+.slide .table th { font-family: var(--font-mono); color: var(--accent); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 2px solid var(--accent); }
+
+.slide .group { display: flex; gap: 36px; }
+.slide .group-col { flex-direction: column; }
+.slide .group-row { flex-direction: row; }
+/* cards inside groups: elevated panel + accent top-border (keynote cards motif) */
+.slide .group-row > .blk, .slide .group-row > .group { background: var(--surface); border-top: 3px solid var(--accent); padding: 28px 32px; flex: 1; }
+
+/* ---- token utility classes (driven by block.style; always win) ---- */
+.c-bg { color: var(--bg) !important; }
+.c-surface { color: var(--surface) !important; }
+.c-ink { color: var(--ink) !important; }
+.c-muted { color: var(--muted) !important; }
+.c-accent { color: var(--accent) !important; }
+.c-accent-fg { color: var(--accent-fg) !important; }
+.c-link { color: var(--link) !important; }
+.c-border { color: var(--border) !important; }
+.fs-display { font-size: var(--fs-display) !important; line-height: 1.0; font-family: var(--font-display); letter-spacing: -0.03em; }
+.fs-h1 { font-size: var(--fs-h1) !important; }
+.fs-h2 { font-size: var(--fs-h2) !important; }
+.fs-h3 { font-size: var(--fs-h3) !important; }
+.fs-body { font-size: var(--fs-body) !important; }
+.fs-small { font-size: var(--fs-small) !important; }
+.fs-caption { font-size: var(--fs-caption) !important; }
+.al-start { text-align: start !important; }
+.al-center { text-align: center !important; }
+.al-end { text-align: end !important; }
+.w-normal { font-weight: 400 !important; }
+.w-medium { font-weight: 500 !important; }
+.w-bold { font-weight: 700 !important; }
+
+/* ---- layouts ---- */
+.slide__inner.layout-cover { justify-content: center; gap: 0.2em; }
+.slide__inner.layout-cover .slot-main { display: flex; flex-direction: column; gap: 0.18em; }
+
+.slide__inner.layout-section { justify-content: center; }
+.slide__inner.layout-section .slot-main { border-left: 4px solid var(--accent); padding-left: 0.55em; }
+
+.slide__inner.layout-statement { justify-content: center; }
+.slide__inner.layout-statement .slot-main { max-width: 24ch; }
+.slide__inner.layout-statement h1, .slide__inner.layout-statement h2 { font-size: 132px; line-height: 1.05; }
+
+.slide__inner.layout-bullets { justify-content: center; }
+
+.slide__inner.layout-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 72px; align-items: center; }
+.slide__inner.layout-two-col .slot { min-width: 0; }
+
+.slide__inner.layout-data-stat { justify-content: center; align-items: center; text-align: center; }
+.slide__inner.layout-data-stat .slot-main { display: flex; flex-direction: column; align-items: center; gap: 0.05em; }
+.slide__inner.layout-data-stat .list li::before { display: none; }
+
+.slide__inner.layout-quote { justify-content: center; }
+
+.slide__inner.layout-end { justify-content: center; align-items: center; text-align: center; }
+
+</style>
+<style data-sm-theme="editorial" media="all">
+/* ===== Slidesmith theme: editorial (magazine / CJK) =====
+   Tokens -> CSS custom properties. Content references semantic token NAMES;
+   this theme resolves them. Swap this file to re-skin without touching content. */
+
+:root {
+  /* color */
+  --bg: #F4EFE4;
+  --surface: #FBF8F0;
+  --ink: #16181A;
+  --muted: #6E6A5E;
+  --accent: #B5402A;
+  --accent-2: #8E2F1D;
+  --accent-fg: #FBF8F0;
+  --navy: #1B2B4F;
+  --gold: #A07A3A;
+  --link: #1B2B4F;
+  --border: #D9CFBA;
+
+  /* fonts: system stacks => zero-download, offline, CJK-correct (font subsetting comes later) */
+  --font-display: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "SFMono-Regular", Menlo, Consolas, "Noto Sans Mono CJK SC", monospace;
+
+  /* type scale */
+  --fs-display: 150px;
+  --fs-h1: 96px;
+  --fs-h2: 64px;
+  --fs-h3: 40px;
+  --fs-body: 30px;
+  --fs-small: 24px;
+  --fs-caption: 20px;
+  --lh-cjk: 1.5;
+
+  --pad-x: 110px;
+  --pad-y: 90px;
+}
+
+/* ---- slide base ---- */
+.slide {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  text-autospace: normal;       /* CJK <-> Latin/number auto spacing (progressive) */
+  text-spacing-trim: normal;
+}
+.slide__inner {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--pad-y) var(--pad-x);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+
+/* ---- typography ---- */
+.slide h1, .slide h2, .slide h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0 0 0.35em;
+  color: var(--ink);
+}
+.slide h1 { font-size: var(--fs-h1); }
+.slide h2 { font-size: var(--fs-h2); }
+.slide h3 { font-size: var(--fs-h3); color: var(--muted); }
+.slide p { font-size: var(--fs-body); line-height: var(--lh-cjk); margin: 0 0 0.5em; }
+.slide strong { color: var(--accent); font-weight: 700; }
+.slide em { color: var(--accent); font-style: normal; }
+.slide a, .slide .c-link { color: var(--link); }
+
+.slide .list { font-size: var(--fs-body); line-height: var(--lh-cjk); margin: 0; padding-left: 1.1em; }
+.slide .list li { margin: 0.28em 0; }
+.slide .list li::marker { color: var(--accent); }
+
+.slide .quote { font-family: var(--font-display); font-size: var(--fs-h2); line-height: 1.25; margin: 0; border: 0; }
+.slide .quote p { font-size: inherit; line-height: inherit; margin: 0; }
+.slide .quote cite { display: block; font-family: var(--font-body); font-size: var(--fs-small); color: var(--muted); font-style: normal; margin-top: 0.6em; }
+.slide .quote cite::before { content: "— "; }
+
+.slide .code { font-family: var(--font-mono); font-size: var(--fs-small); background: var(--surface); border: 1px solid var(--border); padding: 0.6em 0.8em; border-radius: 8px; overflow: auto; line-height: 1.45; }
+.slide .fig { margin: 0; display: flex; flex-direction: column; height: 100%; }
+.slide .fig img { width: 100%; height: 100%; min-height: 0; }
+.slide .fig img.fit-cover { object-fit: cover; }
+.slide .fig img.fit-contain { object-fit: contain; }
+.slide .fig figcaption { font-size: var(--fs-caption); color: var(--muted); margin-top: 0.4em; }
+
+.slide .table { border-collapse: collapse; font-size: var(--fs-small); width: 100%; }
+.slide .table th, .slide .table td { border: 1px solid var(--border); padding: 0.5em 0.8em; text-align: left; }
+.slide .table th { background: var(--surface); font-weight: 700; }
+
+.slide .group { display: flex; gap: 32px; }
+.slide .group-col { flex-direction: column; }
+.slide .group-row { flex-direction: row; }
+
+/* ---- token utility classes (driven by block.style; always win over component rules) ---- */
+.c-bg { color: var(--bg) !important; }
+.c-surface { color: var(--surface) !important; }
+.c-ink { color: var(--ink) !important; }
+.c-muted { color: var(--muted) !important; }
+.c-accent { color: var(--accent) !important; }
+.c-accent-fg { color: var(--accent-fg) !important; }
+.c-link { color: var(--link) !important; }
+.c-border { color: var(--border) !important; }
+.fs-display { font-size: var(--fs-display) !important; line-height: 1.02; font-family: var(--font-display); }
+.fs-h1 { font-size: var(--fs-h1) !important; }
+.fs-h2 { font-size: var(--fs-h2) !important; }
+.fs-h3 { font-size: var(--fs-h3) !important; }
+.fs-body { font-size: var(--fs-body) !important; }
+.fs-small { font-size: var(--fs-small) !important; }
+.fs-caption { font-size: var(--fs-caption) !important; }
+.al-start { text-align: start !important; }
+.al-center { text-align: center !important; }
+.al-end { text-align: end !important; }
+.w-normal { font-weight: 400 !important; }
+.w-medium { font-weight: 500 !important; }
+.w-bold { font-weight: 700 !important; }
+
+/* ---- layouts (visual; slot containers) ---- */
+.slide__inner.layout-cover { justify-content: center; }
+.slide__inner.layout-cover .slot-main { display: flex; flex-direction: column; gap: 0.15em; }
+
+.slide__inner.layout-section { justify-content: center; }
+.slide__inner.layout-section .slot-main { border-left: 8px solid var(--accent); padding-left: 0.5em; }
+
+.slide__inner.layout-statement { justify-content: center; }
+.slide__inner.layout-statement .slot-main { max-width: 26ch; }
+
+.slide__inner.layout-bullets { justify-content: flex-start; }
+
+.slide__inner.layout-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.slide__inner.layout-two-col .slot { min-width: 0; }
+
+.slide__inner.layout-data-stat { justify-content: center; align-items: center; text-align: center; }
+.slide__inner.layout-data-stat .slot-main { display: flex; flex-direction: column; align-items: center; gap: 0.05em; }
+
+.slide__inner.layout-quote { justify-content: center; }
+
+.slide__inner.layout-end { justify-content: center; align-items: center; text-align: center; }
+
+</style>
+<style data-sm-theme="academic" media="not all">
+/* ===== Slidesmith theme: academic (clean scholarly, light) =====
+   Restrained social-science / humanities lecture look: deep indigo on warm
+   white, serif headings, generous leading, sober accents. Shares the same
+   class contract as `editorial` / `keynote-dark`. Offline: system fonts. */
+
+:root {
+  /* color */
+  --bg: #FBFAF7;
+  --surface: #F2F0EA;
+  --ink: #1A1C22;
+  --muted: #5A5E68;
+  --accent: #27406B;
+  --accent-2: #1A2C4D;
+  --accent-fg: #FBFAF7;
+  --accent-soft: rgba(39, 64, 107, 0.10);
+  --navy: #27406B;
+  --gold: #9A7B3F;
+  --green: #2E7D5B;
+  --bad: #A33A2E;
+  --link: #27406B;
+  --border: #DCD8CE;
+
+  /* fonts: serif display (scholarly), sans body; CJK-correct; zero-download */
+  --font-display: "Newsreader", "Noto Serif CJK SC", "Songti SC", "Source Han Serif SC", Georgia, serif;
+  --font-body: "Inter", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Menlo, Consolas, monospace;
+  --font-serif: var(--font-display);
+
+  /* type scale (moderate, text-forward) */
+  --fs-display: 120px;
+  --fs-h1: 80px;
+  --fs-h2: 56px;
+  --fs-h3: 38px;
+  --fs-body: 30px;
+  --fs-small: 24px;
+  --fs-caption: 20px;
+  --lh-cjk: 1.6;
+
+  --pad-x: 120px;
+  --pad-y: 96px;
+}
+
+/* ---- slide base ---- */
+.slide {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  text-autospace: normal;
+  text-spacing-trim: normal;
+  -webkit-font-smoothing: antialiased;
+}
+.slide__inner {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: var(--pad-y) var(--pad-x);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+}
+
+/* ---- typography ---- */
+.slide h1, .slide h2, .slide h3 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.18;
+  margin: 0 0 0.4em;
+  color: var(--ink);
+}
+.slide h1 { font-size: var(--fs-h1); }
+.slide h2 { font-size: var(--fs-h2); }
+.slide h3 { font-size: var(--fs-h3); color: var(--accent); font-weight: 600; }
+.slide p { font-size: var(--fs-body); line-height: var(--lh-cjk); margin: 0 0 0.55em; color: var(--ink); }
+.slide strong { color: var(--accent); font-weight: 700; }
+.slide em { color: var(--accent); font-style: italic; }
+.slide a, .slide .c-link { color: var(--link); text-decoration: underline; text-underline-offset: 3px; }
+
+.slide .list { font-size: var(--fs-body); line-height: var(--lh-cjk); margin: 0; padding-left: 1.2em; color: var(--ink); }
+.slide .list li { margin: 0.32em 0; }
+.slide .list li::marker { color: var(--accent); }
+
+.slide .quote { font-family: var(--font-display); font-style: italic; font-size: var(--fs-h2); line-height: 1.3; margin: 0; border: 0; color: var(--ink); }
+.slide .quote p { font-size: inherit; line-height: inherit; margin: 0; }
+.slide .quote cite { display: block; font-family: var(--font-body); font-style: normal; font-size: var(--fs-small); color: var(--muted); margin-top: 0.7em; }
+.slide .quote cite::before { content: "— "; }
+
+.slide .code { font-family: var(--font-mono); font-size: var(--fs-small); background: var(--surface); border: 1px solid var(--border); padding: 0.6em 0.85em; border-radius: 4px; overflow: auto; line-height: 1.5; }
+.slide .fig { margin: 0; display: flex; flex-direction: column; height: 100%; }
+.slide .fig img { width: 100%; height: 100%; min-height: 0; border: 1px solid var(--border); }
+.slide .fig img.fit-cover { object-fit: cover; }
+.slide .fig img.fit-contain { object-fit: contain; }
+.slide .fig figcaption { font-size: var(--fs-caption); color: var(--muted); margin-top: 0.5em; font-style: italic; }
+
+.slide .table { border-collapse: collapse; font-size: var(--fs-small); width: 100%; }
+.slide .table th, .slide .table td { border: 1px solid var(--border); padding: 0.5em 0.85em; text-align: left; }
+.slide .table th { background: var(--surface); font-weight: 700; color: var(--accent); }
+
+.slide .group { display: flex; gap: 32px; }
+.slide .group-col { flex-direction: column; }
+.slide .group-row { flex-direction: row; }
+
+/* ---- token utility classes ---- */
+.c-bg { color: var(--bg) !important; }
+.c-surface { color: var(--surface) !important; }
+.c-ink { color: var(--ink) !important; }
+.c-muted { color: var(--muted) !important; }
+.c-accent { color: var(--accent) !important; }
+.c-accent-fg { color: var(--accent-fg) !important; }
+.c-link { color: var(--link) !important; }
+.c-border { color: var(--border) !important; }
+.fs-display { font-size: var(--fs-display) !important; line-height: 1.05; font-family: var(--font-display); }
+.fs-h1 { font-size: var(--fs-h1) !important; }
+.fs-h2 { font-size: var(--fs-h2) !important; }
+.fs-h3 { font-size: var(--fs-h3) !important; }
+.fs-body { font-size: var(--fs-body) !important; }
+.fs-small { font-size: var(--fs-small) !important; }
+.fs-caption { font-size: var(--fs-caption) !important; }
+.al-start { text-align: start !important; }
+.al-center { text-align: center !important; }
+.al-end { text-align: end !important; }
+.w-normal { font-weight: 400 !important; }
+.w-medium { font-weight: 500 !important; }
+.w-bold { font-weight: 700 !important; }
+
+/* ---- layouts ---- */
+.slide__inner.layout-cover { justify-content: center; }
+.slide__inner.layout-cover .slot-main { display: flex; flex-direction: column; gap: 0.2em; }
+
+.slide__inner.layout-section { justify-content: center; }
+.slide__inner.layout-section .slot-main { border-left: 6px solid var(--accent); padding-left: 0.5em; }
+
+.slide__inner.layout-statement { justify-content: center; }
+.slide__inner.layout-statement .slot-main { max-width: 26ch; }
+
+.slide__inner.layout-bullets { justify-content: flex-start; }
+
+.slide__inner.layout-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center; }
+.slide__inner.layout-two-col .slot { min-width: 0; }
+
+.slide__inner.layout-data-stat { justify-content: center; align-items: center; text-align: center; }
+.slide__inner.layout-data-stat .slot-main { display: flex; flex-direction: column; align-items: center; gap: 0.05em; }
+
+.slide__inner.layout-quote { justify-content: center; }
+
+.slide__inner.layout-end { justify-content: center; align-items: center; text-align: center; }
+
+</style>
+</head>
+<body class="sm">
+<script>try{if(!(window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches))document.body.classList.add('anim');}catch(e){}</script>
+<div class="sm-topbar">
+  <div class="sm-progress"><div class="sm-progress__bar"></div></div>
+  <div class="sm-title">带讲稿样例</div>
+  <div class="sm-counter"><span class="cur">1</span>/<span class="total">3</span></div>
+</div>
+<aside class="sm-sidebar"><nav class="sm-segnav"></nav><div class="sm-thumbs"></div></aside>
+<div class="sm-nav">
+  <button class="sm-btn" data-act="present" title="演讲者视图 (P)">&#128483;</button>
+  <button class="sm-btn" data-act="prev" title="上一页 (←)">&lsaquo;</button>
+  <button class="sm-btn" data-act="next" title="下一页 (→)">&rsaquo;</button>
+  <button class="sm-btn" data-act="fs" title="全屏 (F)">&#9974;</button>
+</div>
+<main class="sm-stage"><div class="sm-deck">
+<section class="slide" id="s1" data-layout="cover" data-seg="1" data-segname="段1 · 开场"><div class="slide__inner layout-cover"><div class="slot slot-main"><h1 class="blk h fs-display" data-bid="c1">同步演示</h1></div></div></section>
+<section class="slide" id="s2" data-layout="data-stat" data-seg="1"><div class="slide__inner layout-data-stat"><div class="slot slot-main"><h1 class="blk h c-accent fs-display" data-bid="c2" data-anim="counter-up">18%</h1><p class="blk p c-muted" data-bid="c3">季度增长</p></div></div></section>
+<section class="slide" id="s3" data-layout="quote" data-seg="2" data-segname="段2 · 收尾"><div class="slide__inner layout-quote"><div class="slot slot-main"><blockquote class="blk quote" data-bid="c4"><p>让 AI 生成，让人类精修。</p><cite>Slidesmith</cite></blockquote></div></div></section>
+</div></main>
+<script>window.__SM__={"anchors":["s1","s2","s3"],"titles":["同步演示","18%","让 AI 生成，让人类精修。"],"segs":["1","1","2"],"segNames":["段1 · 开场","","段2 · 收尾"],"channel":"deck-demo-notes","total":3,"theme":"editorial","themes":["keynote-dark","editorial","academic"]};</script>
+<script>
+/* Slidesmith deck runtime. Reads window.__SM__ + the DOM. No dependencies. */
+(function () {
+  'use strict';
+  var boot = window.__SM__ || {};
+  var slides = [].slice.call(document.querySelectorAll('.sm-deck > .slide'));
+  var total = slides.length;
+  var idx = 0;
+
+  var stage = document.querySelector('.sm-stage');
+  var bar = document.querySelector('.sm-progress__bar');
+  var curEl = document.querySelector('.sm-counter .cur');
+  var totalEl = document.querySelector('.sm-counter .total');
+  var segnav = document.querySelector('.sm-segnav');
+  var thumbs = document.querySelector('.sm-thumbs');
+  var groups = [];
+
+  // --- presenter (second screen) sync ---
+  var MSG = 'sm';
+  var anchors = boot.anchors || [];
+  var titles = boot.titles || [];
+  var segs = boot.segs || [];
+  var segNames = boot.segNames || [];
+  var presenterWin = null;
+
+  // --- themes (runtime switch) + animations ---
+  var themeNames = boot.themes || (boot.theme ? [boot.theme] : []);
+  var themeIdx = Math.max(0, themeNames.indexOf(boot.theme));
+  var reduceMotion = false;
+  try { reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  if (!reduceMotion) document.body.classList.add('anim');
+
+  if (totalEl) totalEl.textContent = String(total);
+  buildSegNav();
+  buildThumbs();
+
+  document.addEventListener('keydown', onKey);
+  window.addEventListener('resize', scaleActive);
+  document.addEventListener('fullscreenchange', onFsChange);
+  window.addEventListener('message', onMessage);
+  window.addEventListener('beforeunload', function () { try { if (presenterWin) presenterWin.close(); } catch (e) {} });
+  setInterval(heartbeat, 1000);
+
+  bindAct('prev', function () { go(idx - 1); });
+  bindAct('next', function () { go(idx + 1); });
+  bindAct('fs', toggleFs);
+  bindAct('present', openPresenter);
+
+  // minimal hook for headless PNG export (slidesmith export)
+  try { window.__SM_GO__ = go; window.__SM_TOTAL__ = total; } catch (e) {}
+
+  go(0);
+
+  function bindAct(name, fn) {
+    var el = document.querySelector('[data-act="' + name + '"]');
+    if (el) el.addEventListener('click', fn);
+  }
+
+  function go(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    for (var i = 0; i < slides.length; i++) {
+      slides[i].classList.toggle('active', i === idx);
+    }
+    scaleActive();
+    updateChrome();
+    applyReveal();
+    postState();
+  }
+
+  // ----- declarative animation reveal (reads [data-anim*]) -----
+  function applyReveal() {
+    for (var i = 0; i < slides.length; i++) slides[i].classList.remove('sm-reveal');
+    var s = slides[idx];
+    if (!s || !document.body.classList.contains('anim')) return;
+    var els = s.querySelectorAll('[data-anim]');
+    for (var k = 0; k < els.length; k++) {
+      var el = els[k];
+      var d = parseFloat(el.getAttribute('data-anim-delay') || '0');
+      var st = parseFloat(el.getAttribute('data-anim-stagger') || '0');
+      if (el.getAttribute('data-anim') === 'stagger-list') {
+        var lis = el.querySelectorAll('li');
+        for (var j = 0; j < lis.length; j++) lis[j].style.animationDelay = ((d + j * (st || 90)) / 1000) + 's';
+      } else {
+        el.style.animationDelay = (d / 1000) + 's';
+      }
+    }
+    void s.offsetWidth;            // force reflow so the animation replays each visit
+    s.classList.add('sm-reveal');
+    countUpAll(s);
+  }
+
+  function countUpAll(s) {
+    var nums = s.querySelectorAll('[data-anim="counter-up"]');
+    for (var i = 0; i < nums.length; i++) countUp(nums[i]);
+  }
+  function countUp(el) {
+    if (!document.body.classList.contains('anim')) return;
+    var full = el.getAttribute('data-cu') || el.textContent;
+    el.setAttribute('data-cu', full);
+    var m = full.match(/-?\d[\d,]*\.?\d*/);
+    if (!m) return;
+    var target = parseFloat(m[0].replace(/,/g, ''));
+    if (!isFinite(target)) return;
+    var prefix = full.slice(0, m.index), suffix = full.slice(m.index + m[0].length);
+    var decimals = (m[0].split('.')[1] || '').length;
+    var dur = 900, delay = parseFloat(el.getAttribute('data-anim-delay') || '250');
+    var start = null;
+    function frame(t) {
+      if (start === null) start = t;
+      var p = Math.min(1, (t - start) / dur);
+      var e = 1 - Math.pow(1 - p, 3);
+      el.textContent = prefix + (target * e).toFixed(decimals) + suffix;
+      if (p < 1) requestAnimationFrame(frame);
+    }
+    setTimeout(function () { requestAnimationFrame(frame); }, delay);
+  }
+
+  function toggleAnim() {
+    var on = !document.body.classList.contains('anim');
+    document.body.classList.toggle('anim', on);
+    if (on) applyReveal();
+  }
+
+  // ----- runtime theme switch (T key) -----
+  function setTheme(name) {
+    var styles = document.querySelectorAll('style[data-sm-theme]');
+    for (var i = 0; i < styles.length; i++) {
+      styles[i].setAttribute('media', styles[i].getAttribute('data-sm-theme') === name ? 'all' : 'not all');
+    }
+    scaleActive();
+  }
+  function cycleTheme() {
+    if (themeNames.length < 2) return;
+    themeIdx = (themeIdx + 1) % themeNames.length;
+    setTheme(themeNames[themeIdx]);
+  }
+
+  function scaleActive() {
+    var s = slides[idx];
+    if (!s || !stage) return;
+    var r = stage.getBoundingClientRect();
+    var pad = document.body.classList.contains('present') ? 0 : 36;
+    var sc = Math.min((r.width - pad) / 1920, (r.height - pad) / 1080);
+    if (!isFinite(sc) || sc <= 0) sc = 1;
+    s.style.setProperty('--sm-scale', String(sc));
+  }
+
+  function updateChrome() {
+    if (bar) bar.style.width = ((idx + 1) / total * 100) + '%';
+    if (curEl) curEl.textContent = String(idx + 1);
+    var segItems = segnav ? segnav.querySelectorAll('.sm-seg') : [];
+    for (var i = 0; i < segItems.length; i++) {
+      var first = parseInt(segItems[i].getAttribute('data-first'), 10);
+      var last = parseInt(segItems[i].getAttribute('data-last'), 10);
+      segItems[i].classList.toggle('active', idx >= first && idx <= last);
+    }
+    var tnodes = thumbs ? thumbs.querySelectorAll('.sm-thumb') : [];
+    for (var j = 0; j < tnodes.length; j++) {
+      tnodes[j].classList.toggle('active', j === idx);
+    }
+    var act = tnodes[idx];
+    if (act && act.scrollIntoView) act.scrollIntoView({ block: 'nearest' });
+  }
+
+  function onKey(e) {
+    var k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown' || k === 'Enter') {
+      go(idx + 1); e.preventDefault();
+    } else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace') {
+      go(idx - 1); e.preventDefault();
+    } else if (k === 'Home') { go(0); e.preventDefault(); }
+    else if (k === 'End') { go(total - 1); e.preventDefault(); }
+    else if (k === 'f' || k === 'F') { toggleFs(); e.preventDefault(); }
+    else if (k === 'p' || k === 'P') { openPresenter(); e.preventDefault(); }
+    else if (k === 't' || k === 'T') { cycleTheme(); e.preventDefault(); }
+    else if (k === 'b' || k === 'B') { toggleAnim(); e.preventDefault(); }
+    else if (/^[1-9]$/.test(k)) { jumpSeg(parseInt(k, 10) - 1); e.preventDefault(); }
+  }
+
+  function toggleFs() {
+    if (document.fullscreenElement) {
+      if (document.exitFullscreen) document.exitFullscreen();
+    } else if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen();
+    }
+  }
+
+  function onFsChange() {
+    document.body.classList.toggle('present', !!document.fullscreenElement);
+    scaleActive();
+  }
+
+  function computeGroups() {
+    var out = [];
+    var cur = null;
+    for (var i = 0; i < slides.length; i++) {
+      var seg = slides[i].getAttribute('data-seg');
+      var name = slides[i].getAttribute('data-segname');
+      if (!name) {
+        name = seg ? ('段 ' + seg) : ((boot.titles && boot.titles[i]) || ('Slide ' + (i + 1)));
+      }
+      var key = seg != null ? ('seg:' + seg) : ('idx:' + i);
+      if (!cur || cur.key !== key || seg == null) {
+        cur = { key: key, name: name, first: i, last: i };
+        out.push(cur);
+      } else {
+        cur.last = i;
+      }
+    }
+    return out;
+  }
+
+  function buildSegNav() {
+    if (!segnav) return;
+    groups = computeGroups();
+    segnav.innerHTML = '';
+    groups.forEach(function (g) {
+      var b = document.createElement('button');
+      b.className = 'sm-seg';
+      b.textContent = g.name;
+      b.setAttribute('data-first', String(g.first));
+      b.setAttribute('data-last', String(g.last));
+      b.addEventListener('click', function () { go(g.first); });
+      segnav.appendChild(b);
+    });
+  }
+
+  function jumpSeg(n) {
+    if (groups[n]) go(groups[n].first);
+  }
+
+  function buildThumbs() {
+    if (!thumbs) return;
+    thumbs.innerHTML = '';
+    slides.forEach(function (s, i) {
+      var t = document.createElement('div');
+      t.className = 'sm-thumb';
+      var clone = s.cloneNode(true);
+      clone.classList.remove('active');
+      clone.removeAttribute('id');
+      clone.removeAttribute('style');
+      t.appendChild(clone);
+      var num = document.createElement('span');
+      num.className = 'sm-thumb-num';
+      num.textContent = String(i + 1);
+      t.appendChild(num);
+      t.addEventListener('click', function () { go(i); });
+      thumbs.appendChild(t);
+    });
+  }
+
+  // ===== presenter / second-screen sync (window.open + postMessage + heartbeat) =====
+  function presenterUrl() {
+    if (boot.presenterUrl) return boot.presenterUrl;
+    // convention: <name>.html -> <name>.presenter.html
+    return location.href.replace(/\.html?(\?|#|$)/i, '.presenter.html$1');
+  }
+
+  function openPresenter() {
+    try {
+      if (presenterWin && !presenterWin.closed) { presenterWin.focus(); postState(); return; }
+    } catch (e) {}
+    var features = secondScreenFeatures();
+    try { presenterWin = window.open(presenterUrl(), 'slidesmith-presenter', features); } catch (e) { presenterWin = null; }
+    // give the child a moment to wire up its listener, then push state
+    setTimeout(postState, 400);
+    setTimeout(postState, 1200);
+  }
+
+  // best-effort: place the presenter window on a different physical screen
+  function secondScreenFeatures() {
+    try {
+      if (window.screen && window.screen.availWidth) {
+        var w = Math.min(1280, window.screen.availWidth);
+        var h = Math.min(800, window.screen.availHeight);
+        return 'width=' + w + ',height=' + h + ',left=80,top=80';
+      }
+    } catch (e) {}
+    return 'width=1100,height=720';
+  }
+
+  function postState() {
+    if (!presenterWin) return;
+    var closed = false;
+    try { closed = presenterWin.closed; } catch (e) { closed = false; }
+    if (closed) { presenterWin = null; return; }
+    var msg = {
+      type: MSG + ':state', source: 'deck',
+      idx: idx, anchor: anchors[idx] || (slides[idx] && slides[idx].id) || '',
+      total: total,
+      seg: segs[idx] || '', segName: segNames[idx] || '',
+      title: titles[idx] || '',
+      prevTitle: idx > 0 ? (titles[idx - 1] || '') : '',
+      nextTitle: idx < total - 1 ? (titles[idx + 1] || '') : ''
+    };
+    try { presenterWin.postMessage(msg, '*'); } catch (e) {}
+  }
+
+  function heartbeat() {
+    if (!presenterWin) return;
+    try { if (presenterWin.closed) { presenterWin = null; return; } } catch (e) {}
+    postState(); // resending state doubles as a keep-alive / reload recovery
+  }
+
+  function onMessage(e) {
+    var d = e && e.data; if (!d || typeof d !== 'object') return;
+    if (d.source === 'deck') return;               // ignore our own echoes
+    if (d.type === MSG + ':hello') { if (e.source) presenterWin = e.source; postState(); }
+    else if (d.type === MSG + ':jump' && typeof d.idx === 'number') { go(d.idx); }
+  }
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+{
+  "ir_version": "1.0",
+  "theme": "editorial",
+  "metadata": { "title": "带讲稿样例", "channel": "deck-demo-notes" },
+  "slides": [
+    {
+      "id": "s1",
+      "seg": "1",
+      "segName": "段1 · 开场",
+      "layout": "cover",
+      "notes": "封面讲稿：开场用 **一句话** 点题，停顿两秒。",
+      "slots": {
+        "main": [{ "id": "c1", "type": "heading", "text": "同步演示", "level": 1, "style": { "size": "display" } }]
+      }
+    },
+    {
+      "id": "s2",
+      "seg": "1",
+      "layout": "data-stat",
+      "notes": "强调这个 **数字**：季度增长 18%。",
+      "slots": {
+        "main": [
+          { "id": "c2", "type": "heading", "text": "18%", "level": 1, "style": { "color": "accent", "size": "display" }, "build": { "anim": "counter-up" } },
+          { "id": "c3", "type": "text", "text": "季度增长", "style": { "color": "muted" } }
+        ]
+      }
+    },
+    {
+      "id": "s3",
+      "seg": "2",
+      "segName": "段2 · 收尾",
+      "layout": "quote",
+      "notes": "金句收尾，留白三秒。",
+      "slots": {
+        "main": [{ "id": "c4", "type": "quote", "text": "让 AI 生成，让人类精修。", "cite": "Slidesmith" }]
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "slidesmith": {
+    "command": "/Users/zhouliying/.local/bin/node",
+    "args": [
+      "/Users/zhouliying/同步空间/Claude Projects/SlidesHTML/presentsystems/node_modules/tsx/dist/cli.mjs",
+      "/Users/zhouliying/同步空间/Claude Projects/SlidesHTML/presentsystems/packages/cli/src/index.ts",
+      "mcp"
+    ],
+    "cwd": "/Users/zhouliying/同步空间/Claude Projects/SlidesHTML/presentsystems"
+  }
+}

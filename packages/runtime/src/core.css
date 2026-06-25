@@ -1,0 +1,135 @@
+/* ===== Slidesmith runtime: structural mechanics (theme-agnostic) ===== */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body.sm { overflow: hidden; background: #202022; font-family: system-ui, -apple-system, "PingFang SC", sans-serif; }
+
+/* top bar */
+.sm-topbar {
+  position: fixed; top: 0; left: 0; right: 0; height: 46px; z-index: 50;
+  display: flex; align-items: center; gap: 14px; padding: 0 16px;
+  background: #1b1b1d; color: #e9e9e9; font-size: 13px;
+}
+.sm-progress { position: absolute; top: 0; left: 0; right: 0; height: 3px; background: #333; }
+.sm-progress__bar { height: 100%; width: 0; background: #B5402A; transition: width 0.2s ease; }
+.sm-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; opacity: 0.92; }
+.sm-counter { font-variant-numeric: tabular-nums; opacity: 0.8; }
+
+/* sidebar */
+.sm-sidebar {
+  position: fixed; top: 46px; left: 0; bottom: 0; width: 248px; z-index: 40;
+  background: #161618; color: #c8c8c8; overflow: auto; padding: 12px;
+}
+.sm-segnav { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.sm-seg {
+  text-align: left; background: transparent; border: 0; color: #bcbcbc;
+  padding: 7px 9px; border-radius: 6px; cursor: pointer; font: inherit; font-size: 13px;
+  border-left: 3px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sm-seg:hover { background: #232325; }
+.sm-seg.active { color: #fff; background: #232325; border-left-color: #B5402A; }
+.sm-thumbs { display: flex; flex-direction: column; gap: 9px; }
+.sm-thumb {
+  width: 222px; height: 124px; overflow: hidden; position: relative;
+  border: 2px solid #2a2a2c; border-radius: 5px; cursor: pointer; background: #000;
+}
+.sm-thumb.active { border-color: #B5402A; }
+.sm-thumb .slide {
+  position: absolute; top: 0; left: 0; display: block !important;
+  transform: scale(0.11354); transform-origin: top left; box-shadow: none;
+}
+.sm-thumb-num {
+  position: absolute; bottom: 3px; right: 5px; font-size: 10px; color: #fff;
+  background: rgba(0,0,0,0.55); padding: 0 5px; border-radius: 3px; line-height: 15px;
+}
+
+/* stage */
+.sm-stage {
+  position: absolute; top: 46px; left: 248px; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 18px;
+}
+.slide {
+  width: 1920px; height: 1080px; flex: 0 0 auto; display: none;
+  transform: scale(var(--sm-scale, 1)); transform-origin: center center;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.5); overflow: hidden;
+}
+.slide.active { display: block; }
+
+/* floating nav buttons */
+.sm-nav { position: fixed; bottom: 18px; right: 18px; display: flex; gap: 8px; z-index: 60; }
+.sm-btn {
+  background: #2a2a2c; color: #ececec; border: 1px solid #3a3a3c; border-radius: 7px;
+  padding: 6px 12px; cursor: pointer; font-size: 16px; line-height: 1;
+}
+.sm-btn:hover { background: #343437; }
+
+/* present / fullscreen mode hides chrome */
+body.sm.present .sm-topbar,
+body.sm.present .sm-sidebar { display: none; }
+body.sm.present .sm-stage { top: 0; left: 0; padding: 0; }
+body.sm.present .slide { box-shadow: none; }
+
+/* ===== declarative animations (opt-in via block.build -> [data-anim*]) =====
+   Hidden initial state applies ONLY to the active stage slide (not thumbnail
+   clones) and only when animations are enabled (body.anim). The `B` key drops
+   body.anim to disable; reduced-motion never adds it. Per-element / per-item
+   delays are set inline by the runtime; keyframes live here. */
+/* expoOut easing (huashu "anti-cheap" curve): fast start, slow settle */
+body.sm.anim .sm-deck > .slide.active [data-anim] { opacity: 0; animation-fill-mode: both; animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1); }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="fade"] { animation-name: sm-fade; animation-duration: 0.5s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="rise"] { animation-name: sm-rise; animation-duration: 0.55s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="fade-up"] { animation-name: sm-rise; animation-duration: 0.55s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="pop"] { animation-name: sm-pop; animation-duration: 0.5s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="in-left"] { animation-name: sm-in-left; animation-duration: 0.55s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="in-right"] { animation-name: sm-in-right; animation-duration: 0.55s; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="counter-up"] { animation-name: sm-fade; animation-duration: 0.5s; }
+/* stagger-list: container shows immediately, its items rise one by one */
+body.sm.anim .sm-deck > .slide.active [data-anim="stagger-list"] { opacity: 1; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="stagger-list"] li { opacity: 0; }
+body.sm.anim .sm-deck > .slide.active.sm-reveal [data-anim="stagger-list"] li { animation: sm-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+@keyframes sm-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sm-rise { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+@keyframes sm-pop { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: none; } }
+@keyframes sm-in-left { from { opacity: 0; transform: translateX(-48px); } to { opacity: 1; transform: none; } }
+@keyframes sm-in-right { from { opacity: 0; transform: translateX(48px); } to { opacity: 1; transform: none; } }
+
+/* ===== continuous MOTION effects (block.build.motion -> [data-motion]) =====
+   Ambient loops ported from keynote.html (glow=kl-breathe 呼吸灯, neon, stress)
+   + huashu (breathe, float, pulse). Run while shown; honor B-toggle + reduced-
+   motion. A growing library: add a name in IR MOTION_NAMES + a keyframe here. */
+body.sm.anim .sm-deck > .slide [data-motion] { will-change: transform, opacity, filter; }
+body.sm.anim .sm-deck > .slide [data-motion="glow"] { animation: sm-m-glow 3.2s ease-in-out infinite; }
+body.sm.anim .sm-deck > .slide [data-motion="breathe"] { animation: sm-m-breathe 3.6s ease-in-out infinite; transform-origin: center; }
+body.sm.anim .sm-deck > .slide [data-motion="float"] { animation: sm-m-float 3.4s ease-in-out infinite; }
+body.sm.anim .sm-deck > .slide [data-motion="pulse"] { animation: sm-m-pulse 2s ease-in-out infinite; }
+body.sm.anim .sm-deck > .slide [data-motion="neon"] { animation: sm-m-neon 5.5s linear infinite; }
+body.sm.anim .sm-deck > .slide [data-motion="stress"] { animation: sm-m-stress 4.2s ease-in-out infinite; transform-origin: center; }
+@keyframes sm-m-glow { 0%, 100% { filter: drop-shadow(0 0 1px transparent); } 50% { filter: drop-shadow(0 0 16px var(--accent, #F4B73E)); } }
+@keyframes sm-m-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
+@keyframes sm-m-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+@keyframes sm-m-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+@keyframes sm-m-neon { 0%, 16%, 18%, 55%, 57%, 100% { opacity: 1; } 17%, 56% { opacity: 0.7; } 80%, 82% { opacity: 0.88; } }
+@keyframes sm-m-stress { 0%, 38%, 100% { transform: scale(1); } 45% { transform: scale(1.06); } }
+
+@media (prefers-reduced-motion: reduce) {
+  body.sm .sm-deck > .slide [data-anim],
+  body.sm .sm-deck > .slide [data-anim="stagger-list"] li { opacity: 1 !important; animation: none !important; }
+  body.sm .sm-deck > .slide [data-motion] { animation: none !important; }
+}
+
+/* ===== print / PDF export: one slide per page at full 1920x1080 ===== */
+@media print {
+  @page { size: 1920px 1080px; margin: 0; }
+  html, body.sm { overflow: visible; height: auto; background: #fff; }
+  .sm-topbar, .sm-sidebar, .sm-nav { display: none !important; }
+  .sm-stage { position: static; top: 0; left: 0; right: 0; bottom: auto; padding: 0; display: block; overflow: visible; }
+  .sm-deck { display: block; }
+  .slide {
+    display: block !important; position: relative; width: 1920px; height: 1080px;
+    transform: none !important; box-shadow: none; overflow: hidden;
+    page-break-after: always; break-after: page;
+  }
+  .slide:last-child { page-break-after: auto; break-after: auto; }
+  /* never hide animated blocks in print/export */
+  body.sm .slide [data-anim],
+  body.sm .slide [data-anim="stagger-list"] li { opacity: 1 !important; animation: none !important; }
+}

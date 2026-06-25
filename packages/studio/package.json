@@ -1,0 +1,17 @@
+{
+  "name": "@slidesmith/studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Slidesmith Studio: a fully client-side single-file HTML editor (import/edit/export, no server).",
+  "main": "./src/main.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@slidesmith/ir": "*",
+    "@slidesmith/engine": "*",
+    "@slidesmith/parser-md": "*",
+    "@slidesmith/themes": "*"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@slidesmith/bridge",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Slidesmith bridge: local middleman so the browser Studio and Claude Code (MCP) can talk — Studio↔WebSocket, Claude Code↔MCP. Carries user edit-requests up and AI patches down.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13"
+  }
+}

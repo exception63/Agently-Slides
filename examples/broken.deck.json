@@ -1,0 +1,42 @@
+{
+  "ir_version": "1.0",
+  "theme": "editorial",
+  "defaults": { "layout": "bullets", "lang": "zh" },
+  "metadata": { "title": "视觉自检 · 演示用故意翻车的 deck", "author": "Slidesmith", "date": "2026-06-24" },
+  "slides": [
+    {
+      "id": "s-cover",
+      "layout": "cover",
+      "notes": "封面，这一页是正常的，作为对照。",
+      "slots": {
+        "main": [
+          { "id": "b-title", "type": "heading", "level": 1, "text": "视觉自检 Demo", "style": { "size": "display", "color": "accent", "align": "center" } },
+          { "id": "b-sub", "type": "text", "text": "这份 deck 通过了结构校验和 lint，但有两页在**渲染后**才暴露的问题。", "style": { "size": "h3", "color": "muted", "align": "center" } }
+        ]
+      }
+    },
+    {
+      "id": "s-overflow",
+      "layout": "bullets",
+      "notes": "这一页内容太多、字号太大，渲染后会超出画面被裁掉——IR 层的 lint 看不出来。",
+      "slots": {
+        "main": [
+          { "id": "b-of-h", "type": "heading", "level": 2, "text": "把一整段话塞进大字号里" },
+          { "id": "b-of-text", "type": "text", "style": { "size": "display" }, "text": "这是一段被错误地设成 display 巨型字号的正文：演示系统的核心价值不在于把单页画得多漂亮，而在于它把演示变成可重生、可再编辑、可一致换肤、可同步演讲、可导出的数据系统，所以这段话其实根本放不下，底部会被画面边框直接裁掉。" }
+        ]
+      }
+    },
+    {
+      "id": "s-contrast",
+      "layout": "bullets",
+      "notes": "这一页有个块用错了颜色 token（bg = 和背景同色），渲染后几乎看不见。",
+      "slots": {
+        "main": [
+          { "id": "b-ct-h", "type": "heading", "level": 2, "text": "用错颜色 token 的一页" },
+          { "id": "b-ct-bad", "type": "text", "style": { "color": "bg", "size": "h2" }, "text": "这行字被设成了 bg 颜色，和背景几乎一模一样——肉眼基本看不见，但结构校验完全合法。" },
+          { "id": "b-ct-ok", "type": "text", "style": { "color": "ink" }, "text": "这行是正常颜色，作为对照。" }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@slidesmith/ir",
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Slidesmith canonical slide IR: TypeScript types, Zod schema, validation, anchor derivation, JSON Schema export.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "zod": "^3.24.1",
+    "zod-to-json-schema": "^3.24.1"
+  }
+}

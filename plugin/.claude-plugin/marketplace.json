@@ -1,0 +1,12 @@
+{
+  "name": "slidesmith-local",
+  "owner": { "name": "Slidesmith" },
+  "plugins": [
+    {
+      "name": "slidesmith",
+      "source": "./slidesmith",
+      "description": "Slidesmith — 浏览器 Studio 就地改 slides + Claude Code 桥接闭环（MCP: slidesmith_open / get_requests / apply_patch / status）。",
+      "keywords": ["slides", "presentation", "html", "studio"]
+    }
+  ]
+}
