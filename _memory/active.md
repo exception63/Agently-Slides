@@ -1,15 +1,21 @@
 # Active Memory: Slidesmith — AI-first HTML Slides System
 
 > Last updated: 2026-06-25
-> 一句话(v2 转向后): **把 AI 生成的(遵循契约的)HTML deck 变成可视化编辑 + AI 回路 + 可导出的编辑器/增强器**。AI 生成精致 HTML;人类 Studio 就地精修;复杂改动走 Submit-to-AI。
-> ⚠️ **2026-06-24 重大转向 HTML-first**: 真相源从 JSON IR → 契约 HTML deck 本身。蓝图见 `docs/PIVOT-v2-html-first.md`,下一步 = N1(契约+导入器)。下方"Current State"是 v1(IR-first)的存量,大部分作为复用资产保留。
+> 一句话: **高度 AI 整合的 HTML slides 编辑器**。人做高频细活(点字/换色/动画/移动删除元素,即时零 token)、AI 经**评论**做模糊重活;像 Claude Design comment→edit 但真 HTML 自有、只发相关页、可定制。已上 GitHub: `https://github.com/exception63/Agently-Slides.git`(remote origin,main)。
 
-## Current State
-- 阶段: **v1(M0–M5)完成 + M6 独立 Studio + M7 设计系统 v1 + M8 AI 视觉自检环(核心完成)**。40/40 测试、typecheck 0 错；浏览器实测(截图 `docs/screenshots/{m1,m3..m8}/`)。
-- **Studio = `studio/slidesmith-studio.html`(单文件 ~314KB，双击即用，离线)** = 用户"人类侧"主入口。重建 `npm run build:studio`。
-- **设计系统 v1**(用户定向: AI 做整体、人类精修、元素随用沉淀): Studio 右栏 = **Keynote 式三 tab 格式/动画效果/文稿**。能力: 选元素→字号/颜色/粗细/对齐(符号 token) + 上移/下移/删除/加元素;入场动画 + **持续动效库**(呼吸灯/呼吸/漂浮/闪烁/霓虹/强调脉冲,提取自 keynote.html+huashu);文稿 tab 改讲稿+cue/golden/data。IR 加 `build.motion`。登记册 `docs/design-system.md`(怎么加新效果)。
-- **M8 AI 视觉自检环(2026-06-24, "如何迭代"用户拍板的方向)**: `packages/cli/src/audit.ts` headless 渲染逐页量真实布局,catch 结构层 lint 看不见的=越界裁切/低对比/坏图/空页,每条带 slide+block id。新命令 `audit`(--thumbs/--json) + `doctor`(validate+lint+audit 一站式交付前 gate)。AGENTS.md 加"generate→validate→doctor 看+修→build"工作流 + finding codes 表。demo: `examples/broken.deck.json`(过 lint 但翻车)→audit 两 error→AI 改 IR→doctor 全清。截图 `docs/screenshots/m8/`。
-- 双轨: 人类 Studio；AI/终端 CLI。共用 canonical `deck.json`。
+## 🔴 下个会话第一件事:反向连接测试(用户清空上下文后要做)
+**场景**: 用户先**双击打开离线 Studio**(`studio/slidesmith-studio.html`)→ 点顶栏蓝色 **🔌 连接 Claude** → 跳到连接版 → 留评论 → 我自动接活改回写。**我(下个会话)要做的**:
+1. 先 `mcp__plugin_slidesmith_slidesmith__slidesmith_status` 确认桥接在(8765)、有没有 Studio 连着、有没有 deck。`/clear` 不关 Claude Code,所以桥接通常还在。
+2. **挂上自动监听**:后台 `while: curl -s http://localhost:8765/api/requests?drain=0 | grep -q '"count":0' || break; sleep 3`(run_in_background)。**坑:超时和命中都 exit 0,必须读 task output 区分 `NEW_REQUEST_DETECTED` vs `idle-timeout`**。命中→`slidesmith_get_requests`(drain)读评论→按契约只改点名的页(保留 `data-id`)→`slidesmith_apply_patch`→重新挂监听。
+3. 用户从离线→连接版时,deck 经 `POST /api/open` 自动交接到桥接,所以**我不一定要 slidesmith_open**;但若桥接没 deck,就 `slidesmith_open <deck.html>` 帮他载入。
+4. 验收: 用户在连接版留一句评论→点🚀发送→我接到→改对那页→他看到蓝脉冲转✓。**注意桥接服的是启动时缓存的 studio**;若用户开的是旧 tab 没有🔌按钮,让他双击重新打开(已 `npm run build:studio` 的新文件 355KB 才有按钮)。
+
+## Current State(已完成)
+- **Studio** `studio/slidesmith-studio.html`(单文件离线 355KB);源 `packages/studio/src/main.ts`,改后 `npm run build:studio`。
+- **桥接** `packages/bridge`:`slidesmith serve`/`mcp`;HTTP+WS+MCP+控制 API(`/api/{status,requests,patch,open}`+CORS)。**插件**`plugin/`(市场 `slidesmith-local` + `.mcp.json` + `/slidesmith` 命令)已装。MCP 4 工具 `slidesmith_open/get_requests/apply_patch/status`。
+- **编辑器功能**:页内评论(跟随当前页·队列·徽标 ●待发送/●已发送脉冲/✓已改)· 整份 deck 评论 · 审阅「↩︎还原本页」· 直接编辑(选中元素 ↑↓🗑)· 动态进度横幅 · 🔌连接 Claude 按钮(探测+一键跳连接版+带 deck)· 视觉自检 · 导出 HTML/PDF。
+- **验证全绿**:`scripts/verify-{bridge(14),editor(22),connect(7)}.mjs` + `dogfood.mjs`;40 单测;typecheck 0 错。截图 `docs/screenshots/{bridge,editor,dogfood,live}/`。
+- **文档**:README/GUIDE/AGENTS 已清洗成纯现状(无历史);`packages/bridge/README.md`、`plugin/slidesmith/README.md`、`docs/DECK-CONTRACT.md`。
 
 ## Next Likely Action (v2)
 - ✅ **N1 完成(2026-06-24)**: `docs/DECK-CONTRACT.md` 写好(L1/L2/L3 合规层级);Studio 加"导入 HTML"(`mode:'ir'|'html'`,DOMParser 解析 `#deck>.slide` 出 title/seg/segname/variant,srcdoc 自渲染,左栏列 36 页,点页→驱动 deck 原生 thumb.click 导航,HTML 模式 banner,导出原样 HTML,`window.__SM_IMPORT__` 自动化钩子)。实测拖入 keynote.html=36 页+6 段+36 缩略图+0 报错。截图 `docs/screenshots/n1/`。验证脚本 `scripts/verify-n1.mjs`(playwright-core file://)。
