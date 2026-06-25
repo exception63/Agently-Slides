@@ -17,6 +17,13 @@
 3. bridge：HTTP 控制 API + patch 回灌内存 deck（`syncExportToBridge`）+ EADDRINUSE 自动换端口。
 4. dogfood：真浏览器弹出（serve 的 `open` 没被沙箱挡）→ 全闭环跑通，第3页标题被精准改写、其它不动、晚到者也见。
 
+## 🆕 2026-06-25 再续:live dogfood + 进度提示 + GitHub
+- **项目已上 GitHub**:`https://github.com/exception63/Agently-Slides.git`(remote `origin`,main,commit 6ec69c6)。以后改完照常 `git add/commit/push`(凭据走 osxkeychain,无需我输密码)。
+- **进度提示已加**(用户要带动效):`aiSent` Set,徽标 3 态(待发送橙/**已发送蓝脉冲**/已改绿)+ 闪烁横幅 `#aiSentBanner`。状态机:send→sent、apply→done、edit/revert→回退。verify 8 项过。
+- **自动接活回路**:后台轮询 `curl http://localhost:8765/api/requests?drain=0`,命中即通知我去 `slidesmith_get_requests`+`apply`。**坑:超时和命中都 exit 0,必须读 task output 区分**(`NEW_REQUEST_DETECTED` vs `idle-timeout`)。监听一轮 ~20min,需要时重新挂。
+- **坑(重要)**:① **运行中的 bridge/MCP 服的是启动时缓存的 studio HTML**;重建 studio 后用户当前 tab 不会更新,要重启 bridge(kill `cli/src/index.ts mcp` 会被 Claude Code 重生)+ 重新 `slidesmith_open` 才生效。② **serve 的 deck 只在内存**,用户的直接手改(打字/移动)**不自动同步**到 bridge(只有 patch apply 后 `syncExportToBridge` 才同步);重启前先存盘:headless 连 bridge 调 `__SM_EXPORT_HTML__` 写文件,或让用户点「导出 HTML」。已存过 `dist/keynote-edited.html`。
+- **下一步候选**:把"自动接活"做成更稳的常驻(而非 20min 轮询);serve 加 `/api/deck` GET 或 `slidesmith_save` 工具直接存盘;按 mockup 把评论做成贴幻灯片下方的 docked card;deck 级 token 补丁。
+
 ## 🆕 2026-06-25 续:产品重定位 + 编辑器重构 ①-④ 已完成
 用户拍板项目 = **高度 AI 整合的 HTML slides 编辑器**(核心**分工**:人做高频细活、AI 经**评论**做模糊重活;像 Claude Design comment→edit 但真 HTML 自有/省 token/可定制)。给用户看 mockup 对齐了:AI 角色=**只按评论改**;①→④ 全做完且 `scripts/verify-editor.mjs` 22/22:
 - ① **页内评论闭环**:评论跟随当前页(`navSyncTimer` 轮询 deck `.active`;`updateAiTarget` 用 `cur`)、左列每页徽标(●待发送/✓已改)、右栏「全部任务」队列、apply 标✓不删评论。**修好了用户报的 bug**。
