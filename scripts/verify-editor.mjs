@@ -30,6 +30,10 @@ try {
   await waitSlides(p);
   await p.waitForFunction(() => document.querySelectorAll('.srow').length > 30, { timeout: 5000 });
 
+  // HTML mode now uses Keynote-style tabs — AI controls live under the "AI 修改" tab
+  const htab = (name) => p.click('.htab[data-htab="' + name + '"]');
+  await htab('ai');
+
   // ── ① per-slide comment follows the page ──
   ck('① left list is the task navigator (36 rows)', (await p.$$('.srow')).length >= 30);
   await p.$$eval('.srow', (r) => r[2].click()); await p.waitForTimeout(150);
@@ -68,7 +72,8 @@ try {
   ck('③ revert restores the pre-AI page', await p.evaluate((id) => !document.getElementById('preview').contentDocument.querySelector('#deck .slide[data-id="' + id + '"]').textContent.includes('AI 改写版 ABC'), id3));
   ck('③ ✓ badge cleared after revert', await p.$eval('.srow:nth-child(3)', (r) => !r.querySelector('.sbadge.done')));
 
-  // ── ④ direct edits: delete an element ──
+  // ── ④ direct edits: delete an element (element ops live under the "格式" tab) ──
+  await htab('fmt');
   await p.evaluate(() => { const d = document.getElementById('preview').contentDocument; for (const s of d.querySelectorAll('#deck .slide')) { const h = s.querySelector('[contenteditable]'); if (h) { h.click(); h.textContent = 'SENTINEL_DELME_42'; return; } } });
   await p.waitForTimeout(180);
   ck('④ selecting an element opens the inspector', await p.$eval('#hSel', (e) => e.style.display !== 'none'));

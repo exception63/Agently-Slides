@@ -6,6 +6,7 @@ import {
   validateDeck,
   LAYOUTS,
   ANIM_NAMES,
+  ANIM_OUT_NAMES,
   MOTION_NAMES,
   COLOR_TOKENS,
   SIZE_TOKENS,
@@ -114,6 +115,7 @@ const meta = {
   layouts: Object.keys(LAYOUTS),
   layoutSlots: LAYOUTS as Record<string, readonly string[]>,
   anims: ANIM_NAMES as readonly string[],
+  animOuts: ANIM_OUT_NAMES as readonly string[],
   motions: MOTION_NAMES as readonly string[],
   colors: COLOR_TOKENS as readonly string[],
   sizes: SIZE_TOKENS as readonly string[],
@@ -123,11 +125,38 @@ const meta = {
 
 // friendly Chinese labels for the inspector
 const MOTION_LABEL: Record<string, string> = {
-  none: '无', glow: '呼吸灯（发光）', breathe: '呼吸（缩放）', float: '漂浮', pulse: '闪烁', neon: '霓虹微闪', stress: '强调脉冲',
+  none: '无', glow: '呼吸灯（发光）', breathe: '呼吸（缩放）', float: '漂浮', pulse: '闪烁', neon: '霓虹微闪', stress: '强调脉冲', shimmer: '流光溢彩',
 };
 const ANIM_LABEL: Record<string, string> = {
   none: '无', fade: '淡入', rise: '上升淡入', 'fade-up': '上移淡入', pop: '弹出', 'in-left': '从左进', 'in-right': '从右进', 'stagger-list': '逐条浮现', 'counter-up': '数字滚动', morph: '形变',
 };
+const ANIM_OUT_LABEL: Record<string, string> = {
+  none: '无', 'fade-out': '淡出', sink: '下沉淡出', 'zoom-out': '缩小淡出', 'out-left': '向左退出', 'out-right': '向右退出',
+};
+
+// ---- font library: pick a typeface for the selected element. System fonts are
+// fully offline; the rest are Google Fonts loaded by <link> (online) or inlined
+// as subset @font-face on export (the "嵌入字体" option → offline-portable). ----
+interface FontDef { id: string; label: string; family: string; stack: string; google?: string; cat: 'sys' | 'en' | 'cjk' }
+const FONTS: FontDef[] = [
+  { id: '', label: '默认（主题字体）', family: '', stack: '', cat: 'sys' },
+  { id: 'sys-sans', label: '系统无衬线', family: '', stack: 'system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif', cat: 'sys' },
+  { id: 'sys-serif', label: '系统衬线', family: '', stack: 'Georgia,"Times New Roman","Songti SC",STSong,SimSun,serif', cat: 'sys' },
+  { id: 'sys-mono', label: '系统等宽', family: '', stack: 'ui-monospace,SFMono-Regular,Menlo,Consolas,monospace', cat: 'sys' },
+  { id: 'inter', label: 'Inter · 现代英文', family: 'Inter', stack: '"Inter",sans-serif', google: 'Inter:wght@400;500;600;700', cat: 'en' },
+  { id: 'space-grotesk', label: 'Space Grotesk · 几何英文', family: 'Space Grotesk', stack: '"Space Grotesk",sans-serif', google: 'Space+Grotesk:wght@400;500;700', cat: 'en' },
+  { id: 'montserrat', label: 'Montserrat · 标题英文', family: 'Montserrat', stack: '"Montserrat",sans-serif', google: 'Montserrat:wght@400;600;800', cat: 'en' },
+  { id: 'playfair', label: 'Playfair Display · 衬线英文', family: 'Playfair Display', stack: '"Playfair Display",serif', google: 'Playfair+Display:wght@400;700;900', cat: 'en' },
+  { id: 'jetbrains', label: 'JetBrains Mono · 等宽代码', family: 'JetBrains Mono', stack: '"JetBrains Mono",ui-monospace,monospace', google: 'JetBrains+Mono:wght@400;700', cat: 'en' },
+  { id: 'noto-sc', label: '思源黑体 Noto Sans SC', family: 'Noto Sans SC', stack: '"Noto Sans SC",sans-serif', google: 'Noto+Sans+SC:wght@400;500;700;900', cat: 'cjk' },
+  { id: 'noto-serif-sc', label: '思源宋体 Noto Serif SC', family: 'Noto Serif SC', stack: '"Noto Serif SC",serif', google: 'Noto+Serif+SC:wght@400;600;900', cat: 'cjk' },
+  { id: 'zcool-xiaowei', label: '站酷小薇 · 优雅中文', family: 'ZCOOL XiaoWei', stack: '"ZCOOL XiaoWei",serif', google: 'ZCOOL+XiaoWei', cat: 'cjk' },
+  { id: 'zcool-kuaile', label: '站酷快乐体 · 活泼中文', family: 'ZCOOL KuaiLe', stack: '"ZCOOL KuaiLe",sans-serif', google: 'ZCOOL+KuaiLe', cat: 'cjk' },
+  { id: 'mashanzheng', label: '马善政毛笔 · 书法中文', family: 'Ma Shan Zheng', stack: '"Ma Shan Zheng",cursive', google: 'Ma+Shan+Zheng', cat: 'cjk' },
+  { id: 'lxgw', label: '霞鹜文楷 LXGW · 仿宋中文', family: 'LXGW WenKai TC', stack: '"LXGW WenKai TC",serif', google: 'LXGW+WenKai+TC', cat: 'cjk' },
+];
+const FONT_BY_ID: Record<string, FontDef> = {}; FONTS.forEach((f) => (FONT_BY_ID[f.id] = f));
+const usedFontIds = new Set<string>(); // google fonts picked this session → links injected into preview/export
 const NEW_BLOCKS: Array<{ type: Block['type']; label: string; make: () => Block }> = [
   { type: 'heading', label: '标题', make: () => ({ id: '', type: 'heading', text: '新标题', level: 2 }) },
   { type: 'text', label: '正文', make: () => ({ id: '', type: 'text', text: '新的一段文字' }) },
@@ -386,7 +415,7 @@ function download(name: string, content: string, mime: string): void {
 // handle (deck came from the bridge, or first save) it asks the user to pick the file
 // once and remembers it; browsers without the File System Access API get a download.
 async function saveHtmlInPlace(): Promise<void> {
-  const html = mode === 'html' ? exportHtmlDeck() : renderDeckHtml(deck);
+  const html = mode === 'html' ? await buildExportHtml() : renderDeckHtml(deck);
   // 1) reuse a known handle → silent overwrite
   if (fileHandle) {
     try {
@@ -524,7 +553,7 @@ function loadHtmlDeck(name: string, html: string): void {
 
   mode = 'html'; cur = 0; selBid = null; htmlSelEl = null;
   $('#deckname').textContent = fileBase;
-  Object.keys(aiInstructions).forEach((k) => delete aiInstructions[k]); aiApplied.clear(); aiSent.clear(); Object.keys(aiBefore).forEach((k) => delete aiBefore[k]); aiCurId = ''; aiDeckInstruction = '';
+  Object.keys(aiInstructions).forEach((k) => delete aiInstructions[k]); aiApplied.clear(); aiSent.clear(); Object.keys(aiBefore).forEach((k) => delete aiBefore[k]); aiCurId = ''; aiDeckInstruction = ''; usedFontIds.clear();
   const aiBox = $('#aiInstruction') as HTMLTextAreaElement | null; if (aiBox) aiBox.value = '';
   const aiDeckBox = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (aiDeckBox) aiDeckBox.value = '';
   const fxSel = $('#hFxMode') as HTMLSelectElement | null; if (fxSel) fxSel.value = fxMode; // reflect imported deck's play mode
@@ -556,10 +585,34 @@ function assembleDeck(forEdit = false): string {
       + '#deck .slide .sm-sel{outline:2px solid #3a86ff!important;outline-offset:2px}</style>'
     : '';
   const deckInner = htmlSlides.map((s) => s.html).join('\n');
+  // load any user-picked Google fonts (those not already linked by the deck author)
+  const fontLinks = fontLinksFor(deckInner);
   // FX CSS+JS injected into EVERY assembled deck (preview + export) so entrance anims &
   // motion play offline — the imported deck has no such rules of its own. data-smfx on
-  // <html> carries the auto/manual choice into the exported file.
-  return `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}">\n<head>\n${H.head}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n</body>\n</html>`;
+  // <html> carries the auto/manual choice into the exported file; data-smfx-edit marks
+  // the editing surface so the FX driver skips exit-on-nav (keeps Studio nav instant).
+  const editAttr = forEdit ? ' data-smfx-edit="1"' : '';
+  return `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${fontLinks}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n</body>\n</html>`;
+}
+// <link> tags for user-picked Google fonts that the deck author didn't already include.
+// Detected from usedFontIds plus a scan of the deck HTML (so a re-imported deck that
+// carries inline font-family but lost its <link> still loads). Returns '' when none.
+function fontLinksFor(deckHtml: string): string {
+  const ids = new Set<string>(usedFontIds);
+  FONTS.forEach((f) => { if (f.google && f.family && deckHtml.indexOf(f.family) >= 0) ids.add(f.id); });
+  const head = H.head || '';
+  const hasGoogle = /fonts\.googleapis\.com/.test(head);
+  const fams: string[] = [];
+  ids.forEach((id) => {
+    const f = FONT_BY_ID[id]; if (!f || !f.google) return;
+    // skip only if the deck author already loads this family from Google Fonts
+    if (hasGoogle && (head.indexOf(f.family.replace(/ /g, '+')) >= 0 || head.indexOf(f.family) >= 0)) return;
+    fams.push(f.google);
+  });
+  if (!fams.length) return '';
+  return '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    + '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + fams.join('&family=') + '&display=swap">';
 }
 // FX: one-shot ENTRANCE animations (data-anim) + continuous MOTION (data-motion),
 // ported from the runtime so they play in any imported/exported deck (which has no
@@ -576,6 +629,7 @@ const FX_CSS = '<style id="sm-fx">'
   + '#deck .slide [data-motion="pulse"]{animation:sm-m-pulse 2s ease-in-out infinite}'
   + '#deck .slide [data-motion="neon"]{animation:sm-m-neon 5.5s linear infinite}'
   + '#deck .slide [data-motion="stress"]{animation:sm-m-stress 4.2s ease-in-out infinite;transform-origin:center}'
+  + '#deck .slide [data-motion="shimmer"]{will-change:background-position;background:linear-gradient(125deg,#ff6eb4 0%,#ffb347 8%,#ffe46e 16%,#7bf0ff 24%,#a855f7 32%,#f4b73e 40%,#ff6eb4 48%,#06b6d4 56%,#a855f7 64%,#ffb347 72%,#7bf0ff 80%,#ff6eb4 90%,#f4b73e 100%);background-size:600% 600%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;animation:sm-m-shimmer 6s ease-in-out infinite}'
   + 'html[data-smfx="manual"] #deck .slide [data-motion]{animation-play-state:paused}'
   + 'html[data-smfx="manual"] #deck .slide.sm-play [data-motion]{animation-play-state:running}'
   // one-shot ENTRANCE — element is normally visible; only hidden while armed/playing, then animates in
@@ -600,6 +654,13 @@ const FX_CSS = '<style id="sm-fx">'
   + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(5){animation-delay:.28s}'
   + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(6){animation-delay:.35s}'
   + '#deck .slide.sm-play [data-anim="stagger-list"]>li:nth-child(n+7){animation-delay:.42s}'
+  // one-shot EXIT — plays on the leaving slide (FX_JS keeps it visible long enough)
+  + '#deck .slide.sm-exit [data-anim-out]{animation-fill-mode:both;animation-duration:.42s;animation-timing-function:cubic-bezier(.4,0,.2,1)}'
+  + '#deck .slide.sm-exit [data-anim-out="fade-out"]{animation-name:sm-o-fade}'
+  + '#deck .slide.sm-exit [data-anim-out="sink"]{animation-name:sm-o-sink}'
+  + '#deck .slide.sm-exit [data-anim-out="zoom-out"]{animation-name:sm-o-zoom}'
+  + '#deck .slide.sm-exit [data-anim-out="out-left"]{animation-name:sm-o-left}'
+  + '#deck .slide.sm-exit [data-anim-out="out-right"]{animation-name:sm-o-right}'
   // entrance keyframes
   + '@keyframes sm-a-fade{from{opacity:0}to{opacity:1}}'
   + '@keyframes sm-a-rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}'
@@ -613,7 +674,14 @@ const FX_CSS = '<style id="sm-fx">'
   + '@keyframes sm-m-pulse{0%,100%{opacity:1}50%{opacity:.55}}'
   + '@keyframes sm-m-neon{0%,16%,18%,55%,57%,100%{opacity:1}17%,56%{opacity:.7}80%,82%{opacity:.88}}'
   + '@keyframes sm-m-stress{0%,38%,100%{transform:scale(1)}45%{transform:scale(1.06)}}'
-  + '@media(prefers-reduced-motion:reduce){#deck .slide [data-motion],#deck .slide [data-anim],#deck .slide [data-anim] *{animation:none!important;opacity:1!important}}'
+  + '@keyframes sm-m-shimmer{0%{background-position:0% 30%}33%{background-position:80% 65%}66%{background-position:40% 90%}100%{background-position:0% 30%}}'
+  // exit keyframes
+  + '@keyframes sm-o-fade{from{opacity:1}to{opacity:0}}'
+  + '@keyframes sm-o-sink{from{opacity:1;transform:none}to{opacity:0;transform:translateY(44px)}}'
+  + '@keyframes sm-o-zoom{from{opacity:1;transform:none}to{opacity:0;transform:scale(.86)}}'
+  + '@keyframes sm-o-left{from{opacity:1;transform:none}to{opacity:0;transform:translateX(-64px)}}'
+  + '@keyframes sm-o-right{from{opacity:1;transform:none}to{opacity:0;transform:translateX(64px)}}'
+  + '@media(prefers-reduced-motion:reduce){#deck .slide [data-motion],#deck .slide [data-anim],#deck .slide [data-anim] *,#deck .slide [data-anim-out]{animation:none!important;opacity:1!important}}'
   + '</style>';
 // FX driver — injected into preview + export. Watches which slide is active and, per
 // data-smfx mode, plays it (auto) or arms it for a click (manual). Exposes window hooks
@@ -621,13 +689,40 @@ const FX_CSS = '<style id="sm-fx">'
 const FX_JS = '<script id="sm-fx-js">(function(){'
   + 'var root=document.documentElement;var deck=document.getElementById("deck");if(!deck)return;'
   + 'function mode(){return root.getAttribute("data-smfx")||"auto";}'
+  + 'function reduce(){try{return matchMedia("(prefers-reduced-motion:reduce)").matches;}catch(e){return false;}}'
   + 'function active(){return deck.querySelector(".slide.active")||deck.querySelector(".slide");}'
   + 'function arm(s){if(!s)return;s.classList.remove("sm-play");s.classList.add("sm-armed");}'
   + 'function play(s){if(!s)return;s.classList.remove("sm-play");s.classList.remove("sm-armed");void s.offsetWidth;s.classList.add("sm-play");}'
   + 'function onShow(s){if(!s)return;if(mode()==="manual"){arm(s);}else{play(s);}}'
   + 'window.__SM_FX_PLAY__=function(){play(active());};'
   + 'window.__SM_FX_REARM__=function(){onShow(active());};'
+  // EXIT: keep the leaving slide visible while [data-anim-out] elements animate out
+  + 'var EXIT_MS=440,exiting=false,bypass=false;'
+  + 'function hasExit(s){return !!(s&&s.querySelector("[data-anim-out]"));}'
+  + 'function runExit(s,done){if(!s){done&&done();return;}s.classList.remove("sm-exit");void s.offsetWidth;s.classList.add("sm-exit");setTimeout(function(){s.classList.remove("sm-exit");done&&done();},EXIT_MS);}'
+  + 'window.__SM_FX_PLAY_OUT__=function(){runExit(active());};'
   + 'deck.addEventListener("click",function(){if(mode()!=="manual")return;var s=active();if(s&&s.classList.contains("sm-armed"))play(s);},true);'
+  // intercept presentation nav so the exit plays first, then replay the event for the deck engine.
+  // skipped while editing in Studio (data-smfx-edit) so navigating stays instant.
+  + 'if(root.getAttribute("data-smfx-edit")!=="1"){'
+  + 'var NAVK={ArrowRight:1,ArrowDown:1,PageDown:1,Enter:1," ":1,ArrowLeft:1,ArrowUp:1,PageUp:1,Backspace:1,Home:1,End:1};'
+  + 'function isNav(e){return NAVK[e.key]===1||/^[1-9]$/.test(e.key);}'
+  + 'document.addEventListener("keydown",function(e){'
+  + 'if(bypass){bypass=false;return;}'
+  + 'if(!isNav(e)||reduce())return;'
+  + 'if(exiting){e.preventDefault();e.stopImmediatePropagation();return;}'
+  + 'var cur=active();if(!hasExit(cur))return;'
+  + 'e.preventDefault();e.stopImmediatePropagation();exiting=true;'
+  + 'runExit(cur,function(){exiting=false;bypass=true;try{document.dispatchEvent(new KeyboardEvent("keydown",{key:e.key,code:e.code,bubbles:true,cancelable:true}));}catch(x){bypass=false;}});'
+  + '},true);'
+  + 'document.addEventListener("click",function(e){'
+  + 'var btn=e.target&&e.target.closest&&e.target.closest("[data-act=\\"next\\"],[data-act=\\"prev\\"]");if(!btn)return;'
+  + 'if(bypass){bypass=false;return;}if(reduce())return;'
+  + 'if(exiting){e.preventDefault();e.stopImmediatePropagation();return;}'
+  + 'var cur=active();if(!hasExit(cur))return;'
+  + 'e.preventDefault();e.stopImmediatePropagation();exiting=true;'
+  + 'runExit(cur,function(){exiting=false;bypass=true;try{btn.click();}catch(x){bypass=false;}});'
+  + '},true);}'
   + 'var last=null;function tick(){var s=active();if(s&&s!==last){last=s;onShow(s);}}'
   + 'try{new MutationObserver(tick).observe(deck,{attributes:true,subtree:true,attributeFilter:["class"]});}catch(e){}'
   + 'setTimeout(tick,60);setTimeout(tick,400);'
@@ -671,7 +766,7 @@ function renderHtmlEdit(): void {
 // strip the editing/engine cruft so an exported <section> is clean + re-importable
 function cleanSectionHtml(s: Element, id?: string): string {
   const c = s.cloneNode(true) as Element;
-  c.classList.remove('active', 'sm-reveal', 'sm-sel');
+  c.classList.remove('active', 'sm-reveal', 'sm-sel', 'sm-play', 'sm-armed', 'sm-exit');
   c.removeAttribute('contenteditable'); c.removeAttribute('data-global-idx');
   if (id) c.setAttribute('data-id', id); // keep the stable addressing key
   (c as HTMLElement).style.removeProperty('--sm-fit');
@@ -705,19 +800,46 @@ function selectHtmlSlide(i: number): void {
 }
 // —— inspector: tokens / theme / selected-element style + anim ——
 function showHtmlSel(on: boolean, el?: HTMLElement): void {
-  const sel = $('#hSel'), no = $('#hNoSel'); if (!sel || !no) return;
-  sel.style.display = on ? '' : 'none'; no.style.display = on ? 'none' : '';
+  // toggle every "selected element" panel (格式 + 动画效果 tabs) and their empty-state hints
+  document.querySelectorAll('#htmlpanel .hselon').forEach((e) => ((e as HTMLElement).style.display = on ? '' : 'none'));
+  document.querySelectorAll('#htmlpanel .hseloff').forEach((e) => ((e as HTMLElement).style.display = on ? 'none' : ''));
   if (!on || !el) return;
   const cls = String(el.getAttribute('class') || '').split(' ').filter((c) => c && c !== 'sm-sel')[0];
-  $('#hSelTag').textContent = el.tagName.toLowerCase() + (cls ? ' .' + cls : '');
+  const tag = el.tagName.toLowerCase() + (cls ? ' .' + cls : '');
+  const t1 = $('#hSelTag'), t2 = $('#hSelTag2'); if (t1) t1.textContent = tag; if (t2) t2.textContent = tag;
   const cs = el.ownerDocument!.defaultView!.getComputedStyle(el);
+  (($('#hFont') as HTMLSelectElement)).value = fontIdForStack(el.style.fontFamily);
   (($('#hFs') as HTMLInputElement)).value = el.style.fontSize ? String(parseInt(el.style.fontSize, 10)) : '';
   (($('#hColor') as HTMLInputElement)).value = toHex(el.style.color || cs.color) || '#000000';
   (($('#hWeight') as HTMLSelectElement)).value = el.style.fontWeight || '';
-  (($('#hAlign') as HTMLSelectElement)).value = el.style.textAlign || '';
+  // bold / italic / underline toggles reflect the element's current inline style
+  const wt = parseInt(el.style.fontWeight || '', 10);
+  toggleBtn('#hBold', wt >= 600);
+  toggleBtn('#hItalic', el.style.fontStyle === 'italic');
+  toggleBtn('#hUnder', /underline/.test(el.style.textDecorationLine || el.style.textDecoration || ''));
+  const al = el.style.textAlign || '';
+  toggleBtn('#hAlignL', al === 'left'); toggleBtn('#hAlignC', al === 'center'); toggleBtn('#hAlignR', al === 'right');
   (($('#hAnim') as HTMLSelectElement)).value = el.getAttribute('data-anim') || 'none';
   (($('#hMotion') as HTMLSelectElement)).value = el.getAttribute('data-motion') || 'none';
+  (($('#hAnimOut') as HTMLSelectElement)).value = el.getAttribute('data-anim-out') || 'none';
   updateAiTarget();
+}
+function toggleBtn(sel: string, on: boolean): void { const b = $(sel); if (b) b.classList.toggle('on', on); }
+// map an element's inline font-family back to a FONT id (for the dropdown's value)
+function fontIdForStack(ff: string): string {
+  if (!ff) return '';
+  for (const f of FONTS) { if (f.stack && (ff === f.stack || (f.family && ff.indexOf(f.family) >= 0))) return f.id; }
+  return '';
+}
+// fill the font dropdown, grouped 离线安全 / 英文 / 中文
+function populateFontSelect(sel: string): void {
+  const el = $(sel) as HTMLSelectElement; if (!el) return; el.innerHTML = '';
+  const d0 = document.createElement('option'); d0.value = ''; d0.textContent = '默认（主题字体）'; el.appendChild(d0);
+  ([['离线安全（无需联网）', 'sys'], ['英文字体', 'en'], ['中文字体', 'cjk']] as Array<[string, FontDef['cat']]>).forEach(([label, cat]) => {
+    const og = document.createElement('optgroup'); og.label = label;
+    FONTS.filter((f) => f.id && f.cat === cat).forEach((f) => { const o = document.createElement('option'); o.value = f.id; o.textContent = f.label; og.appendChild(o); });
+    if (og.children.length) el.appendChild(og);
+  });
 }
 function applyHtmlStyle(prop: string, val: string): void {
   if (!htmlSelEl) return; const s = (htmlSelEl as HTMLElement).style;
@@ -731,6 +853,30 @@ function setHtmlMotion(val: string): void {
   if (!htmlSelEl) return;
   if (val && val !== 'none') htmlSelEl.setAttribute('data-motion', val); else htmlSelEl.removeAttribute('data-motion');
 }
+function setHtmlAnimOut(val: string): void {
+  if (!htmlSelEl) return;
+  if (val && val !== 'none') htmlSelEl.setAttribute('data-anim-out', val); else htmlSelEl.removeAttribute('data-anim-out');
+}
+// pick a typeface for the selected element; load the webfont into the live preview now
+function setHtmlFont(id: string): void {
+  const f = FONT_BY_ID[id]; if (!f) return;
+  applyHtmlStyle('font-family', f.stack);
+  if (f.google) { usedFontIds.add(f.id); ensureFontLoaded(f); }
+}
+function ensureFontLoaded(f: FontDef): void {
+  if (!f.google) return;
+  const d = previewFrame()?.contentDocument; if (!d) return;
+  const lid = 'sm-font-' + f.id; if (d.getElementById(lid)) return;
+  const l = d.createElement('link'); l.id = lid; l.rel = 'stylesheet';
+  l.href = 'https://fonts.googleapis.com/css2?family=' + f.google + '&display=swap';
+  d.head.appendChild(l);
+}
+// bold / italic / underline as Keynote-style toggles on the selected element's inline style
+function toggleHtmlStyle(prop: string, onVal: string, isOn: () => boolean): void {
+  if (!htmlSelEl) return; const s = (htmlSelEl as HTMLElement).style;
+  if (isOn()) s.removeProperty(prop); else s.setProperty(prop, onVal);
+  showHtmlSel(true, htmlSelEl as HTMLElement);
+}
 // drive the FX engine inside the live preview iframe (defined by FX_JS)
 function previewFrame(): HTMLIFrameElement | null { return document.getElementById('preview') as HTMLIFrameElement | null; }
 function previewFxCall(name: '__SM_FX_PLAY__' | '__SM_FX_REARM__'): void {
@@ -738,6 +884,10 @@ function previewFxCall(name: '__SM_FX_PLAY__' | '__SM_FX_REARM__'): void {
   const fn = w && w[name]; if (typeof fn === 'function') fn();
 }
 function previewPlayFx(): void { previewFxCall('__SM_FX_PLAY__'); }
+function previewPlayFxOut(): void {
+  const w = previewFrame()?.contentWindow as unknown as { __SM_FX_PLAY_OUT__?: () => void } | undefined;
+  if (w && typeof w.__SM_FX_PLAY_OUT__ === 'function') w.__SM_FX_PLAY_OUT__();
+}
 // high-frequency direct edits on the selected element, straight in the live DOM
 // (no AI, no re-render). harvestAll() snapshots the change so export/patch keep it.
 function moveHtmlEl(dir: number): void {
@@ -766,6 +916,56 @@ function refreshHtmlInspector(): void {
 function exportHtmlDeck(): string {
   harvestAll();
   return assembleDeck(false);
+}
+// ---- offline-portable export: inline used Google fonts as subset @font-face data URIs ----
+function embedFontsChecked(): boolean { return !!($('#embedFonts') as HTMLInputElement | null)?.checked; }
+// every character the deck actually shows → we only download those glyphs (CJK stays tiny)
+function deckChars(): string {
+  const raw = htmlSlides.map((s) => s.html).join(' ').replace(/<[^>]+>/g, ' ').replace(/&[#a-z0-9]+;/gi, ' ');
+  const set = new Set<string>();
+  for (const ch of raw) if (ch.charCodeAt(0) > 32) set.add(ch);
+  for (let c = 32; c < 127; c++) set.add(String.fromCharCode(c)); // keep ASCII so numbers/punct render
+  return Array.from(set).join('');
+}
+function abToBase64(buf: ArrayBuffer): string {
+  let bin = ''; const bytes = new Uint8Array(buf); const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+  return btoa(bin);
+}
+// fetch a Google Fonts CSS (subset to deckChars) and inline every gstatic woff2 as a data URI
+async function inlineGoogleCss(cssUrl: string, chars: string): Promise<string> {
+  const url = cssUrl.replace(/&amp;/g, '&') + '&text=' + encodeURIComponent(chars);
+  const css = await (await fetch(url, { headers: { /* default UA → woff2 */ } })).text();
+  const urls = Array.from(css.matchAll(/url\((https:\/\/fonts\.gstatic\.com[^)]+)\)/g));
+  let out = css;
+  for (const u of urls) {
+    try { const buf = await (await fetch(u[1])).arrayBuffer(); out = out.split(u[1]).join('data:font/woff2;base64,' + abToBase64(buf)); }
+    catch { /* leave this url remote if it fails */ }
+  }
+  return out;
+}
+// rewrite an assembled deck so every Google font becomes a self-contained @font-face block
+async function embedFonts(html: string): Promise<string> {
+  // gather Google Fonts CSS URLs from both <link> tags and @import rules
+  const urls = new Set<string>();
+  for (const m of html.matchAll(/<link[^>]+href="(https:\/\/fonts\.googleapis\.com\/css2[^"]+)"[^>]*>/g)) urls.add(m[1]);
+  for (const m of html.matchAll(/@import\s+url\((['"]?)(https:\/\/fonts\.googleapis\.com\/css2[^'")]+)\1\)/g)) urls.add(m[2]);
+  if (!urls.size) return html;
+  const chars = deckChars();
+  const faces: string[] = [];
+  for (const u of urls) faces.push(await inlineGoogleCss(u, chars));
+  const out = html
+    .replace(/<link[^>]+fonts\.(googleapis|gstatic)\.com[^>]*>\s*/g, '') // drop remote links/preconnects
+    .replace(/@import\s+url\((['"]?)https:\/\/fonts\.googleapis\.com\/css2[^'")]+\1\)\s*;?/g, '') // and @imports
+    .replace('</head>', '<style id="sm-embedded-fonts">\n' + faces.join('\n') + '\n</style>\n</head>');
+  return out;
+}
+// the bytes we save/download: assembled deck, optionally with fonts inlined for offline use
+async function buildExportHtml(): Promise<string> {
+  const html = exportHtmlDeck();
+  if (!embedFontsChecked()) return html;
+  try { const out = await embedFonts(html); toast('已嵌入字体（离线可用）'); return out; }
+  catch (e) { toast('嵌入字体失败（需联网下载），已按不嵌入导出：' + (e as Error).message, true); return html; }
 }
 
 // ======================= N3: Submit-to-AI single-slide loop =======================
@@ -1277,6 +1477,24 @@ body.dragging .drop{display:flex;background:rgba(181,64,42,.12);border-color:#B5
 .tab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:12px 0;font-size:13px;color:#6a6a6e;cursor:pointer;font-family:inherit}
 .tab:hover{background:#f6f6f7}.tab.active{color:#B5402A;border-bottom-color:#B5402A;font-weight:600}
 .pane{flex:1;overflow:auto;padding:16px}
+.embedck{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#cfcfd2;cursor:pointer;user-select:none}
+.embedck input{margin:0;cursor:pointer}
+/* HTML-mode Keynote-style top tabs */
+.htabs{display:flex;border-bottom:1px solid #e2e2e4;flex:0 0 auto}
+.htab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:12px 0;font-size:13px;color:#6a6a6e;cursor:pointer;font-family:inherit}
+.htab:hover{background:#f6f6f7}.htab.active{color:#B5402A;border-bottom-color:#B5402A;font-weight:600}
+.hpane{flex:1;overflow:auto;padding:16px}
+/* animation sub-tabs (进入 / 动作 / 消失) */
+.subtabs{display:flex;gap:5px;margin:6px 0 12px}
+.stab{flex:1;background:#f1f1f2;border:1px solid #e0e0e2;border-radius:7px;padding:6px 0;font-size:12px;color:#6a6a6e;cursor:pointer;font-family:inherit}
+.stab:hover{background:#e8e8ea}.stab.active{background:#fbeae6;border-color:#e7b5aa;color:#B5402A;font-weight:600}
+.spane{margin-bottom:4px}
+/* B/I/U + alignment toggle bar */
+.btnbar{display:flex;gap:5px;align-items:center}
+.tgl{min-width:34px;height:34px;background:#f1f1f2;border:1px solid #e0e0e2;border-radius:6px;font-size:14px;color:#3a3a3e;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;padding:0 8px}
+.tgl:hover{background:#e8e8ea}
+.tgl.on{background:#B5402A;border-color:#B5402A;color:#fff}
+.bbsep{width:1px;height:22px;background:#e0e0e2;margin:0 3px}
 .right h3{font-size:11px;letter-spacing:.14em;color:#9a9a9e;margin:18px 0 8px;font-weight:700}.pane h3:first-child{margin-top:0}
 .right select,.right textarea,.right input{width:100%;padding:8px 10px;border:1px solid #d8d8da;border-radius:6px;font-size:14px;background:#fff;font-family:inherit}
 .right textarea{resize:vertical;line-height:1.5}
@@ -1310,6 +1528,7 @@ function buildUI(): void {
   <span class="grow"></span>
   <button id="imp">导入 HTML / deck.json / .md</button>
   <span class="sep"></span>
+  <label class="embedck" title="勾选后，导出/保存时把用到的字体子集内嵌进 HTML —— 断网、换电脑也显示正确字体（文件略大）"><input id="embedFonts" type="checkbox"> 嵌入字体</label>
   <button id="expPdf">导出 PDF</button>
   <button id="expHtml">导出 HTML 副本</button>
   <button id="saveHtml" class="primary" title="直接覆盖你导入的那个 HTML 文件">💾 保存 HTML</button>
@@ -1326,8 +1545,14 @@ function buildUI(): void {
   </main>
   <aside class="right">
     <div id="htmlpanel" style="display:none">
-      <div class="pane">
-        <div class="hb-title">🌐 HTML 模式 · 就地编辑</div>
+      <div class="htabs">
+        <button class="htab active" data-htab="fmt">格式</button>
+        <button class="htab" data-htab="anim">动画效果</button>
+        <button class="htab" data-htab="ai">AI 修改</button>
+      </div>
+
+      <!-- ===== 格式 ===== -->
+      <div class="pane hpane" data-hpane="fmt">
         <h3>主题 / 配色</h3>
         <div class="field" id="hThemeWrap" style="display:none"><label>主题</label><select id="hTheme"></select></div>
         <div class="grid2">
@@ -1338,33 +1563,62 @@ function buildUI(): void {
         <button id="hTokReset" class="mini">↺ 复原配色</button>
 
         <h3>选中元素</h3>
-        <div class="nosel" id="hNoSel">在预览里<b>点一段文字</b>即可直接改字；选中后可调它的字号 / 颜色 / 动效。</div>
-        <div id="hSel" style="display:none">
+        <div class="nosel hseloff" id="hNoSel">在预览里<b>点一段文字</b>即可直接改字；选中后可调它的字体 / 字号 / 颜色。</div>
+        <div id="hSel" class="hselon" style="display:none">
           <div class="tag" id="hSelTag">—</div>
+          <div class="field"><label>字体</label><select id="hFont"></select></div>
           <div class="grid2">
             <div class="field"><label>字号(px)</label><input id="hFs" type="number" min="8" placeholder="默认"></div>
             <div class="field"><label>颜色</label><input id="hColor" type="color"></div>
           </div>
-          <div class="grid2">
-            <div class="field"><label>粗细</label><select id="hWeight"><option value="">默认</option><option>400</option><option>500</option><option>600</option><option>700</option><option>900</option></select></div>
-            <div class="field"><label>对齐</label><select id="hAlign"><option value="">默认</option><option value="left">左</option><option value="center">中</option><option value="right">右</option></select></div>
+          <div class="field"><label>样式</label>
+            <div class="btnbar">
+              <button id="hBold" class="tgl" title="加粗"><b>B</b></button>
+              <button id="hItalic" class="tgl" title="斜体"><i>I</i></button>
+              <button id="hUnder" class="tgl" title="下划线"><span style="text-decoration:underline">U</span></button>
+              <span class="bbsep"></span>
+              <button id="hAlignL" class="tgl" title="左对齐">⬅</button>
+              <button id="hAlignC" class="tgl" title="居中">↔</button>
+              <button id="hAlignR" class="tgl" title="右对齐">➡</button>
+            </div>
           </div>
-          <div class="grid2">
-            <div class="field"><label>入场动画（播一次）</label><select id="hAnim"></select></div>
-            <div class="field"><label>持续动效（一直循环）</label><select id="hMotion"></select></div>
-          </div>
-          <div class="grid2">
-            <div class="field"><label>动效播放</label><select id="hFxMode"><option value="auto">自动（进入页面即播）</option><option value="manual">手动（点击页面才播）</option></select></div>
-            <div class="field"><label>预览</label><button id="hAnimPlay" title="在本页重新播放入场动画/动效">▶ 播放本页动效</button></div>
-          </div>
+          <div class="field"><label>粗细（精细）</label><select id="hWeight"><option value="">默认</option><option>300</option><option>400</option><option>500</option><option>600</option><option>700</option><option>900</option></select></div>
           <div class="oprow"><button id="hElUp" title="上移">↑ 上移</button><button id="hElDown" title="下移">↓ 下移</button><button id="hElDel" class="danger" title="删除这个元素">🗑 删除</button></div>
         </div>
+      </div>
 
-        <h3>视觉自检</h3>
-        <div class="oprow"><button id="auditRun">🔍 检查这套 deck（溢出 / 对比度 / 坏图）</button></div>
-        <div id="auditOut" class="auditout"></div>
+      <!-- ===== 动画效果 ===== -->
+      <div class="pane hpane" data-hpane="anim" hidden>
+        <div class="nosel hseloff">在预览里<b>点选一个元素</b>，再给它加动画。</div>
+        <div class="hselon" style="display:none">
+          <div class="tag" id="hSelTag2">—</div>
+          <div class="subtabs">
+            <button class="stab active" data-stab="in">进入</button>
+            <button class="stab" data-stab="motion">动作</button>
+            <button class="stab" data-stab="out">消失</button>
+          </div>
+          <div class="spane" data-spane="in">
+            <div class="field"><label>进入动画（翻到本页时播一次）</label><select id="hAnim"></select></div>
+            <div class="oprow"><button id="hAnimPlay" title="在本页重放进入/动作">▶ 预览进入 / 动作</button></div>
+          </div>
+          <div class="spane" data-spane="motion" hidden>
+            <div class="field"><label>持续动作（一直循环，如呼吸灯 / 流光）</label><select id="hMotion"></select></div>
+            <div class="oprow"><button id="hAnimPlay2" title="在本页重放进入/动作">▶ 预览进入 / 动作</button></div>
+          </div>
+          <div class="spane" data-spane="out" hidden>
+            <div class="field"><label>消失动画（离开本页时播一次）</label><select id="hAnimOut"></select></div>
+            <div class="oprow"><button id="hAnimPlayOut" title="在本页预览消失动画">▶ 预览消失</button></div>
+            <div class="hint">放映时翻页会自动播放消失动画；编辑态用此按钮预览。</div>
+          </div>
+          <h3>触发方式</h3>
+          <div class="field"><select id="hFxMode"><option value="auto">自动（进入页面即播）</option><option value="manual">手动（点击页面才播）</option></select></div>
+          <div class="hint">触发方式作用于本 deck 的进入 / 动作；放映时按 <b>B</b> 可一键关掉所有动画。</div>
+        </div>
+      </div>
 
-        <h3>✨ 让 AI 改（复杂/模糊的改动）</h3>
+      <!-- ===== AI 修改 ===== -->
+      <div class="pane hpane" data-hpane="ai" hidden>
+        <h3>✨ 让 AI 改（复杂 / 模糊的改动）</h3>
         <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">✓ AI 已改过</span><button id="aiRevertOne" class="mini revert" style="display:none">↩︎ 还原本页</button></div>
         <div class="field"><textarea id="aiInstruction" rows="4" placeholder="这一页想让 AI 怎么改？例如：把三个要点改成左右两栏对照，右栏给一个关键数字。写完自动记住，可切到别页继续写。"></textarea></div>
         <div class="oprow"><button id="aiClearOne">清空本页</button></div>
@@ -1377,6 +1631,10 @@ function buildUI(): void {
         <h4 class="sub">全部任务</h4>
         <div id="aiQueue" class="aiqueue"></div>
         <div class="oprow"><button id="aiExportAll" class="primary-mini" disabled>📦 导出 0 个任务</button></div>
+
+        <h3>视觉自检</h3>
+        <div class="oprow"><button id="auditRun">🔍 检查这套 deck（溢出 / 对比度 / 坏图）</button></div>
+        <div id="auditOut" class="auditout"></div>
       </div>
     </div>
     <div class="tabs">
@@ -1463,12 +1721,21 @@ function buildUI(): void {
   onInput('#hInk', (v) => setHtmlToken('--ink', v));
   $('#hTokReset').addEventListener('click', () => { harvestAll(); H.overrides = {}; renderHtmlEdit(); refreshHtmlInspector(); });
   onChange('#hTheme', (v) => { harvestAll(); H.theme = v; renderHtmlEdit(); refreshHtmlInspector(); });
+  populateFontSelect('#hFont'); onChange('#hFont', (v) => setHtmlFont(v));
   onInput('#hFs', (v) => applyHtmlStyle('font-size', v ? v + 'px' : ''));
   onInput('#hColor', (v) => applyHtmlStyle('color', v));
-  onChange('#hWeight', (v) => applyHtmlStyle('font-weight', v));
-  onChange('#hAlign', (v) => applyHtmlStyle('text-align', v));
+  onChange('#hWeight', (v) => { applyHtmlStyle('font-weight', v); if (htmlSelEl) showHtmlSel(true, htmlSelEl as HTMLElement); });
+  // Keynote-style toggles: bold / italic / underline + alignment
+  $('#hBold').addEventListener('click', () => toggleHtmlStyle('font-weight', '700', () => { const w = parseInt((htmlSelEl as HTMLElement | null)?.style.fontWeight || '', 10); return w >= 600; }));
+  $('#hItalic').addEventListener('click', () => toggleHtmlStyle('font-style', 'italic', () => (htmlSelEl as HTMLElement | null)?.style.fontStyle === 'italic'));
+  $('#hUnder').addEventListener('click', () => toggleHtmlStyle('text-decoration', 'underline', () => /underline/.test((htmlSelEl as HTMLElement | null)?.style.textDecoration || '')));
+  const setAlign = (a: string) => { if (!htmlSelEl) return; const cur = (htmlSelEl as HTMLElement).style.textAlign; applyHtmlStyle('text-align', cur === a ? '' : a); showHtmlSel(true, htmlSelEl as HTMLElement); };
+  $('#hAlignL').addEventListener('click', () => setAlign('left'));
+  $('#hAlignC').addEventListener('click', () => setAlign('center'));
+  $('#hAlignR').addEventListener('click', () => setAlign('right'));
   fillSel('#hAnim', meta.anims, ANIM_LABEL); onChange('#hAnim', (v) => { setHtmlAnim(v); previewPlayFx(); });
   fillSel('#hMotion', meta.motions, MOTION_LABEL); onChange('#hMotion', (v) => { setHtmlMotion(v); previewPlayFx(); });
+  fillSel('#hAnimOut', meta.animOuts, ANIM_OUT_LABEL); onChange('#hAnimOut', (v) => { setHtmlAnimOut(v); previewPlayFxOut(); });
   ($('#hFxMode') as HTMLSelectElement).value = fxMode;
   onChange('#hFxMode', (v) => {
     fxMode = v === 'manual' ? 'manual' : 'auto';
@@ -1476,9 +1743,23 @@ function buildUI(): void {
     previewFxCall('__SM_FX_REARM__');
   });
   $('#hAnimPlay').addEventListener('click', previewPlayFx);
+  $('#hAnimPlay2').addEventListener('click', previewPlayFx);
+  $('#hAnimPlayOut').addEventListener('click', previewPlayFxOut);
   $('#hElUp').addEventListener('click', () => moveHtmlEl(-1));
   $('#hElDown').addEventListener('click', () => moveHtmlEl(1));
   $('#hElDel').addEventListener('click', delHtmlEl);
+  // HTML-mode top tabs (格式 / 动画效果 / AI 修改) + animation sub-tabs (进入 / 动作 / 消失)
+  document.querySelectorAll('.htab').forEach((tb) => tb.addEventListener('click', () => {
+    const name = (tb as HTMLElement).dataset.htab;
+    document.querySelectorAll('.htab').forEach((x) => x.classList.toggle('active', x === tb));
+    document.querySelectorAll('.hpane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.hpane !== name));
+  }));
+  document.querySelectorAll('.stab').forEach((tb) => tb.addEventListener('click', () => {
+    const name = (tb as HTMLElement).dataset.stab;
+    document.querySelectorAll('.stab').forEach((x) => x.classList.toggle('active', x === tb));
+    document.querySelectorAll('.spane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.spane !== name));
+    if (name === 'out') previewPlayFxOut(); else previewPlayFx();
+  }));
 
   // --- Submit-to-AI: per-page memory + batch send (apply comes back over the bridge) ---
   ($('#aiInstruction') as HTMLTextAreaElement).addEventListener('input', onAiInput);
@@ -1541,8 +1822,8 @@ function buildUI(): void {
     f.text().then((t) => importFile(f.name, t)); // no handle from a plain <input> → save will prompt once
   });
   $('#saveHtml').addEventListener('click', () => { void saveHtmlInPlace(); });
-  $('#expHtml').addEventListener('click', () => {
-    if (mode === 'html') { download(fileBase + '.html', exportHtmlDeck(), 'text/html'); toast('已导出编辑后的 HTML'); return; }
+  $('#expHtml').addEventListener('click', async () => {
+    if (mode === 'html') { download(fileBase + '.html', await buildExportHtml(), 'text/html'); toast('已导出编辑后的 HTML'); return; }
     const tn = fileBase + '.transcript.html', pn = fileBase + '.presenter.html';
     download(fileBase + '.html', renderDeckHtml(deck, { presenterUrl: pn }), 'text/html');
     setTimeout(() => download(tn, renderTranscriptHtml(deck), 'text/html'), 250);
@@ -1579,6 +1860,7 @@ function buildUI(): void {
   (window as unknown as { __SM_IMPORT__: typeof importFile }).__SM_IMPORT__ = importFile;
   (window as unknown as { __SM_EXPORT_HTML__: () => string }).__SM_EXPORT_HTML__ = () =>
     mode === 'html' ? exportHtmlDeck() : renderDeckHtml(deck);
+  (window as unknown as { __SM_BUILD_EXPORT__: () => Promise<string> }).__SM_BUILD_EXPORT__ = buildExportHtml;
   (window as unknown as { __SM_SAVE_HTML__: typeof saveHtmlInPlace }).__SM_SAVE_HTML__ = saveHtmlInPlace;
   (window as unknown as { __SM_HAS_FILE_HANDLE__: () => boolean }).__SM_HAS_FILE_HANDLE__ = () => !!fileHandle;
   (window as unknown as { __SM_AI_REQUEST__: typeof buildAiRequest }).__SM_AI_REQUEST__ = buildAiRequest;

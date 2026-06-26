@@ -47,6 +47,19 @@ export const ANIM_NAMES = [
 ] as const;
 export type AnimName = (typeof ANIM_NAMES)[number];
 
+// One-shot EXIT animations (play on the OUTGOING slide when you navigate away).
+// Mirror of ANIM_NAMES; carried on [data-anim-out]. The deck's nav is intercepted
+// (Studio FX driver) so the leaving slide stays visible long enough to animate out.
+export const ANIM_OUT_NAMES = [
+  'none',
+  'fade-out', // 淡出
+  'sink', // 下沉淡出
+  'zoom-out', // 缩小淡出
+  'out-left', // 向左退出
+  'out-right', // 向右退出
+] as const;
+export type AnimOutName = (typeof ANIM_OUT_NAMES)[number];
+
 // Continuous / looping MOTION effects (run while the slide is shown). Ported
 // from keynote.html (kl-breathe 呼吸灯, neon-flicker, em-stress) + huashu
 // (breathe, float, pulse). A growing library — add a name here + CSS keyframe
@@ -59,6 +72,7 @@ export const MOTION_NAMES = [
   'pulse', // 闪烁：透明度脉冲
   'neon', // 霓虹微闪 (keynote neon-flicker)
   'stress', // 强调脉冲：周期性放大点睛 (keynote a-em-stress)
+  'shimmer', // 流光溢彩：文字镂空彩虹液态流动
 ] as const;
 export type MotionName = (typeof MOTION_NAMES)[number];
 
