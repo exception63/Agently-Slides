@@ -54,6 +54,11 @@ body.sm { overflow: hidden; background: #202022; font-family: system-ui, -apple-
 }
 .slide.active { display: block; }
 
+/* typography polish: balance headings (no lonely last word), prettify body wrapping.
+   Native CSS, degrades silently on older browsers, no-op on single-line text. */
+.slide h1, .slide h2, .slide h3, .slide h4, .slide .title, .slide blockquote { text-wrap: balance; }
+.slide p, .slide li, .slide .sub { text-wrap: pretty; }
+
 /* floating nav buttons */
 .sm-nav { position: fixed; bottom: 18px; right: 18px; display: flex; gap: 8px; z-index: 60; }
 .sm-btn {

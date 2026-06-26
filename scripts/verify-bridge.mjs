@@ -13,10 +13,18 @@
 //
 // Run: npx tsx scripts/verify-bridge.mjs
 import { chromium } from 'playwright-core';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { readFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { startBridge } from '../packages/bridge/src/index.ts';
+import { fileURLToPath } from 'node:url';
+// imports TS bridge sources → needs tsx. If launched with plain `node`, transparently
+// re-exec under tsx so CI can just do `node scripts/verify-bridge.mjs`.
+if (!process.env.SM_TSX) {
+  const tsx = fileURLToPath(new URL('../node_modules/tsx/dist/cli.mjs', import.meta.url));
+  const r = spawnSync(process.execPath, [tsx, fileURLToPath(import.meta.url), ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, SM_TSX: '1' } });
+  process.exit(r.status ?? 1);
+}
+const { startBridge } = await import('../packages/bridge/src/index.ts');
 
 const root = process.cwd();
 const SENTINEL = 'BRIDGE-PATCH-OK-7Q';

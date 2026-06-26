@@ -2,9 +2,17 @@
 // and the offline Studio's connect button → probe → detected → "打开连接版".
 // Run: npx tsx scripts/verify-connect.mjs
 import { chromium } from 'playwright-core';
-import { startBridge } from '../packages/bridge/src/index.ts';
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+// imports TS bridge sources → needs tsx. Re-exec under tsx if launched with plain node.
+if (!process.env.SM_TSX) {
+  const tsx = fileURLToPath(new URL('../node_modules/tsx/dist/cli.mjs', import.meta.url));
+  const r = spawnSync(process.execPath, [tsx, fileURLToPath(import.meta.url), ...process.argv.slice(2)], { stdio: 'inherit', env: { ...process.env, SM_TSX: '1' } });
+  process.exit(r.status ?? 1);
+}
+const { startBridge } = await import('../packages/bridge/src/index.ts');
 const root = process.cwd();
 const studio = 'file://' + resolve(root, 'studio/slidesmith-studio.html');
 const keynote = readFileSync(resolve(root, 'docs/style-reference/keynote-target.html'), 'utf8');

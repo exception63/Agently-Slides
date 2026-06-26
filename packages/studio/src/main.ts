@@ -185,6 +185,18 @@ let htmlSelEl: Element | null = null; // currently selected element inside the e
 let htmlGotoAfterRender = -1; // restore this slide after a re-render (e.g. after applying a patch)
 let fxMode: 'auto' | 'manual' = 'auto'; // 动效播放模式：auto=进入页面即播 / manual=点击页面才播（写进导出的 <html data-smfx>）
 
+// ---- never-lose-work: a dirty flag + debounced localStorage draft + undo/redo history.
+// All HTML-mode mutations route through markDirty()/pushHistory() so edits survive a
+// refresh/crash and are reversible. (Roadmap step 1; see _memory/optimization-roadmap.md) ----
+let dirty = false; // true when the deck has edits not yet written to the real file
+let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
+const DRAFT_KEY = 'sm-studio-draft-v1';
+interface Snap { slides: string; overrides: Record<string, string>; theme: string; fx: 'auto' | 'manual'; cur: number }
+let undoStack: Snap[] = [];
+let redoStack: Snap[] = [];
+let lastPushAt = 0, lastPushTag = '';
+let gizmoEl: HTMLElement | null = null; // the move/resize overlay drawn over the selected element (in the iframe)
+
 // ---- File System Access: a writable handle captured when the user opens a deck,
 // so "保存 HTML" can overwrite that exact file in place (one click, no re-pick).
 // Cleared on every import; re-set by the open-picker / drop paths below. Null when
@@ -422,7 +434,7 @@ async function saveHtmlInPlace(): Promise<void> {
       const w = await fileHandle.createWritable();
       await w.write(html); await w.close();
       toast('已保存 → ' + (fileHandle.name || fileBase + '.html'));
-      syncExportToBridge();
+      clearDraft(); syncExportToBridge();
       return;
     } catch { /* permission lost / file moved → fall through to picker */ fileHandle = null; }
   }
@@ -438,7 +450,7 @@ async function saveHtmlInPlace(): Promise<void> {
       await ws.write(html); await ws.close();
       fileHandle = h;
       toast('已保存 → ' + (h.name || fileBase + '.html'));
-      syncExportToBridge();
+      clearDraft(); syncExportToBridge();
       return;
     } catch (e) {
       if ((e as Error).name === 'AbortError') return; // user cancelled the dialog
@@ -554,6 +566,7 @@ function loadHtmlDeck(name: string, html: string): void {
   mode = 'html'; cur = 0; selBid = null; htmlSelEl = null;
   $('#deckname').textContent = fileBase;
   Object.keys(aiInstructions).forEach((k) => delete aiInstructions[k]); aiApplied.clear(); aiSent.clear(); Object.keys(aiBefore).forEach((k) => delete aiBefore[k]); aiCurId = ''; aiDeckInstruction = ''; usedFontIds.clear();
+  undoStack = []; redoStack = []; lastPushTag = ''; dirty = false; updateUndoButtons(); updateDirtyBadge();
   const aiBox = $('#aiInstruction') as HTMLTextAreaElement | null; if (aiBox) aiBox.value = '';
   const aiDeckBox = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (aiDeckBox) aiDeckBox.value = '';
   const fxSel = $('#hFxMode') as HTMLSelectElement | null; if (fxSel) fxSel.value = fxMode; // reflect imported deck's play mode
@@ -592,7 +605,7 @@ function assembleDeck(forEdit = false): string {
   // <html> carries the auto/manual choice into the exported file; data-smfx-edit marks
   // the editing surface so the FX driver skips exit-on-nav (keeps Studio nav instant).
   const editAttr = forEdit ? ' data-smfx-edit="1"' : '';
-  return `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${fontLinks}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n</body>\n</html>`;
+  return `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n</body>\n</html>`;
 }
 // <link> tags for user-picked Google fonts that the deck author didn't already include.
 // Detected from usedFontIds plus a scan of the deck HTML (so a re-imported deck that
@@ -614,6 +627,14 @@ function fontLinksFor(deckHtml: string): string {
     + '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
     + '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' + fams.join('&family=') + '&display=swap">';
 }
+// Typography polish injected into every assembled deck (imported or rendered): balance
+// headings so they don't drop a lonely word onto a second line, and prettify body text
+// so paragraphs/lists avoid orphan last-line words. Native CSS, degrades silently on old
+// browsers, no-op on single-line text. Targets generic tags + the Deck-Contract classes.
+const TYPO_CSS = '<style id="sm-typo">'
+  + '#deck .slide h1,#deck .slide h2,#deck .slide h3,#deck .slide h4,#deck .slide .title,#deck .slide .cover__title,#deck .slide .secdiv__title,#deck .slide .manifesto__title,#deck .slide .insight__statement,#deck .slide .head__title,#deck .slide blockquote{text-wrap:balance}'
+  + '#deck .slide p,#deck .slide li,#deck .slide .cover__sub,#deck .slide .card__desc,#deck .slide .sub{text-wrap:pretty}'
+  + '</style>';
 // FX: one-shot ENTRANCE animations (data-anim) + continuous MOTION (data-motion),
 // ported from the runtime so they play in any imported/exported deck (which has no
 // such rules of its own). Gated by FX_JS via slide classes so we get auto-on-show
@@ -740,8 +761,10 @@ function wireFullDeckEditing(d: Document): void {
     let t = e.target as Node | null; while (t && t.nodeType !== 1) t = (t as Node).parentNode;
     const el = t as HTMLElement | null; if (!el || !el.closest('#deck .slide') || el.classList.contains('slide')) return;
     if (htmlSelEl) (htmlSelEl as HTMLElement).classList.remove('sm-sel');
-    htmlSelEl = el; el.classList.add('sm-sel'); showHtmlSel(true, el);
+    htmlSelEl = el; el.classList.add('sm-sel'); showHtmlSel(true, el); showGizmo(el);
   }, true);
+  // keep the move/resize gizmo aligned when the deck rescales
+  try { (d.defaultView as Window).addEventListener('resize', () => positionGizmo()); } catch { /* noop */ }
 }
 function renderHtmlEdit(): void {
   const ifr = $('#preview') as HTMLIFrameElement;
@@ -756,6 +779,22 @@ function renderHtmlEdit(): void {
     if (!d || !d.querySelector('#deck .slide')) return false;
     done = true;
     wireFullDeckEditing(d); updateAiTarget(); startHtmlNavSync();
+    // never-lose-work + history for text edits done straight in the deck DOM
+    d.addEventListener('input', () => markDirty(), true);
+    d.addEventListener('focusin', (e) => { if ((e.target as HTMLElement)?.isContentEditable) pushHistory('text'); }, true);
+    // paste an image straight onto a slide → inline it
+    d.addEventListener('paste', (e) => {
+      const items = (e as ClipboardEvent).clipboardData?.items; if (!items) return;
+      for (let i = 0; i < items.length; i++) { if (items[i].type.indexOf('image/') === 0) { const f = items[i].getAsFile(); if (f) { e.preventDefault(); const r = new FileReader(); r.onload = () => placeImage(String(r.result)); r.readAsDataURL(f); return; } } }
+    }, true);
+    // forward save/undo/redo shortcuts pressed while focus is inside the deck iframe
+    d.addEventListener('keydown', (e) => {
+      const meta = e.metaKey || e.ctrlKey; if (!meta) return;
+      const k = e.key.toLowerCase();
+      if (k === 's') { e.preventDefault(); void saveHtmlInPlace(); }
+      else if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { e.preventDefault(); redo(); }
+    }, true);
     if (htmlGotoAfterRender >= 0) { const t = htmlGotoAfterRender; htmlGotoAfterRender = -1; setTimeout(() => selectHtmlSlide(t), 120); }
     return true;
   };
@@ -800,6 +839,7 @@ function selectHtmlSlide(i: number): void {
 }
 // —— inspector: tokens / theme / selected-element style + anim ——
 function showHtmlSel(on: boolean, el?: HTMLElement): void {
+  if (!on) hideGizmo();
   // toggle every "selected element" panel (格式 + 动画效果 tabs) and their empty-state hints
   document.querySelectorAll('#htmlpanel .hselon').forEach((e) => ((e as HTMLElement).style.display = on ? '' : 'none'));
   document.querySelectorAll('#htmlpanel .hseloff').forEach((e) => ((e as HTMLElement).style.display = on ? 'none' : ''));
@@ -822,6 +862,8 @@ function showHtmlSel(on: boolean, el?: HTMLElement): void {
   (($('#hAnim') as HTMLSelectElement)).value = el.getAttribute('data-anim') || 'none';
   (($('#hMotion') as HTMLSelectElement)).value = el.getAttribute('data-motion') || 'none';
   (($('#hAnimOut') as HTMLSelectElement)).value = el.getAttribute('data-anim-out') || 'none';
+  const wInp = $('#hElW') as HTMLInputElement | null; if (wInp) wInp.value = el.style.width ? String(parseInt(el.style.width, 10)) : '';
+  positionGizmo();
   updateAiTarget();
 }
 function toggleBtn(sel: string, on: boolean): void { const b = $(sel); if (b) b.classList.toggle('on', on); }
@@ -841,21 +883,185 @@ function populateFontSelect(sel: string): void {
     if (og.children.length) el.appendChild(og);
   });
 }
+// ---- never-lose-work: dirty flag + autosave draft ----
+function markDirty(): void {
+  if (mode !== 'html') return;
+  dirty = true; updateDirtyBadge();
+  if (autosaveTimer) clearTimeout(autosaveTimer);
+  autosaveTimer = setTimeout(autosaveDraft, 1200);
+}
+function updateDirtyBadge(): void {
+  const el = $('#dirtyDot'); if (el) el.style.display = (dirty && mode === 'html') ? '' : 'none';
+}
+function autosaveDraft(): void {
+  if (mode !== 'html') return;
+  try {
+    const html = exportHtmlDeck(); // harvest + assemble (no font embed — a local draft)
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ name: fileBase, ts: Date.now(), html }));
+  } catch { /* quota exceeded (big base64 images) or serialization issue → skip */ }
+}
+function clearDraft(): void { try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ } dirty = false; updateDirtyBadge(); }
+
+// ---- undo / redo: snapshot the committed deck state before each mutation ----
+function snapshot(): Snap { return { slides: JSON.stringify(htmlSlides), overrides: { ...H.overrides }, theme: H.theme, fx: fxMode, cur }; }
+// call BEFORE a mutation. tag coalesces rapid same-kind edits (e.g. dragging a color) into one step.
+function pushHistory(tag = ''): void {
+  if (mode !== 'html') return;
+  const now = Date.now();
+  if (tag && tag === lastPushTag && now - lastPushAt < 700) { lastPushAt = now; return; }
+  harvestAll(); // capture current text edits living in the iframe DOM
+  undoStack.push(snapshot());
+  if (undoStack.length > 60) undoStack.shift();
+  redoStack = []; lastPushAt = now; lastPushTag = tag;
+  updateUndoButtons();
+}
+function restoreSnap(s: Snap): void {
+  htmlSlides = JSON.parse(s.slides) as HtmlSlide[];
+  H.overrides = { ...s.overrides }; H.theme = s.theme; fxMode = s.fx;
+  const fxSel = $('#hFxMode') as HTMLSelectElement | null; if (fxSel) fxSel.value = fxMode;
+  htmlGotoAfterRender = Math.max(0, Math.min(s.cur, htmlSlides.length - 1));
+  htmlSelEl = null; showHtmlSel(false);
+  renderLeft(); renderHtmlEdit(); refreshHtmlInspector();
+}
+function undo(): void {
+  if (mode !== 'html' || !undoStack.length) return;
+  harvestAll(); redoStack.push(snapshot());
+  restoreSnap(undoStack.pop() as Snap);
+  lastPushTag = ''; markDirty(); updateUndoButtons(); toast('已撤销');
+}
+function redo(): void {
+  if (mode !== 'html' || !redoStack.length) return;
+  harvestAll(); undoStack.push(snapshot());
+  restoreSnap(redoStack.pop() as Snap);
+  lastPushTag = ''; markDirty(); updateUndoButtons(); toast('已重做');
+}
+function updateUndoButtons(): void {
+  const u = $('#undoBtn') as HTMLButtonElement | null; if (u) u.disabled = undoStack.length === 0;
+  const r = $('#redoBtn') as HTMLButtonElement | null; if (r) r.disabled = redoStack.length === 0;
+}
+
+// ---- insert an image (HTML mode): file-picker or paste → base64 inlined <img> ----
+function insertImageFromFile(): void {
+  if (mode !== 'html') { toast('请先导入 HTML deck', true); return; }
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+  inp.addEventListener('change', () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    const r = new FileReader(); r.onload = () => placeImage(String(r.result)); r.readAsDataURL(f);
+  });
+  inp.click();
+}
+function placeImage(dataUrl: string): void {
+  const d = ($('#preview') as HTMLIFrameElement).contentDocument; if (!d) return;
+  pushHistory('img');
+  const img = d.createElement('img');
+  img.src = dataUrl; img.setAttribute('alt', '图片');
+  img.style.maxWidth = '100%'; img.style.height = 'auto'; img.style.display = 'block'; img.style.borderRadius = '12px';
+  // insert after the selected element, else append to the active slide's content area
+  if (htmlSelEl && (htmlSelEl as HTMLElement).closest('#deck .slide')) {
+    (htmlSelEl as HTMLElement).insertAdjacentElement('afterend', img);
+  } else {
+    const active = d.querySelector('#deck .slide.active') || d.querySelector('#deck .slide');
+    const host = (active && (active.querySelector('.fill') || active)) as HTMLElement | null;
+    if (host) host.appendChild(img);
+  }
+  if (htmlSelEl) (htmlSelEl as HTMLElement).classList.remove('sm-sel');
+  htmlSelEl = img; img.classList.add('sm-sel'); showHtmlSel(true, img); showGizmo(img);
+  harvestAll(); markDirty();
+  toast('已插入图片（拖蓝框上方 ✥ 移动、右下角改大小）');
+}
+
+// ---- move / resize the selected element directly on the canvas (Keynote-style gizmo) ----
+// Move = inline transform translate (keeps the flow-layout slot, never breaks the contract);
+// resize = inline width/height (images keep aspect via height:auto). Both persist via harvest.
+function parseTranslate(el: HTMLElement): { x: number; y: number } {
+  const m = (el.style.transform || '').match(/translate\(\s*(-?[\d.]+)px\s*,\s*(-?[\d.]+)px\s*\)/);
+  return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : { x: 0, y: 0 };
+}
+function setTranslate(el: HTMLElement, x: number, y: number): void {
+  const rest = (el.style.transform || '').replace(/translate\([^)]*\)/, '').trim();
+  el.style.transform = ('translate(' + Math.round(x) + 'px, ' + Math.round(y) + 'px) ' + rest).trim();
+}
+function deckScale(el: HTMLElement): number { const r = el.getBoundingClientRect(); const w = el.offsetWidth || 1; return (r.width / w) || 1; }
+function nudgeSelected(dxDeck: number, dyDeck: number): void {
+  if (!htmlSelEl) return; const el = htmlSelEl as HTMLElement; const t = parseTranslate(el); setTranslate(el, t.x + dxDeck, t.y + dyDeck);
+}
+function resizeSelected(wDeck: number, hDeck?: number): void {
+  if (!htmlSelEl) return; const el = htmlSelEl as HTMLElement;
+  if (wDeck > 0) el.style.width = Math.max(20, Math.round(wDeck)) + 'px'; else el.style.removeProperty('width');
+  if (el.tagName === 'IMG') el.style.height = 'auto';
+  else if (hDeck != null && hDeck > 0) el.style.height = Math.max(20, Math.round(hDeck)) + 'px';
+}
+// inspector / hook entry points (also used by the drag handlers' commit)
+function commitMove(dx: number, dy: number): void { if (!htmlSelEl) return; pushHistory('box'); nudgeSelected(dx, dy); harvestAll(); markDirty(); positionGizmo(); }
+function commitResize(w: number, h?: number): void { if (!htmlSelEl) return; pushHistory('box'); resizeSelected(w, h); harvestAll(); markDirty(); positionGizmo(); }
+function resetSelectedBox(): void {
+  if (!htmlSelEl) return; pushHistory('box'); const el = htmlSelEl as HTMLElement;
+  el.style.removeProperty('transform'); el.style.removeProperty('width'); el.style.removeProperty('height');
+  harvestAll(); markDirty(); positionGizmo(); showHtmlSel(true, el);
+}
+function ensureGizmoStyle(d: Document): void {
+  if (d.getElementById('sm-gizmo-css')) return;
+  const st = d.createElement('style'); st.id = 'sm-gizmo-css';
+  st.textContent = '.sm-gizmo{position:fixed;z-index:2147483000;border:1.5px solid #3a86ff;pointer-events:none;box-sizing:border-box}'
+    + '.sm-gizmo .h{position:absolute;width:15px;height:15px;background:#fff;border:1.5px solid #3a86ff;border-radius:3px;pointer-events:auto}'
+    + '.sm-gizmo .se{right:-8px;bottom:-8px;cursor:nwse-resize}'
+    + '.sm-gizmo .mv{position:absolute;left:50%;top:-32px;transform:translateX(-50%);min-width:28px;height:24px;padding:0 6px;background:#3a86ff;color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;pointer-events:auto;cursor:move;box-shadow:0 2px 6px rgba(0,0,0,.3)}';
+  d.head.appendChild(st);
+}
+function hideGizmo(): void { if (gizmoEl) { gizmoEl.remove(); gizmoEl = null; } }
+function positionGizmo(): void {
+  if (!gizmoEl || !htmlSelEl) return;
+  const r = (htmlSelEl as HTMLElement).getBoundingClientRect();
+  gizmoEl.style.left = r.left + 'px'; gizmoEl.style.top = r.top + 'px';
+  gizmoEl.style.width = r.width + 'px'; gizmoEl.style.height = r.height + 'px';
+}
+function showGizmo(el: HTMLElement): void {
+  const d = el.ownerDocument; if (!d || !d.body) return;
+  hideGizmo(); ensureGizmoStyle(d);
+  const g = d.createElement('div'); g.className = 'sm-gizmo';
+  g.innerHTML = '<div class="mv" title="拖动移动本元素">✥</div><div class="h se" title="拖动改变大小"></div>';
+  d.body.appendChild(g); gizmoEl = g; positionGizmo();
+  (g.querySelector('.mv') as HTMLElement).addEventListener('mousedown', (e) => startGizmoDrag(e as MouseEvent, 'move'));
+  (g.querySelector('.se') as HTMLElement).addEventListener('mousedown', (e) => startGizmoDrag(e as MouseEvent, 'resize'));
+}
+function startGizmoDrag(e: MouseEvent, mode: 'move' | 'resize'): void {
+  if (!htmlSelEl) return; e.preventDefault(); e.stopPropagation();
+  const el = htmlSelEl as HTMLElement; const d = el.ownerDocument; if (!d) return;
+  const scale = deckScale(el); const t = parseTranslate(el);
+  const sx = e.clientX, sy = e.clientY, baseTx = t.x, baseTy = t.y, baseW = el.offsetWidth, baseH = el.offsetHeight;
+  pushHistory('box');
+  const onMove = (ev: MouseEvent): void => {
+    const dx = (ev.clientX - sx) / scale, dy = (ev.clientY - sy) / scale;
+    if (mode === 'move') setTranslate(el, baseTx + dx, baseTy + dy);
+    else resizeSelected(baseW + dx, baseH + dy);
+    positionGizmo();
+  };
+  const onUp = (): void => {
+    d.removeEventListener('mousemove', onMove, true); d.removeEventListener('mouseup', onUp, true);
+    harvestAll(); markDirty(); showHtmlSel(true, el);
+  };
+  d.addEventListener('mousemove', onMove, true); d.addEventListener('mouseup', onUp, true);
+}
+
 function applyHtmlStyle(prop: string, val: string): void {
-  if (!htmlSelEl) return; const s = (htmlSelEl as HTMLElement).style;
+  if (!htmlSelEl) return; pushHistory('style:' + prop); const s = (htmlSelEl as HTMLElement).style;
   if (val) s.setProperty(prop, val); else s.removeProperty(prop);
+  markDirty(); positionGizmo();
 }
 function setHtmlAnim(val: string): void {
-  if (!htmlSelEl) return;
+  if (!htmlSelEl) return; pushHistory('anim');
   if (val && val !== 'none') htmlSelEl.setAttribute('data-anim', val); else htmlSelEl.removeAttribute('data-anim');
+  markDirty();
 }
 function setHtmlMotion(val: string): void {
-  if (!htmlSelEl) return;
+  if (!htmlSelEl) return; pushHistory('motion');
   if (val && val !== 'none') htmlSelEl.setAttribute('data-motion', val); else htmlSelEl.removeAttribute('data-motion');
+  markDirty();
 }
 function setHtmlAnimOut(val: string): void {
-  if (!htmlSelEl) return;
+  if (!htmlSelEl) return; pushHistory('animout');
   if (val && val !== 'none') htmlSelEl.setAttribute('data-anim-out', val); else htmlSelEl.removeAttribute('data-anim-out');
+  markDirty();
 }
 // pick a typeface for the selected element; load the webfont into the live preview now
 function setHtmlFont(id: string): void {
@@ -873,9 +1079,9 @@ function ensureFontLoaded(f: FontDef): void {
 }
 // bold / italic / underline as Keynote-style toggles on the selected element's inline style
 function toggleHtmlStyle(prop: string, onVal: string, isOn: () => boolean): void {
-  if (!htmlSelEl) return; const s = (htmlSelEl as HTMLElement).style;
+  if (!htmlSelEl) return; pushHistory('style:' + prop); const s = (htmlSelEl as HTMLElement).style;
   if (isOn()) s.removeProperty(prop); else s.setProperty(prop, onVal);
-  showHtmlSel(true, htmlSelEl as HTMLElement);
+  showHtmlSel(true, htmlSelEl as HTMLElement); markDirty();
 }
 // drive the FX engine inside the live preview iframe (defined by FX_JS)
 function previewFrame(): HTMLIFrameElement | null { return document.getElementById('preview') as HTMLIFrameElement | null; }
@@ -891,20 +1097,22 @@ function previewPlayFxOut(): void {
 // high-frequency direct edits on the selected element, straight in the live DOM
 // (no AI, no re-render). harvestAll() snapshots the change so export/patch keep it.
 function moveHtmlEl(dir: number): void {
-  if (!htmlSelEl) return; const el = htmlSelEl as HTMLElement; const p = el.parentElement; if (!p) return;
+  if (!htmlSelEl) return; pushHistory('move'); const el = htmlSelEl as HTMLElement; const p = el.parentElement; if (!p) return;
   if (dir < 0) { const prev = el.previousElementSibling; if (prev) p.insertBefore(el, prev); }
   else { const next = el.nextElementSibling; if (next) p.insertBefore(next, el); }
-  harvestAll();
+  harvestAll(); markDirty(); positionGizmo();
 }
 function delHtmlEl(): void {
-  if (!htmlSelEl) return; const el = htmlSelEl as HTMLElement;
-  htmlSelEl = null; el.remove(); showHtmlSel(false); harvestAll();
-  toast('已删除该元素');
+  if (!htmlSelEl) return; pushHistory('del'); const el = htmlSelEl as HTMLElement;
+  htmlSelEl = null; el.remove(); hideGizmo(); showHtmlSel(false); harvestAll(); markDirty();
+  toast('已删除该元素（可 Ctrl/⌘+Z 撤销）');
 }
 function setHtmlToken(name: string, val: string): void {
+  pushHistory('token:' + name);
   H.overrides[name] = val;
   const d = ($('#preview') as HTMLIFrameElement).contentDocument;
   if (d) d.documentElement.style.setProperty(name, val);
+  markDirty();
 }
 function refreshHtmlInspector(): void {
   // theme switching is handled by the deck's OWN control (visible in full-deck view),
@@ -932,16 +1140,23 @@ function abToBase64(buf: ArrayBuffer): string {
   for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
   return btoa(bin);
 }
-// fetch a Google Fonts CSS (subset to deckChars) and inline every gstatic woff2 as a data URI
+// fetch with a hard timeout so an offline/slow embed fails fast instead of hanging
+async function fetchTimeout(url: string, ms = 15000): Promise<Response> {
+  const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
+  try { return await fetch(url, { signal: c.signal }); } finally { clearTimeout(t); }
+}
+// fetch a Google Fonts CSS (subset to deckChars) and inline every gstatic woff2 as a data URI.
+// woff2 files are downloaded in PARALLEL (Promise.all) — embedding a CJK family is many faces.
 async function inlineGoogleCss(cssUrl: string, chars: string): Promise<string> {
   const url = cssUrl.replace(/&amp;/g, '&') + '&text=' + encodeURIComponent(chars);
-  const css = await (await fetch(url, { headers: { /* default UA → woff2 */ } })).text();
-  const urls = Array.from(css.matchAll(/url\((https:\/\/fonts\.gstatic\.com[^)]+)\)/g));
+  const css = await (await fetchTimeout(url)).text();
+  const urls = Array.from(css.matchAll(/url\((https:\/\/fonts\.gstatic\.com[^)]+)\)/g)).map((m) => m[1]);
+  const pairs = await Promise.all(urls.map(async (u) => {
+    try { return [u, 'data:font/woff2;base64,' + abToBase64(await (await fetchTimeout(u)).arrayBuffer())]; }
+    catch { return [u, u]; } // leave remote if a single file fails
+  }));
   let out = css;
-  for (const u of urls) {
-    try { const buf = await (await fetch(u[1])).arrayBuffer(); out = out.split(u[1]).join('data:font/woff2;base64,' + abToBase64(buf)); }
-    catch { /* leave this url remote if it fails */ }
-  }
+  for (const [orig, rep] of pairs) if (orig !== rep) out = out.split(orig).join(rep);
   return out;
 }
 // rewrite an assembled deck so every Google font becomes a self-contained @font-face block
@@ -952,8 +1167,8 @@ async function embedFonts(html: string): Promise<string> {
   for (const m of html.matchAll(/@import\s+url\((['"]?)(https:\/\/fonts\.googleapis\.com\/css2[^'")]+)\1\)/g)) urls.add(m[2]);
   if (!urls.size) return html;
   const chars = deckChars();
-  const faces: string[] = [];
-  for (const u of urls) faces.push(await inlineGoogleCss(u, chars));
+  // all font families resolved in parallel (each also parallelizes its woff2 downloads)
+  const faces = await Promise.all(Array.from(urls).map((u) => inlineGoogleCss(u, chars)));
   const out = html
     .replace(/<link[^>]+fonts\.(googleapis|gstatic)\.com[^>]*>\s*/g, '') // drop remote links/preconnects
     .replace(/@import\s+url\((['"]?)https:\/\/fonts\.googleapis\.com\/css2[^'")]+\1\)\s*;?/g, '') // and @imports
@@ -964,8 +1179,9 @@ async function embedFonts(html: string): Promise<string> {
 async function buildExportHtml(): Promise<string> {
   const html = exportHtmlDeck();
   if (!embedFontsChecked()) return html;
-  try { const out = await embedFonts(html); toast('已嵌入字体（离线可用）'); return out; }
-  catch (e) { toast('嵌入字体失败（需联网下载），已按不嵌入导出：' + (e as Error).message, true); return html; }
+  setBusy('正在下载并嵌入字体子集…（首次稍慢）');
+  try { const out = await embedFonts(html); setBusy(null); toast('已嵌入字体（离线可用）'); return out; }
+  catch (e) { setBusy(null); toast('嵌入字体失败（需联网下载），已按不嵌入导出：' + (e as Error).message, true); return html; }
 }
 
 // ======================= N3: Submit-to-AI single-slide loop =======================
@@ -1165,6 +1381,7 @@ function applyAiPatch(text: string): void {
   try { secs = Array.prototype.slice.call(new DOMParser().parseFromString(html, 'text/html').querySelectorAll('section.slide')) as Element[]; }
   catch (e) { toast('补丁解析失败: ' + (e as Error).message, true); return; }
   if (!secs.length) { toast('补丁里没找到 <section class="slide">', true); return; }
+  pushHistory('ai'); // so the user can Ctrl/⌘+Z an AI change too
   harvestAll(); // preserve other slides' manual edits before re-render
   let applied = 0, firstIdx = -1;
   secs.forEach((sec) => {
@@ -1175,7 +1392,7 @@ function applyAiPatch(text: string): void {
   });
   if (!applied) { toast('补丁的 data-id 不匹配任何页', true); return; }
   htmlGotoAfterRender = firstIdx; // stay on the patched slide after re-render
-  renderHtmlEdit(); refreshTasks();
+  renderHtmlEdit(); refreshTasks(); markDirty();
   toast('AI 改好了 ' + applied + ' 页（左侧打勾的页，不满意可「还原本页」）');
 }
 // revert one slide to the version it had right before AI changed it. The page's
@@ -1183,11 +1400,12 @@ function applyAiPatch(text: string): void {
 function revertSlide(id: string): void {
   if (aiBefore[id] === undefined) return;
   const idx = htmlSlides.findIndex((s) => s.id === id); if (idx < 0) return;
+  pushHistory('revert');
   harvestAll(); // keep other slides' current state
   htmlSlides[idx].html = aiBefore[id];
   delete aiBefore[id]; aiApplied.delete(id); aiSent.delete(id);
   htmlGotoAfterRender = idx;
-  renderHtmlEdit(); refreshTasks();
+  renderHtmlEdit(); refreshTasks(); markDirty();
   toast('已还原第 ' + (idx + 1) + ' 页到 AI 改之前');
 }
 
@@ -1278,9 +1496,27 @@ function setHtmlMode(on: boolean): void {
   // hide only the IR tabs + IR panes (the inspector has its own .pane w/o data-pane)
   document.querySelectorAll('.tabs,[data-pane]').forEach((el) => ((el as HTMLElement).style.display = on ? 'none' : ''));
   const lbar = document.querySelector('.lbar') as HTMLElement | null; if (lbar) lbar.style.display = on ? 'none' : '';
+  // undo/redo + autosave only apply to HTML mode → show/hide their chrome
+  ['#undoBtn', '#redoBtn'].forEach((s) => { const b = $(s); if (b) b.style.display = on ? '' : 'none'; });
+  updateDirtyBadge();
   // keep the slide list visible in html mode too — it's now the task navigator
   // (per-slide comment badges live on it). The user can still collapse via ☰.
   if (!on) document.body.classList.remove('navcollapsed');
+}
+// offer to restore a draft saved before a refresh/crash (HTML mode only)
+function maybeOfferDraftRestore(): void {
+  let raw: string | null = null;
+  try { raw = localStorage.getItem(DRAFT_KEY); } catch { return; }
+  if (!raw) return;
+  let d: { name?: string; ts?: number; html?: string };
+  try { d = JSON.parse(raw); } catch { return; }
+  if (!d || !d.html) return;
+  const bar = $('#restoreBar'); const txt = $('#restoreTxt'); if (!bar || !txt) return;
+  const when = d.ts ? new Date(d.ts).toLocaleString('zh-CN', { hour12: false }) : '';
+  txt.innerHTML = '发现未保存的草稿 <b>' + esc(d.name || 'deck') + '</b>' + (when ? ' · ' + when : '');
+  bar.style.display = '';
+  $('#restoreGo').onclick = () => { bar.style.display = 'none'; importFile((d.name || 'deck') + '.html', d.html as string); toast('已恢复草稿（保存前请重新选目标文件覆盖）'); };
+  $('#restoreDrop').onclick = () => { bar.style.display = 'none'; clearDraft(); };
 }
 
 let toastT: ReturnType<typeof setTimeout> | null = null;
@@ -1288,6 +1524,26 @@ function toast(msg: string, bad = false): void {
   const el = $('#toast'); el.textContent = msg; el.className = 'toast show' + (bad ? ' bad' : '');
   if (toastT) clearTimeout(toastT);
   toastT = setTimeout(() => (el.className = 'toast'), 2200);
+}
+// persistent busy line for multi-second jobs (e.g. font embedding); pass null to hide
+function setBusy(msg: string | null): void {
+  const el = $('#busy'); if (!el) return;
+  if (msg) { const t = $('#busyTxt'); if (t) t.textContent = msg; el.classList.add('show'); } else el.classList.remove('show');
+}
+// dark / light Studio chrome, remembered across sessions
+const THEME_KEY = 'sm-studio-theme';
+function applyStudioTheme(dark: boolean): void {
+  document.body.classList.toggle('dark', dark);
+  const b = $('#themeTog'); if (b) b.textContent = dark ? '☀️' : '🌙';
+}
+function initStudioTheme(): void {
+  let dark = false; try { dark = localStorage.getItem(THEME_KEY) === 'dark'; } catch { /* noop */ }
+  applyStudioTheme(dark);
+}
+function toggleStudioTheme(): void {
+  const dark = !document.body.classList.contains('dark');
+  applyStudioTheme(dark);
+  try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch { /* noop */ }
 }
 
 // ======================= bridge: connected mode =======================
@@ -1514,6 +1770,49 @@ body.dragging .drop{display:flex;background:rgba(181,64,42,.12);border-color:#B5
 .hint{font-size:12px;color:#9a9a9e;line-height:1.7;margin-top:18px;border-top:1px solid #eee;padding-top:12px}.hint b{color:#6a6a6e}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1b1b1d;color:#9bd29b;padding:10px 18px;border-radius:7px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
 .toast.show{opacity:1}.toast.bad{color:#ff8a7a}
+.ehead .dirtydot{font-size:12px;color:#f0b34a;padding:2px 9px;border-radius:11px;background:#3a2f15;border:1px solid #7a5e22;line-height:1.4}
+.ehead button:disabled{opacity:.35;cursor:not-allowed}
+.restorebar{position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e7b5aa;border-left:4px solid #B5402A;border-radius:9px;padding:10px 14px;box-shadow:0 10px 34px rgba(0,0,0,.18);font-size:13px;color:#3a3a3e}
+.restorebar b{color:#B5402A}
+.restorebar button{border:1px solid #e0e0e2;background:#f1f1f2;border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:inherit}
+.restorebar button.go{background:#B5402A;border-color:#B5402A;color:#fff}
+.busy{position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:70;display:none;align-items:center;gap:9px;background:#1b1b1d;color:#eee;border-radius:9px;padding:9px 16px;font-size:13px;box-shadow:0 10px 34px rgba(0,0,0,.3)}
+.busy.show{display:flex}
+.busy .spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.25);border-top-color:#f0b34a;border-radius:50%;animation:sm-spin .7s linear infinite}
+@keyframes sm-spin{to{transform:rotate(360deg)}}
+/* ===== dark Studio chrome (toggle 🌙, persisted) ===== */
+body.dark{background:#151517;color:#e6e6e8}
+body.dark .left,body.dark .right{background:#1b1b1d;border-color:#2c2c2f}
+body.dark .lbar{border-color:#2c2c2f}
+body.dark .lbar button{background:#2c2c2f;border-color:#3a3a3d;color:#ddd}
+body.dark .lbar button:hover{background:#3a3a3d}
+body.dark .srow:hover{background:#242427}
+body.dark .srow.active{background:#3a2417;border-color:#7a4a2c}
+body.dark .srow .stt{color:#dcdce0}
+body.dark .srow .sseg{background:#2c2c2f;border-color:#3a3a3d;color:#aaa}
+body.dark .htabs,body.dark .tabs{border-color:#2c2c2f}
+body.dark .htab,body.dark .tab{color:#9a9a9e}
+body.dark .htab:hover,body.dark .tab:hover{background:#242427}
+body.dark .htab.active,body.dark .tab.active{color:#f0b34a;border-bottom-color:#f0b34a}
+body.dark .right h3{color:#7a7a7e}
+body.dark .right select,body.dark .right textarea,body.dark .right input{background:#242427;border-color:#3a3a3d;color:#e6e6e8}
+body.dark .right h4.sub{color:#9a9a9e;border-color:#2c2c2f}
+body.dark .field label{color:#9a9a9e}
+body.dark .addrow button,body.dark .oprow button,body.dark button.mini,body.dark .stab,body.dark .tgl{background:#2c2c2f;border-color:#3a3a3d;color:#ddd}
+body.dark .addrow button:hover,body.dark .oprow button:hover,body.dark button.mini:hover,body.dark .stab:hover{background:#3a3a3d}
+body.dark .stab.active{background:#3a2417;border-color:#7a4a2c;color:#f0b34a}
+body.dark .tgl.on{background:#B5402A;border-color:#B5402A;color:#fff}
+body.dark .nosel,body.dark .hint{color:#8a8a8e}
+body.dark .hint b{color:#bdbdc2}
+body.dark .tag{background:#3a2417;border-color:#7a4a2c;color:#f0b34a}
+body.dark .aitarget{background:#26201a;border-color:#5a4326;color:#cfcfd2}
+body.dark .qrow{background:#242427;border-color:#33333a}
+body.dark .qrow:hover{background:#2c2c2f}
+body.dark .qrow.active{background:#3a2417;border-color:#7a4a2c}
+body.dark .restorebar{background:#242427;color:#e6e6e8;border-color:#7a4a2c}
+body.dark .cbox{background:#1b1b1d;color:#e6e6e8}
+body.dark .cbox .ctitle{color:#e6e6e8}
+body.dark .cbox code{background:#2c2c2f}
 `;
 
 function buildUI(): void {
@@ -1521,8 +1820,12 @@ function buildUI(): void {
   document.body.innerHTML = `
 <div class="ehead">
   <button id="navtog" class="iconbtn" title="折叠 / 展开页面列表">☰</button>
+  <button id="undoBtn" class="iconbtn" title="撤销 (⌘/Ctrl+Z)" disabled>↶</button>
+  <button id="redoBtn" class="iconbtn" title="重做 (⌘/Ctrl+⇧+Z)" disabled>↷</button>
+  <button id="themeTog" class="iconbtn" title="深色 / 浅色界面">🌙</button>
   <span class="brand">✎ Slidesmith Studio</span>
   <span class="dn" id="deckname">${esc(fileBase)}</span>
+  <span class="dirtydot" id="dirtyDot" title="有未保存的修改（已自动存草稿，按 ⌘/Ctrl+S 写回文件）" style="display:none">●未保存</span>
   <span id="bridgeBadge" class="bridge-badge" title="与 Claude Code 的连接状态"></span>
   <button id="connectBtn" class="connect-btn" title="一键连接 Claude Code">🔌 连接 Claude</button>
   <span class="grow"></span>
@@ -1562,6 +1865,10 @@ function buildUI(): void {
         <div class="field"><label>文字 ink</label><input id="hInk" type="color"></div>
         <button id="hTokReset" class="mini">↺ 复原配色</button>
 
+        <h3>插入</h3>
+        <div class="oprow"><button id="hInsertImg">🖼 插入图片</button></div>
+        <div class="hint" style="margin-top:6px">图片会内联进 HTML（导出即带，离线可用）。也可直接在预览里粘贴图片。选中某元素时插在它后面。</div>
+
         <h3>选中元素</h3>
         <div class="nosel hseloff" id="hNoSel">在预览里<b>点一段文字</b>即可直接改字；选中后可调它的字体 / 字号 / 颜色。</div>
         <div id="hSel" class="hselon" style="display:none">
@@ -1583,7 +1890,12 @@ function buildUI(): void {
             </div>
           </div>
           <div class="field"><label>粗细（精细）</label><select id="hWeight"><option value="">默认</option><option>300</option><option>400</option><option>500</option><option>600</option><option>700</option><option>900</option></select></div>
-          <div class="oprow"><button id="hElUp" title="上移">↑ 上移</button><button id="hElDown" title="下移">↓ 下移</button><button id="hElDel" class="danger" title="删除这个元素">🗑 删除</button></div>
+          <div class="grid2">
+            <div class="field"><label>宽度(px，空=自动)</label><input id="hElW" type="number" min="20" placeholder="自动"></div>
+            <div class="field"><label>位置 / 大小</label><button id="hBoxReset" class="mini" title="清除拖动产生的位移和尺寸">↺ 复位</button></div>
+          </div>
+          <div class="hint" style="margin-top:0">选中后：拖蓝框上方 <b>✥</b> 移动、拖右下角 <b>◢</b> 改大小。</div>
+          <div class="oprow"><button id="hElUp" title="次序上移">↑ 次序</button><button id="hElDown" title="次序下移">↓ 次序</button><button id="hElDel" class="danger" title="删除这个元素">🗑 删除</button></div>
         </div>
       </div>
 
@@ -1675,6 +1987,12 @@ function buildUI(): void {
   </aside>
 </div>
 <div class="toast" id="toast"></div>
+<div class="busy" id="busy"><span class="spin"></span><span id="busyTxt">处理中…</span></div>
+<div class="restorebar" id="restoreBar" style="display:none">
+  <span id="restoreTxt">发现未保存的草稿</span>
+  <button class="go" id="restoreGo">恢复</button>
+  <button id="restoreDrop">丢弃</button>
+</div>
 <div class="cmodal" id="connectModal" style="display:none">
   <div class="cbox">
     <div class="ctitle">🔌 连接 Claude Code</div>
@@ -1748,6 +2066,41 @@ function buildUI(): void {
   $('#hElUp').addEventListener('click', () => moveHtmlEl(-1));
   $('#hElDown').addEventListener('click', () => moveHtmlEl(1));
   $('#hElDel').addEventListener('click', delHtmlEl);
+  $('#hInsertImg').addEventListener('click', insertImageFromFile);
+  onInput('#hElW', (v) => { commitResize(v ? parseInt(v, 10) : 0); });
+  $('#hBoxReset').addEventListener('click', resetSelectedBox);
+  // undo / redo (buttons + keyboard); autosave lifecycle
+  $('#undoBtn').addEventListener('click', undo);
+  $('#redoBtn').addEventListener('click', redo);
+  $('#restoreBar'); // (handlers attached in maybeOfferDraftRestore)
+  document.addEventListener('keydown', (e) => {
+    const meta = e.metaKey || e.ctrlKey;
+    const k = e.key.toLowerCase();
+    if (meta) {
+      if (k === 's') { e.preventDefault(); void saveHtmlInPlace(); }
+      else if (k === 'z' && !e.shiftKey) { if (mode === 'html') { e.preventDefault(); undo(); } }
+      else if ((k === 'z' && e.shiftKey) || k === 'y') { if (mode === 'html') { e.preventDefault(); redo(); } }
+      return;
+    }
+    // bare-key shortcuts only in HTML mode, and never while typing in a Studio field
+    if (mode !== 'html') return;
+    const ae = document.activeElement as HTMLElement | null;
+    if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
+    if (e.key === 'Escape') { if (htmlSelEl) { (htmlSelEl as HTMLElement).classList.remove('sm-sel'); htmlSelEl = null; showHtmlSel(false); e.preventDefault(); } }
+    else if (e.key === 'Delete') { if (htmlSelEl) { delHtmlEl(); e.preventDefault(); } }
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      const step = e.shiftKey ? 1 : 10;
+      if (htmlSelEl) { // nudge the selected element (Keynote-style)
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+        commitMove(dx, dy); e.preventDefault();
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { // no selection → page through slides
+        selectHtmlSlide(cur + (e.key === 'ArrowRight' ? 1 : -1)); e.preventDefault();
+      }
+    }
+  });
+  window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && dirty) autosaveDraft(); });
   // HTML-mode top tabs (格式 / 动画效果 / AI 修改) + animation sub-tabs (进入 / 动作 / 消失)
   document.querySelectorAll('.htab').forEach((tb) => tb.addEventListener('click', () => {
     const name = (tb as HTMLElement).dataset.htab;
@@ -1797,6 +2150,8 @@ function buildUI(): void {
   $('#down').addEventListener('click', () => moveSlide(1));
 
   $('#navtog').addEventListener('click', () => document.body.classList.toggle('navcollapsed'));
+  $('#themeTog').addEventListener('click', toggleStudioTheme);
+  initStudioTheme();
   $('#connectBtn').addEventListener('click', openConnectModal);
   $('#cclose').addEventListener('click', closeConnectModal);
   $('#connectModal').addEventListener('click', (e) => { if (e.target === $('#connectModal')) closeConnectModal(); });
@@ -1872,6 +2227,17 @@ function buildUI(): void {
   // bridge hooks (for automation / headless verification)
   (window as unknown as { __SM_BRIDGE__: () => { connected: boolean } }).__SM_BRIDGE__ = () => ({ connected: bridge.connected });
   (window as unknown as { __SM_SEND_ALL__: () => void }).__SM_SEND_ALL__ = submitRequests;
+  // resilience hooks (autosave / undo / image) for verification
+  (window as unknown as { __SM_UNDO__: () => void }).__SM_UNDO__ = undo;
+  (window as unknown as { __SM_REDO__: () => void }).__SM_REDO__ = redo;
+  (window as unknown as { __SM_STATE__: () => { dirty: boolean; undo: number; redo: number; draft: boolean } }).__SM_STATE__ = () => {
+    let draft = false; try { draft = !!localStorage.getItem(DRAFT_KEY); } catch { /* noop */ }
+    return { dirty, undo: undoStack.length, redo: redoStack.length, draft };
+  };
+  (window as unknown as { __SM_PLACE_IMAGE__: (u: string) => void }).__SM_PLACE_IMAGE__ = placeImage;
+  (window as unknown as { __SM_MOVE_SEL__: (dx: number, dy: number) => void }).__SM_MOVE_SEL__ = commitMove;
+  (window as unknown as { __SM_RESIZE_SEL__: (w: number, h?: number) => void }).__SM_RESIZE_SEL__ = commitResize;
+  (window as unknown as { __SM_GIZMO_ON__: () => boolean }).__SM_GIZMO_ON__ = () => !!gizmoEl;
 
   // edits from the preview iframe
   window.addEventListener('message', (e) => {
@@ -1883,6 +2249,7 @@ function buildUI(): void {
 
   renderLeft(); refreshSlidePanel(); renderDoc(); reloadPreview();
   updateBridgeBadge(); connectBridge();
+  maybeOfferDraftRestore();
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', buildUI);

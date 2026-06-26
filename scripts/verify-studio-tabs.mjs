@@ -111,6 +111,7 @@ try {
   ok('export has exit-on-nav interception', /data-smfx-edit/.test(exp) && /__SM_FX_PLAY_OUT__/.test(exp));
   ok('export injects picked font link (Ma Shan Zheng)', /fonts\.googleapis\.com\/css2\?family=Ma\+Shan\+Zheng/.test(exp));
   ok('edit preview marked, export not', !/data-smfx-edit="1"/.test(exp));
+  ok('typography: text-wrap balance/pretty injected', /text-wrap:\s*balance/.test(exp) && /text-wrap:\s*pretty/.test(exp));
 
   // 5) exit-on-nav actually fires in the exported (non-edit) deck
   const exitPage = await browser.newPage({ viewport: { width: 1280, height: 800 } });
