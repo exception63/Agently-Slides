@@ -1,0 +1,12 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: catppuccin-mocha — Catppuccin Mocha 柔紫暗 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#1e1e2e;--paper-soft:#313244;--paper-warm:#181825;
+  --rule:rgba(255,255,255,.12);--rule-soft:rgba(255,255,255,.07);
+  --ink:#cdd6f4;--ink-2:#bac2de;--ink-3:#9399b2;--ink-4:#7f849c;
+  --accent:#cba6f7;--accent-2:#89b4fa;--accent-3:#f5c2e7;--accent-soft:color-mix(in srgb,#cba6f7 16%,transparent);--good:#a6e3a1;
+  --radius:14px;
+  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+

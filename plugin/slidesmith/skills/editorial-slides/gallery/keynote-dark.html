@@ -84,6 +84,76 @@ body.fullscreen{background:#000;}
 :fullscreen .slide{box-shadow:none;}
 
 
+
+/* ════════════════════════════════════════════════════════════════════
+   _layouts.css · P4 版式库（kpi / vs / timeline / gantt / roadmap / diff / mindmap）
+   token-generic + 缺失令牌兜底 → build.py 对「所有」皮恒内联（薄皮 + 原 7 厚皮通用）。
+   厚皮没有的令牌就地兜底：--accent-3→--accent-2 · --good→--green→中性绿 · --radius→0。
+   注意：本注释块内严禁出现注释结束符，否则会提前闭合、吞掉下方规则（参见 _components.css 踩坑）。
+   ════════════════════════════════════════════════════════════════════ */
+
+/* —— kpi-grid 指标卡 —— */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;}.kpis--3{grid-template-columns:repeat(3,1fr);}.kpis--2{grid-template-columns:repeat(2,1fr);}
+.kpi{padding:32px 28px;background:var(--paper-soft);border-radius:var(--radius,0px);border-top:3px solid var(--accent);display:flex;flex-direction:column;gap:8px;}
+.kpi__k{font-family:var(--font-mono);font-size:17px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);}
+.kpi__v{font-family:var(--font-display);font-size:84px;font-weight:800;line-height:.95;color:var(--ink);letter-spacing:-.02em;}
+.kpi__d{font-size:22px;font-weight:600;}.kpi__d.up{color:var(--good,var(--green,#2e9e6b));}.kpi__d.down{color:var(--accent-3,var(--accent-2));}
+.kpi__d.up::before{content:"▲ ";}.kpi__d.down::before{content:"▼ ";}
+.kpi__hint{font-size:19px;color:var(--ink-3);line-height:1.4;}
+
+/* —— vs 对比面板 —— */
+.vs{display:grid;grid-template-columns:1fr 96px 1fr;align-items:center;gap:0;}
+.vs__pane{padding:40px 36px;background:var(--paper-soft);border-radius:var(--radius,0px);display:flex;flex-direction:column;gap:16px;border-top:4px solid var(--ink-4);}
+.vs__pane--a{border-top-color:var(--accent-3,var(--accent-2));}.vs__pane--b{border-top-color:var(--good,var(--green,#2e9e6b));}
+.vs__mid{text-align:center;font-family:var(--font-display);font-size:44px;font-weight:800;color:var(--ink-4);}
+.vs__title{font-family:var(--font-display);font-size:40px;font-weight:700;color:var(--ink);}
+.vs__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px;}
+.vs__list li{font-size:23px;color:var(--ink-2);line-height:1.45;padding-left:28px;position:relative;}
+.vs__pane--a .vs__list li::before{content:"✕";position:absolute;left:0;color:var(--accent-3,var(--accent-2));font-weight:700;}
+.vs__pane--b .vs__list li::before{content:"✓";position:absolute;left:0;color:var(--good,var(--green,#2e9e6b));font-weight:700;}
+
+/* —— timeline 时间线 —— */
+.timeline{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding-top:64px;}
+.timeline::before{content:"";position:absolute;top:78px;left:5%;right:5%;height:2px;background:var(--rule);}
+.tl{position:relative;padding:0 18px;text-align:center;}
+.tl::before{content:"";position:absolute;top:-22px;left:50%;transform:translateX(-50%);width:18px;height:18px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 6px var(--paper);}
+.tl__date{font-family:var(--font-mono);font-size:18px;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-top:18px;}
+.tl__title{font-family:var(--font-display);font-size:30px;font-weight:700;color:var(--ink);margin-top:10px;line-height:1.2;}
+.tl__desc{font-size:20px;color:var(--ink-3);line-height:1.45;margin-top:8px;}
+
+/* —— gantt 甘特 —— */
+.gantt{display:flex;flex-direction:column;gap:14px;}
+.gantt__row{display:grid;grid-template-columns:240px 1fr;align-items:center;gap:24px;}
+.gantt__label{font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--ink);}
+.gantt__track{position:relative;height:40px;background:var(--paper-warm);border-radius:999px;}
+.gantt__bar{position:absolute;top:0;height:100%;border-radius:999px;background:var(--accent);display:flex;align-items:center;padding:0 16px;color:#fff;font-family:var(--font-mono);font-size:15px;font-weight:600;}
+.gantt__bar.b2{background:var(--accent-2);}.gantt__bar.b3{background:var(--accent-3,var(--accent-2));}
+
+/* —— roadmap NOW/NEXT/LATER —— */
+.roadmap{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;}
+.rm{padding:32px 28px;border-radius:var(--radius,0px);background:var(--paper-soft);border-top:4px solid var(--accent);display:flex;flex-direction:column;gap:16px;}
+.rm--next{border-top-color:var(--accent-2);}.rm--later{border-top-color:var(--accent-3,var(--accent-2));}.rm--vision{border-top-color:var(--ink-4);}
+.rm__k{font-family:var(--font-mono);font-size:18px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);}
+.rm--next .rm__k{color:var(--accent-2);}.rm--later .rm__k{color:var(--accent-3,var(--accent-2));}.rm--vision .rm__k{color:var(--ink-4);}
+.rm__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.rm__list li{font-size:23px;color:var(--ink-2);line-height:1.4;padding-left:22px;position:relative;}
+.rm__list li::before{content:"›";position:absolute;left:0;color:var(--ink-4);font-weight:700;}
+
+/* —— diff 增删 —— */
+.diff{font-family:var(--font-mono);font-size:24px;line-height:1.7;background:var(--paper-soft);border-radius:var(--radius,0px);padding:28px 32px;}
+.diff__add{color:var(--good,var(--green,#2e9e6b));background:rgba(26,175,108,.1);display:block;padding:0 8px;}
+.diff__add::before{content:"+ ";}
+.diff__del{color:var(--accent-3,var(--accent-2));background:rgba(255,92,138,.1);display:block;padding:0 8px;text-decoration:line-through;opacity:.8;}
+.diff__del::before{content:"- ";}
+.diff__ctx{color:var(--ink-3);display:block;padding:0 8px;}.diff__ctx::before{content:"  ";}
+
+/* —— mindmap 思维导图（SVG 容器 + 节点）—— */
+.mindmap{position:relative;width:100%;height:100%;}
+.mindmap svg{position:absolute;inset:0;width:100%;height:100%;}
+.mm-node{position:absolute;transform:translate(-50%,-50%);padding:14px 22px;border-radius:999px;background:var(--paper-soft);border:2px solid var(--accent);font-family:var(--font-display);font-weight:700;font-size:24px;color:var(--ink);white-space:nowrap;}
+.mm-node.root{background:var(--accent);color:#fff;font-size:30px;padding:18px 30px;}
+.mm-node.b2{border-color:var(--accent-2);}.mm-node.b3{border-color:var(--accent-3,var(--accent-2));}
+
 /* —— 皮肤 keynote-dark —— */
 /* FONTS https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Newsreader:ital,opsz,wght@1,6..72,400;1,6..72,500&family=IBM+Plex+Mono:wght@400;500;600&display=swap */
 /* ════════════════════════════════════════════════════════════════════
@@ -342,7 +412,248 @@ em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote�
 .callout{border-left:3px solid var(--accent);padding:20px 28px;background:var(--accent-soft);font-family:var(--font-sans);font-size:24px;line-height:1.5;color:var(--ink);border-radius:0 4px 4px 0;}
 .note-box{margin-top:24px;padding:22px 30px;background:var(--paper-soft);border-left:3px solid var(--accent);font-family:var(--font-sans);font-size:23px;line-height:1.5;color:var(--ink-2);border-radius:0 4px 4px 0;}
 .row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
+
+/* —— keyline 关键句 · 浅蓝方框 + 琥珀强调（把一句话"钉"在屏上，做全场金句锚点）——
+   静态版（常显）。逐字打字机 + 呼吸灯是「可选动画层」，需引擎注入（见 KeynoteSpeech 项目
+   03-references/keynote-stagecraft-pattern.md）；皮肤本身不含 present 隐藏门控，避免无引擎时被永久隐藏。
+   dogfood：人机共生时代的消费行为研究 keynote。 */
+.keyline{align-self:stretch;margin-top:30px;padding:20px 30px;background:rgba(111,179,222,0.12);border:1.5px solid rgba(111,179,222,0.5);border-radius:12px;font-family:var(--font-sans);font-size:38px;line-height:1.5;font-weight:700;color:var(--ink);}
+.keyline em{color:var(--accent);font-style:normal;}                /* 关键词琥珀点睛 */
+.keyline--sm{font-size:28px;line-height:1.6;font-weight:600;}      /* 长句版 */
+.insight .keyline{align-self:center;max-width:1500px;margin:34px auto 0;text-align:center;font-size:40px;}  /* insight 页居中 */
 .mt-s{margin-top:18px;}.mt-m{margin-top:36px;}.mt-l{margin-top:56px;}
+
+
+/* ——— 动画库 _fx.css（集众家所长 · 编号见 references/animations.md）——— */
+/* ════════════════════════════════════════════════════════════════════
+   _fx.css · Slidesmith 动画库（集众家所长 · 编号见 references/animations.md）
+   与风格无关，所有皮肤共用。由 build.py 内联进成品 deck，也被 gallery/animations.html 复用。
+   触发模型（同一套类，deck 与 gallery 都用）：
+     .smfx-arm  挂在「页/台」上 = 入场元素先藏起来（armed）
+     .smfx-go   挂在「页/台」上 = 现在播入场/强调/点睛
+     .smfx-exit 挂在「页/台」上 = 播消失动画（离场前）
+   入场/强调用 [data-anim] / [data-emph]；持续用 [data-motion]（一直循环）；消失用 [data-anim-out]。
+   全部尊重 prefers-reduced-motion（文末统一降级）。
+   缓动：expoOut = cubic-bezier(.16,1,.3,1)（快起慢收，反廉价）；弹簧 linear() 预设见文末。
+   ════════════════════════════════════════════════════════════════════ */
+
+:root{
+  --smfx-dur: .6s;
+  --smfx-ease: cubic-bezier(.16,1,.3,1);
+  --smfx-ease-inout: cubic-bezier(.4,0,.2,1);
+  /* 烘焙好的弹簧曲线（Josh Comeau 范式 · 离线零运行时，含轻微 overshoot）*/
+  --smfx-spring: linear(0,.02,.08,.2,.38,.58,.76,.89,.97,1.02,1.04,1.03,1.01,1);
+}
+
+/* 透视：翻牌类入场/消失需要父级 perspective */
+.smfx-arm, .smfx-go, .smfx-exit{ perspective: 1400px; }
+
+/* ───────────────────────── A · 入场 Entrance ───────────────────────── */
+/* armed：先藏（仅入场，emphasis 不藏）*/
+.smfx-arm [data-anim]{ opacity:0; }
+.smfx-arm [data-anim="in-left"]{ transform:translateX(-60px); }
+.smfx-arm [data-anim="in-right"]{ transform:translateX(60px); }
+.smfx-arm [data-anim="rise"],
+.smfx-arm [data-anim="fade-up"]{ transform:translateY(28px); }
+.smfx-arm [data-anim="pop"]{ transform:scale(.9); }
+.smfx-arm [data-anim="back-in"]{ transform:translateY(96px) scale(.86); }
+.smfx-arm [data-anim="flip-in"]{ transform:rotateY(88deg); }
+.smfx-arm [data-anim="tracking-in"]{ letter-spacing:-.42em; filter:blur(6px); }
+.smfx-arm [data-anim="focus-in"]{ filter:blur(14px); }
+.smfx-arm [data-anim="slide-blur"]{ transform:translateX(-64px); filter:blur(8px); }
+
+/* go：播放入场 */
+.smfx-go [data-anim]{ opacity:0; animation-fill-mode:both; animation-duration:var(--smfx-dur); animation-timing-function:var(--smfx-ease); }
+.smfx-go [data-anim="fade"]{ animation-name:smfx-fade; animation-duration:.5s; }
+.smfx-go [data-anim="rise"], .smfx-go [data-anim="fade-up"]{ animation-name:smfx-rise; }
+.smfx-go [data-anim="pop"]{ animation-name:smfx-pop; animation-timing-function:var(--smfx-spring); }
+.smfx-go [data-anim="in-left"]{ animation-name:smfx-in-left; }
+.smfx-go [data-anim="in-right"]{ animation-name:smfx-in-right; }
+.smfx-go [data-anim="back-in"]{ animation-name:smfx-back-in; animation-duration:.7s; }
+.smfx-go [data-anim="flip-in"]{ animation-name:smfx-flip-in; animation-duration:.7s; transform-origin:center; }
+.smfx-go [data-anim="tracking-in"]{ animation-name:smfx-tracking-in; animation-duration:.8s; }
+.smfx-go [data-anim="focus-in"]{ animation-name:smfx-focus-in; animation-duration:.7s; }
+.smfx-go [data-anim="slide-blur"]{ animation-name:smfx-slide-blur; animation-duration:.55s; }
+/* 逐条浮现：列表项依次 rise */
+.smfx-arm [data-anim="stagger-list"]{ opacity:1; }
+.smfx-arm [data-anim="stagger-list"]>*{ opacity:0; transform:translateY(20px); }
+.smfx-go [data-anim="stagger-list"]{ opacity:1; animation:none; }
+.smfx-go [data-anim="stagger-list"]>*{ animation:smfx-rise .5s var(--smfx-ease) both; }
+.smfx-go [data-anim="stagger-list"]>*:nth-child(2){animation-delay:.08s}
+.smfx-go [data-anim="stagger-list"]>*:nth-child(3){animation-delay:.16s}
+.smfx-go [data-anim="stagger-list"]>*:nth-child(4){animation-delay:.24s}
+.smfx-go [data-anim="stagger-list"]>*:nth-child(5){animation-delay:.32s}
+.smfx-go [data-anim="stagger-list"]>*:nth-child(6){animation-delay:.40s}
+.smfx-go [data-anim="stagger-list"]>*:nth-child(n+7){animation-delay:.48s}
+
+@keyframes smfx-fade{ to{opacity:1} }
+@keyframes smfx-rise{ from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:none} }
+@keyframes smfx-pop{ from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
+@keyframes smfx-in-left{ from{opacity:0;transform:translateX(-60px)} to{opacity:1;transform:none} }
+@keyframes smfx-in-right{ from{opacity:0;transform:translateX(60px)} to{opacity:1;transform:none} }
+@keyframes smfx-back-in{ from{opacity:0;transform:translateY(96px) scale(.86)} to{opacity:1;transform:none} }
+@keyframes smfx-flip-in{ from{opacity:0;transform:rotateY(88deg)} to{opacity:1;transform:none} }
+@keyframes smfx-tracking-in{ 0%{opacity:0;letter-spacing:-.42em;filter:blur(6px)} 40%{opacity:1} 100%{opacity:1;letter-spacing:normal;filter:none} }
+@keyframes smfx-focus-in{ from{opacity:0;filter:blur(14px)} to{opacity:1;filter:none} }
+@keyframes smfx-slide-blur{ from{opacity:0;transform:translateX(-64px);filter:blur(8px)} to{opacity:1;transform:none;filter:none} }
+
+/* ───────────────────────── C · 强调 Emphasis（一次性，元素不藏）─────────── */
+.smfx-go [data-emph]{ animation-fill-mode:both; animation-duration:.9s; animation-timing-function:ease; }
+.smfx-go [data-emph="tada"]{ animation-name:smfx-tada; }
+.smfx-go [data-emph="rubber-band"]{ animation-name:smfx-rubber; }
+.smfx-go [data-emph="jello"]{ animation-name:smfx-jello; transform-origin:center; }
+.smfx-go [data-emph="heartbeat"]{ animation-name:smfx-heartbeat; animation-duration:1.3s; }
+.smfx-go [data-emph="headshake"]{ animation-name:smfx-headshake; animation-duration:.8s; }
+.smfx-go [data-emph="shake"]{ animation-name:smfx-shake; animation-duration:.7s; }
+.smfx-go [data-emph="text-pop"]{ animation-name:smfx-textpop; animation-duration:.6s; animation-timing-function:var(--smfx-ease); }
+
+@keyframes smfx-tada{ 0%{transform:scale(1)} 10%,20%{transform:scale(.9) rotate(-3deg)} 30%,50%,70%,90%{transform:scale(1.1) rotate(3deg)} 40%,60%,80%{transform:scale(1.1) rotate(-3deg)} 100%{transform:scale(1)} }
+@keyframes smfx-rubber{ 0%{transform:scale(1)} 30%{transform:scaleX(1.25) scaleY(.75)} 40%{transform:scaleX(.75) scaleY(1.25)} 50%{transform:scaleX(1.15) scaleY(.85)} 65%{transform:scaleX(.95) scaleY(1.05)} 75%{transform:scaleX(1.05) scaleY(.95)} 100%{transform:scale(1)} }
+@keyframes smfx-jello{ 0%,11%,100%{transform:none} 22%{transform:skewX(-12deg) skewY(-12deg)} 33%{transform:skewX(6deg) skewY(6deg)} 44%{transform:skewX(-3deg) skewY(-3deg)} 55%{transform:skewX(1.5deg) skewY(1.5deg)} 66%{transform:skewX(-.8deg) skewY(-.8deg)} }
+@keyframes smfx-heartbeat{ 0%,40%,80%,100%{transform:scale(1)} 14%{transform:scale(1.22)} 28%{transform:scale(1)} 54%{transform:scale(1.22)} }
+@keyframes smfx-headshake{ 0%{transform:translateX(0)} 12.5%{transform:translateX(-7px) rotateY(-9deg)} 37.5%{transform:translateX(6px) rotateY(7deg)} 62.5%{transform:translateX(-4px) rotateY(-5deg)} 87.5%{transform:translateX(2px) rotateY(3deg)} 100%{transform:translateX(0)} }
+@keyframes smfx-shake{ 0%,100%{transform:translateX(0)} 10%,30%,50%,70%,90%{transform:translateX(-9px)} 20%,40%,60%,80%{transform:translateX(9px)} }
+@keyframes smfx-textpop{ from{text-shadow:0 0 0 rgba(0,0,0,0);transform:none} to{text-shadow:0 6px 18px rgba(0,0,0,.28);transform:translateY(-4px)} }
+
+/* ───────────────────────── D · 持续动效 Motion（一直循环）───────────────── */
+[data-motion="glow"]{ animation:smfx-glow 2.4s ease-in-out infinite; }
+[data-motion="breathe"]{ animation:smfx-breathe 2.8s ease-in-out infinite; }
+[data-motion="float"]{ animation:smfx-float 3s ease-in-out infinite; }
+[data-motion="pulse"]{ animation:smfx-pulse 1.8s ease-in-out infinite; }
+[data-motion="neon"]{ animation:smfx-neon 3.2s steps(1,end) infinite; }
+[data-motion="stress"]{ animation:smfx-stress 2.6s ease-in-out infinite; }
+[data-motion="shimmer"], [data-motion="gradient-shimmer"]{
+  background:linear-gradient(100deg, currentColor 30%, #fff 48%, currentColor 66%);
+  background-size:220% 100%; -webkit-background-clip:text; background-clip:text;
+  -webkit-text-fill-color:transparent; color:var(--accent,currentColor);
+  animation:smfx-shimmer 3.2s linear infinite;
+}
+@keyframes smfx-glow{ 0%,100%{filter:drop-shadow(0 0 1px currentColor)} 50%{filter:drop-shadow(0 0 12px currentColor)} }
+@keyframes smfx-breathe{ 0%,100%{transform:scale(1)} 50%{transform:scale(1.045)} }
+@keyframes smfx-float{ 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+@keyframes smfx-pulse{ 0%,100%{opacity:1} 50%{opacity:.5} }
+@keyframes smfx-neon{ 0%,19%,21%,55%,57%,100%{opacity:1} 20%,56%{opacity:.55} }
+@keyframes smfx-stress{ 0%,72%,100%{transform:scale(1)} 84%{transform:scale(1.06)} }
+@keyframes smfx-shimmer{ 0%{background-position:140% 0} 100%{background-position:-40% 0} }
+
+/* ───────────────────────── E · 跨页转场 Transition ──────────────────────
+   逐页 CSS 兜底（无 View Transitions API 时）：进/出页用类驱动；deck 级默认由
+   body[data-transition] 决定，单页可用 .slide[data-transition] 覆盖（_fx.js 读取）。
+   有 View Transitions API 时，_fx.js 走原生 ::view-transition，更顺滑。 */
+.smfx-enter{ animation-duration:.5s; animation-fill-mode:both; animation-timing-function:var(--smfx-ease-inout); }
+.smfx-leave{ animation-duration:.5s; animation-fill-mode:both; animation-timing-function:var(--smfx-ease-inout); position:absolute; inset:0; }
+.smfx-tr-fade.smfx-enter{ animation-name:smfx-fade; }
+.smfx-tr-fade.smfx-leave{ animation-name:smfx-fadeout; }
+.smfx-tr-slide.smfx-enter{ animation-name:smfx-in-right; }
+.smfx-tr-slide.smfx-leave{ animation-name:smfx-out-left; }
+.smfx-tr-push.smfx-enter{ animation-name:smfx-in-right; }
+.smfx-tr-push.smfx-leave{ animation-name:smfx-out-left; }
+.smfx-tr-zoom.smfx-enter{ animation-name:smfx-zoom-in; }
+.smfx-tr-zoom.smfx-leave{ animation-name:smfx-zoom-out; }
+.smfx-tr-flip.smfx-enter{ animation-name:smfx-flip-in; }
+.smfx-tr-flip.smfx-leave{ animation-name:smfx-flip-out; }
+.smfx-tr-wipe.smfx-enter{ animation-name:smfx-wipe-in; }
+.smfx-tr-split.smfx-enter{ animation-name:smfx-split-in; }
+@keyframes smfx-zoom-in{ from{opacity:0;transform:scale(.82)} to{opacity:1;transform:none} }
+@keyframes smfx-wipe-in{ from{clip-path:inset(0 100% 0 0)} to{clip-path:inset(0 0 0 0)} }
+@keyframes smfx-split-in{ from{clip-path:inset(0 50% 0 50%)} to{clip-path:inset(0 0 0 0)} }
+
+/* 原生 View Transitions：默认时长 + 弹性，单页可调 */
+::view-transition-group(*){ animation-duration:.5s; animation-timing-function:var(--smfx-ease-inout); }
+
+/* ───────────────────────── F · 神奇移动 Magic Move ───────────────────────
+   元素跨页打同 data-morph（_fx.js 落到 view-transition-name）；浏览器自动补间。
+   无原生 API 时 _fx.js 走 FLIP。补间属性对齐 reveal auto-animate。 */
+[data-morph]{ /* 标记位；view-transition-name 由 _fx.js 运行时设置/清除 */ }
+
+/* ───────────────────────── G · 消失 Exit ──────────────────────────────── */
+.smfx-exit [data-anim-out]{ animation-fill-mode:both; animation-duration:.45s; animation-timing-function:var(--smfx-ease-inout); }
+.smfx-exit [data-anim-out="fade-out"]{ animation-name:smfx-fadeout; }
+.smfx-exit [data-anim-out="sink"]{ animation-name:smfx-sink; }
+.smfx-exit [data-anim-out="zoom-out"]{ animation-name:smfx-zoom-out; }
+.smfx-exit [data-anim-out="out-left"]{ animation-name:smfx-out-left; }
+.smfx-exit [data-anim-out="out-right"]{ animation-name:smfx-out-right; }
+.smfx-exit [data-anim-out="flip-out"]{ animation-name:smfx-flip-out; }
+.smfx-exit [data-anim-out="puff-out"]{ animation-name:smfx-puff-out; }
+.smfx-exit [data-anim-out="back-out"]{ animation-name:smfx-back-out; }
+.smfx-exit [data-anim-out="text-blur-out"]{ animation-name:smfx-text-blur-out; }
+@keyframes smfx-fadeout{ to{opacity:0} }
+@keyframes smfx-sink{ to{opacity:0;transform:translateY(40px)} }
+@keyframes smfx-zoom-out{ to{opacity:0;transform:scale(.82)} }
+@keyframes smfx-out-left{ to{opacity:0;transform:translateX(-70px)} }
+@keyframes smfx-out-right{ to{opacity:0;transform:translateX(70px)} }
+@keyframes smfx-flip-out{ from{transform:rotateY(0);opacity:1} to{transform:rotateY(88deg);opacity:0} }
+@keyframes smfx-puff-out{ to{opacity:0;transform:scale(1.4);filter:blur(12px)} }
+@keyframes smfx-back-out{ to{opacity:0;transform:translateY(96px) scale(.86)} }
+@keyframes smfx-text-blur-out{ to{opacity:0;filter:blur(12px)} }
+
+/* ───────────────────────── B · 分步揭示 Fragments ───────────────────────
+   元素加 .fragment（可加方向/变体类）；_fx.js 按步进加 .smfx-vis（已点出）/ .smfx-dim（退居）。
+   strike/highlight 类例外：默认可见，点出时才变。 */
+.fragment{ opacity:0; transition:opacity .4s var(--smfx-ease), transform .4s var(--smfx-ease), color .3s, text-decoration-color .3s; }
+.fragment.up{ transform:translateY(22px); }
+.fragment.down{ transform:translateY(-22px); }
+.fragment.left{ transform:translateX(28px); }
+.fragment.right{ transform:translateX(-28px); }
+.fragment.grow{ transform:scale(.7); }
+.fragment.shrink{ transform:scale(1.3); }
+.fragment.smfx-vis{ opacity:1; transform:none; }
+.fragment.smfx-dim{ opacity:.32; }                 /* B4 点出后变暗 */
+.fragment.current-visible:not(.smfx-vis){ opacity:0; }  /* B3 只此刻显（_fx.js 控制）*/
+/* strike / highlight：默认可见，点出（smfx-vis）时才变 */
+.fragment.strike{ opacity:1; }
+.fragment.strike.smfx-vis{ text-decoration:line-through; text-decoration-color:currentColor; }
+.fragment.highlight{ opacity:1; }
+.fragment.highlight.smfx-vis{ color:var(--accent,#c0392b); }
+
+/* ───────────────────────── H · 点睛 Accent ──────────────────────────────── */
+/* H1/H2/H3 SVG 线条自绘：path 上加 pathLength="1"，免 getTotalLength */
+.smfx-draw path, .smfx-draw line, .smfx-draw polyline{ stroke-dasharray:1; stroke-dashoffset:1; }
+.smfx-go .smfx-draw path, .smfx-go .smfx-draw line, .smfx-go .smfx-draw polyline{
+  animation:smfx-dash 1.2s var(--smfx-ease-inout) forwards;
+}
+@keyframes smfx-dash{ to{stroke-dashoffset:0} }
+/* H5 聚光灯：容器加 .smfx-spot，被聚焦元素加 [data-focus]，其余压暗 */
+.smfx-spot > *{ transition:opacity .4s, filter .4s; }
+.smfx-spot.smfx-go > :not([data-focus]){ opacity:.22; filter:saturate(.4); }
+.smfx-spot.smfx-go > [data-focus]{ opacity:1; transform:scale(1.04); }
+/* H6 Ken Burns：图片缓慢平移+放大 */
+.smfx-kenburns{ overflow:hidden; }
+.smfx-kenburns img, img[data-motion="ken-burns"]{ animation:smfx-kenburns 18s ease-in-out infinite alternate; transform-origin:center; }
+@keyframes smfx-kenburns{ from{transform:scale(1) translate(0,0)} to{transform:scale(1.12) translate(-2%,-2%)} }
+/* H7 擦幕揭图 */
+.smfx-arm .smfx-wipe, .smfx-arm [data-anim="clip-wipe"]{ clip-path:inset(0 100% 0 0); }
+.smfx-go .smfx-wipe, .smfx-go [data-anim="clip-wipe"]{ animation:smfx-wipe-in .8s var(--smfx-ease-inout) forwards; }
+
+/* ───────────────────────── I · 背景氛围 Ambient Background ───────────────── */
+/* I1 极光/网格渐变：容器加 .smfx-aurora（自带漂移光团）*/
+.smfx-aurora{ position:relative; overflow:hidden; isolation:isolate; }
+.smfx-aurora::before{
+  content:""; position:absolute; inset:-30%; z-index:-1; pointer-events:none;
+  background:
+    radial-gradient(38% 38% at 22% 30%, var(--smfx-aurora-1,#8a7cff66), transparent 70%),
+    radial-gradient(40% 40% at 78% 26%, var(--smfx-aurora-2,#23c4a766), transparent 70%),
+    radial-gradient(46% 46% at 60% 80%, var(--smfx-aurora-3,#ff7a5966), transparent 70%);
+  filter:blur(60px); animation:smfx-aurora 22s ease-in-out infinite alternate;
+}
+@keyframes smfx-aurora{ 0%{transform:translate(0,0) rotate(0)} 50%{transform:translate(3%,-2%) rotate(8deg)} 100%{transform:translate(-2%,3%) rotate(-6deg)} }
+/* I2 胶片颗粒：静态覆层（不动，省性能）*/
+.smfx-grain{ position:relative; }
+.smfx-grain::after{
+  content:""; position:absolute; inset:0; z-index:50; pointer-events:none; opacity:.06; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ───────────────────────── 无障碍：减少动态 ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce){
+  .smfx-arm [data-anim], .smfx-go [data-anim], .smfx-go [data-emph],
+  [data-motion], .fragment, .smfx-enter, .smfx-leave,
+  .smfx-go .smfx-draw path, .smfx-kenburns img, .smfx-aurora::before{
+    animation:none !important; transition:none !important;
+    opacity:1 !important; transform:none !important; filter:none !important;
+    letter-spacing:normal !important; clip-path:none !important; stroke-dashoffset:0 !important;
+  }
+}
 
 </style>
 </head>
@@ -361,7 +672,7 @@ em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote�
 
 <nav class="segnav" id="segnav"></nav>
 <div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
-<div class="hint">F 全屏播放 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
+<div class="hint">F 全屏播放 · O 概览 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
 
 <div class="deck" id="deck">
 
@@ -462,6 +773,498 @@ em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote�
 
 </div>
 
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   _fx.js · Slidesmith 动画引擎（与 _fx.css 配套 · 编号见 references/animations.md）
+   暴露 window.SMFX，供 _engine.js 在导航处可选调用（_engine 没装 _fx 时全是 no-op）：
+     SMFX.onActive(slide)        翻到某页 → 播入场 [data-anim] + 强调 [data-emph] + 点睛
+     SMFX.transition(apply,next) 翻页时包一层（神奇移动 data-morph 走 View Transitions / FLIP）
+     SMFX.stepForward(slide)     该页还有未点出的 .fragment → 点出下一条并返回 true（吃掉这次翻页）
+     SMFX.stepBack(slide)        该页有已点出的 .fragment → 收回上一条并返回 true
+   全部防御式：结构缺失就安静跳过。尊重 prefers-reduced-motion。
+   ════════════════════════════════════════════════════════════════════ */
+(function () {
+  var reduce = false;
+  try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+  var hasVT = typeof document.startViewTransition === 'function';
+
+  /* —— 入场/强调：翻到该页时重播 —— */
+  function onActive(slide) {
+    if (!slide) return;
+    // 复位再播（移除 go → 强制 reflow → 加 arm+go）
+    slide.classList.remove('smfx-go', 'smfx-exit');
+    slide.classList.add('smfx-arm');
+    void slide.offsetWidth;                 // reflow，让动画能重播
+    requestAnimationFrame(function () {
+      slide.classList.add('smfx-go');
+    });
+    resetFragments(slide);
+  }
+
+  /* —— 离场：返回承诺，播完 data-anim-out 再继续（_engine 可不等）—— */
+  function playExit(slide, ms) {
+    if (!slide || reduce || !slide.querySelector('[data-anim-out]')) return Promise.resolve();
+    slide.classList.add('smfx-exit');
+    return new Promise(function (res) { setTimeout(res, ms || 460); });
+  }
+
+  /* ───────── 分步揭示 fragments ───────── */
+  function fragsOf(slide) {
+    return Array.prototype.slice.call(slide.querySelectorAll('.fragment'));
+  }
+  // 返回去重排序后的步序：每个 fragment 的 data-fragment-index（缺省=DOM 顺序），同序号同步出现
+  function fragSteps(slide) {
+    var frags = fragsOf(slide);
+    var order = frags.map(function (f, i) {
+      var idx = f.dataset.fragmentIndex;
+      return { f: f, key: (idx === undefined || idx === '') ? (1000 + i) : parseInt(idx, 10) };
+    });
+    var keys = order.map(function (o) { return o.key; }).filter(function (v, i, a) { return a.indexOf(v) === i; });
+    keys.sort(function (a, b) { return a - b; });
+    return { order: order, keys: keys };
+  }
+  function applyFragState(slide, step) {
+    var s = fragSteps(slide); slide.__fstep = step;
+    s.order.forEach(function (o) {
+      var rank = s.keys.indexOf(o.key);          // 该条属于第几步（0 起）
+      var f = o.f;
+      f.classList.toggle('smfx-vis', rank < step);
+      // current-visible：只在“正好这一步”可见
+      if (f.classList.contains('current-visible')) {
+        f.classList.toggle('smfx-vis', rank === step - 1);
+      }
+      // semi-out：点出后、再往后走则变暗
+      if (f.classList.contains('semi-out')) {
+        f.classList.toggle('smfx-dim', rank < step - 1);
+      }
+    });
+  }
+  function resetFragments(slide) {
+    if (!slide.querySelector('.fragment')) return;
+    applyFragState(slide, reduce ? 999 : 0);     // 减少动态时直接全显
+  }
+  function stepForward(slide) {
+    if (!slide || reduce) return false;
+    var s = fragSteps(slide); if (!s.keys.length) return false;
+    var cur = slide.__fstep || 0;
+    if (cur >= s.keys.length) return false;       // 没有更多步 → 放行翻页
+    applyFragState(slide, cur + 1); return true;
+  }
+  function stepBack(slide) {
+    if (!slide || reduce) return false;
+    var s = fragSteps(slide); if (!s.keys.length) return false;
+    var cur = slide.__fstep || 0;
+    if (cur <= 0) return false;
+    applyFragState(slide, cur - 1); return true;
+  }
+
+  /* ───────── 神奇移动 Magic Move（data-morph）───────── */
+  function morphMap(slide) {
+    var m = {};
+    if (!slide) return m;
+    slide.querySelectorAll('[data-morph]').forEach(function (el) { m[el.getAttribute('data-morph')] = el; });
+    return m;
+  }
+  // 给两页中“同 data-morph”的元素配上同一个 view-transition-name；返回清理函数
+  function tagMorphPairs(oldSlide, newSlide) {
+    var a = morphMap(oldSlide), b = morphMap(newSlide), tagged = [];
+    Object.keys(a).forEach(function (id) {
+      if (b[id]) {
+        var name = 'smfx-morph-' + id.replace(/[^a-zA-Z0-9_-]/g, '');
+        a[id].style.viewTransitionName = name;
+        b[id].style.viewTransitionName = name;
+        tagged.push(a[id], b[id]);
+      }
+    });
+    return function clear() { tagged.forEach(function (el) { el.style.viewTransitionName = ''; }); };
+  }
+  // FLIP 兜底：不支持 View Transitions 时，手动把配对元素从旧位置补间到新位置
+  function flipPairs(oldSlide, newSlide, applyFn) {
+    var a = morphMap(oldSlide), b = morphMap(newSlide), firsts = {};
+    Object.keys(a).forEach(function (id) { if (b[id]) firsts[id] = a[id].getBoundingClientRect(); });
+    applyFn();
+    Object.keys(firsts).forEach(function (id) {
+      var first = firsts[id], el = b[id], last = el.getBoundingClientRect();
+      var dx = first.left - last.left, dy = first.top - last.top;
+      var sx = last.width ? first.width / last.width : 1, sy = last.height ? first.height / last.height : 1;
+      try {
+        el.animate(
+          [{ transform: 'translate(' + dx + 'px,' + dy + 'px) scale(' + sx + ',' + sy + ')' }, { transform: 'none' }],
+          { duration: 560, easing: 'cubic-bezier(.2,.8,.2,1)' });
+      } catch (e) {}
+    });
+  }
+
+  /* —— 翻页包装：有配对的 data-morph 用 VT/FLIP 做神奇移动；否则原生淡变或瞬切 —— */
+  function transition(applyFn, newSlide) {
+    var oldSlide = document.querySelector('#deck .slide.active');
+    var hasMorph = oldSlide && newSlide &&
+      Object.keys(morphMap(oldSlide)).some(function (id) { return morphMap(newSlide)[id]; });
+
+    if (reduce) { applyFn(); return; }
+
+    if (hasVT) {
+      var clear = hasMorph ? tagMorphPairs(oldSlide, newSlide) : function () {};
+      var vt = document.startViewTransition(function () { applyFn(); });
+      if (vt && vt.finished && vt.finished.finally) vt.finished.finally(clear);
+      else setTimeout(clear, 700);
+      return;
+    }
+    // 无 View Transitions：有 morph 走 FLIP，否则直接切（入场动画补足观感）
+    if (hasMorph) { flipPairs(oldSlide, newSlide, applyFn); return; }
+    applyFn();
+  }
+
+  /* ───────── 点睛初始化（线条自绘已纯 CSS；这里给没写 pathLength 的 path 补救）───────── */
+  function initAccents(root) {
+    (root || document).querySelectorAll('.smfx-draw path:not([pathLength]), .smfx-draw polyline:not([pathLength])').forEach(function (p) {
+      try {
+        var len = p.getTotalLength();
+        p.style.strokeDasharray = len; p.style.strokeDashoffset = len;
+      } catch (e) {}
+    });
+  }
+
+  window.SMFX = {
+    onActive: onActive,
+    transition: transition,
+    stepForward: stepForward,
+    stepBack: stepBack,
+    playExit: playExit,
+    initAccents: initAccents,
+    applyFragState: applyFragState,
+    hasViewTransitions: hasVT
+  };
+
+  if (document.readyState !== 'loading') initAccents();
+  else document.addEventListener('DOMContentLoaded', function () { initAccents(); });
+})();
+
+</script>
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   _fx-canvas.js · Slidesmith 动画库「J · Canvas 特效」（移植自 html-ppt-skill, MIT）
+   零依赖 canvas2D 特效，读本项目主题色（--accent/--accent-2/--ink），生命周期托管：
+   元素加 data-fx="名"，翻到该页(.slide.active)即跑、离开就 stop()（自带 MutationObserver）。
+   也供 gallery/animations.html 直接调 window.HPX[name](stageEl)。编号见 references/animations.md（J 类）。
+   ════════════════════════════════════════════════════════════════════ */
+(function () {
+  window.HPX = window.HPX || {};
+  var U = window.HPX._u = {};
+  U.css = function (el, name, fb) { var v = getComputedStyle(el).getPropertyValue(name).trim(); return v || fb; };
+  U.accent = function (el, fb) { return U.css(el, '--accent', fb || '#7c5cff'); };
+  U.accent2 = function (el, fb) { return U.css(el, '--accent-2', U.css(el, '--accent', fb || '#22d3ee')); };
+  U.text = function (el, fb) { return U.css(el, '--ink', U.css(el, '--text-1', fb || '#eaeaf2')); };
+  U.palette = function (el) {
+    var a = U.accent(el, '#7c5cff'), b = U.accent2(el, '#22d3ee');
+    return [a, b, U.css(el, '--accent-3', a), U.css(el, '--accent-2', b), U.css(el, '--ink', '#e7e7ef')];
+  };
+  U.rand = function (a, b) { return a + Math.random() * (b - a); };
+  U.canvas = function (el) {
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    var c = document.createElement('canvas');
+    c.className = 'sm-fx-canvas';
+    c.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;display:block;z-index:0;';
+    el.insertBefore(c, el.firstChild);  // 作背景：放最前 → 后面的正文内容自然盖在 canvas 之上
+    var ctx = c.getContext('2d');
+    var w = 0, h = 0, dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    var fit = function () {
+      var r = el.getBoundingClientRect();
+      w = Math.max(1, r.width | 0); h = Math.max(1, r.height | 0);
+      c.width = (w * dpr) | 0; c.height = (h * dpr) | 0;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+    fit();
+    var ro = null; try { ro = new ResizeObserver(fit); ro.observe(el); } catch (e) {}
+    return { c: c, ctx: ctx, get w() { return w; }, get h() { return h; }, get dpr() { return dpr; },
+      destroy: function () { try { ro && ro.disconnect(); } catch (e) {} if (c.parentNode) c.parentNode.removeChild(c); } };
+  };
+  U.loop = function (fn) {
+    var raf = 0, stopped = false, t0 = performance.now();
+    var tick = function (t) { if (stopped) return; fn((t - t0) / 1000); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return function () { stopped = true; cancelAnimationFrame(raf); };
+  };
+
+  var H = window.HPX;
+
+  // ── J1 极光团 gradient-blob（满屏 · 加性模糊渐变 · Stripe/Linear 高级感）──
+  H['gradient-blob'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, pal = U.palette(el);
+    var blobs = []; for (var i = 0; i < 4; i++) blobs.push({ x: U.rand(0, 1), y: U.rand(0, 1), vx: U.rand(-0.08, 0.08), vy: U.rand(-0.08, 0.08), r: U.rand(180, 320), c: pal[i % pal.length] });
+    var hex2rgb = function (h) { var m = String(h).replace('#', '').match(/.{2}/g); return m ? m.map(function (x) { return parseInt(x, 16); }) : [124, 92, 255]; };
+    var stop = U.loop(function (t) {
+      ctx.fillStyle = 'rgba(10,12,22,0.2)'; ctx.fillRect(0, 0, k.w, k.h);
+      ctx.globalCompositeOperation = 'lighter';
+      for (var n = 0; n < blobs.length; n++) {
+        var b = blobs[n]; b.x += b.vx * 0.01; b.y += b.vy * 0.01;
+        if (b.x < 0 || b.x > 1) b.vx *= -1; if (b.y < 0 || b.y > 1) b.vy *= -1;
+        var px = b.x * k.w, py = b.y * k.h, r = b.r + Math.sin(t * 0.8 + b.x * 6) * 30, rgb = hex2rgb(b.c);
+        var g = ctx.createRadialGradient(px, py, 0, px, py, r);
+        g.addColorStop(0, 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0.55)'); g.addColorStop(1, 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalCompositeOperation = 'source-over';
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J2 星座连线 constellation（满屏 · 漂移点 + 近邻连线）──
+  H['constellation'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, ac = U.accent(el, '#9fb4ff'), N = 70, pts = [], lw = k.w, lh = k.h;
+    var seed = function () { pts = []; for (var i = 0; i < N; i++) pts.push({ x: Math.random() * k.w, y: Math.random() * k.h, vx: U.rand(-0.3, 0.3), vy: U.rand(-0.3, 0.3) }); };
+    seed();
+    var stop = U.loop(function () {
+      if (k.w !== lw || k.h !== lh) { seed(); lw = k.w; lh = k.h; }
+      ctx.clearRect(0, 0, k.w, k.h);
+      for (var i = 0; i < N; i++) { var p = pts[i]; p.x += p.vx; p.y += p.vy; if (p.x < 0 || p.x > k.w) p.vx *= -1; if (p.y < 0 || p.y > k.h) p.vy *= -1; }
+      for (var a = 0; a < N; a++) for (var b = a + 1; b < N; b++) { var pa = pts[a], pb = pts[b], d = Math.hypot(pa.x - pb.x, pa.y - pb.y); if (d < 150) { ctx.globalAlpha = 1 - d / 150; ctx.strokeStyle = ac; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke(); } }
+      ctx.globalAlpha = 1; ctx.fillStyle = ac;
+      for (var q = 0; q < N; q++) { ctx.beginPath(); ctx.arc(pts[q].x, pts[q].y, 1.8, 0, Math.PI * 2); ctx.fill(); }
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J3 知识图谱 knowledge-graph（面板 · 力导向 + 标签节点）──
+  H['knowledge-graph'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, pal = U.palette(el), tx = U.text(el, '#e7e7ef');
+    var labels = (el.getAttribute('data-fx-labels') || 'AI,ML,LLM,Graph,Node,Edge,Claude,GPT,RAG,Vector,Embed,Neural,Agent,Tool,Memory,Logic,Data,Train,Infer,Token,Prompt,Chain,Plan,Skill,Cloud,GPU,Code,Task').split(',');
+    var N = 28, nodes = [], i;
+    for (i = 0; i < N; i++) nodes.push({ x: U.rand(40, 300), y: U.rand(40, 200), vx: 0, vy: 0, label: labels[i % labels.length], c: pal[i % pal.length] });
+    var edges = [], made = {};
+    while (edges.length < 50) { var a = (Math.random() * N) | 0, b = (Math.random() * N) | 0; if (a === b) continue; var key = a < b ? a + '-' + b : b + '-' + a; if (made[key]) continue; made[key] = 1; edges.push([a, b]); }
+    var stop = U.loop(function () {
+      for (i = 0; i < N; i++) for (var j = i + 1; j < N; j++) { var na = nodes[i], nb = nodes[j], dx = nb.x - na.x, dy = nb.y - na.y, d2 = dx * dx + dy * dy; if (d2 < 1) d2 = 1; var d = Math.sqrt(d2), f = 1600 / d2, fx = (dx / d) * f, fy = (dy / d) * f; na.vx -= fx; na.vy -= fy; nb.vx += fx; nb.vy += fy; }
+      for (var e = 0; e < edges.length; e++) { var ea = nodes[edges[e][0]], eb = nodes[edges[e][1]], edx = eb.x - ea.x, edy = eb.y - ea.y, ed = Math.hypot(edx, edy) || 1, ef = (ed - 90) * 0.008, efx = (edx / ed) * ef, efy = (edy / ed) * ef; ea.vx += efx; ea.vy += efy; eb.vx -= efx; eb.vy -= efy; }
+      var cx = k.w / 2, cy = k.h / 2;
+      for (i = 0; i < N; i++) { var n = nodes[i]; n.vx += (cx - n.x) * 0.002; n.vy += (cy - n.y) * 0.002; n.vx *= 0.85; n.vy *= 0.85; n.x += n.vx; n.y += n.vy; }
+      ctx.clearRect(0, 0, k.w, k.h); ctx.strokeStyle = 'rgba(180,180,220,0.25)'; ctx.lineWidth = 1;
+      for (e = 0; e < edges.length; e++) { var a2 = nodes[edges[e][0]], b2 = nodes[edges[e][1]]; ctx.beginPath(); ctx.moveTo(a2.x, a2.y); ctx.lineTo(b2.x, b2.y); ctx.stroke(); }
+      ctx.font = '11px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (i = 0; i < N; i++) { var nn = nodes[i]; ctx.fillStyle = nn.c; ctx.beginPath(); ctx.arc(nn.x, nn.y, 7, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = tx; ctx.fillText(nn.label, nn.x, nn.y - 14); }
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J4 神经网络 neural-net（面板 · 前馈网 + 脉冲传播）──
+  H['neural-net'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, ac = U.accent(el, '#7c5cff'), ac2 = U.accent2(el, '#22d3ee');
+    var layers = [4, 6, 6, 3], nodes = [], edges = [], pulses = [], lw = k.w, lh = k.h, last = 0;
+    var layout = function () {
+      nodes = []; var pad = 40, cw = k.w - pad * 2, ch = k.h - pad * 2, L, i;
+      for (L = 0; L < layers.length; L++) { var x = pad + (cw * L / (layers.length - 1)), nn = layers[L]; for (i = 0; i < nn; i++) nodes.push({ x: x, y: pad + (ch * (i + 0.5) / nn), L: L, i: i }); }
+      edges = [];
+      for (L = 0; L < layers.length - 1; L++) { var aa = nodes.filter(function (n) { return n.L === L; }), bb = nodes.filter(function (n) { return n.L === L + 1; }); for (var p = 0; p < aa.length; p++) for (var q = 0; q < bb.length; q++) edges.push([nodes.indexOf(aa[p]), nodes.indexOf(bb[q])]); }
+    };
+    layout();
+    var stop = U.loop(function (t) {
+      if (k.w !== lw || k.h !== lh) { layout(); lw = k.w; lh = k.h; }
+      ctx.clearRect(0, 0, k.w, k.h); ctx.strokeStyle = 'rgba(160,160,200,0.22)'; ctx.lineWidth = 1;
+      for (var e = 0; e < edges.length; e++) { var a = nodes[edges[e][0]], b = nodes[edges[e][1]]; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
+      if (t - last > 0.25) { last = t; var starts = nodes.filter(function (n) { return n.L === 0; }); pulses.push({ node: starts[(Math.random() * starts.length) | 0], L: 0, t: 0 }); }
+      pulses = pulses.filter(function (p) { return p.L < layers.length - 1; });
+      for (var pi = 0; pi < pulses.length; pi++) {
+        var p2 = pulses[pi];
+        if (!p2.target) { var next = nodes.filter(function (n) { return n.L === p2.L + 1; }); p2.target = next[(Math.random() * next.length) | 0]; }
+        p2.t += 0.04; var x = p2.node.x + (p2.target.x - p2.node.x) * Math.min(1, p2.t), y = p2.node.y + (p2.target.y - p2.node.y) * Math.min(1, p2.t);
+        ctx.fillStyle = ac2; ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+        if (p2.t >= 1) { p2.node = p2.target; p2.target = null; p2.L++; p2.t = 0; }
+      }
+      for (var ni = 0; ni < nodes.length; ni++) { var nd = nodes[ni]; ctx.fillStyle = ac; ctx.beginPath(); ctx.arc(nd.x, nd.y, 6, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = ac2; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(nd.x, nd.y, 8, 0, Math.PI * 2); ctx.stroke(); }
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J5 数字爆炸 counter-explosion（一次性 · 数字滚动 + 粒子爆，KPI 揭晓）──
+  H['counter-explosion'] = function (el) {
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    var target = parseInt(el.getAttribute('data-fx-to') || '2400', 10), k = U.canvas(el), ctx = k.ctx, pal = U.palette(el);
+    var num = document.createElement('div');
+    num.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:900 110px system-ui,sans-serif;color:var(--ink,#fff);pointer-events:none;';
+    num.textContent = '0'; el.appendChild(num);
+    var parts = [], state = 'count', stateT = 0;
+    var burst = function () { var cx = k.w / 2, cy = k.h / 2; for (var i = 0; i < 120; i++) { var a = Math.random() * Math.PI * 2, s = U.rand(120, 400); parts.push({ x: cx, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, r: U.rand(2, 5), c: pal[(Math.random() * pal.length) | 0] }); } };
+    var stop = U.loop(function () {
+      ctx.clearRect(0, 0, k.w, k.h); var dt = 1 / 60; stateT += dt;
+      if (state === 'count') { var p = Math.min(1, stateT / 2.2), eased = 1 - Math.pow(1 - p, 3); num.textContent = Math.round(target * eased).toLocaleString(); if (p >= 1) { state = 'burst'; stateT = 0; burst(); } }
+      else if (state === 'burst') { if (stateT > 2.5) { state = 'hold'; stateT = 0; } }
+      else if (state === 'hold') { if (stateT > 1.5) { state = 'count'; stateT = 0; num.textContent = '0'; } }
+      parts = parts.filter(function (p) { return p.life > 0; });
+      for (var i = 0; i < parts.length; i++) { var pt = parts[i]; pt.vy += 260 * dt; pt.vx *= 0.985; pt.vy *= 0.985; pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.life -= 0.01; ctx.globalAlpha = Math.max(0, pt.life); ctx.fillStyle = pt.c; ctx.beginPath(); ctx.arc(pt.x, pt.y, pt.r, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    });
+    return { stop: function () { stop(); k.destroy(); if (num.parentNode) num.parentNode.removeChild(num); } };
+  };
+
+  // ── J6 粒子迸发 particle-burst（一次性 · 中心爆开）──
+  H['particle-burst'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, pal = U.palette(el), parts = [], lastSpawn = 0;
+    var spawn = function () { var cx = k.w / 2, cy = k.h / 2; for (var i = 0; i < 90; i++) { var a = Math.random() * Math.PI * 2, s = U.rand(80, 260); parts.push({ x: cx, y: cy, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 1, r: U.rand(2, 5), c: pal[(Math.random() * pal.length) | 0] }); } };
+    spawn();
+    var stop = U.loop(function (t) {
+      ctx.clearRect(0, 0, k.w, k.h); if (t - lastSpawn > 2.5) { spawn(); lastSpawn = t; } var dt = 1 / 60;
+      parts = parts.filter(function (p) { return p.life > 0; });
+      for (var i = 0; i < parts.length; i++) { var p = parts[i]; p.vy += 220 * dt; p.vx *= 0.985; p.vy *= 0.985; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= 0.012; ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J7 冲击波 shockwave（一次性 · 同心圆扩散 + 核心光）──
+  H['shockwave'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, ac = U.accent(el, '#7c5cff'), ac2 = U.accent2(el, '#22d3ee'), waves = [], last = -1;
+    var stop = U.loop(function (t) {
+      ctx.fillStyle = 'rgba(0,0,0,0.12)'; ctx.fillRect(0, 0, k.w, k.h);
+      if (t - last > 0.6) { last = t; waves.push({ t: 0 }); }
+      var cx = k.w / 2, cy = k.h / 2, max = Math.hypot(k.w, k.h) / 2;
+      waves = waves.filter(function (w) { return w.t < 1; });
+      for (var i = 0; i < waves.length; i++) { var w = waves[i]; w.t += 0.012; var r = w.t * max, alpha = 1 - w.t; ctx.strokeStyle = w.t < 0.5 ? ac2 : ac; ctx.globalAlpha = alpha; ctx.lineWidth = 3 + (1 - w.t) * 3; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.globalAlpha = alpha * 0.4; ctx.beginPath(); ctx.arc(cx, cy, r * 0.92, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.globalAlpha = 1; var g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 40); g.addColorStop(0, 'rgba(255,255,255,0.9)'); g.addColorStop(1, 'rgba(124,92,255,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 40, 0, Math.PI * 2); ctx.fill();
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J8 星空穿越 starfield（满屏暗底 · 3D 飞星）──
+  H['starfield'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, tx = U.text(el, '#ffffff'), N = 260, stars = [];
+    for (var i = 0; i < N; i++) stars.push({ x: U.rand(-1, 1), y: U.rand(-1, 1), z: Math.random() });
+    var stop = U.loop(function () {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.fillRect(0, 0, k.w, k.h); var cx = k.w / 2, cy = k.h / 2;
+      for (var j = 0; j < N; j++) { var s = stars[j]; s.z -= 0.006; if (s.z <= 0.02) { s.x = U.rand(-1, 1); s.y = U.rand(-1, 1); s.z = 1; } var px = cx + (s.x / s.z) * cx, py = cy + (s.y / s.z) * cy; if (px < 0 || py < 0 || px > k.w || py > k.h) continue; ctx.globalAlpha = 1 - s.z; ctx.fillStyle = tx; ctx.beginPath(); ctx.arc(px, py, (1 - s.z) * 2.4, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J9 星系漩涡 galaxy-swirl（满屏暗底 · 对数螺旋）──
+  H['galaxy-swirl'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, pal = U.palette(el), N = 800, parts = [];
+    for (var i = 0; i < N; i++) { var arm = i % 3, r = Math.random() * 180 + 8; parts.push({ r: r, a: (arm / 3) * Math.PI * 2 + Math.log(r + 1) * 1.6 + U.rand(-0.2, 0.2), c: pal[arm % pal.length], s: U.rand(0.8, 2.2) }); }
+    var stop = U.loop(function (t) {
+      ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.fillRect(0, 0, k.w, k.h); var cx = k.w / 2, cy = k.h / 2;
+      for (var j = 0; j < N; j++) { var p = parts[j], a = p.a + t * 0.15; ctx.fillStyle = p.c; ctx.globalAlpha = 0.7; ctx.beginPath(); ctx.arc(cx + Math.cos(a) * p.r, cy + Math.sin(a) * p.r * 0.7, p.s, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J10 矩阵雨 matrix-rain（满屏暗底 · 落码，黑客风）──
+  H['matrix-rain'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, glyphs = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789ABCDEF'.split(''), fs = 16, cols = 0, drops = [], lw = k.w, lh = k.h;
+    var init = function () { cols = Math.ceil(k.w / fs); drops = []; for (var i = 0; i < cols; i++) drops.push(U.rand(-20, 0)); };
+    init();
+    var stop = U.loop(function () {
+      if (k.w !== lw || k.h !== lh) { init(); lw = k.w; lh = k.h; }
+      ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(0, 0, k.w, k.h); ctx.font = fs + 'px monospace';
+      for (var i = 0; i < cols; i++) { var ch = glyphs[(Math.random() * glyphs.length) | 0], x = i * fs, y = drops[i] * fs; ctx.fillStyle = '#9fffc9'; ctx.fillText(ch, x, y); ctx.fillStyle = '#00ff6a'; ctx.fillText(ch, x, y - fs); drops[i] += 1; if (y > k.h && Math.random() > 0.975) drops[i] = 0; }
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J11 数据流 data-stream（满屏暗底 · 滚动二进制/十六进制）──
+  H['data-stream'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, ac = U.accent(el, '#22d3ee'), ac2 = U.accent2(el, '#7c5cff'), rows = [], rh = 22, lh = k.h;
+    var genRow = function (y) { var text = []; for (var i = 0; i < 120; i++) { var r = Math.random(); text.push(r < 0.3 ? (Math.random() < 0.5 ? '0' : '1') : r < 0.6 ? '0x' + Math.floor(Math.random() * 256).toString(16) : Math.random().toString(16).slice(2, 6)); } return { y: y, dir: Math.random() < 0.5 ? -1 : 1, speed: U.rand(30, 90), offset: Math.random() * 2000, text: text.join(' ') }; };
+    var init = function () { rows.length = 0; var n = Math.ceil(k.h / rh); for (var i = 0; i < n; i++) rows.push(genRow(i * rh + rh * 0.7)); };
+    init();
+    var stop = U.loop(function (t) {
+      if (k.h !== lh) { init(); lh = k.h; }
+      ctx.fillStyle = 'rgba(5,8,14,0.35)'; ctx.fillRect(0, 0, k.w, k.h); ctx.font = '13px ui-monospace,Menlo,monospace';
+      for (var i = 0; i < rows.length; i++) { var r = rows[i], x = r.dir > 0 ? ((t * r.speed + r.offset) % (k.w + 400)) - 400 : k.w - (((t * r.speed + r.offset) % (k.w + 400)) - 400); ctx.fillStyle = (i % 3 === 0) ? ac : ac2; ctx.globalAlpha = 0.65 + (i % 2) * 0.3; ctx.fillText(r.text, x, r.y); }
+      ctx.globalAlpha = 1;
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J12 礼花炮 confetti-cannon（庆祝 · 两侧喷彩纸）──
+  H['confetti-cannon'] = function (el) {
+    var k = U.canvas(el), ctx = k.ctx, pal = U.palette(el), parts = [], last = 0;
+    var fire = function () { for (var side = 0; side < 2; side++) { var x0 = side === 0 ? 20 : k.w - 20, y0 = k.h - 20; for (var i = 0; i < 40; i++) { var a = side === 0 ? U.rand(-Math.PI * 0.7, -Math.PI * 0.4) : U.rand(-Math.PI * 0.6, -Math.PI * 0.3) - Math.PI / 2 - Math.PI / 6, spd = U.rand(300, 520); parts.push({ x: x0, y: y0, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, w: U.rand(6, 12), h: U.rand(3, 7), rot: Math.random() * Math.PI, vr: U.rand(-6, 6), c: pal[(Math.random() * pal.length) | 0], life: 1 }); } } };
+    fire();
+    var stop = U.loop(function (t) {
+      ctx.clearRect(0, 0, k.w, k.h); if (t - last > 3) { fire(); last = t; } var dt = 1 / 60;
+      parts = parts.filter(function (p) { return p.life > 0 && p.y < k.h + 40; });
+      for (var i = 0; i < parts.length; i++) { var p = parts[i]; p.vy += 520 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt; p.life -= 0.006; ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore(); }
+      ctx.globalAlpha = 1;
+    });
+    return { stop: function () { stop(); k.destroy(); } };
+  };
+
+  // ── J13 多行打字机 typewriter-multi（文字 · 终端/启动日志，纯 DOM）──
+  H['typewriter-multi'] = function (el) {
+    if (getComputedStyle(el).position === 'static') el.style.position = 'relative';
+    var lines = [el.getAttribute('data-fx-line1') || '> initializing knowledge graph...', el.getAttribute('data-fx-line2') || '> loading 28 concept nodes', el.getAttribute('data-fx-line3') || '> agent ready. awaiting prompt_'];
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:14px;padding:32px 48px;font:600 22px ui-monospace,Menlo,monospace;color:var(--ink,#e7e7ef);';
+    el.appendChild(wrap);
+    if (!document.getElementById('hpx-blink-kf')) { var st = document.createElement('style'); st.id = 'hpx-blink-kf'; st.textContent = '@keyframes hpxBlink{50%{opacity:0}}'; document.head.appendChild(st); }
+    var stopped = false, speeds = [55, 70, 45];
+    var rows = lines.map(function (txt, idx) {
+      var row = document.createElement('div'); row.style.cssText = 'white-space:pre;display:flex;align-items:center;';
+      var span = document.createElement('span'); span.textContent = '';
+      var cur = document.createElement('span'); cur.textContent = '█'; cur.style.cssText = 'display:inline-block;margin-left:2px;color:var(--accent,#22d3ee);animation:hpxBlink 1s steps(2) infinite;';
+      row.appendChild(span); row.appendChild(cur); wrap.appendChild(row);
+      return { span: span, txt: txt, i: 0, idx: idx };
+    });
+    rows.forEach(function (r) {
+      var tick = function () { if (stopped) return; if (r.i < r.txt.length) { r.span.textContent += r.txt[r.i++]; setTimeout(tick, speeds[r.idx]); } else { setTimeout(function () { if (stopped) return; r.i = 0; r.span.textContent = ''; tick(); }, 2200); } };
+      setTimeout(tick, r.idx * 400);
+    });
+    return { stop: function () { stopped = true; if (wrap.parentNode) wrap.parentNode.removeChild(wrap); } };
+  };
+
+  // ── 生命周期：翻到 .slide.active 即 init data-fx，离开即 stop（自带，不依赖 SMFX）──
+  var active = window.__smfxActive = window.__smfxActive || new Map();
+  // collect [data-fx] descendants PLUS root itself — a full-slide effect lives on the .slide
+  // element (documented usage: 满屏加 .slide 上), which querySelectorAll alone would miss.
+  function fxEls(root) {
+    var els = [].slice.call(root.querySelectorAll('[data-fx]'));
+    if (root.matches && root.matches('[data-fx]')) els.unshift(root);
+    return els;
+  }
+  function initIn(root) {
+    if (!root) return;
+    fxEls(root).forEach(function (el) {
+      if (active.has(el)) return;
+      var fn = H[el.getAttribute('data-fx')];
+      if (typeof fn !== 'function') return;
+      try { active.set(el, fn(el, {}) || { stop: function () {} }); } catch (e) {}
+    });
+  }
+  function stopIn(root) {
+    if (!root) return;
+    fxEls(root).forEach(function (el) {
+      var h = active.get(el); if (h && h.stop) { try { h.stop(); } catch (e) {} } active.delete(el);
+    });
+  }
+  window.__smfxCanvas = { initIn: initIn, stopIn: stopIn };
+  function boot() {
+    var slides = document.querySelectorAll('#deck .slide');
+    if (!slides.length) return;
+    // Drive the lifecycle off VISIBILITY, which unifies both modes:
+    //  · present/export — only the active slide is displayed (others display:none) → it alone runs
+    //  · deck-scroll / Studio edit — whatever slide is scrolled into view runs (no .active needed)
+    var io = null;
+    try {
+      io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting && e.intersectionRatio > 0.1) initIn(e.target); else stopIn(e.target); });
+      }, { threshold: [0, 0.12, 0.5] });
+    } catch (e) {}
+    if (io) {
+      slides.forEach(function (sl) { io.observe(sl); });
+    } else {
+      // fallback (no IntersectionObserver): original .active-based lifecycle
+      slides.forEach(function (sl) {
+        try { new MutationObserver(function () { if (sl.classList.contains('active')) initIn(sl); else stopIn(sl); }).observe(sl, { attributes: true, attributeFilter: ['class'] }); } catch (e) {}
+      });
+    }
+    var act = document.querySelector('#deck .slide.active'); if (act) initIn(act);
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+
+</script>
 <script>
 /* ════════════════════════════════════════════════════════════════════
    自配置引擎 · 与风格无关 · 所有皮肤共用 · 不用改这里
@@ -581,8 +1384,7 @@ em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote�
   }
 
   // —— 核心导航 ——
-  function setActive(n) {
-    idx = Math.max(0, Math.min(total - 1, n));
+  function applyActive() {
     slides.forEach((s, i) => s.classList.toggle('active', i === idx));
     if (present) {
       const sc = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 0.98;
@@ -590,6 +1392,14 @@ em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote�
     } else {
       const wrap = slides[idx].parentNode; if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  }
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    const target = slides[idx];
+    // FX 钩子（可选）：放映态翻页时包一层（神奇移动/转场），并重播该页入场动画
+    if (present && window.SMFX && window.SMFX.transition) window.SMFX.transition(applyActive, target);
+    else applyActive();
+    if (present && window.SMFX && window.SMFX.onActive) window.SMFX.onActive(target);
     updateUI(); broadcastPresenter(idx);
   }
   function updateUI() {
@@ -605,7 +1415,15 @@ em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote�
     if (at) { const nr = segnav.getBoundingClientRect(), tr = at.getBoundingClientRect();
       if (tr.top < nr.top + 60 || tr.bottom > nr.bottom - 20) at.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
   }
-  function next() { setActive(idx + 1); } function prev() { setActive(idx - 1); }
+  // 翻页：放映态下若本页还有未点出的 .fragment，先点出（吃掉这次翻页）
+  function next() {
+    if (present && window.SMFX && window.SMFX.stepForward && window.SMFX.stepForward(slides[idx])) return;
+    setActive(idx + 1);
+  }
+  function prev() {
+    if (present && window.SMFX && window.SMFX.stepBack && window.SMFX.stepBack(slides[idx])) return;
+    setActive(idx - 1);
+  }
   function goSeg(n) { setActive(segStarts[n] || 0); }
 
   function togglePresent() {
@@ -632,10 +1450,60 @@ em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote�
         setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); } }
   });
 
+  // —— 概览网格（O 键）：缩出全 deck 缩略图、点击跳页（移植 html-ppt-skill 思路）——
+  let overviewEl = null;
+  function buildOverview() {
+    if (!document.getElementById('sm-overview-css')) {
+      const st = document.createElement('style'); st.id = 'sm-overview-css';
+      st.textContent = '.overview{position:fixed;inset:0;background:rgba(10,12,18,.94);z-index:2000;display:none;grid-template-columns:repeat(4,1fr);gap:18px;padding:44px;overflow:auto;align-content:start;}'
+        + '.overview.open{display:grid;}'
+        + '.ov-cell{position:relative;cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid transparent;transition:border-color .15s,transform .15s;background:var(--paper,#fff);}'
+        + '.ov-cell:hover{border-color:var(--accent,#c0392b);transform:scale(1.03);}'
+        + '.ov-frame{width:100%;overflow:hidden;position:relative;background:var(--paper,#fff);}'
+        + '.ov-frame > .slide{position:absolute;top:0;left:0;transform-origin:top left;box-shadow:none!important;margin:0;}'
+        + '.ov-num{position:absolute;top:6px;left:8px;font-family:var(--font-mono,monospace);font-size:13px;font-weight:700;color:#fff;background:rgba(0,0,0,.55);padding:1px 8px;border-radius:4px;z-index:3;}'
+        + '.ov-bar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(10,12,18,.96);color:#f2ede2;display:flex;align-items:center;gap:14px;padding:0 24px;z-index:2001;font-family:var(--font-mono,monospace);font-size:12px;letter-spacing:.12em;text-transform:uppercase;}';
+      document.head.appendChild(st);
+    }
+    const ov = document.createElement('div'); ov.className = 'overview'; ov.id = 'sm-overview';
+    const bar = document.createElement('div'); bar.className = 'ov-bar';
+    bar.innerHTML = '<strong>概览 OVERVIEW</strong><span style="opacity:.6">' + total + ' 张 · 点击跳页 · O / ESC 关闭</span>';
+    ov.appendChild(bar);
+    slides.forEach((s, i) => {
+      const cell = document.createElement('div'); cell.className = 'ov-cell'; cell.dataset.idx = i;
+      const frame = document.createElement('div'); frame.className = 'ov-frame';
+      const clone = s.cloneNode(true);
+      clone.classList.remove('active', 'sm-play', 'sm-armed', 'smfx-go', 'smfx-arm');
+      clone.querySelectorAll('canvas').forEach(c => c.remove());
+      frame.appendChild(clone);
+      const num = document.createElement('div'); num.className = 'ov-num'; num.textContent = (i + 1);
+      cell.appendChild(frame); cell.appendChild(num);
+      cell.addEventListener('click', () => { closeOverview(); setActive(i); });
+      ov.appendChild(cell);
+    });
+    ov.addEventListener('click', e => { if (e.target === ov) closeOverview(); });
+    document.body.appendChild(ov);
+    return ov;
+  }
+  function fitOverview() {
+    if (!overviewEl) return;
+    overviewEl.querySelectorAll('.ov-frame').forEach(frame => {
+      const clone = frame.firstChild; const scale = frame.clientWidth / 1920;
+      frame.style.height = (frame.clientWidth * 1080 / 1920) + 'px';
+      clone.style.transform = 'scale(' + scale + ')';
+    });
+  }
+  function openOverview() { if (!overviewEl) overviewEl = buildOverview(); overviewEl.classList.add('open'); requestAnimationFrame(fitOverview); }
+  function closeOverview() { if (overviewEl) overviewEl.classList.remove('open'); }
+  function toggleOverview() { (overviewEl && overviewEl.classList.contains('open')) ? closeOverview() : openOverview(); }
+  window.addEventListener('resize', () => { if (overviewEl && overviewEl.classList.contains('open')) fitOverview(); });
+
   // —— 键盘 ——
   document.addEventListener('keydown', e => {
     if (e.target.matches('input, textarea, select')) return;
     const k = e.key;
+    if (k === 'o' || k === 'O') { toggleOverview(); e.preventDefault(); return; }
+    if (k === 'Escape' && overviewEl && overviewEl.classList.contains('open')) { closeOverview(); e.preventDefault(); return; }
     if (k === 'f' || k === 'F' || k === 'Enter') { (document.fullscreenElement || body.classList.contains('present')) ? exitFullscreen() : enterFullscreen(); e.preventDefault(); return; }
     if (k === 'p' || k === 'P') { togglePresent(); e.preventDefault(); return; }
     if (k === 's' || k === 'S') { if (!e.ctrlKey && !e.metaKey) { openPresenter(); e.preventDefault(); } return; }
@@ -677,7 +1545,14 @@ em{font-style:normal;color:var(--accent);font-family:inherit;}      /* keynote�
 
   updateUI();
   // 暴露给 slides-presenter-mode / 控制台调试
-  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
+  // —— bare 模式（?bare 或 ?bare=N）：只显示某页、去掉所有界面，供 showcase 缩略 iframe ——
+  const bareM = /[?&]bare(?:=(\d+))?/.exec(location.search);
+  if (bareM) {
+    present = true; body.classList.add('present', 'sm-bare');
+    setActive(bareM[1] ? (parseInt(bareM[1], 10) - 1) : 0);
+  }
+
+  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, toggleOverview, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
 })();
 
 </script>

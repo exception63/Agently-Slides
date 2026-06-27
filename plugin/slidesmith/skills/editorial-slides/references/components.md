@@ -351,3 +351,17 @@
 - **引用上桌但不抢戏**：`[作者 年份]` 用 `.cite` 小灰字挂在数据/论断旁；末尾另起 1-2 张"参考文献"页（用 `numlist--lg` 或 `small`）。
 - **secdiv 开每段**：让听众随时知道"在第几章"。
 - **数据优先用 bignum/insight**，别埋在正文里——大数字是这套风格最抓眼的武器。
+
+---
+
+## 新版式（P4 · 移植自 html-ppt-skill · 在薄皮 `_components.css` 里，21 皮通用）
+
+> 仅薄皮（dracula/swiss-grid/… 21 张里的 14 薄皮）自带；原生 7 厚皮如需可单独补。预览 `gallery/layout-showcase.html`（按 O 看全部）。
+
+- **kpi-grid 指标卡**：`<div class="kpis">`（`kpis--3/--2`）内 `<div class="kpi"><div class="kpi__k">标签</div><div class="kpi__v num">2.4M</div><div class="kpi__d up">18%</div><div class="kpi__hint">注</div></div>`（`kpi__d up/down` 自动 ▲▼ + 绿/粉色）。
+- **vs 对比面板**：`<div class="vs">` = `vs__pane vs__pane--a`（✕ 红）+ `vs__mid`（VS）+ `vs__pane vs__pane--b`（✓ 绿）；内 `vs__title` + `vs__list>li`。
+- **timeline 时间线**：`<div class="timeline">` 内若干 `<div class="tl"><div class="tl__date">Q1</div><div class="tl__title">…</div><div class="tl__desc">…</div></div>`（CSS 横线 + 圆点，自动均分）。
+- **gantt 甘特**：`<div class="gantt">` 内 `gantt__row` = `gantt__label` + `gantt__track>div.gantt__bar`（条用内联 `style="left:20%;width:30%"` 定位；`b2/b3` 换色）。
+- **roadmap 路线图**：`<div class="roadmap">` 四列 `rm` / `rm--next` / `rm--later` / `rm--vision`，内 `rm__k` + `rm__list>li`。
+- **diff 增删**：`<div class="diff">` 内 `<span class="diff__add">…</span>` / `diff__del`（删除线）/ `diff__ctx`（上下文）。
+- **mindmap 思维导图**：`<div class="mindmap">` 内一张 `<svg viewBox="0 0 100 56" preserveAspectRatio="none">` 画 `<line style="stroke:var(--rule);vector-effect:non-scaling-stroke">` + 若干 `<div class="mm-node root|b2|b3" style="left:%;top:%">` 节点。

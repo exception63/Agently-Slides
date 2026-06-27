@@ -1,0 +1,68 @@
+/* ════════════════════════════════════════════════════════════════════
+   _layouts.css · P4 版式库（kpi / vs / timeline / gantt / roadmap / diff / mindmap）
+   token-generic + 缺失令牌兜底 → build.py 对「所有」皮恒内联（薄皮 + 原 7 厚皮通用）。
+   厚皮没有的令牌就地兜底：--accent-3→--accent-2 · --good→--green→中性绿 · --radius→0。
+   注意：本注释块内严禁出现注释结束符，否则会提前闭合、吞掉下方规则（参见 _components.css 踩坑）。
+   ════════════════════════════════════════════════════════════════════ */
+
+/* —— kpi-grid 指标卡 —— */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;}.kpis--3{grid-template-columns:repeat(3,1fr);}.kpis--2{grid-template-columns:repeat(2,1fr);}
+.kpi{padding:32px 28px;background:var(--paper-soft);border-radius:var(--radius,0px);border-top:3px solid var(--accent);display:flex;flex-direction:column;gap:8px;}
+.kpi__k{font-family:var(--font-mono);font-size:17px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);}
+.kpi__v{font-family:var(--font-display);font-size:84px;font-weight:800;line-height:.95;color:var(--ink);letter-spacing:-.02em;}
+.kpi__d{font-size:22px;font-weight:600;}.kpi__d.up{color:var(--good,var(--green,#2e9e6b));}.kpi__d.down{color:var(--accent-3,var(--accent-2));}
+.kpi__d.up::before{content:"▲ ";}.kpi__d.down::before{content:"▼ ";}
+.kpi__hint{font-size:19px;color:var(--ink-3);line-height:1.4;}
+
+/* —— vs 对比面板 —— */
+.vs{display:grid;grid-template-columns:1fr 96px 1fr;align-items:center;gap:0;}
+.vs__pane{padding:40px 36px;background:var(--paper-soft);border-radius:var(--radius,0px);display:flex;flex-direction:column;gap:16px;border-top:4px solid var(--ink-4);}
+.vs__pane--a{border-top-color:var(--accent-3,var(--accent-2));}.vs__pane--b{border-top-color:var(--good,var(--green,#2e9e6b));}
+.vs__mid{text-align:center;font-family:var(--font-display);font-size:44px;font-weight:800;color:var(--ink-4);}
+.vs__title{font-family:var(--font-display);font-size:40px;font-weight:700;color:var(--ink);}
+.vs__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:13px;}
+.vs__list li{font-size:23px;color:var(--ink-2);line-height:1.45;padding-left:28px;position:relative;}
+.vs__pane--a .vs__list li::before{content:"✕";position:absolute;left:0;color:var(--accent-3,var(--accent-2));font-weight:700;}
+.vs__pane--b .vs__list li::before{content:"✓";position:absolute;left:0;color:var(--good,var(--green,#2e9e6b));font-weight:700;}
+
+/* —— timeline 时间线 —— */
+.timeline{position:relative;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;padding-top:64px;}
+.timeline::before{content:"";position:absolute;top:78px;left:5%;right:5%;height:2px;background:var(--rule);}
+.tl{position:relative;padding:0 18px;text-align:center;}
+.tl::before{content:"";position:absolute;top:-22px;left:50%;transform:translateX(-50%);width:18px;height:18px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 6px var(--paper);}
+.tl__date{font-family:var(--font-mono);font-size:18px;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;margin-top:18px;}
+.tl__title{font-family:var(--font-display);font-size:30px;font-weight:700;color:var(--ink);margin-top:10px;line-height:1.2;}
+.tl__desc{font-size:20px;color:var(--ink-3);line-height:1.45;margin-top:8px;}
+
+/* —— gantt 甘特 —— */
+.gantt{display:flex;flex-direction:column;gap:14px;}
+.gantt__row{display:grid;grid-template-columns:240px 1fr;align-items:center;gap:24px;}
+.gantt__label{font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--ink);}
+.gantt__track{position:relative;height:40px;background:var(--paper-warm);border-radius:999px;}
+.gantt__bar{position:absolute;top:0;height:100%;border-radius:999px;background:var(--accent);display:flex;align-items:center;padding:0 16px;color:#fff;font-family:var(--font-mono);font-size:15px;font-weight:600;}
+.gantt__bar.b2{background:var(--accent-2);}.gantt__bar.b3{background:var(--accent-3,var(--accent-2));}
+
+/* —— roadmap NOW/NEXT/LATER —— */
+.roadmap{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;}
+.rm{padding:32px 28px;border-radius:var(--radius,0px);background:var(--paper-soft);border-top:4px solid var(--accent);display:flex;flex-direction:column;gap:16px;}
+.rm--next{border-top-color:var(--accent-2);}.rm--later{border-top-color:var(--accent-3,var(--accent-2));}.rm--vision{border-top-color:var(--ink-4);}
+.rm__k{font-family:var(--font-mono);font-size:18px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);}
+.rm--next .rm__k{color:var(--accent-2);}.rm--later .rm__k{color:var(--accent-3,var(--accent-2));}.rm--vision .rm__k{color:var(--ink-4);}
+.rm__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;}
+.rm__list li{font-size:23px;color:var(--ink-2);line-height:1.4;padding-left:22px;position:relative;}
+.rm__list li::before{content:"›";position:absolute;left:0;color:var(--ink-4);font-weight:700;}
+
+/* —— diff 增删 —— */
+.diff{font-family:var(--font-mono);font-size:24px;line-height:1.7;background:var(--paper-soft);border-radius:var(--radius,0px);padding:28px 32px;}
+.diff__add{color:var(--good,var(--green,#2e9e6b));background:rgba(26,175,108,.1);display:block;padding:0 8px;}
+.diff__add::before{content:"+ ";}
+.diff__del{color:var(--accent-3,var(--accent-2));background:rgba(255,92,138,.1);display:block;padding:0 8px;text-decoration:line-through;opacity:.8;}
+.diff__del::before{content:"- ";}
+.diff__ctx{color:var(--ink-3);display:block;padding:0 8px;}.diff__ctx::before{content:"  ";}
+
+/* —— mindmap 思维导图（SVG 容器 + 节点）—— */
+.mindmap{position:relative;width:100%;height:100%;}
+.mindmap svg{position:absolute;inset:0;width:100%;height:100%;}
+.mm-node{position:absolute;transform:translate(-50%,-50%);padding:14px 22px;border-radius:999px;background:var(--paper-soft);border:2px solid var(--accent);font-family:var(--font-display);font-weight:700;font-size:24px;color:var(--ink);white-space:nowrap;}
+.mm-node.root{background:var(--accent);color:#fff;font-size:30px;padding:18px 30px;}
+.mm-node.b2{border-color:var(--accent-2);}.mm-node.b3{border-color:var(--accent-3,var(--accent-2));}

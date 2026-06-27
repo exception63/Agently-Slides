@@ -1,0 +1,12 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: y2k-chrome — Y2K 液态铬 · 银彩 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#dfe6f2;--paper-soft:#eef2f9;--paper-warm:#cfd8e8;
+  --rule:rgba(0,0,0,.12);--rule-soft:rgba(0,0,0,.06);
+  --ink:#2a3550;--ink-2:#4a5670;--ink-3:#6a768f;--ink-4:#9aa4ba;
+  --accent:#8a5cff;--accent-2:#3ccfd8;--accent-3:#ff84c4;--accent-soft:color-mix(in srgb,#8a5cff 16%,transparent);--good:#2fae6a;
+  --radius:18px;
+  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+.cover__title,.secdiv__title,.insight__statement{background:linear-gradient(180deg,#f8faff,#9aa8c4 50%,#4a5670);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;}

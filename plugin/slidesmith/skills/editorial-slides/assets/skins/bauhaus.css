@@ -1,0 +1,12 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&family=Archivo+Black&display=swap */
+/* uses-base */
+/* skin: bauhaus — 包豪斯 · 三原色几何 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#f4f1e9;--paper-soft:#ffffff;--paper-warm:#ebe7da;
+  --rule:rgba(0,0,0,.12);--rule-soft:rgba(0,0,0,.06);
+  --ink:#111111;--ink-2:#333333;--ink-3:#666666;--ink-4:#999999;
+  --accent:#e03c27;--accent-2:#1d4eaf;--accent-3:#f4c430;--accent-soft:color-mix(in srgb,#e03c27 16%,transparent);--good:#2a7a3a;
+  --radius:0px;
+  --font-display:'Archivo Black','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+.card,.kpi,.rm,.vs__pane,.sum-card,.bignum{border:2px solid #111;box-shadow:5px 5px 0 #111;}

@@ -1,0 +1,13 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: swiss-grid — 瑞士网格 · 红 · 12 栏 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#ffffff;--paper-soft:#f4f4f4;--paper-warm:#ececec;
+  --rule:rgba(0,0,0,.12);--rule-soft:rgba(0,0,0,.06);
+  --ink:#111111;--ink-2:#444444;--ink-3:#777777;--ink-4:#999999;
+  --accent:#d6001c;--accent-2:#111111;--accent-3:#777777;--accent-soft:color-mix(in srgb,#d6001c 16%,transparent);--good:#0f8a2f;
+  --radius:0px;
+  --font-display:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+.slide{background-image:linear-gradient(90deg,rgba(0,0,0,.04) 1px,transparent 1px);background-size:calc(100%/12) 100%;}
+.card,.kpi,.bignum{box-shadow:none;}

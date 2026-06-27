@@ -1,0 +1,12 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: nord — Nord 北欧冷蓝 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#2e3440;--paper-soft:#3b4252;--paper-warm:#262b35;
+  --rule:rgba(255,255,255,.12);--rule-soft:rgba(255,255,255,.07);
+  --ink:#eceff4;--ink-2:#d8dee9;--ink-3:#9aa3b5;--ink-4:#6c7689;
+  --accent:#88c0d0;--accent-2:#81a1c1;--accent-3:#b48ead;--accent-soft:color-mix(in srgb,#88c0d0 16%,transparent);--good:#a3be8c;
+  --radius:10px;
+  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+

@@ -1,0 +1,93 @@
+<section data-seg="0" data-segname="段 0 · 版式库" class="slide cover">
+  <div class="cover__top"><div class="cover__brand">{{BRAND}}</div><div class="cover__seal">版</div></div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">版式库 · Layout Library</div>
+    <h1 class="cover__title">一套<em>版式</em><br>覆盖常见场景</h1>
+    <p class="cover__sub">KPI · 对比 · 时间线 · 甘特 · 路线图 · 增删 · 思维导图——按 O 看全部。</p>
+  </div>
+  <div class="cover__meta"><div class="cover__meta-item"><span class="cover__meta-k">Layouts</span><span class="cover__meta-v">9+</span></div><div class="cover__meta-item"><span class="cover__meta-k">Pure</span><span class="cover__meta-v">CSS</span></div></div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · KPI" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">指标卡 · kpi-grid</div><h2 class="title head__title">关键数字</h2></div>
+  <div class="kpis fill" style="align-content:center">
+    <div class="kpi"><div class="kpi__k">月活</div><div class="kpi__v num">2.4M</div><div class="kpi__d up">18%</div><div class="kpi__hint">环比上月</div></div>
+    <div class="kpi"><div class="kpi__k">留存</div><div class="kpi__v num">63%</div><div class="kpi__d up">5pt</div><div class="kpi__hint">30 日</div></div>
+    <div class="kpi"><div class="kpi__k">成本</div><div class="kpi__v num">¥0.8</div><div class="kpi__d down">12%</div><div class="kpi__hint">单位获客</div></div>
+    <div class="kpi"><div class="kpi__k">NPS</div><div class="kpi__v num">+52</div><div class="kpi__d up">9</div><div class="kpi__hint">净推荐</div></div>
+  </div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 对比" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">对比 · vs</div><h2 class="title head__title">旧 vs 新</h2></div>
+  <div class="vs fill" style="align-content:center">
+    <div class="vs__pane vs__pane--a"><div class="vs__title">旧做法</div><ul class="vs__list"><li>从零摸索</li><li>风格不统一</li><li>牵一发动全身</li></ul></div>
+    <div class="vs__mid">VS</div>
+    <div class="vs__pane vs__pane--b"><div class="vs__title">新做法</div><ul class="vs__list"><li>换皮即换气质</li><li>组件契约统一</li><li>令牌一改全变</li></ul></div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 时间线" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">时间线 · timeline</div><h2 class="title head__title">四步走</h2></div>
+  <div class="timeline fill" style="align-content:center">
+    <div class="tl"><div class="tl__date">Q1</div><div class="tl__title">立项</div><div class="tl__desc">定契约与令牌</div></div>
+    <div class="tl"><div class="tl__date">Q2</div><div class="tl__title">组件</div><div class="tl__desc">抽共享版式</div></div>
+    <div class="tl"><div class="tl__date">Q3</div><div class="tl__title">多皮</div><div class="tl__desc">薄皮上线</div></div>
+    <div class="tl"><div class="tl__date">Q4</div><div class="tl__title">展厅</div><div class="tl__desc">所见即所得</div></div>
+  </div>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 甘特" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">甘特 · gantt</div><h2 class="title head__title">排期</h2></div>
+  <div class="gantt fill" style="align-content:center">
+    <div class="gantt__row"><div class="gantt__label">调研</div><div class="gantt__track"><div class="gantt__bar" style="left:0%;width:25%">2 周</div></div></div>
+    <div class="gantt__row"><div class="gantt__label">设计</div><div class="gantt__track"><div class="gantt__bar b2" style="left:20%;width:30%">3 周</div></div></div>
+    <div class="gantt__row"><div class="gantt__label">开发</div><div class="gantt__track"><div class="gantt__bar b3" style="left:45%;width:40%">5 周</div></div></div>
+    <div class="gantt__row"><div class="gantt__label">上线</div><div class="gantt__track"><div class="gantt__bar" style="left:82%;width:18%">2 周</div></div></div>
+  </div>
+</section>
+
+<section data-seg="5" data-segname="段 5 · 路线图" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">路线图 · roadmap</div><h2 class="title head__title">NOW / NEXT / LATER</h2></div>
+  <div class="roadmap fill" style="align-content:center">
+    <div class="rm"><div class="rm__k">NOW</div><ul class="rm__list"><li>Canvas 特效</li><li>多换皮</li></ul></div>
+    <div class="rm rm--next"><div class="rm__k">NEXT</div><ul class="rm__list"><li>Showcase</li><li>概览网格</li></ul></div>
+    <div class="rm rm--later"><div class="rm__k">LATER</div><ul class="rm__list"><li>更多版式</li><li>图表内联</li></ul></div>
+    <div class="rm rm--vision"><div class="rm__k">VISION</div><ul class="rm__list"><li>AI 一句成片</li></ul></div>
+  </div>
+</section>
+
+<section data-seg="6" data-segname="段 6 · 增删" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">增删 · diff</div><h2 class="title head__title">改了什么</h2></div>
+  <div class="diff fill" style="align-content:center;align-self:stretch">
+    <span class="diff__ctx">skin = editorial</span>
+    <span class="diff__del">components: 内联在每张皮里</span>
+    <span class="diff__add">components: 抽成共享 _components.css</span>
+    <span class="diff__del">themes: 7</span>
+    <span class="diff__add">themes: 21（薄皮 + 签名微调）</span>
+    <span class="diff__ctx">canvas-fx, overview-grid: ok</span>
+  </div>
+</section>
+
+<section data-seg="7" data-segname="段 7 · 思维导图" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">思维导图 · mindmap</div><h2 class="title head__title">借鉴四轨</h2></div>
+  <div class="mindmap fill" style="align-self:stretch;min-height:600px">
+    <svg viewBox="0 0 100 56" preserveAspectRatio="none">
+      <line x1="50" y1="28" x2="20" y2="12" style="stroke:var(--rule);stroke-width:2;vector-effect:non-scaling-stroke"/>
+      <line x1="50" y1="28" x2="80" y2="12" style="stroke:var(--rule);stroke-width:2;vector-effect:non-scaling-stroke"/>
+      <line x1="50" y1="28" x2="16" y2="46" style="stroke:var(--rule);stroke-width:2;vector-effect:non-scaling-stroke"/>
+      <line x1="50" y1="28" x2="84" y2="46" style="stroke:var(--rule);stroke-width:2;vector-effect:non-scaling-stroke"/>
+    </svg>
+    <div class="mm-node root" style="left:50%;top:50%">借鉴</div>
+    <div class="mm-node" style="left:20%;top:21%">动画</div>
+    <div class="mm-node b2" style="left:80%;top:21%">换皮</div>
+    <div class="mm-node b3" style="left:16%;top:82%">Showcase</div>
+    <div class="mm-node" style="left:84%;top:82%">概览</div>
+  </div>
+</section>
+
+<section data-seg="8" data-segname="段 8 · 收束" class="slide insight">
+  <div class="insight__eyebrow">版式库</div>
+  <h2 class="insight__statement">写法一样，<em>外观随皮</em>。</h2>
+  <p class="insight__sub">同一套 class 契约，21 张皮通用。</p>
+</section>

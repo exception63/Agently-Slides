@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Slidesmith 换皮展厅 · Theme Showcase</title>
+<style>
+:root{--w:360px;}
+*{box-sizing:border-box;}
+body{margin:0;background:#0b0c10;color:#e8e6df;font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;}
+.wrap{max-width:1240px;margin:0 auto;padding:32px 24px 80px;}
+h1{font-size:30px;font-weight:800;margin:0 0 6px;letter-spacing:-.5px;}
+.sub{color:#9a988f;font-size:14px;line-height:1.6;margin:0 0 8px;}
+h2{font-size:18px;font-weight:700;margin:34px 0 4px;display:flex;align-items:center;gap:10px;}
+h2 .c{font-size:12px;font-weight:600;color:#0f6e56;background:#d8f0e7;padding:2px 9px;border-radius:20px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,var(--w));gap:18px;justify-content:center;margin-top:14px;}
+.sc-card{text-decoration:none;color:inherit;border:1px solid #25262c;border-radius:12px;overflow:hidden;background:#15161b;transition:transform .15s,border-color .15s;display:block;}
+.sc-card:hover{transform:translateY(-4px);border-color:#4a4b55;}
+.sc-frame{width:var(--w);height:calc(var(--w) * 9 / 16);overflow:hidden;position:relative;background:#000;}
+.sc-frame iframe{width:1920px;height:1080px;border:0;transform:scale(calc(var(--w) / 1920));transform-origin:top left;pointer-events:none;}
+.sc-meta{display:flex;align-items:center;justify-content:space-between;padding:9px 13px;}
+.sc-name{font-size:14px;font-weight:600;}
+.sc-tag{font:600 11px ui-monospace,Menlo,monospace;color:#8a887f;}
+.foot{margin-top:40px;color:#6f6e66;font-size:12px;border-top:1px solid #25262c;padding-top:16px;line-height:1.7;}
+</style></head>
+<body><div class="wrap">
+<h1>Slidesmith 换皮展厅 · Theme Showcase</h1>
+<p class="sub">21 张皮 · 每格是<b>真实渲染</b>的封面（非截图）· 点任意一张打开它的全屏样板。<br>
+对 AI 说皮名即可（"用 dracula / 蒸汽波 / 瑞士网格 做"）。</p>
+<h2>原生皮 <span class="c">7 · 基建最全</span></h2>
+<div class="grid"><a class="sc-card" href="skins/editorial.html" target="_blank" title="点击打开 杂志风 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/editorial.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">杂志风</span><span class="sc-tag">editorial · 浅</span></div></a>
+<a class="sc-card" href="skins/academic.html" target="_blank" title="点击打开 学术 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/academic.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">学术</span><span class="sc-tag">academic · 浅</span></div></a>
+<a class="sc-card" href="skins/keynote-dark.html" target="_blank" title="点击打开 暗场主旨 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/keynote-dark.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">暗场主旨</span><span class="sc-tag">keynote-dark · 暗</span></div></a>
+<a class="sc-card" href="skins/cartesian.html" target="_blank" title="点击打开 极简网格 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/cartesian.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">极简网格</span><span class="sc-tag">cartesian · 浅</span></div></a>
+<a class="sc-card" href="skins/signal.html" target="_blank" title="点击打开 机构正式 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/signal.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">机构正式</span><span class="sc-tag">signal · 浅</span></div></a>
+<a class="sc-card" href="skins/vellum.html" target="_blank" title="点击打开 暗色学术 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/vellum.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">暗色学术</span><span class="sc-tag">vellum · 暗</span></div></a>
+<a class="sc-card" href="skins/daisy-days.html" target="_blank" title="点击打开 温暖活泼 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/daisy-days.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">温暖活泼</span><span class="sc-tag">daisy-days · 浅</span></div></a></div>
+<h2>移植自 html-ppt-skill <span class="c">14 · 薄皮 + 共享组件</span></h2>
+<div class="grid"><a class="sc-card" href="skins/dracula.html" target="_blank" title="点击打开 Dracula 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/dracula.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">Dracula</span><span class="sc-tag">dracula · 暗</span></div></a>
+<a class="sc-card" href="skins/nord.html" target="_blank" title="点击打开 Nord 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/nord.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">Nord</span><span class="sc-tag">nord · 暗</span></div></a>
+<a class="sc-card" href="skins/tokyo-night.html" target="_blank" title="点击打开 东京夜 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/tokyo-night.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">东京夜</span><span class="sc-tag">tokyo-night · 暗</span></div></a>
+<a class="sc-card" href="skins/catppuccin-mocha.html" target="_blank" title="点击打开 Catppuccin Mocha 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/catppuccin-mocha.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">Catppuccin Mocha</span><span class="sc-tag">catppuccin-mocha · 暗</span></div></a>
+<a class="sc-card" href="skins/catppuccin-latte.html" target="_blank" title="点击打开 Catppuccin Latte 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/catppuccin-latte.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">Catppuccin Latte</span><span class="sc-tag">catppuccin-latte · 浅</span></div></a>
+<a class="sc-card" href="skins/vaporwave.html" target="_blank" title="点击打开 蒸汽波 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/vaporwave.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">蒸汽波</span><span class="sc-tag">vaporwave · 暗</span></div></a>
+<a class="sc-card" href="skins/swiss-grid.html" target="_blank" title="点击打开 瑞士网格 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/swiss-grid.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">瑞士网格</span><span class="sc-tag">swiss-grid · 浅</span></div></a>
+<a class="sc-card" href="skins/bauhaus.html" target="_blank" title="点击打开 包豪斯 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/bauhaus.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">包豪斯</span><span class="sc-tag">bauhaus · 浅</span></div></a>
+<a class="sc-card" href="skins/cyberpunk-neon.html" target="_blank" title="点击打开 赛博朋克 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/cyberpunk-neon.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">赛博朋克</span><span class="sc-tag">cyberpunk-neon · 暗</span></div></a>
+<a class="sc-card" href="skins/glassmorphism.html" target="_blank" title="点击打开 玻璃拟态 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/glassmorphism.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">玻璃拟态</span><span class="sc-tag">glassmorphism · 暗</span></div></a>
+<a class="sc-card" href="skins/y2k-chrome.html" target="_blank" title="点击打开 Y2K 铬 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/y2k-chrome.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">Y2K 铬</span><span class="sc-tag">y2k-chrome · 浅</span></div></a>
+<a class="sc-card" href="skins/neo-brutalism.html" target="_blank" title="点击打开 新野兽派 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/neo-brutalism.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">新野兽派</span><span class="sc-tag">neo-brutalism · 浅</span></div></a>
+<a class="sc-card" href="skins/terminal-green.html" target="_blank" title="点击打开 终端绿 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/terminal-green.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">终端绿</span><span class="sc-tag">terminal-green · 暗</span></div></a>
+<a class="sc-card" href="skins/rose-pine.html" target="_blank" title="点击打开 Rosé Pine 全屏样板"><div class="sc-frame"><iframe loading="lazy" src="skins/rose-pine.html?bare"></iframe></div><div class="sc-meta"><span class="sc-name">Rosé Pine</span><span class="sc-tag">rose-pine · 暗</span></div></a></div>
+<div class="foot">由 <code>assets/build-showcases.py</code> 生成 · 薄皮 = 令牌块 + 共享 <code>_components.css</code> + 签名微调 · 调色移植自 html-ppt-skill (MIT)。</div>
+</div></body></html>

@@ -1,0 +1,12 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: dracula — Dracula 暗色 · 紫粉青 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#282a36;--paper-soft:#343746;--paper-warm:#21222c;
+  --rule:rgba(255,255,255,.12);--rule-soft:rgba(255,255,255,.07);
+  --ink:#f8f8f2;--ink-2:#bdbde0;--ink-3:#9a9fc4;--ink-4:#6272a4;
+  --accent:#bd93f9;--accent-2:#ff79c6;--accent-3:#8be9fd;--accent-soft:color-mix(in srgb,#bd93f9 16%,transparent);--good:#50fa7b;
+  --radius:12px;
+  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+

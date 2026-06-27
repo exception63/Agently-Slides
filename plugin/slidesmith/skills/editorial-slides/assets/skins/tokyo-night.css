@@ -1,0 +1,12 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: tokyo-night — 东京夜 · 蓝紫夜色 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#1a1b26;--paper-soft:#24283b;--paper-warm:#16161e;
+  --rule:rgba(255,255,255,.12);--rule-soft:rgba(255,255,255,.07);
+  --ink:#c0caf5;--ink-2:#a9b1d6;--ink-3:#787fa3;--ink-4:#565f89;
+  --accent:#7aa2f7;--accent-2:#bb9af7;--accent-3:#7dcfff;--accent-soft:color-mix(in srgb,#7aa2f7 16%,transparent);--good:#9ece6a;
+  --radius:12px;
+  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+

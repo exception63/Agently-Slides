@@ -1,0 +1,13 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: glassmorphism — 玻璃拟态 · 磨砂暗 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#0e1430;--paper-soft:rgba(255,255,255,.07);--paper-warm:rgba(255,255,255,.04);
+  --rule:rgba(255,255,255,.12);--rule-soft:rgba(255,255,255,.07);
+  --ink:#eef2ff;--ink-2:#b9c2e0;--ink-3:#8a93b5;--ink-4:#6a7290;
+  --accent:#7dd3fc;--accent-2:#c084fc;--accent-3:#f0abfc;--accent-soft:color-mix(in srgb,#7dd3fc 16%,transparent);--good:#86efac;
+  --radius:20px;
+  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+.slide{background-image:radial-gradient(40% 40% at 20% 20%,rgba(125,211,252,.22),transparent 70%),radial-gradient(40% 40% at 80% 30%,rgba(192,132,252,.2),transparent 70%);}
+.card,.kpi,.rm,.vs__pane,.sum-card,.bignum{backdrop-filter:blur(22px) saturate(160%);border:1px solid rgba(255,255,255,.12);}

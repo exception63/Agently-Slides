@@ -1,0 +1,12 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: rose-pine — Rosé Pine · 暮色玫瑰 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#191724;--paper-soft:#1f1d2e;--paper-warm:#13111d;
+  --rule:rgba(255,255,255,.12);--rule-soft:rgba(255,255,255,.07);
+  --ink:#e0def4;--ink-2:#c5c3dd;--ink-3:#908caa;--ink-4:#6e6a86;
+  --accent:#ebbcba;--accent-2:#c4a7e7;--accent-3:#9ccfd8;--accent-soft:color-mix(in srgb,#ebbcba 16%,transparent);--good:#31748f;
+  --radius:12px;
+  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+

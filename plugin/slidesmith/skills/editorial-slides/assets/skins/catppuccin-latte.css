@@ -1,0 +1,12 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: catppuccin-latte — Catppuccin Latte 柔彩浅 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#eff1f5;--paper-soft:#e6e9ef;--paper-warm:#dce0e8;
+  --rule:rgba(0,0,0,.12);--rule-soft:rgba(0,0,0,.06);
+  --ink:#4c4f69;--ink-2:#5c5f77;--ink-3:#7c7f93;--ink-4:#9ca0b0;
+  --accent:#8839ef;--accent-2:#1e66f5;--accent-3:#ea76cb;--accent-soft:color-mix(in srgb,#8839ef 16%,transparent);--good:#40a02b;
+  --radius:14px;
+  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>杂志风 · editorial 样板</title>
+<title>机构正式 · signal 样板</title>
 <!-- 在线时加载该皮肤的字体；离线时自动回退到系统字体（字体栈已含 fallback） -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap">
 <style>
-/* skin: editorial · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
+/* skin: signal · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
 /* ════════════════════════════════════════════════════════════════════
    _core.css · 与风格无关的骨架 + 引擎界面（topbar / 段导航 / 进度条 / 投屏态）
    所有皮肤共用。它只用令牌，不定义令牌——令牌由各皮肤的 :root 提供：
@@ -154,263 +154,292 @@ body.fullscreen{background:#000;}
 .mm-node.root{background:var(--accent);color:#fff;font-size:30px;padding:18px 30px;}
 .mm-node.b2{border-color:var(--accent-2);}.mm-node.b3{border-color:var(--accent-3,var(--accent-2));}
 
-/* —— 皮肤 editorial —— */
-/* FONTS https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,700;0,800;0,900;1,500;1,700&family=Cormorant+Garamond:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap */
+/* —— 皮肤 signal —— */
+/* FONTS https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&family=IBM+Plex+Mono:wght@300;400;500&family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500&display=swap */
+/* skin: signal · ported from beautiful-html-templates/signal (MIT · © 2026 Zara Zhang) · 机构正式 / 可信稳重 */
 /* ════════════════════════════════════════════════════════════════════
-   skin: editorial · 杂志级风格（纸色 + 朱红 + 宋体大字 + 大数字冲击）
-   这是本 skill 的原始风格，抽成皮肤后外观不变。
-   换主题色 → 只改 :root 里的 --vermilion / --navy / --gold 等几个变量。
+   DNA：scheme=mixed（浅米为主版 + 藏青深色版面）· formality=high · density=high
+   mood：institutional / trustworthy / considered / weighty（机构、可信、有分量；政府 / 智库 / 年报）
+   移植策略：以浅米 #f0ece3 为主纸 · ink = 深藏青近黑 #1c2644 · accent = 古金 #c8a870 ·
+   secdiv / manifesto 的 --dark 变体改用藏青满版（呼应模板深色版式）。
+   机构感 = 衬线标题（Source Serif 4 过渡衬线）+ 高密度承载（表格 / 引用 / 多卡）
+   + 金色克制点缀（唯一抢眼热色）+ 稳重发丝线 / 边框。
+   红线：主强调色只用金一个；藏青是结构色 / 深色版式色，不当强调；em 取稳重处理（衬线斜体 + 藏青，金仅在标题里点睛）。
+   换主色 → 只改 :root 的 --accent / --accent-2 / --accent-soft。
    ════════════════════════════════════════════════════════════════════ */
 :root {
-  /* —— 配色令牌（改主题色只改这一组）—— */
-  --paper:#F2EDE2;--paper-soft:#EEE7D7;--paper-warm:#E8DFC9;
-  --rule:#D8CFB9;--rule-soft:#E4DCC8;
-  --ink:#131516;--ink-2:#2A2F36;--ink-3:#5C636F;--ink-4:#8E94A0;
-  --navy:#1B2B4F;--navy-soft:#2C3F6A;
-  --vermilion:#B8412A;--vermilion-2:#92301F;--vermilion-50:rgba(184,65,42,0.10);
-  --gold:#A07A3A;--gold-soft:#C2A06B;--green:#4E7549;
-  --night:#14171F;--night-2:#1E222D;--night-3:#2C313E;--night-paper:#E6E0D2;
-  /* —— 引擎界面用的强调别名（_core.css 读这些）—— */
-  --accent:var(--vermilion);--accent-2:var(--vermilion-2);--accent-soft:rgba(184,65,42,0.12);--accent-ui:#C2A06B;
-  /* —— 字号阶梯 —— */
-  --t-display:156px;--t-h1:96px;--t-h2:72px;--t-h3:52px;--t-h4:40px;
-  --t-lead:34px;--t-body:30px;--t-small:26px;--t-eyebrow:22px;
-  --pad-x:110px;--pad-y:84px;
-  /* 杂志级字体栈 · 西文 Playfair Display + 中文宋体 / 苹方 */
-  --font-serif:"Playfair Display","Cormorant Garamond","Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
-  --font-sans:"Inter","Helvetica Neue","PingFang SC","Hiragino Sans GB","Microsoft YaHei","-apple-system",sans-serif;
-  --font-display:"Playfair Display","Cormorant Garamond","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
-  --font-mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
-  --fit-scale:0.55; /* JS 动态设置 · 此为 fallback */
+  /* —— 配色（浅米纸 + 深藏青墨 + 古金稀用 · 改主题只改这一组）—— */
+  --paper:#f0ece3;--paper-soft:#e9e4d8;--paper-warm:#e2dcd0;
+  --rule:#cac4b4;--rule-soft:#d8d2c4;--rule-strong:#b3ab98;
+  --ink:#1c2644;--ink-2:#3a4360;--ink-3:#5a6270;--ink-4:#9aa0a8;
+  --accent:#c8a870;--accent-2:#a3823f;--accent-soft:rgba(200,168,112,0.12);--accent-ui:#dcc99c;
+  --navy:#1c2644;--navy-2:#232f55;
+  --gold:#c8a870;--gold-soft:#dcc99c;          /* 第二色，稀用（深侧栏可读） */
+  --good:#3f6e55;--green:#3f6e55;--warn:#a3823f;--bad:#a24632;  /* 语义色，克制 */
+  --night:#1c2644;--night-2:#232f55;--night-paper:#e2dcd0;
+  /* —— 字号阶梯（high density · 承载多内容 / 表格 / 引用）—— */
+  --t-display:122px;--t-h1:82px;--t-h2:56px;--t-h3:40px;--t-h4:32px;
+  --t-lead:30px;--t-body:28px;--t-small:23px;--t-eyebrow:19px;
+  --pad-x:120px;--pad-y:84px;
+  /* 字体栈 · 标题过渡衬线（Source Serif 4 + 思源宋体）· 正文无衬线（DM Sans + 思源黑体）· 中文优先 */
+  --font-serif:"Source Serif 4","Noto Serif SC","Source Han Serif SC","Songti SC","STSong",serif;
+  --font-display:"Source Serif 4","Noto Serif SC","Source Han Serif SC","Songti SC",serif;
+  --font-sans:"DM Sans","Noto Sans SC","Source Han Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:"IBM Plex Mono","JetBrains Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55;
 }
 
-/* —— 页脚 chrome / 顶部 runner —— */
-.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:38px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;}
-.chrome__l{display:flex;gap:28px;align-items:baseline;white-space:nowrap;}
+/* —— 页脚 chrome：细发丝线 + 段名 / 作者 · 页码（机构汇报坐标感）—— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:40px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-mono);font-size:16px;letter-spacing:0.06em;color:var(--ink-4);padding-top:14px;border-top:1px solid var(--rule);text-transform:uppercase;}
+.chrome__l{display:flex;gap:24px;align-items:baseline;white-space:nowrap;}
 .chrome__seg{color:var(--ink-3);font-weight:500;}
-.chrome__r{font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;}
-.runner{position:absolute;top:56px;left:var(--pad-x);right:var(--pad-x);display:flex;gap:18px;align-items:center;font-family:var(--font-mono);font-size:16px;letter-spacing:0.18em;color:var(--ink-3);text-transform:uppercase;}
-.runner::before{content:"";width:32px;height:1px;background:var(--ink-3);}
+.chrome__r{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:0.1em;}
+/* —— runner：可选顶部页眉条（讲题 / 机构）—— */
+.runner{position:absolute;top:54px;left:var(--pad-x);right:var(--pad-x);display:flex;justify-content:space-between;align-items:center;font-family:var(--font-sans);font-size:18px;color:var(--ink-3);padding-bottom:14px;border-bottom:1px solid var(--rule);}
+.runner__r{font-family:var(--font-mono);font-size:15px;letter-spacing:0.14em;color:var(--ink-4);text-transform:uppercase;}
 
 /* —— 通用排版原子 —— */
-.eyebrow{font-family:var(--font-sans);font-size:var(--t-eyebrow);letter-spacing:0.22em;color:var(--vermilion);text-transform:uppercase;font-weight:600;}
-.title{font-family:var(--font-display);font-weight:700;font-size:80px;line-height:1.1;letter-spacing:-0.01em;color:var(--ink);margin:0;}
-.title--xl{font-size:140px;}.title--lg{font-size:108px;}.title--md{font-size:64px;}.title--sm{font-size:48px;}
-.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.55;color:var(--ink-2);max-width:1500px;margin:0;}
-.body{font-size:var(--t-body);line-height:1.65;color:var(--ink-2);}
-.small{font-size:var(--t-small);line-height:1.6;color:var(--ink-3);}
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-eyebrow);letter-spacing:0.18em;color:var(--accent-2);text-transform:uppercase;font-weight:500;}
+.title{font-family:var(--font-display);font-weight:600;font-size:var(--t-h2);line-height:1.16;letter-spacing:-0.01em;color:var(--ink);margin:0;}
+.title--xl{font-size:104px;}.title--lg{font-size:80px;}.title--md{font-size:48px;}.title--sm{font-size:38px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.58;color:var(--ink-2);max-width:1480px;margin:0;font-weight:400;}
+.body{font-size:var(--t-body);line-height:1.68;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.62;color:var(--ink-3);}
 .num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
-.mark-v{color:var(--vermilion);}.mark-n{color:var(--navy);}.mark-g{color:var(--gold);}
-strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--vermilion);font-family:var(--font-display);}
-.cite{font-family:var(--font-mono);font-size:0.62em;letter-spacing:0.04em;color:var(--ink-4);vertical-align:0.15em;white-space:nowrap;font-style:normal;}
-.head{margin-top:10px;margin-bottom:24px;}.head__eyebrow{margin-bottom:12px;}.head__title{margin:0 0 8px;}
-.head__sub{font-size:24px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.4;}
+.mark-v{color:var(--accent-2);}.mark-n{color:var(--accent-2);}.mark-g{color:var(--accent-2);}
+.key{color:var(--ink);font-weight:600;font-style:normal;}
+strong{font-weight:600;color:var(--ink);}                                       /* 机构：加粗 = 藏青墨，不抢色 */
+em{font-style:italic;color:var(--ink);font-family:var(--font-serif);}            /* 稳重：衬线斜体 = 术语 / 强调，克制 */
+.cite{font-family:var(--font-sans);font-size:0.7em;color:var(--ink-3);letter-spacing:0.01em;white-space:nowrap;font-style:normal;font-weight:400;}
+.head{margin-top:6px;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--rule);}  /* 机构：标题下发丝线 = 页眉感 */
+.head__eyebrow{margin-bottom:14px;}.head__title{margin:0 0 8px;}
+.head__sub{font-family:var(--font-sans);font-size:24px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.5;}
 .fill{flex:1;min-height:0;}
 .center{align-items:center;justify-content:center;text-align:center;}
 .center .lead{margin-left:auto;margin-right:auto;}
+.center .head{border-bottom:0;}
 
-/* —— cover 封面 —— */
+/* —— cover 封面（浅米纸 · 金细印 · 藏青竖条引领）—— */
 .cover{background:var(--paper);justify-content:space-between;}
 .cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
-.cover__brand{font-family:var(--font-display);font-size:24px;letter-spacing:0.06em;color:var(--ink-3);}
-.cover__seal{width:96px;height:96px;border:2px solid var(--vermilion);color:var(--vermilion);font-family:var(--font-display);font-weight:700;font-size:32px;display:grid;place-items:center;letter-spacing:0.1em;line-height:1;padding-top:4px;}
-.cover__main{display:flex;flex-direction:column;gap:36px;}
-.cover__eyebrow{font-size:24px;letter-spacing:0.3em;color:var(--vermilion);text-transform:uppercase;font-weight:600;}
-.cover__title{font-family:var(--font-display);font-weight:800;font-size:168px;line-height:1.02;letter-spacing:-0.02em;color:var(--ink);margin:0;}
-.cover__title em{color:var(--vermilion);font-style:normal;}
-.cover__sub{font-family:var(--font-display);font-style:italic;font-size:40px;color:var(--ink-2);max-width:1400px;font-weight:400;line-height:1.4;}
-.cover__meta{display:flex;gap:56px;font-family:var(--font-mono);font-size:18px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;padding-top:32px;border-top:1px solid var(--rule);flex-wrap:wrap;}
-.cover__meta-item{display:flex;flex-direction:column;gap:8px;}
-.cover__meta-k{color:var(--ink-4);font-size:14px;}
-.cover__meta-v{color:var(--ink);font-size:20px;font-weight:500;}
+.cover__brand{font-family:var(--font-sans);font-size:22px;letter-spacing:0.02em;color:var(--ink-3);font-weight:500;}
+.cover__seal{font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;color:var(--accent-2);text-transform:uppercase;border:1px solid var(--accent);padding:8px 16px;border-radius:2px;}
+.cover__main{display:flex;flex-direction:column;gap:30px;border-left:3px solid var(--accent);padding-left:44px;}
+.cover__eyebrow{font-family:var(--font-mono);font-size:21px;letter-spacing:0.22em;color:var(--accent-2);text-transform:uppercase;font-weight:500;}
+.cover__title{font-family:var(--font-display);font-weight:700;font-size:100px;line-height:1.04;letter-spacing:-0.02em;color:var(--ink);margin:0;}
+.cover__title em{color:var(--accent-2);font-style:italic;font-weight:600;}
+.cover__sub{font-family:var(--font-sans);font-size:33px;color:var(--ink-2);max-width:1500px;font-weight:400;line-height:1.5;}
+.cover__meta{display:flex;gap:64px;font-family:var(--font-sans);color:var(--ink-3);padding-top:30px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:7px;}
+.cover__meta-k{font-family:var(--font-mono);color:var(--ink-4);font-size:14px;letter-spacing:0.12em;text-transform:uppercase;}
+.cover__meta-v{color:var(--ink);font-size:21px;font-weight:500;}
 
-/* —— section divider 段分隔（巨型幽灵数字）—— */
-.secdiv{background:var(--paper);justify-content:flex-end;padding-bottom:140px;}
+/* —— section divider 段分隔（克制 · 衬线大字 + 金顶线 · --dark 用藏青满版）—— */
+.secdiv{background:var(--paper);justify-content:center;}
 .secdiv--dark{background:var(--night);color:var(--night-paper);}
-.secdiv--vermilion{background:var(--vermilion-2);color:var(--paper);}
-.secdiv__num{position:absolute;top:80px;right:var(--pad-x);font-family:var(--font-display);font-weight:800;font-size:520px;line-height:0.85;letter-spacing:-0.04em;color:var(--ink);opacity:0.10;}
-.secdiv--dark .secdiv__num{color:var(--night-paper);opacity:0.08;}
-.secdiv--vermilion .secdiv__num{color:var(--paper);opacity:0.18;}
-.secdiv__eyebrow{font-family:var(--font-mono);font-size:20px;letter-spacing:0.3em;color:var(--vermilion);text-transform:uppercase;margin-bottom:36px;font-weight:600;}
-.secdiv--dark .secdiv__eyebrow{color:var(--gold-soft);}
-.secdiv--vermilion .secdiv__eyebrow{color:var(--paper);opacity:0.85;}
-.secdiv__title{font-family:var(--font-display);font-weight:800;font-size:132px;line-height:1.05;letter-spacing:-0.02em;color:var(--ink);margin:0 0 36px;max-width:1500px;position:relative;z-index:1;}
-.secdiv__title em{color:var(--vermilion);font-style:normal;}
-.secdiv--dark .secdiv__title{color:var(--night-paper);}
-.secdiv--vermilion .secdiv__title{color:var(--paper);}
-.secdiv__lead{font-family:var(--font-sans);font-size:32px;line-height:1.6;color:var(--ink-2);max-width:1400px;margin:0 0 56px;font-weight:400;position:relative;z-index:1;}
-.secdiv--dark .secdiv__lead{color:rgba(230,224,210,0.75);}
-.secdiv--vermilion .secdiv__lead{color:rgba(242,237,226,0.88);}
-.secdiv__meta{font-family:var(--font-mono);font-size:18px;letter-spacing:0.16em;color:var(--ink-3);text-transform:uppercase;padding-top:28px;border-top:1px solid var(--rule);display:flex;gap:40px;}
+.secdiv--accent{background:var(--navy-2);color:var(--night-paper);}
+.secdiv__num{font-family:var(--font-mono);font-size:24px;font-weight:500;letter-spacing:0.18em;color:var(--accent-2);text-transform:uppercase;margin-bottom:22px;}
+.secdiv--dark .secdiv__num,.secdiv--accent .secdiv__num{color:var(--gold);}
+.secdiv__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--ink-3);text-transform:uppercase;margin-bottom:30px;font-weight:400;}
+.secdiv--dark .secdiv__eyebrow,.secdiv--accent .secdiv__eyebrow{color:rgba(226,220,208,0.65);}
+.secdiv__title{font-family:var(--font-display);font-weight:700;font-size:90px;line-height:1.08;letter-spacing:-0.02em;color:var(--ink);margin:0 0 32px;max-width:1500px;padding-top:30px;border-top:2px solid var(--accent);}
+.secdiv__title em{color:var(--accent-2);font-style:italic;font-weight:600;}
+.secdiv--dark .secdiv__title{color:var(--night-paper);border-top-color:var(--gold);}
+.secdiv--dark .secdiv__title em{color:var(--gold);}
+.secdiv--accent .secdiv__title{color:var(--night-paper);border-top-color:var(--gold);}
+.secdiv--accent .secdiv__title em{color:var(--gold);}
+.secdiv__lead{font-family:var(--font-sans);font-size:30px;line-height:1.58;color:var(--ink-2);max-width:1400px;margin:0;font-weight:400;}
+.secdiv--dark .secdiv__lead{color:rgba(226,220,208,0.78);}
+.secdiv--accent .secdiv__lead{color:rgba(226,220,208,0.82);}
+.secdiv__meta{font-family:var(--font-mono);font-size:17px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;padding-top:26px;margin-top:30px;border-top:1px solid var(--rule);display:flex;gap:36px;}
+.secdiv--dark .secdiv__meta,.secdiv--accent .secdiv__meta{color:rgba(226,220,208,0.55);border-top-color:var(--navy-2);}
 
-/* —— manifesto 大字宣言 —— */
-.manifesto{align-items:center;justify-content:center;text-align:center;}
-.manifesto__eyebrow{margin-bottom:56px;font-family:var(--font-mono);font-size:22px;letter-spacing:0.32em;color:var(--vermilion);text-transform:uppercase;font-weight:600;}
-.manifesto__title{font-family:var(--font-display);font-weight:700;font-size:132px;line-height:1.08;letter-spacing:-0.02em;margin:0;max-width:1700px;}
-.manifesto__title em{color:var(--vermilion);font-style:normal;}
-.manifesto__sub{font-family:var(--font-sans);font-size:36px;color:var(--ink-2);margin:48px auto 0;max-width:1500px;line-height:1.55;font-weight:400;}
-.manifesto--dark{background:var(--night);color:var(--night-paper);}
-.manifesto--dark .manifesto__title{color:var(--night-paper);}
-.manifesto--dark .manifesto__sub{color:rgba(230,224,210,0.78);}
+/* —— manifesto / insight 中心论断（机构：稳重衬线，不喊口号）—— */
+.manifesto,.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 140px;}
+.manifesto__eyebrow,.insight__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent-2);text-transform:uppercase;margin-bottom:46px;font-weight:500;}
+.manifesto__title,.insight__statement{font-family:var(--font-display);font-weight:600;font-size:82px;line-height:1.2;letter-spacing:-0.01em;color:var(--ink);margin:0;max-width:1640px;}
+.manifesto__title em,.insight__statement em{color:var(--accent-2);font-style:italic;}
+.manifesto__sub,.insight__sub{font-family:var(--font-sans);font-size:30px;color:var(--ink-3);margin:42px auto 0;max-width:1400px;line-height:1.58;font-weight:400;}
+.manifesto--dark,.insight--dark{background:var(--night);color:var(--night-paper);}
+.manifesto--dark .manifesto__eyebrow,.insight--dark .insight__eyebrow{color:var(--gold);}
+.manifesto--dark .manifesto__title,.insight--dark .insight__statement{color:var(--night-paper);}
+.manifesto--dark .manifesto__title em,.insight--dark .insight__statement em{color:var(--gold);}
+.manifesto--dark .manifesto__sub,.insight--dark .insight__sub{color:rgba(226,220,208,0.78);}
 
-/* —— insight 洞见金句 —— */
-.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 120px;}
-.insight__eyebrow{font-family:var(--font-mono);font-size:22px;letter-spacing:0.32em;color:var(--vermilion);text-transform:uppercase;margin-bottom:56px;font-weight:600;}
-.insight__statement{font-family:var(--font-display);font-weight:700;font-size:124px;line-height:1.1;letter-spacing:-0.02em;color:var(--ink);margin:0;max-width:1700px;}
-.insight__statement em{color:var(--vermilion);font-style:normal;}
-.insight__sub{font-family:var(--font-sans);font-size:32px;color:var(--ink-2);margin:56px auto 0;max-width:1500px;line-height:1.55;font-weight:400;}
+/* —— bullets 论点清单（机构主力版式 · 金破折号引导 · 舒展）—— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:26px;}
+.bullets > li{font-family:var(--font-sans);font-size:30px;line-height:1.58;color:var(--ink-2);padding-left:46px;position:relative;}
+.bullets > li::before{content:"—";position:absolute;left:0;top:0;color:var(--accent);font-family:var(--font-mono);}
+.bullets li b,.bullets li strong{color:var(--ink);font-weight:600;}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:13px;}
+.bullets ul li{font-size:25px;color:var(--ink-3);padding-left:40px;position:relative;line-height:1.55;}
+.bullets ul li::before{content:"";position:absolute;left:8px;top:15px;width:9px;height:9px;border:1.5px solid var(--ink-4);border-radius:50%;}
+.bullets--lead > li{font-size:33px;}
 
-/* —— cards 卡片组 —— */
-.cards{display:grid;gap:28px;grid-template-columns:repeat(3,1fr);}
+/* —— figure 图（机构：模型图 / 图表 + 编号图注）—— */
+.figure{display:flex;flex-direction:column;gap:18px;height:100%;}
+.figure__frame{flex:1;min-height:0;background:#FBF9F3;border:1px solid var(--rule);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+.figure__cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--accent-2);font-weight:500;margin-right:12px;text-transform:uppercase;}
+.figure__src{font-family:var(--font-sans);font-size:16px;color:var(--ink-4);}
+.figure--row{flex-direction:row;gap:36px;align-items:stretch;}
+
+/* —— 概念模型小零件（X→M→Y / 调节）· 给 figure 内联 SVG 用作参照 —— */
+.node{fill:#FBF9F3;stroke:var(--ink);stroke-width:2;}
+.node-accent{fill:var(--accent);}
+.path-arrow{stroke:var(--ink);stroke-width:2;fill:none;}
+.path-dash{stroke:var(--accent-2);stroke-width:2;stroke-dasharray:7 5;fill:none;}
+
+/* —— cards 卡片组（要点 / 贡献 · 金顶线 · 高密度可多列）—— */
+.cards{display:grid;gap:26px;grid-template-columns:repeat(3,1fr);}
 .cards--2{grid-template-columns:repeat(2,1fr);}
 .cards--4{grid-template-columns:repeat(4,1fr);}
 .cards--5{grid-template-columns:repeat(5,1fr);}
 .cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
-.card{background:var(--paper-soft);padding:32px 28px;display:flex;flex-direction:column;gap:14px;border-top:3px solid var(--ink);}
-.card--v{border-top-color:var(--vermilion);background:#F3E9DE;}
-.card--n{border-top-color:var(--navy);background:#E6E9F0;}
-.card--g{border-top-color:var(--gold);background:#EFE7D2;}
-.card--plain{background:transparent;padding:32px 0;}
-.card__eyebrow{font-family:var(--font-mono);font-size:18px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-3);}
-.card__level{font-family:var(--font-display);font-size:64px;font-weight:700;line-height:0.9;color:var(--ink);letter-spacing:-0.02em;}
-.card--v .card__level{color:var(--vermilion);}.card--n .card__level{color:var(--navy);}.card--g .card__level{color:var(--gold);}
-.card__title{font-family:var(--font-display);font-weight:700;font-size:34px;color:var(--ink);line-height:1.25;margin-top:8px;}
-.card__desc{font-size:22px;color:var(--ink-2);line-height:1.5;}
-.card__meta{font-family:var(--font-mono);font-size:17px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule);}
+.card{background:#FBF9F3;padding:30px 28px;display:flex;flex-direction:column;gap:13px;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;}
+.card--v{border-top-color:var(--accent);}.card--n{border-top-color:var(--ink);}.card--g{border-top-color:var(--good);}
+.card--plain{background:transparent;border:0;border-top:1px solid var(--rule);border-radius:0;padding:24px 0;}
+.card__eyebrow{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent-2);font-weight:500;}
+.card__level{font-family:var(--font-display);font-size:54px;font-weight:700;line-height:0.95;color:var(--accent-2);}
+.card__title{font-family:var(--font-display);font-weight:600;font-size:31px;color:var(--ink);line-height:1.28;margin-top:6px;}
+.card__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.58;}
+.card__meta{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule);}
 
-/* —— numlist 编号清单 —— */
+/* —— numlist 编号清单（证据 / 步骤 · 衬线序号）—— */
 .numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule);}
-.numitem{display:grid;grid-template-columns:76px 1fr auto;align-items:baseline;gap:32px;padding:16px 0;border-bottom:1px solid var(--rule);}
-.numitem--tight{padding:11px 0;}
-.numitem__n{font-family:var(--font-display);font-size:36px;font-weight:600;color:var(--vermilion);line-height:1;}
+.numitem{display:grid;grid-template-columns:64px 1fr auto;align-items:baseline;gap:30px;padding:18px 0;border-bottom:1px solid var(--rule);}
+.numitem--tight{padding:12px 0;}
+.numitem__n{font-family:var(--font-display);font-size:32px;font-weight:700;color:var(--accent-2);line-height:1;}
 .numitem__main{display:flex;flex-direction:column;gap:6px;}
-.numitem__title{font-family:var(--font-display);font-weight:700;font-size:32px;color:var(--ink);line-height:1.25;}
-.numitem__desc{font-size:22px;color:var(--ink-2);line-height:1.5;}
-.numitem__tag{font-family:var(--font-mono);font-size:18px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-4);padding-top:12px;}
-.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--vermilion);}
-.numlist--lg .numitem{padding:14px 0;gap:24px;grid-template-columns:74px 1fr auto;}
-.numlist--lg .numitem__n{font-size:36px;}.numlist--lg .numitem__title{font-size:26px;}
-.numlist--lg .numitem__desc{font-size:18px;line-height:1.4;}.numlist--lg .numitem__tag{font-size:15px;}
+.numitem__title{font-family:var(--font-display);font-weight:600;font-size:29px;color:var(--ink);line-height:1.28;}
+.numitem__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.58;}
+.numitem__tag{font-family:var(--font-mono);font-size:16px;letter-spacing:0.06em;color:var(--ink-4);padding-top:8px;text-transform:uppercase;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--accent-2);}
+.numlist--lg .numitem{padding:13px 0;gap:22px;grid-template-columns:60px 1fr auto;}
+.numlist--lg .numitem__n{font-size:30px;}.numlist--lg .numitem__title{font-size:24px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.5;}.numlist--lg .numitem__tag{font-size:15px;}
 
-/* —— terminal 终端 / 代码 / prompt —— */
-.terminal{background:var(--night);color:#DDD8C9;padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.5;position:relative;}
-.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.18em;text-transform:uppercase;color:rgba(221,216,201,0.5);margin-bottom:24px;display:flex;justify-content:space-between;}
-.terminal__tag span:first-child::before{content:"● ";color:var(--vermilion);}
-.terminal__user{color:#E8B95C;}.terminal__system{color:#A8D0A0;}.terminal__hint{color:#F5C97A;}.terminal__dim{color:rgba(221,216,201,0.45);}
+/* —— terminal 终端 / prompt（藏青底 · 金 prompt 点）—— */
+.terminal{background:var(--night);color:#d6d0c4;padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.55;position:relative;border-radius:4px;border:1px solid var(--navy-2);}
+.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(214,208,196,0.5);margin-bottom:22px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--gold);}
+.terminal__user{color:#a9b6c8;}.terminal__system{color:#9ec3a8;}.terminal__hint{color:var(--gold);}.terminal__dim{color:rgba(214,208,196,0.45);}
 .terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
 
 /* —— compare 两栏对比 —— */
-.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
-.compare__col{padding:40px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:16px;}
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--rule);}
+.compare__col{padding:38px 40px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:16px;}
 .compare__col:last-child{border-right:0;}
 .compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
-.compare__col--good .compare__title{color:var(--vermilion);}
-.compare__label{font-family:var(--font-mono);font-size:18px;letter-spacing:0.2em;text-transform:uppercase;color:var(--ink-4);}
-.compare__title{font-family:var(--font-display);font-weight:700;font-size:44px;color:var(--ink);line-height:1.2;margin-bottom:12px;}
-.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:16px;}
-.compare__list li{font-size:22px;line-height:1.5;color:var(--ink-2);padding-left:26px;position:relative;}
-.compare__list li::before{content:"—";position:absolute;left:0;color:var(--ink-4);}
-.compare__col--good .compare__list li::before{color:var(--vermilion);}
+.compare__col--good .compare__title{color:var(--accent-2);}
+.compare__label{font-family:var(--font-mono);font-size:17px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-4);}
+.compare__col--good .compare__label{color:var(--accent-2);}
+.compare__title{font-family:var(--font-display);font-weight:600;font-size:40px;color:var(--ink);line-height:1.2;margin-bottom:10px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:15px;}
+.compare__list li{font-family:var(--font-sans);font-size:22px;line-height:1.58;color:var(--ink-2);padding-left:26px;position:relative;}
+.compare__list li::before{content:"–";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--accent);}
 
 /* —— steps 流程 —— */
-.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid var(--ink);border-bottom:1px solid var(--rule);}
 .steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
-.step{padding:36px 28px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:12px;}
+.step{padding:34px 28px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:12px;}
 .step:last-child{border-right:0;}
-.step__n{font-family:var(--font-mono);font-size:22px;font-weight:600;letter-spacing:0.16em;color:var(--vermilion);}
-.step__title{font-family:var(--font-display);font-weight:700;font-size:32px;color:var(--ink);line-height:1.2;}
-.step__desc{font-size:20px;color:var(--ink-2);line-height:1.5;}
+.step__n{font-family:var(--font-mono);font-size:18px;font-weight:500;letter-spacing:0.1em;color:var(--accent-2);text-transform:uppercase;}
+.step__title{font-family:var(--font-display);font-weight:600;font-size:29px;color:var(--ink);line-height:1.25;}
+.step__desc{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.58;}
 
-/* —— table 表格 —— */
-.table{width:100%;border-collapse:collapse;font-size:22px;}
-.table th,.table td{padding:14px 16px;border-bottom:1px solid var(--rule);text-align:left;vertical-align:top;line-height:1.5;}
-.table th{font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);border-bottom:2px solid var(--ink);font-weight:600;}
-.table td.bad{color:var(--ink-3);}.table td.good{color:var(--vermilion);font-weight:600;}
+/* —— table 表格（booktabs：上下粗线、无竖线 · 高密度承载）—— */
+.table-cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);margin-bottom:14px;}
+.table-cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--accent-2);font-weight:500;margin-right:12px;text-transform:uppercase;}
+.table{width:100%;border-collapse:collapse;font-family:var(--font-sans);font-size:22px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);}
+.table th,.table td{padding:15px 18px;text-align:left;vertical-align:top;line-height:1.5;}
+.table thead th{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent-2);border-bottom:1px solid var(--rule-strong);font-weight:500;}
+.table tbody tr{border-bottom:1px solid var(--rule);}
+.table tbody tr:last-child{border-bottom:0;}
+.table td.num{font-variant-numeric:tabular-nums;}
+.table td.bad{color:var(--ink-4);}.table td.good{color:var(--accent-2);font-weight:600;}
+.table tr.hl td{background:var(--accent-soft);}
 
 /* —— formula5 编号公式行 —— */
-.formula5{display:grid;grid-template-columns:90px 1fr 1fr;gap:0;border-top:2px solid var(--ink);}
+.formula5{display:grid;grid-template-columns:80px 1fr 1.2fr;gap:0;border-top:2px solid var(--ink);}
 .formula5__row{display:contents;}
 .formula5__row > div{padding:22px 24px;border-bottom:1px solid var(--rule);}
-.formula5__n{font-family:var(--font-display);font-size:42px;font-weight:700;color:var(--vermilion);line-height:1;}
-.formula5__k{font-family:var(--font-display);font-size:34px;font-weight:700;color:var(--ink);}
-.formula5__v{font-size:22px;color:var(--ink-2);line-height:1.5;font-style:italic;}
+.formula5__n{font-family:var(--font-display);font-size:38px;font-weight:700;color:var(--accent-2);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--ink);}
+.formula5__v{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.58;}
 
 /* —— arch 分层堆栈 —— */
-.arch{display:flex;flex-direction:column;gap:4px;}
-.arch__layer{display:grid;grid-template-columns:64px 220px 1fr;gap:24px;align-items:center;padding:12px 22px;background:var(--paper-soft);border-left:5px solid var(--ink);}
-.arch__layer--5{border-left-color:var(--vermilion);background:#F3E9DE;}
-.arch__layer--4{border-left-color:var(--navy);background:#E6E9F0;}
-.arch__layer--3{border-left-color:var(--gold);background:#EFE7D2;}
-.arch__layer--2{border-left-color:var(--green);background:#E3EBE0;}
-.arch__layer--1{border-left-color:var(--ink);background:var(--paper-warm);}
-.arch__n{font-family:var(--font-display);font-size:34px;font-weight:700;color:var(--ink);line-height:1;}
-.arch__name{font-family:var(--font-display);font-size:24px;font-weight:700;color:var(--ink);}
-.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-3);letter-spacing:0.12em;margin-top:2px;font-weight:400;text-transform:uppercase;}
-.arch__desc{font-size:17px;color:var(--ink-2);line-height:1.4;}
-.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.12em;color:var(--ink-3);text-transform:uppercase;text-align:right;}
+.arch{display:flex;flex-direction:column;gap:6px;}
+.arch__layer{display:grid;grid-template-columns:60px 240px 1fr;gap:24px;align-items:center;padding:14px 24px;background:#FBF9F3;border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:2px;}
+.arch__layer--5{border-left-color:var(--accent);}
+.arch__layer--4{border-left-color:var(--accent-2);}
+.arch__layer--3{border-left-color:var(--good);}
+.arch__layer--2{border-left-color:var(--ink-3);}
+.arch__layer--1{border-left-color:var(--ink);}
+.arch__n{font-family:var(--font-display);font-size:30px;font-weight:700;color:var(--accent-2);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-4);letter-spacing:0.1em;margin-top:3px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-family:var(--font-sans);font-size:18px;color:var(--ink-2);line-height:1.5;}
+.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;text-align:right;}
 
-/* —— three-circle 三区（红绿灯 / 三分法）—— */
-.three-circle{display:flex;gap:32px;align-items:stretch;}
-.zone{flex:1;padding:36px 32px;border-top:6px solid;display:flex;flex-direction:column;gap:16px;}
-.zone--g{border-top-color:var(--green);background:rgba(78,117,73,0.08);}
-.zone--y{border-top-color:var(--gold);background:rgba(160,122,58,0.08);}
-.zone--r{border-top-color:var(--vermilion);background:rgba(184,65,42,0.08);}
-.zone__k{font-family:var(--font-mono);font-size:18px;letter-spacing:0.18em;text-transform:uppercase;color:var(--ink-3);}
-.zone__title{font-family:var(--font-display);font-size:44px;font-weight:700;color:var(--ink);}
-.zone--g .zone__title{color:var(--green);}.zone--y .zone__title{color:var(--gold);}.zone--r .zone__title{color:var(--vermilion);}
-.zone__test{font-size:22px;color:var(--ink-2);font-style:italic;}
-.zone__eg{font-size:20px;color:var(--ink-2);line-height:1.5;}
-.zone__action{margin-top:auto;padding-top:16px;border-top:1px solid rgba(0,0,0,0.1);font-size:22px;font-weight:600;color:var(--ink);}
+/* —— three-circle 三区 —— */
+.three-circle{display:flex;gap:30px;align-items:stretch;}
+.zone{flex:1;padding:34px 32px;background:#FBF9F3;border:1px solid var(--rule);border-top:5px solid;border-radius:3px;display:flex;flex-direction:column;gap:15px;}
+.zone--g{border-top-color:var(--good);}
+.zone--y{border-top-color:var(--accent);}
+.zone--r{border-top-color:var(--bad);}
+.zone__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-3);font-weight:500;}
+.zone__title{font-family:var(--font-display);font-size:38px;font-weight:600;color:var(--ink);}
+.zone--g .zone__title{color:var(--good);}.zone--y .zone__title{color:var(--accent-2);}.zone--r .zone__title{color:var(--bad);}
+.zone__test{font-family:var(--font-serif);font-size:22px;color:var(--ink-2);font-style:italic;}
+.zone__eg{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.58;}
+.zone__action{margin-top:auto;padding-top:15px;border-top:1px solid var(--rule);font-family:var(--font-sans);font-size:21px;font-weight:600;color:var(--accent-2);}
 
-/* —— bigq 装框大引用 —— */
-.bigq{background:linear-gradient(135deg,#FBF3DE 0%,#FAEBC2 100%);padding:36px 56px;border:3px solid var(--vermilion);border-radius:8px;text-align:center;}
-.bigq__t{font-family:var(--font-display);font-size:56px;font-weight:700;line-height:1.2;color:var(--ink);margin:0;}
-.bigq__t em{color:var(--vermilion);font-style:normal;}
-.bigq__sub{font-size:22px;color:var(--ink-2);margin-top:16px;}
+/* —— bigq 装框大引用（衬线斜体 · 金竖条）—— */
+.bigq{background:var(--paper-soft);padding:40px 56px;border-left:4px solid var(--accent);border-radius:3px;text-align:left;}
+.bigq__t{font-family:var(--font-serif);font-size:48px;font-weight:400;font-style:italic;line-height:1.35;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--accent-2);}
+.bigq__sub{font-family:var(--font-sans);font-size:21px;color:var(--ink-3);margin-top:18px;font-style:normal;}
 
 /* —— matrix 矩阵 —— */
-.matrix{display:grid;grid-template-columns:240px repeat(3,1fr);border-top:2px solid var(--ink);border-left:1px solid var(--rule);}
-.matrix__h{padding:18px 16px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);background:var(--paper-warm);text-align:center;}
+.matrix{display:grid;grid-template-columns:260px repeat(3,1fr);border-top:2px solid var(--ink);border-left:1px solid var(--rule);}
+.matrix__h{padding:18px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent-2);background:var(--paper-soft);text-align:center;font-weight:500;}
 .matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;}
-.matrix__cell{padding:20px 16px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-size:18px;line-height:1.4;color:var(--ink-2);min-height:84px;}
-.matrix__cell strong{color:var(--vermilion);}
+.matrix__cell{padding:20px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-sans);font-size:18px;line-height:1.5;color:var(--ink-2);min-height:84px;}
+.matrix__cell strong{color:var(--ink);}
 
-/* —— bignum 大数字 —— */
-.bignum{display:flex;flex-direction:column;gap:8px;padding:32px 28px;background:var(--paper-soft);border-top:4px solid var(--vermilion);}
-.bignum__v{font-family:var(--font-display);font-size:110px;font-weight:700;line-height:0.95;color:var(--vermilion);letter-spacing:-0.02em;}
-.bignum__u{font-family:var(--font-sans);font-size:26px;color:var(--ink-2);font-weight:500;}
-.bignum__k{font-family:var(--font-mono);font-size:17px;letter-spacing:0.16em;color:var(--ink-3);text-transform:uppercase;margin-top:12px;}
+/* —— bignum 关键数字（机构：克制 · 衬线古金大字）—— */
+.bignum{display:flex;flex-direction:column;gap:8px;padding:30px 30px;background:#FBF9F3;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;}
+.bignum__v{font-family:var(--font-display);font-size:84px;font-weight:700;line-height:0.98;color:var(--accent-2);letter-spacing:-0.02em;}
+.bignum__u{font-family:var(--font-sans);font-size:25px;color:var(--ink-2);font-weight:500;line-height:1.4;}
+.bignum__k{font-family:var(--font-mono);font-size:16px;color:var(--ink-4);margin-top:12px;letter-spacing:0.04em;text-transform:uppercase;}
 
 /* —— summary 总结三栏 —— */
 .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
-.sum-card{padding:36px 32px;background:var(--paper-soft);border-top:3px solid var(--ink);display:flex;flex-direction:column;gap:14px;}
-.sum-card--v{border-top-color:var(--vermilion);}.sum-card--n{border-top-color:var(--navy);}.sum-card--g{border-top-color:var(--gold);}
-.sum-card__k{font-family:var(--font-mono);font-size:18px;letter-spacing:0.16em;color:var(--ink-3);text-transform:uppercase;}
-.sum-card__v{font-family:var(--font-display);font-weight:700;font-size:50px;color:var(--ink);line-height:1.1;}
-.sum-card--v .sum-card__v{color:var(--vermilion);}.sum-card--n .sum-card__v{color:var(--navy);}.sum-card--g .sum-card__v{color:var(--gold);}
-.sum-card__hint{font-size:20px;color:var(--ink-2);line-height:1.55;}
+.sum-card{padding:34px 32px;background:#FBF9F3;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--accent);}.sum-card--n{border-top-color:var(--ink);}.sum-card--g{border-top-color:var(--good);}
+.sum-card__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;font-weight:500;}
+.sum-card__v{font-family:var(--font-display);font-weight:700;font-size:42px;color:var(--accent-2);line-height:1.15;}
+.sum-card--n .sum-card__v{color:var(--ink);}.sum-card--g .sum-card__v{color:var(--good);}
+.sum-card__hint{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.58;}
+
+/* —— refs 参考文献（编号 + 悬挂缩进 + 刊名斜体 · 两列）—— */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:14px 56px;counter-reset:ref;list-style:none;margin:0;padding:0;}
+.refs--1col{grid-template-columns:1fr;}
+.refs li{font-family:var(--font-sans);font-size:19px;line-height:1.5;color:var(--ink-2);padding-left:38px;position:relative;break-inside:avoid;}
+.refs li::before{counter-increment:ref;content:"["counter(ref)"]";position:absolute;left:0;top:0;font-family:var(--font-mono);font-size:16px;color:var(--accent-2);font-weight:500;}
+.refs li em,.refs li .jrnl{font-style:italic;color:var(--ink);}
+.refs--plain li::before{content:"";}
+.refs--plain li{padding-left:30px;text-indent:-30px;}
+.refs--dim li{color:var(--ink-4);}
 
 /* —— helpers —— */
-.callout{border-left:3px solid var(--vermilion);padding:18px 24px;background:var(--vermilion-50);font-size:22px;line-height:1.55;color:var(--ink-2);}
-.note-box{margin-top:24px;padding:20px 28px;background:rgba(184,65,42,0.06);border-left:3px solid var(--vermilion);font-size:22px;line-height:1.5;color:var(--ink-2);}
+.callout{border-left:3px solid var(--accent);padding:18px 26px;background:var(--accent-soft);font-family:var(--font-sans);font-size:22px;line-height:1.58;color:var(--ink-2);border-radius:0 3px 3px 0;}
+.note-box{margin-top:24px;padding:20px 28px;background:var(--paper-soft);border-left:3px solid var(--accent-2);font-family:var(--font-sans);font-size:22px;line-height:1.58;color:var(--ink-2);border-radius:0 3px 3px 0;}
 .row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
-.mt-s{margin-top:18px;}.mt-m{margin-top:36px;}.mt-l{margin-top:56px;}
-
-/* —— figure 图（学术皮主用 · 杂志皮也可用）—— */
-.figure{display:flex;flex-direction:column;gap:14px;}
-.figure__frame{background:var(--paper-soft);border:1px solid var(--rule);display:flex;align-items:center;justify-content:center;overflow:hidden;}
-.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
-.figure__cap{font-size:20px;color:var(--ink-3);line-height:1.5;}
-.figure__cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--vermilion);font-weight:600;margin-right:10px;}
-.figure__src{font-family:var(--font-mono);font-size:15px;color:var(--ink-4);letter-spacing:0.04em;}
-
-/* —— bullets 论点清单（学术皮主用）—— */
-.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:22px;}
-.bullets li{font-size:30px;line-height:1.55;color:var(--ink-2);padding-left:42px;position:relative;}
-.bullets li::before{content:"";position:absolute;left:6px;top:16px;width:14px;height:2px;background:var(--accent);}
-.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:12px;}
-.bullets ul li{font-size:25px;color:var(--ink-3);padding-left:38px;}
-.bullets ul li::before{width:8px;background:var(--ink-4);top:15px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:34px;}.mt-l{margin-top:54px;}
 
 
 /* ——— 动画库 _fx.css（集众家所长 · 编号见 references/animations.md）——— */
@@ -649,8 +678,8 @@ strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--vermil
 <body>
 
 <header class="topbar">
-  <div class="topbar__brand">EDITORIAL</div>
-  <div class="topbar__sub">editorial skin</div>
+  <div class="topbar__brand">机构正式</div>
+  <div class="topbar__sub">signal skin</div>
   <div class="topbar__spacer"></div>
   <span class="topbar__info">当前 <strong id="curSeg">段 0</strong> · <strong id="curIdx">1</strong> / <strong id="totalIdx">0</strong></span>
   <button class="topbar__btn" id="prevBtn" title="上一页 ←">←</button>
@@ -666,69 +695,175 @@ strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--vermil
 <div class="deck" id="deck">
 
 <!-- ① 封面 cover -->
-<section data-seg="0" data-segname="段 0 · 开场" class="slide cover">
+<section data-seg="0" data-segname="段 0 · 总览" class="slide cover">
   <div class="cover__top">
-    <div class="cover__brand">EDITORIAL</div>
-    <div class="cover__seal">题</div>
+    <div class="cover__brand">机构正式</div>
+    <div class="cover__seal">Policy Brief · 2026</div>
   </div>
   <div class="cover__main">
-    <div class="cover__eyebrow">课程封面 · 段 0</div>
-    <h1 class="cover__title">主标题<br><em>关键词</em></h1>
-    <p class="cover__sub">一句副标题 · 点明这场讲什么、为谁讲。</p>
+    <div class="cover__eyebrow">Annual Review · 政策简报</div>
+    <h1 class="cover__title">把数字红利<br>沉到<em>县域</em>去</h1>
+    <p class="cover__sub">区域数字经济年度回顾与下一阶段行动框架（2025 年度 · 内部审议稿）</p>
   </div>
   <div class="cover__meta">
-    <div class="cover__meta-item"><span class="cover__meta-k">SPEAKER</span><span class="cover__meta-v">讲者</span></div>
-    <div class="cover__meta-item"><span class="cover__meta-k">OCCASION</span><span class="cover__meta-v">场合</span></div>
-    <div class="cover__meta-item"><span class="cover__meta-k">DATE</span><span class="cover__meta-v">2026</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">主办</span><span class="cover__meta-v">区域数字经济发展研究院</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">面向</span><span class="cover__meta-v">联席工作会议</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">密级</span><span class="cover__meta-v">内部 · 审议</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">日期</span><span class="cover__meta-v">2026.06</span></div>
   </div>
 </section>
 
-<!-- ② 大字宣言 manifesto（深色变体）-->
-<section data-seg="0" data-segname="段 0 · 开场" class="slide manifesto manifesto--dark">
-  <h2 class="manifesto__title">一句话<br><em>把人钉在椅子上</em></h2>
-  <p class="manifesto__sub">副句 · 解释或反问。</p>
-</section>
-
-<!-- ③ 内容页：标题 head + 卡片 cards -->
-<section data-seg="0" data-segname="段 0 · 开场" class="slide">
+<!-- ② 提纲 outline -->
+<section data-seg="0" data-segname="段 0 · 总览" data-title="简报提纲" class="slide">
   <div class="head">
-    <div class="eyebrow head__eyebrow">小节标签</div>
-    <h2 class="title head__title">本页<em>主标题</em></h2>
-    <p class="head__sub">一行副标题，补充说明。</p>
+    <div class="eyebrow head__eyebrow">Outline · 简报提纲</div>
+    <h2 class="title head__title">本次审议分四部分</h2>
+    <p class="head__sub">从年度成效，到结构短板，再到下一阶段的<em>资源配置</em>与可量化目标。</p>
   </div>
-  <div class="fill">
-    <div class="cards cards--3">
-      <div class="card card--v"><div class="card__eyebrow">A</div><div class="card__title">要点一</div><div class="card__desc">一句话解释。<span class="cite">[作者 年份]</span></div></div>
-      <div class="card card--n"><div class="card__eyebrow">B</div><div class="card__title">要点二</div><div class="card__desc">一句话解释。</div></div>
-      <div class="card card--g"><div class="card__eyebrow">C</div><div class="card__title">要点三</div><div class="card__desc">一句话解释。</div></div>
-    </div>
-  </div>
-</section>
-
-<!-- ④ 段分隔 secdiv（巨型幽灵数字）-->
-<section data-seg="1" data-segname="段 1 · 论证" class="slide secdiv secdiv--dark">
-  <div class="secdiv__num">01</div>
-  <div class="secdiv__eyebrow">第一章</div>
-  <h2 class="secdiv__title">这一章<br>要讲<em>什么</em></h2>
-  <p class="secdiv__lead">一两句话，给这一章定调。</p>
-</section>
-
-<!-- ⑤ 大数字冲击 bignum -->
-<section data-seg="1" data-segname="段 1 · 论证" class="slide center">
-  <div class="head center"><div class="eyebrow head__eyebrow">关键数据</div><h2 class="title head__title">一个<em>反直觉</em>的数</h2></div>
   <div class="fill" style="justify-content:center;">
-    <div class="row" style="gap:40px;width:100%;">
-      <div class="bignum" style="flex:1;"><div class="bignum__v">−80%</div><div class="bignum__u">某指标的变化</div><div class="bignum__k">来源说明 · [作者 年份]</div></div>
-      <div class="bignum" style="flex:1;"><div class="bignum__v">68%</div><div class="bignum__u">另一个数</div><div class="bignum__k">[作者 年份]</div></div>
-    </div>
+    <ul class="bullets bullets--lead">
+      <li><b>年度成效</b>　数字基础设施、产业渗透与公共服务三条线的关键进展。</li>
+      <li><b>结构短板</b>　城乡之间、行业之间的<em>数字鸿沟</em>仍在扩大的三个信号。</li>
+      <li><b>行动框架</b>　六项重点工程与对应的牵头单位、时序与投入。</li>
+      <li><b>目标承诺</b>　到 2027 年的五项可量化、可问责指标。</li>
+    </ul>
   </div>
 </section>
 
-<!-- ⑥ 洞见金句 insight -->
-<section data-seg="1" data-segname="段 1 · 论证" class="slide insight">
-  <div class="insight__eyebrow">本场核心</div>
-  <h2 class="insight__statement">一句<em>你想让全场记住</em>的话。</h2>
-  <p class="insight__sub">下面一行小字，把它接住。</p>
+<!-- ③ 段分隔 secdiv（浅米）-->
+<section data-seg="1" data-segname="段 1 · 年度成效" class="slide secdiv">
+  <div class="secdiv__num">Part I</div>
+  <div class="secdiv__eyebrow">Annual Performance</div>
+  <h2 class="secdiv__title">一年来，<br>底座<em>更稳了</em></h2>
+  <p class="secdiv__lead">网络通达、平台下沉、政务上云——三项基础工程进入兑现期。先看一组可核验的数据。</p>
+  <div class="secdiv__meta"><span>统计口径 · 2025 全年</span><span>来源 · 区域统计公报</span></div>
+</section>
+
+<!-- ④ 关键指标 bignum -->
+<section data-seg="1" data-segname="段 1 · 年度成效" data-title="关键指标" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.1　Headline Metrics</div>
+    <h2 class="title head__title">三个数字看全年</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="row" style="gap:28px;width:100%;">
+      <div class="bignum" style="flex:1;"><div class="bignum__v">98.6%</div><div class="bignum__u">行政村<br>千兆光网通达率</div><div class="bignum__k">较上年 +4.2pt</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">2.3×</div><div class="bignum__u">县域电商<br>交易额增速</div><div class="bignum__k">对比全区平均</div></div>
+      <div class="bignum" style="flex:1;"><div class="bignum__v">1,840万</div><div class="bignum__u">政务服务<br>"一网通办"办件</div><div class="bignum__k">网办率 87.5%</div></div>
+    </div>
+    <div class="callout mt-m">三条线同向发力：<em>网络通达</em>提供物理底座，<em>平台下沉</em>放大商业价值，<em>政务上云</em>沉淀公共信任——但增量并未均匀落到每个县。</div>
+  </div>
+</section>
+
+<!-- ⑤ 进展表格 table（booktabs）-->
+<section data-seg="1" data-segname="段 1 · 年度成效" data-title="分项进展" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§1.2　Progress by Track</div>
+    <h2 class="title head__title">六项重点工程进度</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="table-cap"><b>表 1</b>2025 年度重点工程完成情况（牵头单位 · 完成率 · 评级）</div>
+    <table class="table">
+      <thead><tr><th>工程</th><th>牵头单位</th><th class="num">投入（亿元）</th><th class="num">完成率</th><th>评级</th></tr></thead>
+      <tbody>
+        <tr><td>千兆光网下乡</td><td>通信管理局</td><td class="num">12.4</td><td class="num">102%</td><td class="good">超额</td></tr>
+        <tr class="hl"><td>县域电商集群</td><td>商务局</td><td class="num">8.7</td><td class="num">96%</td><td class="good">达标</td></tr>
+        <tr><td>政务云迁移</td><td>政务服务中心</td><td class="num">6.1</td><td class="num">91%</td><td>达标</td></tr>
+        <tr><td>智慧农业试点</td><td>农业农村局</td><td class="num">4.3</td><td class="num">78%</td><td class="bad">滞后</td></tr>
+        <tr><td>数字技能培训</td><td>人社局</td><td class="num">2.9</td><td class="num">73%</td><td class="bad">滞后</td></tr>
+        <tr><td>数据安全合规</td><td>网信办</td><td class="num">3.2</td><td class="num">88%</td><td>达标</td></tr>
+      </tbody>
+    </table>
+    <div class="note-box">两项<em>滞后</em>工程集中在"人"与"地"——技能培训覆盖不足、农业场景落地慢，正是城乡数字鸿沟的根因所在。</div>
+  </div>
+</section>
+
+<!-- ⑥ 段分隔 secdiv--dark（藏青满版）-->
+<section data-seg="2" data-segname="段 2 · 结构短板" class="slide secdiv secdiv--dark">
+  <div class="secdiv__num">Part II</div>
+  <div class="secdiv__eyebrow">Structural Gaps</div>
+  <h2 class="secdiv__title">底座之上，<br>差距仍在<em>拉大</em></h2>
+  <p class="secdiv__lead">通达不等于使用，接入不等于受益。三个被平均数掩盖的信号，值得本次会议正视。</p>
+  <div class="secdiv__meta"><span>口径 · 县级面板</span><span>样本 · 全区 47 县</span></div>
+</section>
+
+<!-- ⑦ 三个信号 numlist -->
+<section data-seg="2" data-segname="段 2 · 结构短板" data-title="三个信号" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§2.1　Three Signals</div>
+    <h2 class="title head__title">被平均数掩盖的三件事</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="numlist numlist--lg">
+      <div class="numitem numitem--accent"><div class="numitem__n">01</div><div class="numitem__main"><div class="numitem__title">"通而不用"——通达率高，活跃使用率却低。</div><div class="numitem__desc">后 10 个县的人均移动数据用量，仅为前 10 个县的 41%。</div></div><div class="numitem__tag">使用鸿沟</div></div>
+      <div class="numitem numitem--accent"><div class="numitem__n">02</div><div class="numitem__main"><div class="numitem__title">"接而不惠"——电商集群增长集中在少数头部县。</div><div class="numitem__desc">前 5 县贡献了全区电商增量的 63%，长尾县增长乏力。</div></div><div class="numitem__tag">价值鸿沟</div></div>
+      <div class="numitem numitem--accent"><div class="numitem__n">03</div><div class="numitem__main"><div class="numitem__title">"能而不会"——设备到位，但数字技能供给不足。</div><div class="numitem__desc">45 岁以上劳动者的数字技能达标率不足三成，培训缺口最大。</div></div><div class="numitem__tag">能力鸿沟</div></div>
+    </div>
+    <div class="callout mt-m">三个鸿沟环环相扣：<em>不会用</em>导致<em>用不上</em>，进而<em>得不到</em>价值——下一阶段的重心应从"铺网"转向"育人"。</div>
+  </div>
+</section>
+
+<!-- ⑧ 段分隔 + 行动框架 -->
+<section data-seg="3" data-segname="段 3 · 行动框架" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part III</div>
+  <div class="secdiv__eyebrow">Action Framework</div>
+  <h2 class="secdiv__title">把重心，<br>从"铺网"<em>转向"育人"</em></h2>
+  <p class="secdiv__lead">下一阶段三大主线，对应明确的牵头单位、时序与可问责的产出。</p>
+</section>
+
+<!-- ⑨ 三大主线 cards -->
+<section data-seg="3" data-segname="段 3 · 行动框架" data-title="三大主线" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§3.1　Three Pillars</div>
+    <h2 class="title head__title">下一阶段三大主线</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="cards cards--3">
+      <div class="card card--v"><div class="card__eyebrow">育人</div><div class="card__title">数字技能普惠</div><div class="card__desc">面向中老年与新农人的分层培训，把"会用"指标纳入乡镇考核。</div><div class="card__meta">牵头 · 人社局</div></div>
+      <div class="card card--n"><div class="card__eyebrow">扶尾</div><div class="card__title">长尾县帮带</div><div class="card__desc">头部县与长尾县结对，建立电商供应链与流量的跨县共享机制。</div><div class="card__meta">牵头 · 商务局</div></div>
+      <div class="card card--g"><div class="card__eyebrow">兜底</div><div class="card__title">公共数字底座</div><div class="card__desc">政务云与数据安全合规先行，确保普惠不以牺牲安全为代价。</div><div class="card__meta">牵头 · 网信办</div></div>
+    </div>
+    <div class="note-box">三线并进、但<em>育人优先</em>：技能不补齐，基础设施投入的边际回报将持续递减。</div>
+  </div>
+</section>
+
+<!-- ⑩ 目标承诺 table -->
+<section data-seg="3" data-segname="段 3 · 行动框架" data-title="目标承诺" class="slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">§3.2　Targets to 2027</div>
+    <h2 class="title head__title">五项可问责指标</h2>
+  </div>
+  <div class="fill" style="justify-content:center;">
+    <div class="table-cap"><b>表 2</b>到 2027 年的可量化目标（基线 · 目标值 · 责任）</div>
+    <table class="table">
+      <thead><tr><th>指标</th><th class="num">2025 基线</th><th class="num">2027 目标</th><th>牵头单位</th></tr></thead>
+      <tbody>
+        <tr><td>后 10 县人均数据用量 / 前 10 县</td><td class="num">41%</td><td class="num good">≥ 65%</td><td>通信管理局</td></tr>
+        <tr class="hl"><td>45 岁以上数字技能达标率</td><td class="num">29%</td><td class="num good">≥ 55%</td><td>人社局</td></tr>
+        <tr><td>长尾县电商增量占比</td><td class="num">37%</td><td class="num good">≥ 50%</td><td>商务局</td></tr>
+        <tr><td>政务"一网通办"网办率</td><td class="num">87.5%</td><td class="num good">≥ 95%</td><td>政务服务中心</td></tr>
+        <tr><td>关键政务系统等保合规率</td><td class="num">88%</td><td class="num good">100%</td><td>网信办</td></tr>
+      </tbody>
+    </table>
+    <div class="callout mt-m">五项指标全部<em>对外公开、按年问责</em>——这是把"数字红利下沉"从口号变成承诺的关键一步。</div>
+  </div>
+</section>
+
+<!-- ⑪ 核心论断 insight -->
+<section data-seg="4" data-segname="段 4 · 收束" class="slide insight">
+  <div class="insight__eyebrow">Take-home Message</div>
+  <h2 class="insight__statement">数字经济的下半场，<br>较量的不是<em>带宽</em>，是<em>能力</em>。</h2>
+  <p class="insight__sub">把红利沉到县域，关键在人——让更多人会用、能用、用得上。</p>
+</section>
+
+<!-- ⑫ 收尾 end -->
+<section data-seg="4" data-segname="段 4 · 收束" data-title="致谢与联系" class="slide center">
+  <div class="fill center" style="gap:34px;">
+    <div class="eyebrow">区域数字经济发展研究院</div>
+    <h2 class="title title--lg">恳请审议 · 欢迎批评指正</h2>
+    <p class="lead" style="max-width:1100px;">本简报数据来源于区域统计公报与各牵头单位月报，目标值经联席工作组初步测算，提交本次会议审议后定稿。</p>
+    <p class="small">联系 · 研究院政策研究部　|　policy@example.gov　|　内部审议稿 · 请勿外传</p>
+  </div>
 </section>
 
 
@@ -1237,7 +1372,7 @@ strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--vermil
    ════════════════════════════════════════════════════════════════════ */
 (function () {
   /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
-  const CONFIG = { channel: 'editorial-demo', presenterFile: '演讲者模式.html' };
+  const CONFIG = { channel: 'signal-demo', presenterFile: '演讲者模式.html' };
 
   const deck = document.getElementById('deck');
   const slides = Array.from(deck.querySelectorAll(':scope > .slide'));

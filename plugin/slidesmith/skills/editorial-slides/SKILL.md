@@ -5,12 +5,17 @@ description: |
   原生风格：① editorial 杂志风（纸色 + 朱红 + 宋体大字 + 大数字冲击，抓眼）；② academic 学术汇报风（社科/人文 · 深靛青 + 衬线 + 概念模型图 + 规范参考文献，专业克制）；③ keynote-dark 暗场主旨风（近黑底 + 巨大白字 + 琥珀点睛，大场子/发布会感）。
   另有从「风格银行」(beautiful-html-templates) 移植的皮：cartesian 极简 / signal 机构正式 / vellum 暗色文艺学术 / daisy-days 温暖活泼；还可按需现移植更多（见 references/external-templates.md）。
   所有风格共用同一引擎：单文件、可移植、离线可用；固定 1920×1080 画布；自带全屏投屏、左侧段导航 + 实时缩略图、进度条、键盘控制、演讲者双屏钩子。
+  还自带「动画库」：A 入场 / B 分步揭示 / C 强调 / D 持续动效 / E 跨页转场 / F 神奇移动(Magic Move) / G 消失 / H 点睛 / I 背景氛围 共九类、带编号、所见即所得预览（gallery/animations.html）；用户可按编号点名要某个动画/转场（"入场用 A8、大数字 F1 神奇移动、转场 E2"），见 references/animations.md。也在用户说"给 slides 加动画 / 加转场 / 加动效 / 神奇移动 / 分步出现 / Magic Move / 让某页动起来"时启用。
   当用户说 "做 slides / 做 PPT / 做演示 / 做讲演幻灯 / 学术 slides / 学术汇报 slides / 会议汇报 PPT / 杂志风 slides / keynote / 漂亮的 slides / 把讲稿做成 slides / 做 HTML slides / 换个风格的 slides" 时启用，即使没点名某个风格也要启用并先让用户挑风格。
   这个 skill 负责"从内容生成成品 slides"；若用户是"slides 已经有了、想加副屏讲稿同步"，那是 slides-presenter-mode skill。
 metadata:
-  version: 1.3.1
+  version: 1.5.0
   status: dogfood-validated
-  skins: [editorial, academic, keynote-dark, cartesian, signal, vellum, daisy-days]
+  skins: [editorial, academic, keynote-dark, cartesian, signal, vellum, daisy-days, dracula, nord, tokyo-night, catppuccin-mocha, catppuccin-latte, vaporwave, swiss-grid, bauhaus, cyberpunk-neon, glassmorphism, y2k-chrome, neo-brutalism, terminal-green, rose-pine]
+  skins_note: 7 原生厚皮 + 14 薄皮（令牌 + 共享 _components.css）· 换皮展厅 gallery/theme-showcase.html
+  animations: 10 类编号库（入场/分步/强调/持续/转场/神奇移动/消失/点睛/背景/Canvas特效）· 所见即所得画廊 gallery/animations.html · 见 references/animations.md
+  layouts: kpi-grid/vs/timeline/gantt/roadmap/diff/mindmap + cover/secdiv/cards/compare/steps/table/bignum… · 版式展厅 gallery/layout-showcase.html
+  engine: 段导航 + 缩略图 + 进度 + 投屏 + 概览网格(O 键) + 演讲者钩子 + 动画引擎(_fx/_fx-canvas)
   dogfood: 7 张皮 gallery 全部浏览器 present 态截图核版（2026-06-04）· 后 4 张移植自 beautiful-html-templates (MIT)
   pairs_with: [transcripts_html, slides-presenter-mode]
 ---
@@ -53,7 +58,11 @@ metadata:
 | **vellum** 暗色学术 | 深 | 深靛蓝 + 羊皮金 Cormorant 衬线，文艺学术 | 人文/思想史/文学讲座 |
 | **daisy-days** 活泼 | 浅 | 奶油 + 粉蜡笔 + 圆角贴纸卡 + coral 点睛 | 课堂/工作坊/亲子科普 |
 
-> 预览 `gallery/<skin>.html`。想要别的气质 → 从风格银行现移植，见 `references/external-templates.md`。
+**移植自 html-ppt-skill（14 · 薄皮 = 令牌块 + 共享组件 `_components.css`，MIT 调色）**
+dracula · nord · tokyo-night · catppuccin-mocha/latte · vaporwave · swiss-grid · bauhaus · cyberpunk-neon · glassmorphism · y2k-chrome · neo-brutalism · terminal-green · rose-pine。
+暗场流行色（Dracula/Nord/东京夜/Catppuccin/Rosé Pine）、AESTHETIC（蒸汽波/Y2K铬/赛博朋克）、设计流派（瑞士网格/包豪斯/新野兽派/玻璃拟态/终端绿）。这 14 张是**薄皮**：只写一组 `:root` 令牌（+ 签名微调），版式组件来自 `_components.css`（声明 `/* uses-base */`，build.py 自动内联）。
+
+> **眼见为实挑皮 → 打开 `gallery/theme-showcase.html`（21 张皮活封面网格，点击开全屏）。** 单皮样板 `gallery/skins/<skin>.html` 或原生皮 `gallery/<skin>.html`。想要别的气质 → 风格银行 `references/external-templates.md`，或加薄皮（见 `references/design-system.md`）。
 
 - 用户**点名了**（"做学术风 / 用杂志风"）→ 直接用那个。
 - 用户**没点名** → 先把上表给他挑；他偏向哪种场合（学术汇报 vs. 主旨抓眼）就选哪个。
@@ -61,6 +70,21 @@ metadata:
 - 选定的 skin 决定字体、配色、版式气质；**组件 class 契约（`.cover/.secdiv/.head/.cards/.table/.figure`…）所有皮通用**，所以写法一样、外观不同。
 
 > 想加一个新风格？见 `references/design-system.md` 的"加一个皮肤"——写一份 `assets/skins/<名>.css` 即可，引擎不用动。
+
+---
+
+## Step 0.5 ·〔可选〕动画 / 动效 / 转场（编号库）
+
+所有皮共用一套**动画库**（集众家所长 · `assets/_fx.css`+`_fx.js`，build.py 自动内联）。9 类：
+**A 入场 · B 分步揭示 · C 强调 · D 持续动效 · E 跨页转场 · F 神奇移动 · G 消失 · H 点睛 · I 背景氛围**。
+
+- 用户**眼见为实**挑：让他打开 `gallery/animations.html`（所见即所得画廊，每效果带编号 + 实时预览 + 重播）。
+- 用户**按编号点名**（"封面 A8、要点 A6、大数字 F1 神奇移动、转场 E2"）→ 你查 **`references/animations.md`** 落属性：
+  入场 `data-anim` · 强调 `data-emph` · 持续 `data-motion` · 消失 `data-anim-out` · 分步 `class="fragment …"` · 转场 `data-transition`（body 或单页）· 神奇移动 两页同元素同 `data-morph`。
+- 用户**没点名** → 别堆动画。默认克制：封面一个入场 + deck 级 `data-transition="fade"` 足矣；要点列表 `stagger-list`；想强调某页大数字才上 `F` 神奇移动。
+- ⛔ **声明式，别写死**内联 `animation`/keyframes；放映按 `B` 全关、尊重"减少动态"。动画是点睛，不是主角——一页最多一两处。
+
+> 详见 `references/animations.md`（编号→属性映射）。新效果会随使用沉淀进库（`_fx.css` + 重跑 `build-anim-gallery.py`）。
 
 ---
 
@@ -120,16 +144,21 @@ editorial-slides/
 ├── SKILL.md                          (本文件 · 路由 + 选风格 + 工作流 + 红线)
 ├── assets/
 │   ├── _core.css                     ⭐ 与风格无关的骨架 + 引擎界面（所有皮共用）
-│   ├── _engine.js                    ⭐ 与风格无关的引擎（导航/缩略图/投屏/副屏，所有皮共用）
-│   ├── skins/                        7 张皮 · 一皮一文件（:root 令牌 + 全部组件样式）
-│   │   ├── editorial / academic / keynote-dark .css     原生
-│   │   └── cartesian / signal / vellum / daisy-days .css 移植自风格银行(MIT)
-│   ├── demo/                         （各皮的 slide 片段 .slides.txt · 装配器原料 · 不是成品，看成品去 gallery/）
-│   ├── build.py                      ⭐ 装配器：core + skin + engine + slides → 单文件
-│   └── deck-template.html            editorial 空白起手式（= build.py editorial --blank 产出）
-├── gallery/                          7 张皮各一套预览 deck（<skin>.html · 可直接打开/复制）
+│   ├── _engine.js                    ⭐ 引擎（导航/缩略图/投屏 + 概览网格 O 键 + ?bare 模式 + SMFX 动画钩子）
+│   ├── _components.css               ⭐ 共享组件层（薄皮用 · token-generic · 含 P4 版式 kpi/vs/timeline/gantt/roadmap/diff/mindmap）
+│   ├── _fx.css / _fx.js / _fx-canvas.js  ⭐ 动画库引擎（A–J 十类含 Canvas 特效 · build.py 自动内联）
+│   ├── skins/                        21 张皮 · 一皮一文件
+│   │   ├── editorial/academic/keynote-dark/cartesian/signal/vellum/daisy-days  原生厚皮（自带全部组件）
+│   │   └── dracula/nord/tokyo-night/catppuccin-*/vaporwave/swiss-grid/bauhaus/cyberpunk-neon/glassmorphism/y2k-chrome/neo-brutalism/terminal-green/rose-pine  薄皮（/* uses-base */ → 内联 _components.css）
+│   ├── demo/                         各皮 slide 片段 + _showcase.slides.txt / _layouts.slides.txt（展厅原料）
+│   ├── build.py                      ⭐ 装配器：core + components(薄皮) + skin + fx + engine + slides → 单文件
+│   ├── build-anim-gallery.py         生成动画库画廊 → gallery/animations.html
+│   ├── build-showcases.py            生成换皮展厅 + 版式展厅 + gallery/skins/*.html
+│   └── deck-template.html            editorial 空白起手式
+├── gallery/                          原生皮 <skin>.html · animations.html(动画库) · theme-showcase.html(换皮展厅) · layout-showcase.html(版式) · skins/<skin>.html(21 单皮样板)
 ├── references/
 │   ├── styles.md                     ⭐ 风格画廊 + 选风格指南（Step 0 读这个）
+│   ├── animations.md                 ⭐ 动画库编号注册表（Step 0.5 · 编号→属性映射）
 │   ├── components.md                 ⭐ 版式组件目录（所有皮通用的 class 契约，最常翻）
 │   ├── design-system.md              皮肤架构 / 令牌 / 加一个皮肤
 │   ├── external-templates.md         ⭐ 风格银行：从 beautiful-html-templates 移植新皮的配方

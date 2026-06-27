@@ -1,0 +1,13 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: terminal-green — 终端绿 · 磷光 CRT · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#001a0f;--paper-soft:#002b18;--paper-warm:#00130b;
+  --rule:rgba(255,255,255,.12);--rule-soft:rgba(255,255,255,.07);
+  --ink:#c6ffe0;--ink-2:#79e6a8;--ink-3:#4f9c6a;--ink-4:#357a52;
+  --accent:#00ff88;--accent-2:#67ffd0;--accent-3:#b6ff6b;--accent-soft:color-mix(in srgb,#00ff88 16%,transparent);--good:#00ff88;
+  --radius:6px;
+  --font-display:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+body{text-shadow:0 0 2px rgba(0,255,136,.5);}
+.title,.cover__title,.secdiv__title,.manifesto__title,.insight__statement{font-family:var(--font-mono);}

@@ -1,0 +1,57 @@
+<section data-seg="0" data-segname="段 0 · 开场" class="slide cover">
+  <div class="cover__top"><div class="cover__brand">{{BRAND}}</div><div class="cover__seal">皮</div></div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">风格样张 · Theme Sample</div>
+    <h1 class="cover__title">换皮即换<br><em>气质</em></h1>
+    <p class="cover__sub">同一份内容，换一个皮肤，整套配色 / 字体 / 版式气质随之改变。</p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Skin</span><span class="cover__meta-v">{{BRAND}}</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Canvas</span><span class="cover__meta-v">1920×1080</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Year</span><span class="cover__meta-v">2026</span></div>
+  </div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 卡片" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">三张卡片 · Cards</div><h2 class="title head__title">这是一个<em>小标题</em></h2><p class="head__sub">card 组件随皮肤的强调色与圆角变化。</p></div>
+  <div class="cards fill" style="align-content:center">
+    <div class="card"><div class="card__eyebrow">L1</div><div class="card__level">01</div><div class="card__title">第一张卡</div><div class="card__desc">正文描述一句，读取 ink-2 颜色与字体栈。</div></div>
+    <div class="card card--n"><div class="card__eyebrow">L2</div><div class="card__level">02</div><div class="card__title">第二张卡</div><div class="card__desc">强调色 accent-2 作顶边，区分层级。</div></div>
+    <div class="card card--g"><div class="card__eyebrow">L3</div><div class="card__level">03</div><div class="card__title">第三张卡</div><div class="card__desc">accent-3 第三强调色，点睛不抢戏。</div></div>
+  </div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 数据" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">指标卡 · KPI</div><h2 class="title head__title">关键数字一眼到</h2></div>
+  <div class="kpis fill" style="align-content:center">
+    <div class="kpi"><div class="kpi__k">月活</div><div class="kpi__v num">2.4M</div><div class="kpi__d up">18%</div><div class="kpi__hint">环比上月</div></div>
+    <div class="kpi"><div class="kpi__k">留存</div><div class="kpi__v num">63%</div><div class="kpi__d up">5pt</div><div class="kpi__hint">30 日留存</div></div>
+    <div class="kpi"><div class="kpi__k">成本</div><div class="kpi__v num">¥0.8</div><div class="kpi__d down">12%</div><div class="kpi__hint">单位获客</div></div>
+    <div class="kpi"><div class="kpi__k">NPS</div><div class="kpi__v num">+52</div><div class="kpi__d up">9</div><div class="kpi__hint">净推荐值</div></div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 对比" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">对比 · VS</div><h2 class="title head__title">旧做法 vs 新做法</h2></div>
+  <div class="vs fill" style="align-content:center">
+    <div class="vs__pane vs__pane--a"><div class="vs__title">旧做法</div><ul class="vs__list"><li>每次从零摸索</li><li>风格不统一</li><li>改一处动全身</li></ul></div>
+    <div class="vs__mid">VS</div>
+    <div class="vs__pane vs__pane--b"><div class="vs__title">新做法</div><ul class="vs__list"><li>换皮即换气质</li><li>组件契约统一</li><li>令牌一改全变</li></ul></div>
+  </div>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 时间线" class="slide">
+  <div class="head"><div class="eyebrow head__eyebrow">时间线 · Timeline</div><h2 class="title head__title">四步走</h2></div>
+  <div class="timeline fill" style="align-content:center">
+    <div class="tl"><div class="tl__date">Q1</div><div class="tl__title">立项</div><div class="tl__desc">定义契约与令牌。</div></div>
+    <div class="tl"><div class="tl__date">Q2</div><div class="tl__title">共享组件</div><div class="tl__desc">抽出可复用版式。</div></div>
+    <div class="tl"><div class="tl__date">Q3</div><div class="tl__title">多皮</div><div class="tl__desc">薄皮批量上线。</div></div>
+    <div class="tl"><div class="tl__date">Q4</div><div class="tl__title">展厅</div><div class="tl__desc">所见即所得挑皮。</div></div>
+  </div>
+</section>
+
+<section data-seg="5" data-segname="段 5 · 收束" class="slide insight">
+  <div class="insight__eyebrow">一句话</div>
+  <h2 class="insight__statement">好看，是<em>系统</em>，不是运气。</h2>
+  <p class="insight__sub">令牌 + 共享组件 + 多皮 + 所见即所得展厅。</p>
+</section>

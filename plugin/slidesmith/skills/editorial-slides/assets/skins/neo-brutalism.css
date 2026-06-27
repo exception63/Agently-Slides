@@ -1,0 +1,13 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&family=Archivo+Black&display=swap */
+/* uses-base */
+/* skin: neo-brutalism — 新野兽派 · 黄黑粗框 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+:root{
+  --paper:#fdfcf7;--paper-soft:#ffffff;--paper-warm:#f2efe6;
+  --rule:rgba(0,0,0,.12);--rule-soft:rgba(0,0,0,.06);
+  --ink:#000000;--ink-2:#222222;--ink-3:#555555;--ink-4:#888888;
+  --accent:#ffd400;--accent-2:#ff5ca8;--accent-3:#3a7cff;--accent-soft:color-mix(in srgb,#ffd400 16%,transparent);--good:#1fae5a;
+  --radius:0px;
+  --font-display:'Archivo Black','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+}
+.card,.kpi,.rm,.vs__pane,.sum-card,.bignum,.terminal{border:3px solid #000;box-shadow:6px 6px 0 #000;}
+.card{border-top-width:3px;}

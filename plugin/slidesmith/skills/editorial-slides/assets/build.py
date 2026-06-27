@@ -66,8 +66,13 @@ SHELL = """<!DOCTYPE html>
 /* skin: {skinname} · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
 {core}
 
+{components}
+{layouts}
 {skinurl_comment}
 {skin}
+
+/* ——— 动画库 _fx.css（集众家所长 · 编号见 references/animations.md）——— */
+{fx_css}
 </style>
 </head>
 <body>
@@ -85,7 +90,7 @@ SHELL = """<!DOCTYPE html>
 
 <nav class="segnav" id="segnav"></nav>
 <div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
-<div class="hint">F 全屏播放 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
+<div class="hint">F 全屏播放 · O 概览 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
 
 <div class="deck" id="deck">
 
@@ -93,6 +98,12 @@ SHELL = """<!DOCTYPE html>
 
 </div>
 
+<script>
+{fx_js}
+</script>
+<script>
+{fx_canvas}
+</script>
 <script>
 {engine}
 </script>
@@ -128,6 +139,16 @@ def main():
     core = read(os.path.join(BASE, "_core.css"))
     engine = read(os.path.join(BASE, "_engine.js"))
     skin_css = read(skin_path)
+    # 动画库（可选；缺失则不报错，deck 仍可用，只是不带动画）
+    fx_css = read(os.path.join(BASE, "_fx.css")) if os.path.isfile(os.path.join(BASE, "_fx.css")) else ""
+    fx_js = read(os.path.join(BASE, "_fx.js")) if os.path.isfile(os.path.join(BASE, "_fx.js")) else ""
+    fx_canvas = read(os.path.join(BASE, "_fx-canvas.js")) if os.path.isfile(os.path.join(BASE, "_fx-canvas.js")) else ""
+    # 共享组件层：仅当皮声明 /* uses-base */ 时内联（薄皮用；原 7 张厚皮自带组件，不内联）
+    components = ""
+    if "/* uses-base */" in skin_css and os.path.isfile(os.path.join(BASE, "_components.css")):
+        components = read(os.path.join(BASE, "_components.css"))
+    # P4 版式库：对「所有」皮恒内联（token-generic + 缺失令牌兜底 → 薄皮 + 原 7 厚皮通用）
+    layouts = read(os.path.join(BASE, "_layouts.css")) if os.path.isfile(os.path.join(BASE, "_layouts.css")) else ""
 
     # 抽出字体 URL（皮肤首行 /* FONTS <url> */），生成 <link>
     m = re.search(r"/\*\s*FONTS\s+(\S+)\s*\*/", skin_css)
@@ -156,7 +177,8 @@ def main():
     html = SHELL.format(
         title=title, brand=brand, sub=sub, fontlink=fontlink, skinname=a.skin,
         core=core, skinurl_comment="/* —— 皮肤 %s —— */" % a.skin,
-        skin=skin_css, slides=slides, engine=engine,
+        skin=skin_css, slides=slides, engine=engine, fx_css=fx_css, fx_js=fx_js, fx_canvas=fx_canvas,
+        components=components, layouts=layouts,
     )
     out = a.out or os.path.join(SKILL, "gallery", a.skin + ".html")
     os.makedirs(os.path.dirname(out), exist_ok=True)
