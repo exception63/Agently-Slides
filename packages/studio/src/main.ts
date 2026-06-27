@@ -177,7 +177,13 @@ let fileBase = 'deck';
 // back over a same-origin WebSocket so Claude Code (via MCP) can push decks /
 // patches in and read the user's edit-requests out. Opened from file:// → no
 // host → stays in fully-manual (offline) mode. ----
-const bridge = { ws: null as WebSocket | null, connected: false, everConnected: false, tries: 0 };
+const bridge = { ws: null as WebSocket | null, connected: false, everConnected: false, tries: 0,
+  owner: null as { label: string; since: number } | null, port: 0 };
+// 改前先问我：when on, edit-requests carry confirm:true and AI patches arrive as
+// proposals (保留/还原) instead of committing silently. Persisted across sessions.
+const CONFIRM_KEY = 'sm-ai-confirm';
+let aiConfirm = false;
+try { aiConfirm = localStorage.getItem(CONFIRM_KEY) === '1'; } catch { /* noop */ }
 
 // ---- v2 HTML-first mode: an imported contract HTML deck is the source of truth ----
 type Mode = 'ir' | 'html';
@@ -211,6 +217,7 @@ const aiInstructions: Record<string, string> = {}; // per-slide-id comment to AI
 const aiApplied = new Set<string>(); // slide ids AI has already applied a patch to (badge ✓ 已改)
 const aiSent = new Set<string>(); // slide ids sent to Claude, waiting for a patch back (badge 已发送, pulsing)
 const aiBefore: Record<string, string> = {}; // pre-AI html per slide id, so a change can be reverted
+const proposed = new Set<string>(); // slide ids in a pending preview proposal (改前先问我), awaiting 保留/还原
 // the deck's non-slide skeleton, kept verbatim so export re-emits a clean contract deck
 const H = {
   head: '', htmlAttrs: 'lang="zh"', bodyClass: '', prelude: '', trailing: '',
@@ -577,7 +584,7 @@ function loadHtmlDeck(name: string, html: string): void {
 
   mode = 'html'; cur = 0; selBid = null; htmlSelEl = null;
   $('#deckname').textContent = fileBase;
-  Object.keys(aiInstructions).forEach((k) => delete aiInstructions[k]); aiApplied.clear(); aiSent.clear(); Object.keys(aiBefore).forEach((k) => delete aiBefore[k]); aiCurId = ''; aiDeckInstruction = ''; usedFontIds.clear();
+  Object.keys(aiInstructions).forEach((k) => delete aiInstructions[k]); aiApplied.clear(); aiSent.clear(); Object.keys(aiBefore).forEach((k) => delete aiBefore[k]); proposed.clear(); aiCurId = ''; aiDeckInstruction = ''; usedFontIds.clear();
   undoStack = []; redoStack = []; lastPushTag = ''; dirty = false; updateUndoButtons(); updateDirtyBadge();
   const aiBox = $('#aiInstruction') as HTMLTextAreaElement | null; if (aiBox) aiBox.value = '';
   const aiDeckBox = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (aiDeckBox) aiDeckBox.value = '';
@@ -1555,7 +1562,7 @@ function buildAllAiRequests(): { count: number; name: string; content: string } 
   if (blocks.length) body += '## 需要修改的页（这些页有明确要求；上面的整份要求也请一并考虑）\n' + blocks.join('\n');
   return { count: blocks.length + (hasDeck ? 1 : 0), name: `${fileBase}.all-requests.md`, content: body + aiOutputSpec() };
 }
-function applyAiPatch(text: string): void {
+function applyAiPatch(text: string, preview = false): void {
   if (mode !== 'html') { toast('请先导入 HTML deck', true); return; }
   let html = text;
   const m = text.match(/```html\s*([\s\S]*?)```/i); if (m) html = m[1];
@@ -1565,17 +1572,32 @@ function applyAiPatch(text: string): void {
   if (!secs.length) { toast('补丁里没找到 <section class="slide">', true); return; }
   pushHistory('ai'); // so the user can Ctrl/⌘+Z an AI change too
   harvestAll(); // preserve other slides' manual edits before re-render
-  let applied = 0, firstIdx = -1;
+  let applied = 0, firstIdx = -1; const ids: string[] = [];
   secs.forEach((sec) => {
     let id = sec.getAttribute('data-id');
     let idx = id ? htmlSlides.findIndex((s) => s.id === id) : -1;
     if (idx < 0 && secs.length === 1) { idx = currentHtmlSlideIndex(); id = htmlSlides[idx]?.id || null; } // lenient fallback
-    if (idx >= 0 && htmlSlides[idx]) { if (id) { sec.setAttribute('data-id', id); if (aiBefore[id] === undefined) aiBefore[id] = htmlSlides[idx].html; aiApplied.add(id); aiSent.delete(id); } htmlSlides[idx].html = sec.outerHTML; applied++; if (firstIdx < 0) firstIdx = idx; }
+    if (idx >= 0 && htmlSlides[idx]) { if (id) { sec.setAttribute('data-id', id); if (aiBefore[id] === undefined) aiBefore[id] = htmlSlides[idx].html; aiApplied.add(id); aiSent.delete(id); ids.push(id); if (preview) proposed.add(id); } htmlSlides[idx].html = sec.outerHTML; applied++; if (firstIdx < 0) firstIdx = idx; }
   });
   if (!applied) { toast('补丁的 data-id 不匹配任何页', true); return; }
   htmlGotoAfterRender = firstIdx; // stay on the patched slide after re-render
   renderHtmlEdit(); refreshTasks(); markDirty();
-  toast('AI 已修改 ' + applied + ' 页（左侧带勾标记），如不满意可使用「还原本页」');
+  if (preview) { refreshProposalBar(); toast('AI 提议修改 ' + applied + ' 页，请在顶部「保留 / 还原」'); }
+  else toast('AI 已修改 ' + applied + ' 页（左侧带勾标记），如不满意可使用「还原本页」');
+}
+// the proposal bar (改前先问我 mode): AI's patch is applied but flagged. The user
+// keeps all (dismiss) or reverts all (back to pre-AI). Reuses aiBefore for revert.
+function refreshProposalBar(): void {
+  const bar = $('#aiProposalBar'); if (!bar) return;
+  if (!proposed.size) { bar.style.display = 'none'; return; }
+  const txt = $('#aiProposalTxt'); if (txt) txt.textContent = `AI 提议了 ${proposed.size} 页改动，请确认`;
+  bar.style.display = '';
+}
+function keepProposed(): void { proposed.clear(); refreshProposalBar(); toast('已保留 AI 的改动'); }
+function revertProposed(): void {
+  const ids = [...proposed]; proposed.clear();
+  ids.forEach((id) => { if (aiBefore[id] !== undefined) revertSlide(id); });
+  refreshProposalBar(); toast('已还原 AI 提议的改动');
 }
 // revert one slide to the version it had right before AI changed it. The page's
 // comment stays, so it goes back to 待发送 (you can edit + re-send).
@@ -1730,7 +1752,21 @@ function toggleStudioTheme(): void {
 
 // ======================= bridge: connected mode =======================
 function updateBridgeBadge(): void {
-  const b = $('#bridgeBadge'); if (b) { b.textContent = bridge.connected ? '● 已连接 Claude' : ''; b.className = 'bridge-badge' + (bridge.connected ? ' on' : ''); }
+  const b = $('#bridgeBadge');
+  if (b) {
+    // once handshook, name the session + port so it's unambiguous which Claude is on
+    // the other end (no more "did my request land in the right session?").
+    let label = '';
+    if (bridge.connected) {
+      label = '● 已连接 Claude';
+      if (bridge.owner && bridge.owner.label) label += ' · 会话 ' + bridge.owner.label;
+      if (bridge.port) label += ' · 端口 ' + bridge.port;
+    }
+    b.textContent = label; b.className = 'bridge-badge' + (bridge.connected ? ' on' : '');
+    b.title = bridge.connected
+      ? (bridge.owner ? '已与 Claude 握手：' + bridge.owner.label + '（端口 ' + bridge.port + '）。修改请求只会发给这个会话。' : '已连接，等待 Claude 握手（运行 /slidesmith）')
+      : '与 Claude Code 的连接状态';
+  }
   // when NOT connected, offer the one-click "连接 Claude" button (hidden once connected)
   const cb = $('#connectBtn'); if (cb) cb.style.display = bridge.connected ? 'none' : '';
   updateSendButton();
@@ -1789,8 +1825,8 @@ function submitRequests(): void {
   // the pages going out now become "已发送 · 等待" until a patch comes back
   const sentNow = htmlSlides.filter((s) => aiInstructions[s.id] && !aiApplied.has(s.id)).map((s) => s.id);
   if (bridge.connected && bridge.ws && bridge.ws.readyState === WebSocket.OPEN) {
-    bridge.ws.send(JSON.stringify({ type: 'requests', request: r }));
-    toast(`已发送 ${r.count} 个任务给 Claude`);
+    bridge.ws.send(JSON.stringify({ type: 'requests', request: { ...r, confirm: aiConfirm } }));
+    toast(aiConfirm ? `已发送 ${r.count} 个任务（改前先问我：会以提议预览返回）` : `已发送 ${r.count} 个任务给 Claude`);
   } else {
     download(r.name, r.content, 'text/markdown');
     toast(`已导出 ${r.count} 个任务：${r.name}`);
@@ -1817,12 +1853,15 @@ function connectBridge(): void {
     updateBridgeBadge(); toast('已连接 Claude Code');
   });
   ws.addEventListener('message', (e: MessageEvent) => {
-    let m: { type?: string; name?: string; html?: string; text?: string };
+    let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; owner?: { label: string; since: number } | null; port?: number };
     try { m = JSON.parse(String(e.data)); } catch { return; }
-    if (m.type === 'import' && typeof m.html === 'string') importFile(m.name || 'deck.html', m.html);
+    // hello carries the handshake: which session owns this bridge + its port. Re-sent
+    // after a handshake, so the badge updates the moment Claude runs /slidesmith.
+    if (m.type === 'hello') { bridge.owner = m.owner || null; bridge.port = m.port || 0; updateBridgeBadge(); }
+    else if (m.type === 'import' && typeof m.html === 'string') importFile(m.name || 'deck.html', m.html);
     // after applying a patch, sync the updated full deck back so the bridge's
     // in-memory copy stays current (late-joiners / reconnects see the change)
-    else if (m.type === 'patch' && typeof m.text === 'string') { applyAiPatch(m.text); setTimeout(syncExportToBridge, 500); }
+    else if (m.type === 'patch' && typeof m.text === 'string') { applyAiPatch(m.text, !!m.preview); setTimeout(syncExportToBridge, 500); }
   });
   ws.addEventListener('close', () => {
     bridge.connected = false; bridge.ws = null; updateBridgeBadge();
@@ -1877,6 +1916,11 @@ body.navcollapsed .left{display:none}
 @keyframes sm-blink{0%,100%{opacity:1}50%{opacity:.2}}
 .aisent-banner{display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 11px;border-radius:8px;font-size:12px;line-height:1.4;color:#0c447c;background:#e6f1fb;border:1px solid #b5d4f4}
 .aisent-banner .aisent-dot{color:#378ADD;font-size:11px;animation:sm-blink 1.05s ease-in-out infinite}
+.confirm-tog{display:flex;align-items:center;gap:7px;margin:2px 0 10px;font-size:12px;color:#5f5e5a;cursor:pointer;user-select:none}
+.confirm-tog input{cursor:pointer}
+.proposal-bar{display:flex;align-items:center;gap:8px;margin:8px 0;padding:8px 11px;border-radius:8px;font-size:12px;line-height:1.4;color:#854f0b;background:#faeeda;border:1px solid #fac775}
+.proposal-bar .proposal-dot{color:#ba7517;font-size:11px;animation:sm-blink 1.05s ease-in-out infinite}
+.proposal-bar .grow{flex:1}
 #htmlpanel{flex:1;display:flex;flex-direction:column;min-height:0}
 .hb-title{font-weight:700;color:#1c1c1f;font-size:13px;margin-bottom:4px}
 .right input[type=color]{padding:2px;height:34px;cursor:pointer}
@@ -2127,6 +2171,8 @@ function buildUI(): void {
       <!-- ===== AI 修改 ===== -->
       <div class="pane hpane" data-hpane="ai" hidden>
         <h3>交给 AI 修改</h3>
+        <label class="confirm-tog" title="开启后，AI 的改动会先以「提议」呈现，你点保留才算数；关闭则改完直接生效"><input id="aiConfirmTog" type="checkbox"> 改前先问我（默认自动应用）</label>
+        <div class="proposal-bar" id="aiProposalBar" style="display:none"><span class="proposal-dot">●</span><span id="aiProposalTxt">AI 提议了改动，请确认</span><span class="grow"></span><button id="aiKeep" class="mini">保留</button><button id="aiRevertAll" class="mini revert">还原</button></div>
         <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">AI 已修改</span><button id="aiRevertOne" class="mini revert" style="display:none">还原本页</button></div>
         <div class="field"><textarea id="aiInstruction" rows="4" placeholder="描述这一页希望 AI 如何修改。例如：将三个要点改为左右两栏对照，右栏突出一个关键数字。内容会自动保存，可切换到其他页继续编写。"></textarea></div>
         <div class="oprow"><button id="aiClearOne">清空本页</button></div>
@@ -2329,6 +2375,10 @@ function buildUI(): void {
     const box = $('#aiInstruction') as HTMLTextAreaElement; box.value = ''; onAiInput();
   });
   $('#aiRevertOne').addEventListener('click', () => { if (aiCurId) revertSlide(aiCurId); });
+  const confirmTog = $('#aiConfirmTog') as HTMLInputElement | null;
+  if (confirmTog) { confirmTog.checked = aiConfirm; confirmTog.addEventListener('change', () => { aiConfirm = confirmTog.checked; try { localStorage.setItem(CONFIRM_KEY, aiConfirm ? '1' : '0'); } catch { /* noop */ } }); }
+  $('#aiKeep').addEventListener('click', keepProposed);
+  $('#aiRevertAll').addEventListener('click', revertProposed);
   $('#auditRun').addEventListener('click', () => renderAuditReport(auditImportedDeck()));
   $('#expPdf').addEventListener('click', exportPdf);
 
@@ -2432,8 +2482,11 @@ function buildUI(): void {
   (window as unknown as { __SM_AUDIT__: typeof auditImportedDeck }).__SM_AUDIT__ = auditImportedDeck;
   (window as unknown as { __SM_PDF_HTML__: typeof pdfPrintHtml }).__SM_PDF_HTML__ = pdfPrintHtml;
   // bridge hooks (for automation / headless verification)
-  (window as unknown as { __SM_BRIDGE__: () => { connected: boolean } }).__SM_BRIDGE__ = () => ({ connected: bridge.connected });
+  (window as unknown as { __SM_BRIDGE__: () => { connected: boolean; owner: { label: string; since: number } | null; port: number } }).__SM_BRIDGE__ = () => ({ connected: bridge.connected, owner: bridge.owner, port: bridge.port });
   (window as unknown as { __SM_SEND_ALL__: () => void }).__SM_SEND_ALL__ = submitRequests;
+  // permission mode + proposal state (for verification)
+  (window as unknown as { __SM_SET_CONFIRM__: (v: boolean) => void }).__SM_SET_CONFIRM__ = (v) => { aiConfirm = v; const t = $('#aiConfirmTog') as HTMLInputElement | null; if (t) t.checked = v; };
+  (window as unknown as { __SM_PROPOSAL__: () => { count: number; visible: boolean } }).__SM_PROPOSAL__ = () => ({ count: proposed.size, visible: ($('#aiProposalBar')?.style.display !== 'none') });
   // resilience hooks (autosave / undo / image) for verification
   (window as unknown as { __SM_UNDO__: () => void }).__SM_UNDO__ = undo;
   (window as unknown as { __SM_REDO__: () => void }).__SM_REDO__ = redo;

@@ -61,6 +61,11 @@ body.sm { overflow: hidden; background: #202022; font-family: system-ui, -apple-
 }
 .slide.active { display: block; }
 
+/* typography polish: balance headings (no lonely last word), prettify body wrapping.
+   Native CSS, degrades silently on older browsers, no-op on single-line text. */
+.slide h1, .slide h2, .slide h3, .slide h4, .slide .title, .slide blockquote { text-wrap: balance; }
+.slide p, .slide li, .slide .sub { text-wrap: pretty; }
+
 /* floating nav buttons */
 .sm-nav { position: fixed; bottom: 18px; right: 18px; display: flex; gap: 8px; z-index: 60; }
 .sm-btn {
@@ -110,12 +115,14 @@ body.sm.anim .sm-deck > .slide [data-motion="float"] { animation: sm-m-float 3.4
 body.sm.anim .sm-deck > .slide [data-motion="pulse"] { animation: sm-m-pulse 2s ease-in-out infinite; }
 body.sm.anim .sm-deck > .slide [data-motion="neon"] { animation: sm-m-neon 5.5s linear infinite; }
 body.sm.anim .sm-deck > .slide [data-motion="stress"] { animation: sm-m-stress 4.2s ease-in-out infinite; transform-origin: center; }
+body.sm.anim .sm-deck > .slide [data-motion="shimmer"] { will-change: background-position; background: linear-gradient(125deg, #ff6eb4 0%, #ffb347 8%, #ffe46e 16%, #7bf0ff 24%, #a855f7 32%, #f4b73e 40%, #ff6eb4 48%, #06b6d4 56%, #a855f7 64%, #ffb347 72%, #7bf0ff 80%, #ff6eb4 90%, #f4b73e 100%); background-size: 600% 600%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; animation: sm-m-shimmer 6s ease-in-out infinite; }
 @keyframes sm-m-glow { 0%, 100% { filter: drop-shadow(0 0 1px transparent); } 50% { filter: drop-shadow(0 0 16px var(--accent, #F4B73E)); } }
 @keyframes sm-m-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
 @keyframes sm-m-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
 @keyframes sm-m-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
 @keyframes sm-m-neon { 0%, 16%, 18%, 55%, 57%, 100% { opacity: 1; } 17%, 56% { opacity: 0.7; } 80%, 82% { opacity: 0.88; } }
 @keyframes sm-m-stress { 0%, 38%, 100% { transform: scale(1); } 45% { transform: scale(1.06); } }
+@keyframes sm-m-shimmer { 0% { background-position: 0% 30%; } 33% { background-position: 80% 65%; } 66% { background-position: 40% 90%; } 100% { background-position: 0% 30%; } }
 
 @media (prefers-reduced-motion: reduce) {
   body.sm .sm-deck > .slide [data-anim],

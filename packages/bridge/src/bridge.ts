@@ -23,7 +23,7 @@ const DEFAULT_STUDIO = resolve(REPO_ROOT, 'studio', 'slidesmith-studio.html');
 export const DEFAULT_PORT = 8765;
 
 // ---- wire protocol (JSON over WebSocket) ----
-//   bridge → Studio : { type:'hello', hasDeck } | { type:'import', name, html } | { type:'patch', text }
+//   bridge → Studio : { type:'hello', hasDeck, owner, port } | { type:'import', name, html } | { type:'patch', text, preview }
 //   Studio → bridge : { type:'ready' } | { type:'requests', request } | { type:'exported', name, html }
 export interface BridgeRequest {
   id: string;
@@ -33,6 +33,16 @@ export interface BridgeRequest {
   content: string;
   /** how many slides the user asked to change */
   count: number;
+  /** user wants to review the AI's change before it's final (Studio's 改前先问我 switch) */
+  confirm?: boolean;
+}
+
+/** who owns this bridge — the Claude Code session that ran `/slidesmith`. The
+ * handshake binds a session label to this bridge+deck so a Studio knows exactly
+ * which session is on the other end, and a request can't land in the wrong one. */
+export interface BridgeOwner {
+  label: string;
+  since: number;
 }
 
 export interface BridgeStatus {
@@ -42,6 +52,8 @@ export interface BridgeStatus {
   hasDeck: boolean;
   deckName: string | null;
   pendingRequests: number;
+  /** the session that handshook this bridge (null until `/slidesmith` connects) */
+  owner: BridgeOwner | null;
 }
 
 export interface BridgeOptions {
@@ -60,9 +72,20 @@ export interface BridgeHandle extends EventEmitter {
   openHtml(name: string, html: string): { url: string; name: string; bytes: number };
   /** the edit-requests the user has submitted from the Studio (drains the queue by default) */
   getRequests(drain?: boolean): BridgeRequest[];
-  /** push an AI patch (one or more <section data-id>) down to the connected Studio(s) */
-  applyPatch(text: string): { clients: number; queued: boolean };
+  /** long-poll: resolve as soon as the user submits a request (drains), or after
+   *  timeoutMs with an empty list. This is what turns the pull model into a
+   *  handshake loop — a caller blocks here instead of busy-polling. */
+  waitForRequests(timeoutMs?: number): Promise<BridgeRequest[]>;
+  /** push an AI patch (one or more <section data-id>) down to the connected Studio(s).
+   *  preview=true marks it as a *proposal* so the Studio shows it behind a 保留/还原
+   *  banner instead of committing silently (the 改前先问我 permission mode). */
+  applyPatch(text: string, opts?: { preview?: boolean }): { clients: number; queued: boolean };
   status(): BridgeStatus;
+  /** bind a Claude Code session label to this bridge (the handshake). Re-broadcasts
+   *  hello so every connected Studio shows which session it's talking to. */
+  handshake(label: string): BridgeOwner;
+  /** the current owner, or null before any handshake */
+  owner(): BridgeOwner | null;
   /** resolve once at least one Studio is connected (or reject on timeout) */
   waitForStudio(timeoutMs?: number): Promise<void>;
   /** open the Studio URL in the user's default browser */
@@ -71,6 +94,7 @@ export interface BridgeHandle extends EventEmitter {
   /** emitted when the user submits edit-requests from the Studio */
   on(event: 'request', listener: (r: BridgeRequest) => void): this;
   on(event: 'studio-connected', listener: () => void): this;
+  on(event: 'handshake', listener: (o: BridgeOwner) => void): this;
   on(event: string, listener: (...args: unknown[]) => void): this;
 }
 
@@ -110,9 +134,13 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   const emitter = new EventEmitter();
   const sockets = new Set<WebSocket>();
   let deck: { name: string; html: string } | null = null;
+  let owner: BridgeOwner | null = null; // set by the handshake (which session owns this bridge)
   const pending: BridgeRequest[] = [];
+  // long-poll waiters: callers blocked in waitForRequests / GET /api/wait. Resolved
+  // the instant a request arrives (push-like), or by their own timeout.
+  const waiters = new Set<(reqs: BridgeRequest[]) => void>();
   // patches that arrived while no Studio was connected — flushed on next connect
-  const queuedPatches: string[] = [];
+  const queuedPatches: Array<{ text: string; preview: boolean }> = [];
 
   // permissive CORS so the offline (file://) Studio can probe the bridge and hand
   // its deck over before jumping to the connected version. Localhost dev tool only.
@@ -128,6 +156,30 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     }
     if (url === '/healthz' || url === '/status' || url === '/api/status') {
       sendJson(res, statusObj());
+      return;
+    }
+    // POST /api/handshake?label=…  → bind this session to the bridge (the handshake).
+    // Lets a curl-driven loop claim ownership without MCP; re-broadcasts hello.
+    if (url === '/api/handshake' && req.method === 'POST') {
+      const label = decodeURIComponent((/[?&]label=([^&]+)/.exec(req.url || '') || [])[1] || '').trim();
+      readBody(req).then((body) => {
+        let lbl = label;
+        if (!lbl) { try { const j = JSON.parse(body); if (j && typeof j.label === 'string') lbl = j.label.trim(); } catch { /* raw */ } }
+        const o = handle.handshake(lbl || 'Claude');
+        sendJson(res, { ok: true, owner: o, status: statusObj() });
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
+      return;
+    }
+    // GET|POST /api/wait?timeout=N → long-poll: hold the connection until the user
+    // submits an edit-request, then return it (drained). Times out empty after N ms.
+    // This is the heartbeat of the auto loop: a background `curl` blocks here and
+    // exits the moment work arrives, waking the session. Cap at 290s (< 5-min idle).
+    if (url === '/api/wait' && (req.method === 'GET' || req.method === 'POST')) {
+      const raw = parseInt((/[?&]timeout=(\d+)/.exec(req.url || '') || [])[1] || '25000', 10);
+      const timeoutMs = Math.min(Math.max(isFinite(raw) ? raw : 25000, 1000), 290000);
+      handle.waitForRequests(timeoutMs).then((reqs) => {
+        sendJson(res, { ok: true, count: reqs.length, requests: reqs, timedOut: reqs.length === 0 });
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
     // POST /api/open  body: a contract HTML deck → load it (used by the offline Studio's
@@ -148,13 +200,15 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       sendJson(res, { ok: true, count: reqs.length, requests: reqs });
       return;
     }
-    // POST /api/patch  body: raw <section data-id> html (or {"sections": "..."}) → applied to Studio
+    // POST /api/patch  body: raw <section data-id> html (or {"sections":"…","preview":bool}) → applied to Studio.
+    // ?preview=1 (or JSON preview:true) marks it a proposal → Studio stages it behind 保留/还原.
     if (url === '/api/patch' && req.method === 'POST') {
+      let preview = /[?&]preview=1\b/.test(req.url || '');
       readBody(req).then((body) => {
         let text = body;
-        try { const j = JSON.parse(body); if (j && typeof j.sections === 'string') text = j.sections; } catch { /* raw html body */ }
-        const r = handle.applyPatch(text);
-        sendJson(res, { ok: true, ...r, status: statusObj() });
+        try { const j = JSON.parse(body); if (j && typeof j.sections === 'string') { text = j.sections; if (typeof j.preview === 'boolean') preview = j.preview; } } catch { /* raw html body */ }
+        const r = handle.applyPatch(text, { preview });
+        sendJson(res, { ok: true, ...r, preview, status: statusObj() });
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
@@ -184,16 +238,33 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     return n;
   }
 
+  // the hello a Studio gets on connect (and again after a handshake) — carries the
+  // owning session + port so the Studio's top bar can show who it's talking to.
+  function helloMsg(): { type: 'hello'; hasDeck: boolean; owner: BridgeOwner | null; port: number } {
+    return { type: 'hello', hasDeck: !!deck, owner, port: handle.port };
+  }
+  // hand the freshly-queued requests to ONE blocked long-poll waiter (FIFO). Normal
+  // operation has a single waiter (the owner session's loop); delivering to just one
+  // keeps queue semantics if two ever overlap (no double-processing).
+  function wakeWaiters(): void {
+    if (!waiters.size || !pending.length) return;
+    const first = waiters.values().next().value as ((r: BridgeRequest[]) => void) | undefined;
+    if (!first) return;
+    waiters.delete(first);
+    const reqs = pending.slice(); pending.length = 0;
+    try { first(reqs); } catch { /* noop */ }
+  }
+
   wss.on('connection', (ws: WebSocket) => {
     sockets.add(ws);
-    send(ws, { type: 'hello', hasDeck: !!deck });
+    send(ws, helloMsg());
     if (deck) send(ws, { type: 'import', name: deck.name, html: deck.html });
     // flush any patches that were waiting for a Studio to show up
-    while (queuedPatches.length) send(ws, { type: 'patch', text: queuedPatches.shift() });
+    while (queuedPatches.length) { const p = queuedPatches.shift()!; send(ws, { type: 'patch', text: p.text, preview: p.preview }); }
     emitter.emit('studio-connected');
 
     ws.on('message', (data) => {
-      let m: { type?: string; request?: { name?: string; content?: string; count?: number }; name?: string; html?: string };
+      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; name?: string; html?: string };
       try { m = JSON.parse(String(data)); } catch { return; }
       if (m.type === 'requests' && m.request && typeof m.request.content === 'string') {
         const r: BridgeRequest = {
@@ -202,9 +273,11 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
           name: m.request.name || 'request.md',
           content: m.request.content,
           count: m.request.count || 1,
+          confirm: !!m.request.confirm,
         };
         pending.push(r);
         emitter.emit('request', r);
+        wakeWaiters(); // a long-poller blocked in /api/wait gets it instantly
       } else if (m.type === 'exported' && typeof m.html === 'string') {
         // the Studio's current full deck html (e.g. after edits) — keep latest
         if (deck) deck.html = m.html;
@@ -223,6 +296,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       hasDeck: !!deck,
       deckName: deck ? deck.name : null,
       pendingRequests: pending.length,
+      owner,
     };
   }
 
@@ -247,11 +321,28 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     if (drain) pending.length = 0;
     return out;
   };
-  handle.applyPatch = (text) => {
-    const clients = broadcast({ type: 'patch', text });
-    if (clients === 0) { queuedPatches.push(text); return { clients: 0, queued: true }; }
+  handle.waitForRequests = (timeoutMs = 25000) =>
+    new Promise<BridgeRequest[]>((res) => {
+      // already-queued work returns immediately — never make a caller wait for
+      // something that's already here.
+      if (pending.length) { const out = pending.slice(); pending.length = 0; return res(out); }
+      const settle = (reqs: BridgeRequest[]) => { clearTimeout(t); waiters.delete(settle); res(reqs); };
+      const t = setTimeout(() => settle([]), timeoutMs);
+      waiters.add(settle);
+    });
+  handle.applyPatch = (text, opts = {}) => {
+    const preview = !!opts.preview;
+    const clients = broadcast({ type: 'patch', text, preview });
+    if (clients === 0) { queuedPatches.push({ text, preview }); return { clients: 0, queued: true }; }
     return { clients, queued: false };
   };
+  handle.handshake = (label) => {
+    owner = { label: label || 'Claude', since: Date.now() };
+    broadcast(helloMsg()); // every Studio re-renders its "已连接会话 X" badge
+    emitter.emit('handshake', owner);
+    return owner;
+  };
+  handle.owner = () => owner;
   handle.status = statusObj;
   handle.openBrowser = () => launchBrowser(handle.url);
   handle.waitForStudio = (timeoutMs = 15000) =>
@@ -263,6 +354,9 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     });
   handle.close = () =>
     new Promise<void>((res) => {
+      // release any long-poll waiters so their HTTP response/curl doesn't hang
+      for (const w of [...waiters]) { try { w([]); } catch { /* noop */ } }
+      waiters.clear();
       for (const ws of sockets) { try { ws.close(); } catch { /* noop */ } }
       sockets.clear();
       wss.close(() => httpServer.close(() => res()));

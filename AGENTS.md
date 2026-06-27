@@ -24,11 +24,11 @@ Your jobs as an agent:
 - **(B-offline) Apply** a request file the human exported manually when not connected (§4).
 
 **The connected path (start here when the `slidesmith` MCP tools are available):**
-`slidesmith_open(deckPath)` opens the Studio in the human's browser (connected) →
-`slidesmith_get_requests()` returns their submitted comments → rewrite the slides →
-`slidesmith_apply_patch({sections})` lands them instantly. `slidesmith_status()` shows
-connection / deck / pending count. After `slidesmith_open`, poll `get_requests` (or wait
-for the human to say they sent) — the bridge does not push to you. Details in §4b.
+`slidesmith_open(deckPath)` opens the Studio in the human's browser (connected) **and
+handshakes this session** (Studio shows 会话 X · 端口 Y) → `slidesmith_wait()` blocks until
+they submit → rewrite the slides → `slidesmith_apply_patch({sections, preview?})` lands them
+instantly → back to `slidesmith_wait()`. `slidesmith_status()` shows owner / deck / pending.
+The handshake auto-loop means you never manually poll — `wait` wakes you. Details in §4b.
 
 The canonical truth is the **HTML deck itself** (not a JSON IR). An older IR + CLI
 pipeline still exists as an optional, guard-railed path — see §6.
@@ -115,26 +115,45 @@ you and the Studio talk directly — the human never moves a file.
 How it works: a small local process (`slidesmith serve` or, for you, `slidesmith mcp`)
 serves the Studio over `http://localhost:<port>` and holds the deck + a request queue in
 memory. The Studio, when opened from that URL (not `file://`), connects back over a
-same-origin **WebSocket** and shows a green **● 已连接 Claude** badge. You reach the same
-process over **MCP**. Edit-requests flow up (Studio→bridge→you), patches flow down
-(you→bridge→Studio, applied on the spot by `data-id`). If the Studio is opened from
-`file://` instead, there's no connection and it silently falls back to the manual path
-above — nothing breaks.
+same-origin **WebSocket**. You reach the same process over **MCP**. Edit-requests flow up
+(Studio→bridge→you), patches flow down (you→bridge→Studio, applied on the spot by
+`data-id`). If the Studio is opened from `file://` instead, there's no connection and it
+silently falls back to the manual path above — nothing breaks.
+
+**Handshake + auto-loop (the primary model).** `slidesmith_open` (or `slidesmith_connect`)
+**handshakes** the bridge: it binds *this session* as the bridge's `owner`, and the Studio's
+top bar shows **● 已连接 Claude · 会话 X · 端口 Y** — so there's never ambiguity about which
+session a request lands in. After the handshake you don't poll-and-guess; you **block on
+`slidesmith_wait`** (a long-poll). It returns the instant the user submits, or `timedOut`
+when idle — then you change the slides and loop back to `slidesmith_wait`. Zero manual pull.
 
 MCP tools (server name `slidesmith-bridge`):
-- `slidesmith_open({ deckPath })` — load a contract HTML deck and open the Studio in the
-  user's browser (connected). Call this first.
-- `slidesmith_get_requests()` — return the edit-requests the user submitted from Studio.
-  Each request's `content` is exactly the `*.all-requests.md` prompt from §4 (instruction
-  + that slide's current HTML + tokens + output spec). Reading drains the queue.
-- `slidesmith_apply_patch({ sections })` — push your rewritten `<section data-id>`(s) back;
-  the Studio replaces those slides by `data-id` immediately. Same patch format as §4.
-- `slidesmith_status()` — is a Studio connected, which deck, how many requests pending.
+- `slidesmith_open({ deckPath, label? })` — load a contract HTML deck, open the Studio in the
+  user's browser (connected), **and handshake** this session as owner. Call this first.
+- `slidesmith_connect({ label? })` — handshake without opening (Studio-first cold start: the
+  user already has a Studio running; bind this session to it, then go straight to `wait`).
+- `slidesmith_wait({ timeout? })` — **long-poll**: block until the user submits an
+  edit-request, then return it (drained); or return `timedOut` after `timeout` ms (default
+  25000, cap 290000). This is the loop's heartbeat — call it, await, handle, call it again.
+- `slidesmith_get_requests()` — non-blocking drain (peek the queue right now). `wait` is
+  preferred for the loop; `get_requests` is for a one-shot check. Each request's `content`
+  is exactly the `*.all-requests.md` prompt from §4 (instruction + that slide's current HTML
+  + tokens + output spec). A request carries `confirm: true` when the user turned on
+  **改前先问我**.
+- `slidesmith_apply_patch({ sections, preview? })` — push your rewritten `<section data-id>`(s)
+  back; the Studio replaces those slides by `data-id` immediately. `preview: true` lands the
+  change as a **proposal** (Studio shows a 保留/还原 bar) — use it whenever the request had
+  `confirm: true`. Same patch format as §4.
+- `slidesmith_status()` — is a Studio connected, the `owner`, which deck, how many pending.
 
-The connected loop: `slidesmith_open` → user edits visually and hits **🚀 发送给 Claude** →
-you `slidesmith_get_requests` → rewrite the listed slides per the contract → `slidesmith_apply_patch`.
-The patch format and the conflict-safety rules from §4 apply unchanged. To run the bridge
-standalone for a human (no MCP), use `slidesmith serve <deck.html>`.
+The connected loop: `slidesmith_open` (handshake) → `slidesmith_wait` (blocks) → user edits
+visually and hits **发送给 Claude** → `wait` returns the request → rewrite the listed slides
+per the contract → `slidesmith_apply_patch` (`preview: true` if `confirm`) → back to
+`slidesmith_wait`. The patch format and conflict-safety rules from §4 apply unchanged.
+Driving it without MCP: `slidesmith serve <deck.html>` for the bridge, then a background
+`curl -s "<url>api/wait?timeout=280000"` is the same long-poll (it exits the moment a
+request arrives), `curl -XPOST "<url>api/handshake?label=…"` handshakes, and
+`POST /api/patch` (`?preview=1` for a proposal) writes back.
 
 **What a request now contains** (the comment model — like Claude Design comments, but on
 real HTML): the human leaves a **comment per slide** ("把这页改成两栏…") and/or one
@@ -153,11 +172,11 @@ don't re-touch a page they reverted unless they ask again.
 Best path: call `slidesmith_open(deckPath)` — the Studio opens in their browser already
 connected. Tell them to edit visually (click text, right panel for colors / fonts /
 animations / move·delete element, 「视觉自检」, 「导出 HTML / 导出 PDF」), and for
-complex changes to **leave a comment on the slide and hit 🚀 发送给 Claude** — you'll
-pick it up via `slidesmith_get_requests`.
+complex changes to **leave a comment on the slide and hit 发送给 Claude** — you'll
+pick it up via `slidesmith_wait` (or `slidesmith_get_requests`).
 
 If you can't open it for them (no MCP), they can double-click `studio/slidesmith-studio.html`
-(offline) and drag the deck in; to connect to you, they click the top-bar **🔌 连接 Claude**
+(offline) and drag the deck in; to connect to you, they click the top-bar **连接 Claude Code**
 button (auto-detects the bridge and jumps to the connected Studio), or you run
 `slidesmith serve <deck>`.
 
