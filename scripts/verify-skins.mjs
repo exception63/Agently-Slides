@@ -13,9 +13,9 @@ const DEMO = path.join(ASSETS, 'demo/_showcase.slides.txt');
 const SHOTS = path.join(ROOT, 'docs/screenshots/skins');
 mkdirSync(SHOTS, { recursive: true });
 
-const SKINS = ['dracula', 'nord', 'tokyo-night', 'catppuccin-mocha', 'catppuccin-latte', 'vaporwave',
+const SKINS = ['acrylic', 'dracula', 'nord', 'tokyo-night', 'catppuccin-mocha', 'catppuccin-latte', 'vaporwave',
   'swiss-grid', 'bauhaus', 'cyberpunk-neon', 'glassmorphism', 'y2k-chrome', 'neo-brutalism', 'terminal-green', 'rose-pine'];
-const SHOOT = ['dracula', 'vaporwave', 'swiss-grid', 'bauhaus', 'neo-brutalism', 'glassmorphism', 'terminal-green', 'tokyo-night'];
+const SHOOT = ['acrylic', 'dracula', 'vaporwave', 'swiss-grid', 'bauhaus', 'neo-brutalism', 'glassmorphism', 'terminal-green', 'tokyo-night'];
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { c ? (pass++, console.log('  ✓ ' + m)) : (fail++, console.log('  ✗ ' + m)); };

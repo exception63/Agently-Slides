@@ -35,7 +35,7 @@ try {
     return { present: !!sel, options: sel ? sel.options.length : 0, hasDefault: sel && sel.options[0] && sel.options[0].value === '' };
   });
   ok('换皮下拉存在', dropdown.present);
-  ok('21 皮 + 保持原样 = 22 项', dropdown.options === 22, String(dropdown.options));
+  ok('22 皮 + 保持原样 = 23 项', dropdown.options === 23, String(dropdown.options));
   ok('首项为「保持原样」（空值）', dropdown.hasDefault);
 
   // switch to vaporwave → tokens change live

@@ -476,6 +476,15 @@ em{font-style:normal;color:var(--accent);font-family:var(--font-display);font-we
   --smfx-ease-inout: cubic-bezier(.4,0,.2,1);
   /* 烘焙好的弹簧曲线（Josh Comeau 范式 · 离线零运行时，含轻微 overshoot）*/
   --smfx-spring: linear(0,.02,.08,.2,.38,.58,.76,.89,.97,1.02,1.04,1.03,1.01,1);
+  /* ── 动效令牌：时长/缓动/间隔/模糊的共享刻度（灵感来自 transitions.dev 的 motion-token
+     scale，已按 slides 放映态重新定标——远观尺度比 App UI 更大更稳）。新效果统一引用，
+     节奏一致、可整体调。*/
+  --smfx-t-quick: .28s;   /* 小动作（单字/图标）*/
+  --smfx-t-base: .5s;     /* 标准入场 */
+  --smfx-t-slow: .72s;    /* 大动作（数字/成功对勾/纵深）*/
+  --smfx-stagger: .07s;   /* 逐项/逐字间隔 */
+  --smfx-blur-in: 6px;    /* 入场模糊起手量 */
+  --smfx-ease-pop: cubic-bezier(.34,1.5,.5,1);  /* 弹性收尾（数字/对勾的"砸进来"感）*/
 }
 
 /* 透视：翻牌类入场/消失需要父级 perspective */
@@ -519,6 +528,30 @@ em{font-style:normal;color:var(--accent);font-family:var(--font-display);font-we
 .smfx-go [data-anim="stagger-list"]>*:nth-child(6){animation-delay:.40s}
 .smfx-go [data-anim="stagger-list"]>*:nth-child(n+7){animation-delay:.48s}
 
+/* A5 数字弹入 num-pop：每个字符错落带模糊滑入（KPI/价格/票数的"砸进来"感）。
+   _fx.js 把没拆的自动拆成 .smfx-ch（带 --i 序号）；作者也可手写
+   <span class="smfx-ch" style="--i:0">1</span> 预拆。容器本身不藏，藏的是字符。*/
+.smfx-arm [data-anim="num-pop"]{ opacity:1; }
+.smfx-arm [data-anim="num-pop"] .smfx-ch{ display:inline-block; opacity:0; transform:translateY(.5em); filter:blur(var(--smfx-blur-in)); }
+.smfx-go  [data-anim="num-pop"]{ opacity:1; animation:none; }
+.smfx-go  [data-anim="num-pop"] .smfx-ch{
+  display:inline-block;
+  animation:smfx-num-pop var(--smfx-t-slow) var(--smfx-ease-pop) both;
+  animation-delay:calc(var(--i,0) * var(--smfx-stagger));
+}
+/* A12 多行浮现 texts-reveal：堆叠的多行文字依次带模糊上浮（标题+副题/要点块）。
+   容器不藏，藏的是每一行（直接子元素）。纯 CSS，无需拆字。*/
+.smfx-arm [data-anim="texts-reveal"]{ opacity:1; }
+.smfx-arm [data-anim="texts-reveal"]>*{ opacity:0; transform:translateY(.55em); filter:blur(var(--smfx-blur-in)); }
+.smfx-go  [data-anim="texts-reveal"]{ opacity:1; animation:none; }
+.smfx-go  [data-anim="texts-reveal"]>*{ animation:smfx-texts-reveal var(--smfx-t-base) var(--smfx-ease) both; }
+.smfx-go  [data-anim="texts-reveal"]>*:nth-child(2){ animation-delay:calc(var(--smfx-stagger)*1.5) }
+.smfx-go  [data-anim="texts-reveal"]>*:nth-child(3){ animation-delay:calc(var(--smfx-stagger)*3) }
+.smfx-go  [data-anim="texts-reveal"]>*:nth-child(4){ animation-delay:calc(var(--smfx-stagger)*4.5) }
+.smfx-go  [data-anim="texts-reveal"]>*:nth-child(n+5){ animation-delay:calc(var(--smfx-stagger)*6) }
+
+@keyframes smfx-num-pop{ from{opacity:0;transform:translateY(.5em);filter:blur(var(--smfx-blur-in))} to{opacity:1;transform:none;filter:none} }
+@keyframes smfx-texts-reveal{ from{opacity:0;transform:translateY(.55em);filter:blur(var(--smfx-blur-in))} to{opacity:1;transform:none;filter:none} }
 @keyframes smfx-fade{ to{opacity:1} }
 @keyframes smfx-rise{ from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:none} }
 @keyframes smfx-pop{ from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
@@ -646,6 +679,15 @@ em{font-style:normal;color:var(--accent);font-family:var(--font-display);font-we
   animation:smfx-dash 1.2s var(--smfx-ease-inout) forwards;
 }
 @keyframes smfx-dash{ to{stroke-dashoffset:0} }
+/* H8 成功对勾：圆环弹入 + 对勾描线 + 轻微回弹，给"完成/达成/上线"时刻一个庆祝拍。
+   用法：<span class="smfx-check"><svg viewBox="0 0 52 52"><circle cx=26 cy=26 r=24 .../>
+   <path class="smfx-check-tick" pathLength="1" d="M14 27 l8 8 16-18" .../></svg></span> */
+.smfx-arm .smfx-check{ opacity:0; transform:scale(.6) rotate(-12deg); }
+.smfx-go  .smfx-check{ animation:smfx-check-in var(--smfx-t-slow) var(--smfx-ease-pop) both; display:inline-block; }
+.smfx-check svg{ overflow:visible; }
+.smfx-check .smfx-check-tick{ stroke-dasharray:1; stroke-dashoffset:1; }
+.smfx-go .smfx-check .smfx-check-tick{ animation:smfx-dash var(--smfx-t-base) var(--smfx-ease-inout) .2s forwards; }
+@keyframes smfx-check-in{ 0%{opacity:0;transform:scale(.6) rotate(-12deg)} 60%{opacity:1;transform:scale(1.08) rotate(2deg)} 100%{opacity:1;transform:scale(1) rotate(0)} }
 /* H5 聚光灯：容器加 .smfx-spot，被聚焦元素加 [data-focus]，其余压暗 */
 .smfx-spot > *{ transition:opacity .4s, filter .4s; }
 .smfx-spot.smfx-go > :not([data-focus]){ opacity:.22; filter:saturate(.4); }
@@ -680,6 +722,9 @@ em{font-style:normal;color:var(--accent);font-family:var(--font-display);font-we
 /* ───────────────────────── 无障碍：减少动态 ──────────────────────────────── */
 @media (prefers-reduced-motion: reduce){
   .smfx-arm [data-anim], .smfx-go [data-anim], .smfx-go [data-emph],
+  .smfx-arm [data-anim="num-pop"] .smfx-ch, .smfx-go [data-anim="num-pop"] .smfx-ch,
+  .smfx-arm [data-anim="texts-reveal"]>*, .smfx-go [data-anim="texts-reveal"]>*,
+  .smfx-arm .smfx-check, .smfx-go .smfx-check, .smfx-go .smfx-check .smfx-check-tick,
   [data-motion], .fragment, .smfx-enter, .smfx-leave,
   .smfx-go .smfx-draw path, .smfx-kenburns img, .smfx-aurora::before{
     animation:none !important; transition:none !important;
@@ -859,9 +904,27 @@ em{font-style:normal;color:var(--accent);font-family:var(--font-display);font-we
   try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   var hasVT = typeof document.startViewTransition === 'function';
 
+  /* —— A5 数字弹入：把 [data-anim="num-pop"] 的文本拆成逐字 .smfx-ch（带 --i 序号），
+     这样 CSS 能逐字错落入场。作者可手写 span 预拆；这里给没拆的兜底自动拆（只拆一次）。—— */
+  function splitNumPop(slide) {
+    slide.querySelectorAll('[data-anim="num-pop"]:not([data-smfx-split])').forEach(function (el) {
+      var txt = el.textContent;
+      el.setAttribute('data-smfx-split', '1');
+      el.textContent = '';
+      var i = 0;
+      txt.split('').forEach(function (ch) {
+        if (ch === ' ') { el.appendChild(document.createTextNode(' ')); return; }
+        var s = document.createElement('span');
+        s.className = 'smfx-ch'; s.style.setProperty('--i', i++); s.textContent = ch;
+        el.appendChild(s);
+      });
+    });
+  }
+
   /* —— 入场/强调：翻到该页时重播 —— */
   function onActive(slide) {
     if (!slide) return;
+    try { splitNumPop(slide); } catch (e) {}
     // 复位再播（移除 go → 强制 reflow → 加 arm+go）
     slide.classList.remove('smfx-go', 'smfx-exit');
     slide.classList.add('smfx-arm');

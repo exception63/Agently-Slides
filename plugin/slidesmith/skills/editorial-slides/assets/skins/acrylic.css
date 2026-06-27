@@ -1,0 +1,67 @@
+/* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
+/* uses-base */
+/* skin: acrylic — 亚克力毛玻璃 · Fluent/Mica 风 · 深邃光晕底 + 真磨砂卡片（模糊+饱和·inset 高光·颗粒·景深）· 自有实现，灵感取自微软 Fluent Design */
+:root{
+  --paper:#0a0e1d;--paper-2:#0c1126;
+  --paper-soft:rgba(255,255,255,.06);--paper-warm:rgba(255,255,255,.035);
+  --rule:rgba(255,255,255,.14);--rule-soft:rgba(255,255,255,.08);
+  --ink:#eaf0ff;--ink-2:#b7c2e2;--ink-3:#8b97bd;--ink-4:#69749a;
+  --accent:#5b9dff;--accent-2:#b98bff;--accent-3:#5fe6f0;--accent-soft:color-mix(in srgb,#5b9dff 18%,transparent);--good:#7ef0b0;
+  --radius:18px;
+  --font-display:'Segoe UI Variable Display','Space Grotesk','Segoe UI','Inter','Noto Sans SC',sans-serif;
+  --font-sans:'Segoe UI Variable Text','Segoe UI','Inter','Noto Sans SC',-apple-system,sans-serif;
+  --font-mono:'Cascadia Code','JetBrains Mono','IBM Plex Mono',Menlo,monospace;
+  --font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+  /* ── 毛玻璃令牌（统一节奏，可整体调；性能/PDF 兜底用 --glass-mode）── */
+  --glass-bg:rgba(255,255,255,.08);
+  --glass-bg-2:rgba(255,255,255,.12);
+  --glass-border:rgba(255,255,255,.18);
+  --glass-blur:26px;--glass-sat:175%;
+  --glass-hi:rgba(255,255,255,.34);
+  --glass-shadow:0 28px 64px rgba(3,7,20,.52);
+  --glass-grain:.05;
+}
+/* 深邃底 + 三团 accent 光晕（卡片靠大模糊"采样"这层 → 近似 Mica 透色）。
+   isolation 让每页成独立合成上下文，防多页 deck 卡片串味采样；print-color-adjust 保 PDF 不丢底色。 */
+.slide{
+  isolation:isolate;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  background-color:var(--paper);
+  background-image:
+    radial-gradient(52% 50% at 14% 16%,rgba(91,157,255,.42),transparent 72%),
+    radial-gradient(50% 48% at 86% 22%,rgba(185,139,255,.36),transparent 74%),
+    radial-gradient(64% 54% at 60% 110%,rgba(95,230,240,.28),transparent 72%),
+    linear-gradient(160deg,#0c1330,#0a0f24 60%,#0b1026);
+}
+/* 真毛玻璃卡片：半透底（务必 rgba，禁用 opacity，否则 backdrop-filter 失效）+ 模糊饱和
+   + 顶部 inset 高光（光从上来）+ 大柔投影（景深）。颗粒层去塑料感见 ::after。 */
+.card,.kpi,.rm,.vs__pane,.sum-card,.bignum,.tl__card,.gantt,.diff__col,.mind__node{
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
+  border-top:1px solid var(--glass-hi);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow:inset 0 1px 0 var(--glass-hi),inset 0 0 0 1px rgba(255,255,255,.03),var(--glass-shadow);
+  border-radius:var(--radius);
+  position:relative;overflow:hidden;
+}
+.bignum,.sum-card,.kpi{background:var(--glass-bg-2);}
+/* 颗粒覆层：内联 SVG feTurbulence（零外部资源、离线、能进 PDF）。# 必须转义成 %23。 */
+.card::after,.kpi::after,.rm::after,.vs__pane::after,.sum-card::after,.bignum::after,.tl__card::after,.gantt::after,.diff__col::after,.mind__node::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;z-index:0;
+  opacity:var(--glass-grain);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* 让卡片内容压在颗粒层之上 */
+.card>*,.kpi>*,.rm>*,.vs__pane>*,.sum-card>*,.bignum>*,.tl__card>*,.diff__col>*,.mind__node>*{position:relative;z-index:1;}
+/* 封面/段标巨字加一点 Fluent 光泽（蓝紫青渐变描字） */
+.cover__title,.secdiv__title,.manifesto__title,.insight__statement{
+  background:linear-gradient(120deg,#dbe7ff 0%,#9cc0ff 32%,#c4a8ff 64%,#8ef0f5 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+}
+/* 大数字用 accent 实色（渐变描字会让超大字发虚，数字要锐利） */
+.bignum__v,.sum-card__v{color:var(--accent);}
+/* 性能/PDF 兜底：不支持 backdrop-filter 时退化为较实的半透底（视觉接近，绝不空白） */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .card,.kpi,.rm,.vs__pane,.sum-card,.bignum,.tl__card,.gantt,.diff__col,.mind__node{background:rgba(18,24,48,.82);}
+}

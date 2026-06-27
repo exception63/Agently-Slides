@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>cyberpunk-neon</title>
+<title>acrylic</title>
 <!-- 在线时加载该皮肤的字体；离线时自动回退到系统字体（字体栈已含 fallback） -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap">
 <style>
-/* skin: cyberpunk-neon · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
+/* skin: acrylic · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
 /* ════════════════════════════════════════════════════════════════════
    _core.css · 与风格无关的骨架 + 引擎界面（topbar / 段导航 / 进度条 / 投屏态）
    所有皮肤共用。它只用令牌，不定义令牌——令牌由各皮肤的 :root 提供：
@@ -309,20 +309,74 @@ strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--accent
 .mm-node.root{background:var(--accent);color:#fff;font-size:30px;padding:18px 30px;}
 .mm-node.b2{border-color:var(--accent-2);}.mm-node.b3{border-color:var(--accent-3,var(--accent-2));}
 
-/* —— 皮肤 cyberpunk-neon —— */
+/* —— 皮肤 acrylic —— */
 /* FONTS https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700;900&family=Noto+Serif+SC:wght@500;700;900&display=swap */
 /* uses-base */
-/* skin: cyberpunk-neon — 赛博朋克 · 霓虹粉青 · 薄皮（令牌 + 共享组件 _components.css）·移植自 html-ppt-skill 调色 */
+/* skin: acrylic — 亚克力毛玻璃 · Fluent/Mica 风 · 深邃光晕底 + 真磨砂卡片（模糊+饱和·inset 高光·颗粒·景深）· 自有实现，灵感取自微软 Fluent Design */
 :root{
-  --paper:#07070b;--paper-soft:#12121a;--paper-warm:#0c0c12;
-  --rule:rgba(255,255,255,.12);--rule-soft:rgba(255,255,255,.07);
-  --ink:#eaf6ff;--ink-2:#9fb3c8;--ink-3:#6a7d94;--ink-4:#4a5b6a;
-  --accent:#ff2bd6;--accent-2:#00f0ff;--accent-3:#f9f871;--accent-soft:color-mix(in srgb,#ff2bd6 16%,transparent);--good:#39ff88;
-  --radius:10px;
-  --font-display:'Space Grotesk','Inter','Noto Sans SC',sans-serif;--font-sans:'Inter','Noto Sans SC',-apple-system,sans-serif;--font-mono:'JetBrains Mono','IBM Plex Mono',Menlo,monospace;--font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+  --paper:#0a0e1d;--paper-2:#0c1126;
+  --paper-soft:rgba(255,255,255,.06);--paper-warm:rgba(255,255,255,.035);
+  --rule:rgba(255,255,255,.14);--rule-soft:rgba(255,255,255,.08);
+  --ink:#eaf0ff;--ink-2:#b7c2e2;--ink-3:#8b97bd;--ink-4:#69749a;
+  --accent:#5b9dff;--accent-2:#b98bff;--accent-3:#5fe6f0;--accent-soft:color-mix(in srgb,#5b9dff 18%,transparent);--good:#7ef0b0;
+  --radius:18px;
+  --font-display:'Segoe UI Variable Display','Space Grotesk','Segoe UI','Inter','Noto Sans SC',sans-serif;
+  --font-sans:'Segoe UI Variable Text','Segoe UI','Inter','Noto Sans SC',-apple-system,sans-serif;
+  --font-mono:'Cascadia Code','JetBrains Mono','IBM Plex Mono',Menlo,monospace;
+  --font-serif:'Playfair Display','Noto Serif SC',Georgia,serif;
+  /* ── 毛玻璃令牌（统一节奏，可整体调；性能/PDF 兜底用 --glass-mode）── */
+  --glass-bg:rgba(255,255,255,.08);
+  --glass-bg-2:rgba(255,255,255,.12);
+  --glass-border:rgba(255,255,255,.18);
+  --glass-blur:26px;--glass-sat:175%;
+  --glass-hi:rgba(255,255,255,.34);
+  --glass-shadow:0 28px 64px rgba(3,7,20,.52);
+  --glass-grain:.05;
 }
-.cover__title,.secdiv__title,.manifesto__title,.insight__statement{text-shadow:0 0 14px var(--accent-soft),0 0 30px rgba(0,240,255,.25);}
-.card,.kpi,.bignum{box-shadow:0 0 0 1px var(--rule),0 0 24px rgba(255,43,214,.12);}
+/* 深邃底 + 三团 accent 光晕（卡片靠大模糊"采样"这层 → 近似 Mica 透色）。
+   isolation 让每页成独立合成上下文，防多页 deck 卡片串味采样；print-color-adjust 保 PDF 不丢底色。 */
+.slide{
+  isolation:isolate;
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;
+  background-color:var(--paper);
+  background-image:
+    radial-gradient(52% 50% at 14% 16%,rgba(91,157,255,.42),transparent 72%),
+    radial-gradient(50% 48% at 86% 22%,rgba(185,139,255,.36),transparent 74%),
+    radial-gradient(64% 54% at 60% 110%,rgba(95,230,240,.28),transparent 72%),
+    linear-gradient(160deg,#0c1330,#0a0f24 60%,#0b1026);
+}
+/* 真毛玻璃卡片：半透底（务必 rgba，禁用 opacity，否则 backdrop-filter 失效）+ 模糊饱和
+   + 顶部 inset 高光（光从上来）+ 大柔投影（景深）。颗粒层去塑料感见 ::after。 */
+.card,.kpi,.rm,.vs__pane,.sum-card,.bignum,.tl__card,.gantt,.diff__col,.mind__node{
+  background:var(--glass-bg);
+  border:1px solid var(--glass-border);
+  border-top:1px solid var(--glass-hi);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  backdrop-filter:blur(var(--glass-blur)) saturate(var(--glass-sat));
+  box-shadow:inset 0 1px 0 var(--glass-hi),inset 0 0 0 1px rgba(255,255,255,.03),var(--glass-shadow);
+  border-radius:var(--radius);
+  position:relative;overflow:hidden;
+}
+.bignum,.sum-card,.kpi{background:var(--glass-bg-2);}
+/* 颗粒覆层：内联 SVG feTurbulence（零外部资源、离线、能进 PDF）。# 必须转义成 %23。 */
+.card::after,.kpi::after,.rm::after,.vs__pane::after,.sum-card::after,.bignum::after,.tl__card::after,.gantt::after,.diff__col::after,.mind__node::after{
+  content:"";position:absolute;inset:0;pointer-events:none;border-radius:inherit;z-index:0;
+  opacity:var(--glass-grain);mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* 让卡片内容压在颗粒层之上 */
+.card>*,.kpi>*,.rm>*,.vs__pane>*,.sum-card>*,.bignum>*,.tl__card>*,.diff__col>*,.mind__node>*{position:relative;z-index:1;}
+/* 封面/段标巨字加一点 Fluent 光泽（蓝紫青渐变描字） */
+.cover__title,.secdiv__title,.manifesto__title,.insight__statement{
+  background:linear-gradient(120deg,#dbe7ff 0%,#9cc0ff 32%,#c4a8ff 64%,#8ef0f5 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+}
+/* 大数字用 accent 实色（渐变描字会让超大字发虚，数字要锐利） */
+.bignum__v,.sum-card__v{color:var(--accent);}
+/* 性能/PDF 兜底：不支持 backdrop-filter 时退化为较实的半透底（视觉接近，绝不空白） */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .card,.kpi,.rm,.vs__pane,.sum-card,.bignum,.tl__card,.gantt,.diff__col,.mind__node{background:rgba(18,24,48,.82);}
+}
 
 
 /* ——— 动画库 _fx.css（集众家所长 · 编号见 references/animations.md）——— */
@@ -606,8 +660,8 @@ strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--accent
 <body>
 
 <header class="topbar">
-  <div class="topbar__brand">赛博朋克</div>
-  <div class="topbar__sub">cyberpunk-neon skin</div>
+  <div class="topbar__brand">亚克力毛玻璃</div>
+  <div class="topbar__sub">acrylic skin</div>
   <div class="topbar__spacer"></div>
   <span class="topbar__info">当前 <strong id="curSeg">段 0</strong> · <strong id="curIdx">1</strong> / <strong id="totalIdx">0</strong></span>
   <button class="topbar__btn" id="prevBtn" title="上一页 ←">←</button>
@@ -623,14 +677,14 @@ strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--accent
 <div class="deck" id="deck">
 
 <section data-seg="0" data-segname="段 0 · 开场" class="slide cover">
-  <div class="cover__top"><div class="cover__brand">赛博朋克</div><div class="cover__seal">皮</div></div>
+  <div class="cover__top"><div class="cover__brand">亚克力毛玻璃</div><div class="cover__seal">皮</div></div>
   <div class="cover__main">
     <div class="cover__eyebrow">风格样张 · Theme Sample</div>
     <h1 class="cover__title">换皮即换<br><em>气质</em></h1>
     <p class="cover__sub">同一份内容，换一个皮肤，整套配色 / 字体 / 版式气质随之改变。</p>
   </div>
   <div class="cover__meta">
-    <div class="cover__meta-item"><span class="cover__meta-k">Skin</span><span class="cover__meta-v">赛博朋克</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Skin</span><span class="cover__meta-v">亚克力毛玻璃</span></div>
     <div class="cover__meta-item"><span class="cover__meta-k">Canvas</span><span class="cover__meta-v">1920×1080</span></div>
     <div class="cover__meta-item"><span class="cover__meta-k">Year</span><span class="cover__meta-v">2026</span></div>
   </div>
@@ -1204,7 +1258,7 @@ strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--accent
    ════════════════════════════════════════════════════════════════════ */
 (function () {
   /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
-  const CONFIG = { channel: 'cyberpunk-neon-sync', presenterFile: '演讲者模式.html' };
+  const CONFIG = { channel: 'acrylic-sync', presenterFile: '演讲者模式.html' };
 
   const deck = document.getElementById('deck');
   const slides = Array.from(deck.querySelectorAll(':scope > .slide'));

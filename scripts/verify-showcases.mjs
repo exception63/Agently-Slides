@@ -26,8 +26,8 @@ const tinfo = await page.evaluate(() => {
   const bare = frames.filter(f => /\?bare\b/.test(f.getAttribute('src') || '')).length;
   return { frames: frames.length, bare };
 });
-ok(tinfo.frames === 21, `21 张皮缩略 iframe（实得 ${tinfo.frames}）`);
-ok(tinfo.bare === 21, `全部 iframe 走 ?bare 只显封面（实得 ${tinfo.bare}，渲染见截图）`);
+ok(tinfo.frames === 22, `22 张皮缩略 iframe（实得 ${tinfo.frames}）`);
+ok(tinfo.bare === 22, `全部 iframe 走 ?bare 只显封面（实得 ${tinfo.bare}，渲染见截图）`);
 await page.screenshot({ path: path.join(SHOTS, '_theme-showcase.png') });
 
 console.log('\n[P2] 版式库展厅 layout-showcase（O 键概览看全部版式）');

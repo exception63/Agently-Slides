@@ -80,15 +80,15 @@ const fxCanvasMod = `export const fxCanvasJs = ${JSON.stringify(fxCanvasJs)};`;
 const edDir = join(root, 'plugin/slidesmith/skills/editorial-slides/assets');
 const componentsCss = read(join(edDir, '_components.css'));
 const layoutsCss = read(join(edDir, '_layouts.css'));
-const SKIN_ORDER = ['editorial', 'academic', 'keynote-dark', 'cartesian', 'signal', 'vellum', 'daisy-days',
+const SKIN_ORDER = ['editorial', 'academic', 'keynote-dark', 'acrylic', 'cartesian', 'signal', 'vellum', 'daisy-days',
   'dracula', 'nord', 'tokyo-night', 'catppuccin-mocha', 'catppuccin-latte', 'vaporwave', 'swiss-grid',
   'bauhaus', 'cyberpunk-neon', 'glassmorphism', 'y2k-chrome', 'neo-brutalism', 'terminal-green', 'rose-pine'];
-const SKIN_LABEL = { editorial: '杂志风', academic: '学术', 'keynote-dark': '暗场主旨', cartesian: '极简网格',
+const SKIN_LABEL = { editorial: '杂志风', academic: '学术', 'keynote-dark': '暗场主旨', acrylic: '亚克力毛玻璃', cartesian: '极简网格',
   signal: '机构正式', vellum: '暗色学术', 'daisy-days': '温暖活泼', dracula: 'Dracula', nord: 'Nord',
   'tokyo-night': '东京夜', 'catppuccin-mocha': 'Catppuccin Mocha', 'catppuccin-latte': 'Catppuccin Latte',
   vaporwave: '蒸汽波', 'swiss-grid': '瑞士网格', bauhaus: '包豪斯', 'cyberpunk-neon': '赛博朋克',
   glassmorphism: '玻璃拟态', 'y2k-chrome': 'Y2K 铬', 'neo-brutalism': '新野兽派', 'terminal-green': '终端绿', 'rose-pine': 'Rosé Pine' };
-const SKIN_DARK = new Set(['keynote-dark', 'vellum', 'dracula', 'nord', 'tokyo-night', 'catppuccin-mocha',
+const SKIN_DARK = new Set(['keynote-dark', 'acrylic', 'vellum', 'dracula', 'nord', 'tokyo-night', 'catppuccin-mocha',
   'vaporwave', 'cyberpunk-neon', 'glassmorphism', 'terminal-green', 'rose-pine']);
 const skinBundles = {};
 for (const n of SKIN_ORDER) {

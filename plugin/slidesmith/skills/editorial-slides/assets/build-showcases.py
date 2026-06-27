@@ -15,12 +15,12 @@ SKINS_DIR = os.path.join(SKILL, "gallery", "skins")
 os.makedirs(SKINS_DIR, exist_ok=True)
 
 OLD = ["editorial", "academic", "keynote-dark", "cartesian", "signal", "vellum", "daisy-days"]
-NEW = ["dracula", "nord", "tokyo-night", "catppuccin-mocha", "catppuccin-latte", "vaporwave",
+NEW = ["acrylic", "dracula", "nord", "tokyo-night", "catppuccin-mocha", "catppuccin-latte", "vaporwave",
        "swiss-grid", "bauhaus", "cyberpunk-neon", "glassmorphism", "y2k-chrome", "neo-brutalism",
        "terminal-green", "rose-pine"]
-DARK = {"keynote-dark", "vellum", "dracula", "nord", "tokyo-night", "catppuccin-mocha", "vaporwave",
+DARK = {"keynote-dark", "acrylic", "vellum", "dracula", "nord", "tokyo-night", "catppuccin-mocha", "vaporwave",
         "cyberpunk-neon", "glassmorphism", "terminal-green", "rose-pine"}
-NAME = {"editorial": "杂志风", "academic": "学术", "keynote-dark": "暗场主旨", "cartesian": "极简网格",
+NAME = {"editorial": "杂志风", "academic": "学术", "keynote-dark": "暗场主旨", "acrylic": "亚克力毛玻璃", "cartesian": "极简网格",
         "signal": "机构正式", "vellum": "暗色学术", "daisy-days": "温暖活泼", "dracula": "Dracula",
         "nord": "Nord", "tokyo-night": "东京夜", "catppuccin-mocha": "Catppuccin Mocha",
         "catppuccin-latte": "Catppuccin Latte", "vaporwave": "蒸汽波", "swiss-grid": "瑞士网格",
