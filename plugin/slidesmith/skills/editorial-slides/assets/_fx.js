@@ -12,9 +12,27 @@
   try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   var hasVT = typeof document.startViewTransition === 'function';
 
+  /* —— A5 数字弹入：把 [data-anim="num-pop"] 的文本拆成逐字 .smfx-ch（带 --i 序号），
+     这样 CSS 能逐字错落入场。作者可手写 span 预拆；这里给没拆的兜底自动拆（只拆一次）。—— */
+  function splitNumPop(slide) {
+    slide.querySelectorAll('[data-anim="num-pop"]:not([data-smfx-split])').forEach(function (el) {
+      var txt = el.textContent;
+      el.setAttribute('data-smfx-split', '1');
+      el.textContent = '';
+      var i = 0;
+      txt.split('').forEach(function (ch) {
+        if (ch === ' ') { el.appendChild(document.createTextNode(' ')); return; }
+        var s = document.createElement('span');
+        s.className = 'smfx-ch'; s.style.setProperty('--i', i++); s.textContent = ch;
+        el.appendChild(s);
+      });
+    });
+  }
+
   /* —— 入场/强调：翻到该页时重播 —— */
   function onActive(slide) {
     if (!slide) return;
+    try { splitNumPop(slide); } catch (e) {}
     // 复位再播（移除 go → 强制 reflow → 加 arm+go）
     slide.classList.remove('smfx-go', 'smfx-exit');
     slide.classList.add('smfx-arm');

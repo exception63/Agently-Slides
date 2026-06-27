@@ -3,6 +3,7 @@
 > 人在 `gallery/animations.html`（所见即所得）里翻着挑，记住编号；对你（AI）说编号，你照本表落属性。
 > 引擎：`assets/_fx.css` + `assets/_fx.js`（build.py 自动内联进成品 deck）。来源/取舍见 `docs/ANIMATION-LIBRARY-PLAN.md`。
 > **黄金法则**：动画是声明式属性，写在 slide 元素上即可；**别写死内联 animation/keyframes**（破坏换肤与放映关闭）。放映按 `B` 全关，尊重系统"减少动态"。
+> **动效令牌**：`_fx.css :root` 有共享的时长/缓动/间隔/模糊刻度（`--smfx-t-quick/base/slow`、`--smfx-stagger`、`--smfx-blur-in`、`--smfx-ease-pop` 等），新效果统一引用、节奏一致。灵感来自 [transitions.dev](https://transitions.dev) 的 motion-token scale（按 slides 放映态重新定标，本库为自有实现）。
 
 ## 怎么落（三种属性 + 两个机制）
 
@@ -34,7 +35,8 @@
 | A9 | 动感模糊滑入 | `slide-blur` | 比平滑入高级一档 |
 | A10 | 翻牌入场 | `flip-in` | 揭晓数字/答案 |
 | A11 | 纵深拉入 | `back-in` | 含景深的进场 |
-| A5/A12 | 数字滚动 / 逐字浮现 | （规划中）| — |
+| A5 | 数字弹入 | `num-pop` | KPI/价格/票数（逐字错落+模糊"砸"入；引擎自动拆字，也可手写 `<span class="smfx-ch" style="--i:0">`）|
+| A12 | 多行浮现 | `texts-reveal`（写在堆叠多行的容器上）| 标题+副题/要点块（每行依次模糊上浮）|
 
 ### B · 分步揭示 Fragments（`class="fragment ..."`）
 | № | 名 | class | 行为 |
@@ -76,7 +78,8 @@ F1 飞移+变大 · F3 文字/数字变形 · F4 颜色渐变。**用法**：在
 | H5 | 聚光灯压暗 | 容器加 `class="smfx-spot"`，要突出的子元素加 `data-focus`（其余自动压暗）|
 | H6 | Ken Burns | 图容器加 `class="smfx-kenburns"`（或 `<img data-motion="ken-burns">`）|
 | H7 | 擦幕揭图 | 元素加 `data-anim="clip-wipe"` |
-| H2/H3/H4/H8–H11 | 手绘下划线/连线箭头/手绘批注/打字机/解码/滚轮数字/撒花 | （规划中；H4 用 Rough Notation、H11 用 canvas-confetti，零依赖小脚本）|
+| H8 | 成功对勾 | 容器加 `class="smfx-check"`，内含对勾 `<svg>`：圆环 + `<path class="smfx-check-tick" pathLength="1" d="M15 27 l8 8 15-17">`。翻到该页：圆环弹入 + 对勾描线（"完成/达成/上线"时刻的庆祝拍）|
+| H2/H3/H4/H9–H11 | 手绘下划线/连线箭头/手绘批注/解码/滚轮数字/撒花 | （规划中；H4 用 Rough Notation、H11 用 canvas-confetti，零依赖小脚本；打字机见 J13）|
 
 ### I · 背景氛围 Ambient
 I1 极光渐变：容器加 `class="smfx-aurora"`（可调 `--smfx-aurora-1/2/3` 三团光的色）。
