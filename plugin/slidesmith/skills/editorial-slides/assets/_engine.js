@@ -116,8 +116,7 @@
   }
 
   // —— 核心导航 ——
-  function setActive(n) {
-    idx = Math.max(0, Math.min(total - 1, n));
+  function applyActive() {
     slides.forEach((s, i) => s.classList.toggle('active', i === idx));
     if (present) {
       const sc = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 0.98;
@@ -125,6 +124,14 @@
     } else {
       const wrap = slides[idx].parentNode; if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  }
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    const target = slides[idx];
+    // FX 钩子（可选）：放映态翻页时包一层（神奇移动/转场），并重播该页入场动画
+    if (present && window.SMFX && window.SMFX.transition) window.SMFX.transition(applyActive, target);
+    else applyActive();
+    if (present && window.SMFX && window.SMFX.onActive) window.SMFX.onActive(target);
     updateUI(); broadcastPresenter(idx);
   }
   function updateUI() {
@@ -140,7 +147,15 @@
     if (at) { const nr = segnav.getBoundingClientRect(), tr = at.getBoundingClientRect();
       if (tr.top < nr.top + 60 || tr.bottom > nr.bottom - 20) at.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
   }
-  function next() { setActive(idx + 1); } function prev() { setActive(idx - 1); }
+  // 翻页：放映态下若本页还有未点出的 .fragment，先点出（吃掉这次翻页）
+  function next() {
+    if (present && window.SMFX && window.SMFX.stepForward && window.SMFX.stepForward(slides[idx])) return;
+    setActive(idx + 1);
+  }
+  function prev() {
+    if (present && window.SMFX && window.SMFX.stepBack && window.SMFX.stepBack(slides[idx])) return;
+    setActive(idx - 1);
+  }
   function goSeg(n) { setActive(segStarts[n] || 0); }
 
   function togglePresent() {
@@ -167,10 +182,60 @@
         setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); } }
   });
 
+  // —— 概览网格（O 键）：缩出全 deck 缩略图、点击跳页（移植 html-ppt-skill 思路）——
+  let overviewEl = null;
+  function buildOverview() {
+    if (!document.getElementById('sm-overview-css')) {
+      const st = document.createElement('style'); st.id = 'sm-overview-css';
+      st.textContent = '.overview{position:fixed;inset:0;background:rgba(10,12,18,.94);z-index:2000;display:none;grid-template-columns:repeat(4,1fr);gap:18px;padding:44px;overflow:auto;align-content:start;}'
+        + '.overview.open{display:grid;}'
+        + '.ov-cell{position:relative;cursor:pointer;border-radius:8px;overflow:hidden;border:2px solid transparent;transition:border-color .15s,transform .15s;background:var(--paper,#fff);}'
+        + '.ov-cell:hover{border-color:var(--accent,#c0392b);transform:scale(1.03);}'
+        + '.ov-frame{width:100%;overflow:hidden;position:relative;background:var(--paper,#fff);}'
+        + '.ov-frame > .slide{position:absolute;top:0;left:0;transform-origin:top left;box-shadow:none!important;margin:0;}'
+        + '.ov-num{position:absolute;top:6px;left:8px;font-family:var(--font-mono,monospace);font-size:13px;font-weight:700;color:#fff;background:rgba(0,0,0,.55);padding:1px 8px;border-radius:4px;z-index:3;}'
+        + '.ov-bar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(10,12,18,.96);color:#f2ede2;display:flex;align-items:center;gap:14px;padding:0 24px;z-index:2001;font-family:var(--font-mono,monospace);font-size:12px;letter-spacing:.12em;text-transform:uppercase;}';
+      document.head.appendChild(st);
+    }
+    const ov = document.createElement('div'); ov.className = 'overview'; ov.id = 'sm-overview';
+    const bar = document.createElement('div'); bar.className = 'ov-bar';
+    bar.innerHTML = '<strong>概览 OVERVIEW</strong><span style="opacity:.6">' + total + ' 张 · 点击跳页 · O / ESC 关闭</span>';
+    ov.appendChild(bar);
+    slides.forEach((s, i) => {
+      const cell = document.createElement('div'); cell.className = 'ov-cell'; cell.dataset.idx = i;
+      const frame = document.createElement('div'); frame.className = 'ov-frame';
+      const clone = s.cloneNode(true);
+      clone.classList.remove('active', 'sm-play', 'sm-armed', 'smfx-go', 'smfx-arm');
+      clone.querySelectorAll('canvas').forEach(c => c.remove());
+      frame.appendChild(clone);
+      const num = document.createElement('div'); num.className = 'ov-num'; num.textContent = (i + 1);
+      cell.appendChild(frame); cell.appendChild(num);
+      cell.addEventListener('click', () => { closeOverview(); setActive(i); });
+      ov.appendChild(cell);
+    });
+    ov.addEventListener('click', e => { if (e.target === ov) closeOverview(); });
+    document.body.appendChild(ov);
+    return ov;
+  }
+  function fitOverview() {
+    if (!overviewEl) return;
+    overviewEl.querySelectorAll('.ov-frame').forEach(frame => {
+      const clone = frame.firstChild; const scale = frame.clientWidth / 1920;
+      frame.style.height = (frame.clientWidth * 1080 / 1920) + 'px';
+      clone.style.transform = 'scale(' + scale + ')';
+    });
+  }
+  function openOverview() { if (!overviewEl) overviewEl = buildOverview(); overviewEl.classList.add('open'); requestAnimationFrame(fitOverview); }
+  function closeOverview() { if (overviewEl) overviewEl.classList.remove('open'); }
+  function toggleOverview() { (overviewEl && overviewEl.classList.contains('open')) ? closeOverview() : openOverview(); }
+  window.addEventListener('resize', () => { if (overviewEl && overviewEl.classList.contains('open')) fitOverview(); });
+
   // —— 键盘 ——
   document.addEventListener('keydown', e => {
     if (e.target.matches('input, textarea, select')) return;
     const k = e.key;
+    if (k === 'o' || k === 'O') { toggleOverview(); e.preventDefault(); return; }
+    if (k === 'Escape' && overviewEl && overviewEl.classList.contains('open')) { closeOverview(); e.preventDefault(); return; }
     if (k === 'f' || k === 'F' || k === 'Enter') { (document.fullscreenElement || body.classList.contains('present')) ? exitFullscreen() : enterFullscreen(); e.preventDefault(); return; }
     if (k === 'p' || k === 'P') { togglePresent(); e.preventDefault(); return; }
     if (k === 's' || k === 'S') { if (!e.ctrlKey && !e.metaKey) { openPresenter(); e.preventDefault(); } return; }
@@ -212,5 +277,12 @@
 
   updateUI();
   // 暴露给 slides-presenter-mode / 控制台调试
-  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
+  // —— bare 模式（?bare 或 ?bare=N）：只显示某页、去掉所有界面，供 showcase 缩略 iframe ——
+  const bareM = /[?&]bare(?:=(\d+))?/.exec(location.search);
+  if (bareM) {
+    present = true; body.classList.add('present', 'sm-bare');
+    setActive(bareM[1] ? (parseInt(bareM[1], 10) - 1) : 0);
+  }
+
+  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, toggleOverview, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
 })();
