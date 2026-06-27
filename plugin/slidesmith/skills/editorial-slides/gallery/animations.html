@@ -5,54 +5,98 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Slidesmith 动画库 · 所见即所得</title>
 <style>
-:root{ --accent:#c0392b; --paper:#f4f2ec; --ink:#1c1b19; }
+:root{ --accent:#e0563f; --paper:#f4f2ec; --ink:#1c1b19;      /* DEMO 令牌（浅底舞台默认） */
+  --bg:#0d1017; --bg-2:#151a24; --bg-3:#1c2230;
+  --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.15);
+  --tx:#e7e9ef; --tx-2:#a3abbd; --tx-3:#6b7384; --brand:#6ea8fe; }
 *{ box-sizing:border-box; }
-body{ margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif; color:var(--ink); background:#e9e6df; }
-.wrap{ max-width:1180px; margin:0 auto; padding:28px 26px 80px; }
-header.hero{ padding:18px 0 10px; }
-.hero h1{ font-size:30px; margin:0 0 6px; font-weight:800; letter-spacing:-.5px; }
-.hero p{ margin:0; color:#5b574e; font-size:15px; line-height:1.6; }
-.toolbar{ position:sticky; top:0; z-index:30; background:#e9e6df; padding:12px 0; margin:10px 0 6px; border-bottom:1px solid #cfcabd; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-.toolbar input{ flex:1; min-width:200px; height:38px; padding:0 14px; border:1px solid #cfcabd; border-radius:9px; font-size:14px; background:#fff; }
-.jump{ display:flex; flex-wrap:wrap; gap:6px; }
-.jump a{ font-size:12px; text-decoration:none; color:#3a362e; background:#fff; border:1px solid #d7d2c5; padding:5px 10px; border-radius:7px; }
-.jump a:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
-section.cat{ margin:30px 0 8px; }
+body{ margin:0; font-family:-apple-system,"PingFang SC","Microsoft YaHei",system-ui,sans-serif; color:var(--tx); background:var(--bg);
+  background-image:radial-gradient(58% 48% at 16% -6%,rgba(110,168,254,.10),transparent 60%),radial-gradient(46% 40% at 100% -2%,rgba(176,140,255,.09),transparent 60%); background-attachment:fixed; }
+.wrap{ max-width:1240px; margin:0 auto; padding:30px 26px 90px; }
+header.hero{ padding:14px 0 6px; }
+.hero h1{ font-size:30px; margin:0 0 8px; font-weight:800; letter-spacing:-.4px; }
+.hero h1 .dot{ color:var(--brand); }
+.hero p{ margin:0; color:var(--tx-2); font-size:14.5px; line-height:1.66; max-width:920px; }
+.hero code{ background:var(--bg-3); color:var(--tx); padding:1px 6px; border-radius:5px; font-size:12.5px; }
+.toolbar{ position:sticky; top:0; z-index:30; background:rgba(13,16,23,.82); backdrop-filter:blur(12px) saturate(140%); -webkit-backdrop-filter:blur(12px) saturate(140%); padding:12px 0; margin:14px 0 4px; border-bottom:1px solid var(--line); display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.toolbar input{ flex:1; min-width:220px; height:40px; padding:0 14px; border:1px solid var(--line-2); border-radius:10px; font-size:14px; background:var(--bg-2); color:var(--tx); }
+.toolbar input::placeholder{ color:var(--tx-3); }
+.toolbar input:focus{ outline:none; border-color:var(--brand); }
+.tbtn{ height:40px; padding:0 13px; border:1px solid var(--line-2); border-radius:10px; background:var(--bg-2); color:var(--tx-2); font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
+.tbtn:hover{ color:var(--tx); border-color:var(--brand); }
+.tbtn.on{ background:var(--brand); color:#08121f; border-color:var(--brand); font-weight:600; }
+.tbtn .sw{ width:26px; height:15px; border-radius:9px; background:var(--bg-3); position:relative; transition:background .2s; flex:none; }
+.tbtn .sw::after{ content:""; position:absolute; top:2px; left:2px; width:11px; height:11px; border-radius:50%; background:var(--tx-2); transition:transform .2s,background .2s; }
+.tbtn.on .sw::after{ transform:translateX(11px); background:#08121f; }
+.filters{ display:flex; flex-wrap:wrap; gap:6px; margin:11px 0 2px; }
+.fchip{ font-size:12px; padding:5px 11px; border-radius:20px; border:1px solid var(--line-2); background:transparent; color:var(--tx-2); cursor:pointer; }
+.fchip:hover{ color:var(--tx); }
+.fchip.on{ background:var(--brand); color:#08121f; border-color:var(--brand); font-weight:600; }
+.jump{ display:flex; flex-wrap:wrap; gap:5px; }
+.jump a{ font:600 12px ui-monospace,Menlo,monospace; text-decoration:none; color:var(--tx-2); background:var(--bg-2); border:1px solid var(--line); width:28px; height:28px; display:flex; align-items:center; justify-content:center; border-radius:8px; }
+.jump a:hover{ color:var(--tx); border-color:var(--brand); }
+.jump a.active{ background:var(--brand); color:#08121f; border-color:var(--brand); }
+section.cat{ margin:34px 0 8px; scroll-margin-top:84px; }
 .cat-h{ display:flex; align-items:center; gap:10px; margin:0 0 4px; }
-.cat-rule{ width:5px; height:24px; border-radius:3px; }
-.cat-h h2{ font-size:19px; margin:0; font-weight:800; }
-.cat-h .badge-new{ font-size:11px; font-weight:700; color:#0f6e56; background:#d8f0e7; padding:2px 8px; border-radius:20px; }
-.cat-h .badge-star{ font-size:11px; font-weight:700; color:#854f0b; background:#faeeda; padding:2px 8px; border-radius:20px; }
-.cat-note{ margin:0 0 14px; color:#6b665c; font-size:13px; }
-.grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(248px, 1fr)); gap:14px; }
-.card{ background:#fff; border:1px solid #ddd8cc; border-radius:14px; padding:12px; display:flex; flex-direction:column; }
-.card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:9px; }
-.code{ font:700 12px ui-monospace,SFMono-Regular,Menlo,monospace; padding:2px 8px; border-radius:7px; }
-.nm{ font-size:13px; color:#3a362e; font-weight:600; }
-.stage{ height:118px; border-radius:10px; background:var(--paper); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; }
+.cat-rule{ width:4px; height:22px; border-radius:3px; }
+.cat-h h2{ font-size:18px; margin:0; font-weight:800; letter-spacing:-.2px; }
+.cat-h .badge-new{ font-size:10.5px; font-weight:700; color:#7ee0b8; background:rgba(38,194,129,.14); padding:2px 8px; border-radius:20px; }
+.cat-h .badge-star{ font-size:10.5px; font-weight:700; color:#ffce8a; background:rgba(245,176,66,.14); padding:2px 8px; border-radius:20px; }
+.cat-note{ margin:2px 0 14px; color:var(--tx-3); font-size:13px; }
+.grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(252px, 1fr)); gap:14px; }
+.card{ background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:13px; display:flex; flex-direction:column; transition:border-color .15s,transform .15s; }
+.card:hover{ border-color:var(--line-2); transform:translateY(-1px); }
+.card-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; gap:8px; }
+.code{ font:700 12px ui-monospace,Menlo,monospace; padding:2px 8px; border-radius:7px; }
+.nm{ font-size:13px; color:var(--tx); font-weight:600; }
+.stage{ height:120px; border-radius:10px; background:var(--paper); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; transition:background .2s; }
 .demo-chip{ display:inline-block; padding:9px 18px; border-radius:9px; background:#fff; border:1px solid #e0dccf; font-weight:700; font-size:19px; color:#1a1a1a; }
 .demo-big{ font-size:40px; font-weight:800; }
-.row{ display:flex; gap:6px; margin-top:9px; align-items:center; }
-.btn{ font-size:12px; padding:5px 11px; border-radius:8px; border:1px solid #d7d2c5; background:#faf8f3; cursor:pointer; color:#2c2922; }
-.btn:hover{ background:var(--accent); color:#fff; border-color:var(--accent); }
+.row{ display:flex; gap:6px; margin-top:10px; align-items:center; flex-wrap:wrap; }
+.btn{ font-size:12px; padding:5px 11px; border-radius:8px; border:1px solid var(--line-2); background:var(--bg-3); cursor:pointer; color:var(--tx); }
+.btn:hover{ border-color:var(--brand); }
 .btn:active{ transform:scale(.97); }
-.attr{ margin-top:8px; font:600 11px ui-monospace,SFMono-Regular,Menlo,monospace; color:#9a6a3a; word-break:break-all; }
-.loop-tag{ font-size:11px; color:#8a857a; }
+.loop-tag{ font-size:11px; color:var(--tx-3); }
+.attrbar{ margin-top:9px; display:flex; align-items:stretch; gap:6px; }
+.attr{ flex:1; min-width:0; font:600 11px ui-monospace,Menlo,monospace; color:#e0a989; background:#0a0d14; border:1px solid var(--line); padding:6px 9px; border-radius:7px; word-break:break-all; }
+.copy{ flex:none; font-size:11px; padding:0 10px; border-radius:7px; border:1px solid var(--line-2); background:var(--bg-3); color:var(--tx-2); cursor:pointer; white-space:nowrap; }
+.copy:hover{ color:var(--tx); border-color:var(--brand); }
+.copy.done{ color:#7ee0b8; border-color:#26c281; }
 .fr-list{ display:flex; flex-direction:column; gap:7px; align-items:flex-start; padding:0 16px; width:100%; }
-.fr-list .fragment{ background:#fff; border:1px solid #e0dccf; border-radius:7px; padding:6px 12px; font-size:14px; font-weight:600; }
+.fr-list .fragment{ background:#fff; border:1px solid #e0dccf; border-radius:7px; padding:6px 12px; font-size:14px; font-weight:600; color:#1a1a1a; }
 .tr-view{ width:80%; height:88px; position:relative; border-radius:8px; overflow:hidden; background:#fff; border:1px solid #e0dccf; }
 .tr-pane{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:22px; }
 .mm-stage{ position:relative; width:100%; height:100%; }
 .mm-el{ position:absolute; padding:8px 14px; border-radius:9px; background:var(--accent); color:#fff; font-weight:800; transition:all .7s cubic-bezier(.5,0,.2,1); }
-.planned{ margin-top:10px; font-size:12px; color:#7a756a; background:#f3f1ea; border:1px dashed #cfcabd; border-radius:8px; padding:8px 11px; }
-.planned b{ color:#5b574e; }
+.planned{ margin-top:10px; font-size:12px; color:var(--tx-3); background:var(--bg-2); border:1px dashed var(--line-2); border-radius:8px; padding:9px 12px; }
+.planned b{ color:var(--tx-2); }
 .kb{ width:100%; height:100%; background:linear-gradient(120deg,#c0392b,#e8a13a 60%,#2b6cb0); }
 .spot-row{ display:flex; gap:10px; }
-footer.foot{ margin-top:40px; color:#7a756a; font-size:12px; line-height:1.7; border-top:1px solid #cfcabd; padding-top:16px; }
+footer.foot{ margin-top:44px; color:var(--tx-3); font-size:12px; line-height:1.7; border-top:1px solid var(--line); padding-top:18px; }
+footer.foot code{ background:var(--bg-3); padding:1px 5px; border-radius:4px; color:var(--tx-2); }
 .hidden{ display:none !important; }
-.picker-banner{ background:#1c3d5a; color:#fff; padding:11px 16px; border-radius:11px; margin:0 0 6px; font-size:13.5px; line-height:1.5; }
-.pick-btn{ font-size:12.5px; font-weight:700; padding:7px 12px; border-radius:8px; border:1px solid #1d9e75; background:#1d9e75; color:#fff; cursor:pointer; width:100%; margin-top:9px; }
-.pick-btn:hover{ background:#0f6e56; } .pick-btn:active{ transform:scale(.98); }
+.empty{ padding:40px 10px; text-align:center; color:var(--tx-3); font-size:14px; }
+/* 暗底预览：翻转 DEMO 令牌，让浅色舞台 + 令牌驱动的效果整体转暗 */
+body.dark-stage{ --paper:#0e1430; --ink:#eef2ff; }
+body.dark-stage .demo-chip{ background:rgba(255,255,255,.08); color:#f0f2f8; border-color:rgba(255,255,255,.18); }
+body.dark-stage .fr-list .fragment{ background:rgba(255,255,255,.08); color:#f0f2f8; border-color:rgba(255,255,255,.18); }
+body.dark-stage .tr-view{ background:#16203a; border-color:rgba(255,255,255,.14); }
+.picker-banner{ background:linear-gradient(120deg,#16324d,#1d9e75); color:#fff; padding:12px 16px; border-radius:12px; margin:0 0 8px; font-size:13.5px; line-height:1.55; }
+.pick-btn{ font-size:12.5px; font-weight:700; padding:8px 12px; border-radius:8px; border:1px solid #26c281; background:#1d9e75; color:#fff; cursor:pointer; width:100%; margin-top:10px; }
+.pick-btn:hover{ background:#17855f; } .pick-btn:active{ transform:scale(.98); }
+
+/* 组合预览面板 */
+.combo{ margin:18px 0 4px; background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:16px 18px; display:flex; gap:18px; align-items:stretch; flex-wrap:wrap; }
+.combo-l{ flex:1; min-width:260px; display:flex; flex-direction:column; gap:10px; }
+.combo-title{ font-size:14px; font-weight:700; color:var(--tx); display:flex; align-items:center; gap:8px; }
+.combo-title .tag-new{ font-size:10.5px; font-weight:700; color:#7ee0b8; background:rgba(38,194,129,.14); padding:2px 8px; border-radius:20px; }
+.combo-controls{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.combo-controls label{ font-size:11px; color:var(--tx-3); display:flex; flex-direction:column; gap:4px; }
+.combo-controls select{ height:34px; background:var(--bg-3); color:var(--tx); border:1px solid var(--line-2); border-radius:8px; padding:0 8px; font-size:12.5px; }
+.combo-stage{ flex:none; width:300px; height:150px; border-radius:11px; background:var(--paper); display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; transition:background .2s; }
+.combo-el{ font-size:34px; font-weight:800; color:#1a1a1a; }
+body.dark-stage .combo-el{ color:#eef2ff; }
+.combo-foot{ display:flex; gap:6px; align-items:stretch; }
 
 /* ——— 动画库 _fx.css（内联，单一来源）——— */
 /* ════════════════════════════════════════════════════════════════════
@@ -73,6 +117,15 @@ footer.foot{ margin-top:40px; color:#7a756a; font-size:12px; line-height:1.7; bo
   --smfx-ease-inout: cubic-bezier(.4,0,.2,1);
   /* 烘焙好的弹簧曲线（Josh Comeau 范式 · 离线零运行时，含轻微 overshoot）*/
   --smfx-spring: linear(0,.02,.08,.2,.38,.58,.76,.89,.97,1.02,1.04,1.03,1.01,1);
+  /* ── 动效令牌：时长/缓动/间隔/模糊的共享刻度（灵感来自 transitions.dev 的 motion-token
+     scale，已按 slides 放映态重新定标——远观尺度比 App UI 更大更稳）。新效果统一引用，
+     节奏一致、可整体调。*/
+  --smfx-t-quick: .28s;   /* 小动作（单字/图标）*/
+  --smfx-t-base: .5s;     /* 标准入场 */
+  --smfx-t-slow: .72s;    /* 大动作（数字/成功对勾/纵深）*/
+  --smfx-stagger: .07s;   /* 逐项/逐字间隔 */
+  --smfx-blur-in: 6px;    /* 入场模糊起手量 */
+  --smfx-ease-pop: cubic-bezier(.34,1.5,.5,1);  /* 弹性收尾（数字/对勾的"砸进来"感）*/
 }
 
 /* 透视：翻牌类入场/消失需要父级 perspective */
@@ -116,6 +169,30 @@ footer.foot{ margin-top:40px; color:#7a756a; font-size:12px; line-height:1.7; bo
 .smfx-go [data-anim="stagger-list"]>*:nth-child(6){animation-delay:.40s}
 .smfx-go [data-anim="stagger-list"]>*:nth-child(n+7){animation-delay:.48s}
 
+/* A5 数字弹入 num-pop：每个字符错落带模糊滑入（KPI/价格/票数的"砸进来"感）。
+   _fx.js 把没拆的自动拆成 .smfx-ch（带 --i 序号）；作者也可手写
+   <span class="smfx-ch" style="--i:0">1</span> 预拆。容器本身不藏，藏的是字符。*/
+.smfx-arm [data-anim="num-pop"]{ opacity:1; }
+.smfx-arm [data-anim="num-pop"] .smfx-ch{ display:inline-block; opacity:0; transform:translateY(.5em); filter:blur(var(--smfx-blur-in)); }
+.smfx-go  [data-anim="num-pop"]{ opacity:1; animation:none; }
+.smfx-go  [data-anim="num-pop"] .smfx-ch{
+  display:inline-block;
+  animation:smfx-num-pop var(--smfx-t-slow) var(--smfx-ease-pop) both;
+  animation-delay:calc(var(--i,0) * var(--smfx-stagger));
+}
+/* A12 多行浮现 texts-reveal：堆叠的多行文字依次带模糊上浮（标题+副题/要点块）。
+   容器不藏，藏的是每一行（直接子元素）。纯 CSS，无需拆字。*/
+.smfx-arm [data-anim="texts-reveal"]{ opacity:1; }
+.smfx-arm [data-anim="texts-reveal"]>*{ opacity:0; transform:translateY(.55em); filter:blur(var(--smfx-blur-in)); }
+.smfx-go  [data-anim="texts-reveal"]{ opacity:1; animation:none; }
+.smfx-go  [data-anim="texts-reveal"]>*{ animation:smfx-texts-reveal var(--smfx-t-base) var(--smfx-ease) both; }
+.smfx-go  [data-anim="texts-reveal"]>*:nth-child(2){ animation-delay:calc(var(--smfx-stagger)*1.5) }
+.smfx-go  [data-anim="texts-reveal"]>*:nth-child(3){ animation-delay:calc(var(--smfx-stagger)*3) }
+.smfx-go  [data-anim="texts-reveal"]>*:nth-child(4){ animation-delay:calc(var(--smfx-stagger)*4.5) }
+.smfx-go  [data-anim="texts-reveal"]>*:nth-child(n+5){ animation-delay:calc(var(--smfx-stagger)*6) }
+
+@keyframes smfx-num-pop{ from{opacity:0;transform:translateY(.5em);filter:blur(var(--smfx-blur-in))} to{opacity:1;transform:none;filter:none} }
+@keyframes smfx-texts-reveal{ from{opacity:0;transform:translateY(.55em);filter:blur(var(--smfx-blur-in))} to{opacity:1;transform:none;filter:none} }
 @keyframes smfx-fade{ to{opacity:1} }
 @keyframes smfx-rise{ from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:none} }
 @keyframes smfx-pop{ from{opacity:0;transform:scale(.9)} to{opacity:1;transform:scale(1)} }
@@ -243,6 +320,15 @@ footer.foot{ margin-top:40px; color:#7a756a; font-size:12px; line-height:1.7; bo
   animation:smfx-dash 1.2s var(--smfx-ease-inout) forwards;
 }
 @keyframes smfx-dash{ to{stroke-dashoffset:0} }
+/* H8 成功对勾：圆环弹入 + 对勾描线 + 轻微回弹，给"完成/达成/上线"时刻一个庆祝拍。
+   用法：<span class="smfx-check"><svg viewBox="0 0 52 52"><circle cx=26 cy=26 r=24 .../>
+   <path class="smfx-check-tick" pathLength="1" d="M14 27 l8 8 16-18" .../></svg></span> */
+.smfx-arm .smfx-check{ opacity:0; transform:scale(.6) rotate(-12deg); }
+.smfx-go  .smfx-check{ animation:smfx-check-in var(--smfx-t-slow) var(--smfx-ease-pop) both; display:inline-block; }
+.smfx-check svg{ overflow:visible; }
+.smfx-check .smfx-check-tick{ stroke-dasharray:1; stroke-dashoffset:1; }
+.smfx-go .smfx-check .smfx-check-tick{ animation:smfx-dash var(--smfx-t-base) var(--smfx-ease-inout) .2s forwards; }
+@keyframes smfx-check-in{ 0%{opacity:0;transform:scale(.6) rotate(-12deg)} 60%{opacity:1;transform:scale(1.08) rotate(2deg)} 100%{opacity:1;transform:scale(1) rotate(0)} }
 /* H5 聚光灯：容器加 .smfx-spot，被聚焦元素加 [data-focus]，其余压暗 */
 .smfx-spot > *{ transition:opacity .4s, filter .4s; }
 .smfx-spot.smfx-go > :not([data-focus]){ opacity:.22; filter:saturate(.4); }
@@ -277,6 +363,9 @@ footer.foot{ margin-top:40px; color:#7a756a; font-size:12px; line-height:1.7; bo
 /* ───────────────────────── 无障碍：减少动态 ──────────────────────────────── */
 @media (prefers-reduced-motion: reduce){
   .smfx-arm [data-anim], .smfx-go [data-anim], .smfx-go [data-emph],
+  .smfx-arm [data-anim="num-pop"] .smfx-ch, .smfx-go [data-anim="num-pop"] .smfx-ch,
+  .smfx-arm [data-anim="texts-reveal"]>*, .smfx-go [data-anim="texts-reveal"]>*,
+  .smfx-arm .smfx-check, .smfx-go .smfx-check, .smfx-go .smfx-check .smfx-check-tick,
   [data-motion], .fragment, .smfx-enter, .smfx-leave,
   .smfx-go .smfx-draw path, .smfx-kenburns img, .smfx-aurora::before{
     animation:none !important; transition:none !important;
@@ -290,18 +379,20 @@ footer.foot{ margin-top:40px; color:#7a756a; font-size:12px; line-height:1.7; bo
 <body>
 <div class="wrap">
   <header class="hero">
-    <h1>Slidesmith 动画库 · 所见即所得</h1>
-    <p>像剪辑 App 一样翻着挑：每个效果都有<b>编号</b>、<b>实时预览</b>、和它对应的<b>属性写法</b>。<br>
-       做 slides 时只要对 AI 说编号（如「入场用 A8、关键数字 F1 神奇移动、关键词 H1 自绘线」），AI 就照着做。集众家所长 · 来源见 <code>docs/ANIMATION-LIBRARY-PLAN.md</code>。</p>
+    <h1>Slidesmith 动画库<span class="dot">.</span></h1>
+    <p>每个效果都带<b>编号</b>、<b>实时预览</b>与<b>属性写法</b>。制作 slides 时对 AI 说编号（如「入场 A8、关键数字 F1 神奇移动、关键词 H1 自绘线」）即可套用；也可点卡片<b>复制写法</b>直接粘贴。来源见 <code>docs/ANIMATION-LIBRARY-PLAN.md</code>。</p>
   </header>
   <div class="toolbar">
     <input id="q" type="search" placeholder="搜索动画名 / 编号 / 属性，如「神奇」「flip」「A8」">
+    <button id="stageTog" class="tbtn" type="button" title="切换预览底色：Canvas / 毛玻璃等深色效果在暗底更清楚"><span class="sw"></span>暗底预览</button>
     <nav class="jump" id="jump"></nav>
   </div>
+  <div class="filters" id="filters"></div>
+  <section class="combo" id="combo"></section>
   <main id="cats"></main>
   <footer class="foot">
-    所见即所得画廊 · 由 <code>assets/build-anim-gallery.py</code> 生成（内联 <code>_fx.css</code> + <code>_fx.js</code>，单文件离线可用）。<br>
-    标 <span style="color:#0f6e56;font-weight:700">新</span> = 本次集众家所长新增；标 <span style="color:#854f0b;font-weight:700">★</span> = 旗舰。规划中的效果列在各类末尾。
+    由 <code>assets/build-anim-gallery.py</code> 生成（内联 <code>_fx.css</code> + <code>_fx.js</code>，单文件离线可用）。
+    标 <span style="color:#7ee0b8;font-weight:700">新</span> = 新增；标 <span style="color:#ffce8a;font-weight:700">★</span> = 旗舰；规划中的效果列在各类末尾。
   </footer>
 </div>
 
@@ -320,9 +411,27 @@ footer.foot{ margin-top:40px; color:#7a756a; font-size:12px; line-height:1.7; bo
   try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
   var hasVT = typeof document.startViewTransition === 'function';
 
+  /* —— A5 数字弹入：把 [data-anim="num-pop"] 的文本拆成逐字 .smfx-ch（带 --i 序号），
+     这样 CSS 能逐字错落入场。作者可手写 span 预拆；这里给没拆的兜底自动拆（只拆一次）。—— */
+  function splitNumPop(slide) {
+    slide.querySelectorAll('[data-anim="num-pop"]:not([data-smfx-split])').forEach(function (el) {
+      var txt = el.textContent;
+      el.setAttribute('data-smfx-split', '1');
+      el.textContent = '';
+      var i = 0;
+      txt.split('').forEach(function (ch) {
+        if (ch === ' ') { el.appendChild(document.createTextNode(' ')); return; }
+        var s = document.createElement('span');
+        s.className = 'smfx-ch'; s.style.setProperty('--i', i++); s.textContent = ch;
+        el.appendChild(s);
+      });
+    });
+  }
+
   /* —— 入场/强调：翻到该页时重播 —— */
   function onActive(slide) {
     if (!slide) return;
+    try { splitNumPop(slide); } catch (e) {}
     // 复位再播（移除 go → 强制 reflow → 加 arm+go）
     slide.classList.remove('smfx-go', 'smfx-exit');
     slide.classList.add('smfx-arm');
@@ -812,7 +921,9 @@ var REG = [
    {code:'A9', name:'动感模糊滑入', kind:'enter', attr:'data-anim="slide-blur"', _new:1},
    {code:'A10', name:'翻牌入场', kind:'enter', attr:'data-anim="flip-in"', _new:1},
    {code:'A11', name:'纵深拉入', kind:'enter', attr:'data-anim="back-in"', _new:1},
- ], planned:'A5 数字滚动（counter-up，需结构）· A12 逐字/逐词浮现（split-reveal，需 JS 拆字）— 排期中'},
+   {code:'A5', name:'数字弹入', kind:'numpop', attr:'data-anim="num-pop"', _new:1},
+   {code:'A12', name:'多行浮现', kind:'texts', attr:'data-anim="texts-reveal"', _new:1},
+ ], planned:'逐词浮现（word-by-word）· 数字滚动累加（counter-up，需 JS 计数）— 排期中'},
 
  {key:'B', title:'分步揭示 Build / Fragments', color:'#1D9E75', note:'点一下出一条，控制讲解节奏', _new:1, items:[
    {code:'B1', name:'逐点点出', kind:'frag', variant:'', attr:'class="fragment"'},
@@ -877,7 +988,8 @@ var REG = [
    {code:'H5', name:'聚光灯压暗', kind:'spot', attr:'class="smfx-spot"，目标加 data-focus'},
    {code:'H6', name:'Ken Burns', kind:'kenburns', attr:'class="smfx-kenburns"（内含 img）'},
    {code:'H7', name:'擦幕揭图', kind:'wipe', attr:'data-anim="clip-wipe"'},
- ], planned:'H2 手绘下划线 · H3 渐进连线箭头 · H4 手绘批注(Rough Notation) · H8 打字机 · H9 文字解码 · H10 滚轮数字 · H11 结尾撒花(confetti) — 排期中（H4/H11 为零依赖小脚本）'},
+   {code:'H8', name:'成功对勾', kind:'check', attr:'class="smfx-check"（内含对勾 <svg>）', _new:1},
+ ], planned:'H2 手绘下划线 · H3 渐进连线箭头 · H4 手绘批注(Rough Notation) · H9 文字解码 · H10 滚轮数字 · H11 结尾撒花(confetti) — 排期中（H4/H11 为零依赖小脚本；打字机见 J13）'},
 
  {key:'I', title:'背景氛围 Ambient', color:'#534AB7', note:'整页的高级底子（无需点按）', _new:1, items:[
    {code:'I1', name:'极光渐变', kind:'aurora', attr:'class="smfx-aurora"'},
@@ -907,7 +1019,8 @@ function cleanVal(attr){ var m = String(attr).match(/"([^"]+)"/); return m ? m[1
 function pickSpec(it){
   var v = cleanVal(it.attr);
   switch(it.kind){
-    case 'enter': case 'enter-list': return { mode:'attr', attr:'data-anim', val:v };
+    case 'enter': case 'enter-list': case 'numpop': case 'texts': return { mode:'attr', attr:'data-anim', val:v };
+    case 'check': return { mode:'class', add:['smfx-check'], scope:'el' };
     case 'emph': return { mode:'attr', attr:'data-emph', val:v };
     case 'motion': return { mode:'attr', attr:'data-motion', val:v };
     case 'motion-shimmer': return { mode:'attr', attr:'data-motion', val:'shimmer' };
@@ -936,6 +1049,7 @@ function replay(stage){ stage.classList.remove('smfx-go'); void stage.offsetWidt
 function buildCard(it, color){
   var card = el('div','card');
   card.dataset.search = (it.code+' '+it.name+' '+it.attr).toLowerCase();
+  card.dataset.isnew = it._new ? '1' : '';
   var head = el('div','card-head');
   var code = el('span','code', it.code); code.style.background = tint(color,'22'); code.style.color = color;
   head.appendChild(code); head.appendChild(el('span','nm', it.name + (it._new?' <span class="badge-new">新</span>':'')));
@@ -959,6 +1073,27 @@ function buildCard(it, color){
     stage.appendChild(ul);
     var b=el('button','btn','↻ 重播'); b.onclick=function(){ replay(stage); }; row.appendChild(b);
     setTimeout(function(){ stage.classList.add('smfx-go'); }, 120);
+  } else if(k==='numpop'){
+    stage.classList.add('smfx-arm');
+    var num=el('span','demo-big'); num.setAttribute('data-anim','num-pop'); num.setAttribute('data-smfx-split','1');
+    '2,386'.split('').forEach(function(ch,i){ var s=el('span','smfx-ch',ch); s.style.setProperty('--i', i); num.appendChild(s); });
+    stage.appendChild(num);
+    var b=el('button','btn','↻ 重播'); b.onclick=function(){ replay(stage); }; row.appendChild(b);
+    setTimeout(function(){ stage.classList.add('smfx-go'); }, 120);
+  } else if(k==='texts'){
+    stage.classList.add('smfx-arm');
+    var box=el('div'); box.setAttribute('data-anim','texts-reveal'); box.style.cssText='text-align:center;line-height:1.3;';
+    box.innerHTML='<div style="font-size:23px;font-weight:800">标题一行</div><div style="font-size:14px;color:#6b665c;margin-top:3px">副标题再一行</div><div style="font-size:13px;color:#9a958a;margin-top:2px">补充说明第三行</div>';
+    stage.appendChild(box);
+    var b=el('button','btn','↻ 重播'); b.onclick=function(){ replay(stage); }; row.appendChild(b);
+    setTimeout(function(){ stage.classList.add('smfx-go'); }, 120);
+  } else if(k==='check'){
+    stage.classList.add('smfx-arm');
+    var chk=el('span','smfx-check');
+    chk.innerHTML='<svg width="72" height="72" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="none" stroke="'+color+'" stroke-width="3" opacity=".45"/><path class="smfx-check-tick" pathLength="1" d="M15 27 l8 8 15-17" fill="none" stroke="'+color+'" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    stage.appendChild(chk);
+    var b=el('button','btn','↻ 重播'); b.onclick=function(){ replay(stage); }; row.appendChild(b);
+    setTimeout(function(){ stage.classList.add('smfx-go'); }, 150);
   } else if(k==='emph'){
     var chip=el('span','demo-chip','关键词'); chip.setAttribute('data-emph', it.attr.match(/"(.+)"/)[1]); stage.appendChild(chip);
     var b=el('button','btn','↻ 重播'); b.onclick=function(){ stage.classList.remove('smfx-go'); void stage.offsetWidth; stage.classList.add('smfx-go'); }; row.appendChild(b);
@@ -1056,7 +1191,17 @@ function buildCard(it, color){
     if(it.use) row.appendChild(el('span','loop-tag','● '+it.use));
   }
 
-  card.appendChild(el('div','attr', it.attr));
+  var ab = el('div','attrbar');
+  ab.appendChild(el('div','attr', it.attr));
+  var cp = el('button','copy','复制');
+  cp.onclick = function(){
+    var v = String(it.attr).replace(/（.*$/,'').trim();   // 去掉「（说明）」只复制纯写法
+    function done(){ cp.textContent='已复制'; cp.classList.add('done'); setTimeout(function(){ cp.textContent='复制'; cp.classList.remove('done'); }, 1100); }
+    try{ navigator.clipboard.writeText(v).then(done, fallback); }catch(e){ fallback(); }
+    function fallback(){ try{ var t=document.createElement('textarea'); t.value=v; t.style.position='fixed'; t.style.opacity='0'; document.body.appendChild(t); t.select(); document.execCommand('copy'); document.body.removeChild(t); done(); }catch(e2){} }
+  };
+  ab.appendChild(cp);
+  card.appendChild(ab);
   if(PICKER){
     var pk = el('button','pick-btn','＋ 应用到选中');
     pk.onclick = function(){
@@ -1069,7 +1214,7 @@ function buildCard(it, color){
 }
 
 if(PICKER){
-  var bn = el('div','picker-banner','🎬 选择模式：在 Studio 里先<b>选中一个元素</b>，再点任意效果的「＋ 应用到选中」即可套用 —— 这个窗口可一直开着当调色板。');
+  var bn = el('div','picker-banner','选择模式：在 Studio 中先<b>选中一个元素</b>，再点击任意效果的「＋ 应用到选中」即可应用。本窗口可保持打开，作为效果面板使用。');
   document.querySelector('.toolbar').insertAdjacentElement('beforebegin', bn);
 }
 var catsEl = document.getElementById('cats'), jumpEl = document.getElementById('jump');
@@ -1103,15 +1248,102 @@ if(canvasStages.length){
   }catch(e){ canvasStages.forEach(function(s){ s.__initFx(); }); }
 }
 
-/* 搜索过滤 */
-document.getElementById('q').addEventListener('input', function(e){
-  var q=e.target.value.trim().toLowerCase();
-  document.querySelectorAll('.card').forEach(function(c){ c.classList.toggle('hidden', q && c.dataset.search.indexOf(q)<0); });
+/* ── 搜索 + 筛选（统一）── */
+var FILTER = 'all';   // all | new | <cat-key>
+function applyFilter(){
+  var q = (document.getElementById('q').value||'').trim().toLowerCase();
   document.querySelectorAll('section.cat').forEach(function(s){
-    var any=Array.prototype.some.call(s.querySelectorAll('.card'), function(c){ return !c.classList.contains('hidden'); });
-    s.classList.toggle('hidden', q && !any);
+    var catKey = s.id.replace('cat-','');
+    var catOk = (FILTER==='all'||FILTER==='new'||FILTER===catKey);
+    var any=false;
+    s.querySelectorAll('.card').forEach(function(c){
+      var hit = catOk && (!q || c.dataset.search.indexOf(q)>=0) && (FILTER!=='new' || c.dataset.isnew==='1');
+      c.classList.toggle('hidden', !hit); if(hit) any=true;
+    });
+    s.classList.toggle('hidden', !any);
   });
+  var none = !document.querySelector('.card:not(.hidden)');
+  var em = document.getElementById('emptyMsg');
+  if(none && !em){ em=el('div','empty'); em.id='emptyMsg'; em.textContent='没有匹配的效果，换个关键词或筛选试试。'; document.getElementById('cats').appendChild(em); }
+  else if(em){ em.classList.toggle('hidden', !none); }
+}
+document.getElementById('q').addEventListener('input', applyFilter);
+
+/* 筛选 chips：全部 / 新增 / 各类 */
+var filtersEl = document.getElementById('filters');
+var FILTER_DEFS = [{k:'all',label:'全部'},{k:'new',label:'新增'}].concat(REG.map(function(c){ return {k:c.key, label:c.key+' · '+c.title.split(' ')[0]}; }));
+FILTER_DEFS.forEach(function(f){
+  var b = el('button','fchip'+(f.k==='all'?' on':''), f.label); b.dataset.k=f.k;
+  b.onclick=function(){
+    FILTER=f.k; filtersEl.querySelectorAll('.fchip').forEach(function(x){ x.classList.toggle('on', x.dataset.k===f.k); }); applyFilter();
+    if(f.k!=='all'&&f.k!=='new'){ var sec=document.getElementById('cat-'+f.k); if(sec) sec.scrollIntoView({behavior:'smooth'}); }
+  };
+  filtersEl.appendChild(b);
 });
+
+/* 分类导航 scrollspy：高亮当前可见的类 */
+try{
+  var spy = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){ if(en.isIntersecting){
+      var key = en.target.id.replace('cat-','');
+      jumpEl.querySelectorAll('a').forEach(function(a){ a.classList.toggle('active', a.textContent===key); });
+    }});
+  }, { rootMargin:'-74px 0px -68% 0px' });
+  document.querySelectorAll('section.cat').forEach(function(s){ spy.observe(s); });
+}catch(e){}
+
+/* 明 / 暗底预览切换：翻转 DEMO 令牌，让浅色舞台 + 效果整体转暗（Canvas/毛玻璃在暗底更清楚） */
+var stageTog = document.getElementById('stageTog');
+stageTog.addEventListener('click', function(){
+  var on = document.body.classList.toggle('dark-stage');
+  stageTog.classList.toggle('on', on);
+  stageTog.lastChild.textContent = on ? '亮底预览' : '暗底预览';
+});
+
+/* ── 组合预览：入场 + 强调 + 持续 可叠加在同一元素上，实时重放 ── */
+(function(){
+  var box = document.getElementById('combo'); if(!box) return;
+  function optsFrom(catKey, kinds){
+    var cat = REG.filter(function(c){return c.key===catKey;})[0]; if(!cat) return [];
+    return cat.items.filter(function(it){ return kinds.indexOf(it.kind)>=0; }).map(function(it){ return { v: cleanVal(it.attr), name: it.name }; });
+  }
+  var entr = optsFrom('A', ['enter']), emph = optsFrom('C', ['emph']), moti = optsFrom('D', ['motion','motion-shimmer']);
+  function sel(id, label, list){
+    var s='<label>'+label+'<select id="'+id+'"><option value="">无</option>';
+    list.forEach(function(o){ s+='<option value="'+o.v+'">'+o.name+'</option>'; });
+    return s+'</select></label>';
+  }
+  box.innerHTML =
+    '<div class="combo-l">'
+    + '<div class="combo-title">组合预览 <span class="tag-new">新</span></div>'
+    + '<div class="cat-note" style="margin:0">入场 + 强调 + 持续可叠加在同一元素上。任选后实时重放，下方给出合并写法可一键复制。</div>'
+    + '<div class="combo-controls">'+sel('cIn','进入',entr)+sel('cEm','强调',emph)+sel('cMo','持续',moti)+'</div>'
+    + '<div class="combo-foot"><button class="btn" id="cPlay" style="flex:1">▶ 组合预览</button></div>'
+    + '<div class="attrbar"><div class="attr" id="cAttr"></div><button class="copy" id="cCopy">复制</button></div>'
+    + '</div>'
+    + '<div class="combo-stage" id="cStage"><span class="combo-el" id="cEl">关键标题</span></div>';
+  var stage=document.getElementById('cStage'), elx=document.getElementById('cEl');
+  var inS=document.getElementById('cIn'), emS=document.getElementById('cEm'), moS=document.getElementById('cMo');
+  function attrStr(){
+    var a=[]; if(inS.value)a.push('data-anim="'+inS.value+'"'); if(emS.value)a.push('data-emph="'+emS.value+'"'); if(moS.value)a.push('data-motion="'+moS.value+'"');
+    return a.length ? '<h1 '+a.join(' ')+'>关键标题</h1>' : '<h1>关键标题</h1>  （未选效果）';
+  }
+  function sync(){
+    if(inS.value) elx.setAttribute('data-anim', inS.value); else elx.removeAttribute('data-anim');
+    if(emS.value) elx.setAttribute('data-emph', emS.value); else elx.removeAttribute('data-emph');
+    if(moS.value) elx.setAttribute('data-motion', moS.value); else elx.removeAttribute('data-motion');
+    document.getElementById('cAttr').textContent = attrStr();
+  }
+  function play(){ sync(); stage.classList.remove('smfx-go'); void stage.offsetWidth; stage.classList.add('smfx-arm','smfx-go'); }
+  [inS,emS,moS].forEach(function(s){ s.addEventListener('change', play); });
+  document.getElementById('cPlay').addEventListener('click', play);
+  document.getElementById('cCopy').addEventListener('click', function(){
+    var v=attrStr().replace(/（.*$/,'').replace(/\s+$/,''); var b=this;
+    try{ navigator.clipboard.writeText(v); }catch(e){}
+    b.textContent='已复制'; b.classList.add('done'); setTimeout(function(){ b.textContent='复制'; b.classList.remove('done'); },1100);
+  });
+  sync();
+})();
 </script>
 </body>
 </html>
