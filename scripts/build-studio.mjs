@@ -62,15 +62,59 @@ export default function matter(src){
 }
 `;
 
+// animation library gallery (the WYSIWYG picker, reused as the Studio's effect-browser sub-window)
+const galleryHtml = read(
+  join(root, 'plugin/slidesmith/skills/editorial-slides/gallery/animations.html'),
+);
+const animGalleryMod = `export const galleryHtml = ${JSON.stringify(galleryHtml)};`;
+
+// canvas FX engine (the "J · Canvas 特效" library) — injected into every assembled deck so
+// data-fx effects actually run in the Studio preview + export, same as a built editorial deck.
+const fxCanvasJs = read(
+  join(root, 'plugin/slidesmith/skills/editorial-slides/assets/_fx-canvas.js'),
+);
+const fxCanvasMod = `export const fxCanvasJs = ${JSON.stringify(fxCanvasJs)};`;
+
+// editorial-slides 的 21 张皮，做成「可注入 bundle」：Studio 换皮下拉选一个，就把这套 CSS 叠加
+// 到当前 deck 上重新着皮。薄皮需要共享的组件层 + 版式层；厚皮自带组件，但仍要版式层（P4）。
+const edDir = join(root, 'plugin/slidesmith/skills/editorial-slides/assets');
+const componentsCss = read(join(edDir, '_components.css'));
+const layoutsCss = read(join(edDir, '_layouts.css'));
+const SKIN_ORDER = ['editorial', 'academic', 'keynote-dark', 'cartesian', 'signal', 'vellum', 'daisy-days',
+  'dracula', 'nord', 'tokyo-night', 'catppuccin-mocha', 'catppuccin-latte', 'vaporwave', 'swiss-grid',
+  'bauhaus', 'cyberpunk-neon', 'glassmorphism', 'y2k-chrome', 'neo-brutalism', 'terminal-green', 'rose-pine'];
+const SKIN_LABEL = { editorial: '杂志风', academic: '学术', 'keynote-dark': '暗场主旨', cartesian: '极简网格',
+  signal: '机构正式', vellum: '暗色学术', 'daisy-days': '温暖活泼', dracula: 'Dracula', nord: 'Nord',
+  'tokyo-night': '东京夜', 'catppuccin-mocha': 'Catppuccin Mocha', 'catppuccin-latte': 'Catppuccin Latte',
+  vaporwave: '蒸汽波', 'swiss-grid': '瑞士网格', bauhaus: '包豪斯', 'cyberpunk-neon': '赛博朋克',
+  glassmorphism: '玻璃拟态', 'y2k-chrome': 'Y2K 铬', 'neo-brutalism': '新野兽派', 'terminal-green': '终端绿', 'rose-pine': 'Rosé Pine' };
+const SKIN_DARK = new Set(['keynote-dark', 'vellum', 'dracula', 'nord', 'tokyo-night', 'catppuccin-mocha',
+  'vaporwave', 'cyberpunk-neon', 'glassmorphism', 'terminal-green', 'rose-pine']);
+const skinBundles = {};
+for (const n of SKIN_ORDER) {
+  const css = read(join(edDir, 'skins', n + '.css'));
+  const thin = css.includes('/* uses-base */');
+  const fontM = css.match(/\/\*\s*FONTS\s+(\S+)\s*\*\//);
+  const bundle = (thin ? componentsCss + '\n' + layoutsCss : layoutsCss) + '\n' + css;
+  skinBundles[n] = { css: bundle, font: fontM ? fontM[1] : '', label: SKIN_LABEL[n] || n, dark: SKIN_DARK.has(n) };
+}
+const skinsMod = `
+export const SKINS = ${JSON.stringify(skinBundles)};
+export const SKIN_ORDER = ${JSON.stringify(SKIN_ORDER)};
+`;
+
 const virtualPlugin = {
   name: 'slidesmith-virtual',
   setup(build) {
     const virt = {
       '@slidesmith/runtime': runtimeMod,
       '@slidesmith/themes': themesMod,
+      '@slidesmith/anim-gallery': animGalleryMod,
+      '@slidesmith/fx-canvas': fxCanvasMod,
+      '@slidesmith/skins': skinsMod,
       'gray-matter': grayMatterShim,
     };
-    build.onResolve({ filter: /^(@slidesmith\/(runtime|themes)|gray-matter)$/ }, (args) => ({
+    build.onResolve({ filter: /^(@slidesmith\/(runtime|themes|anim-gallery|fx-canvas|skins)|gray-matter)$/ }, (args) => ({
       path: args.path,
       namespace: 'sm-virtual',
     }));

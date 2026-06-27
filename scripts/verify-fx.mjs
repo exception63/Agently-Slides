@@ -108,6 +108,26 @@ try {
   ok('export has FX JS (__SM_FX_PLAY__)', exp.includes('__SM_FX_PLAY__'));
   ok('export kept the entrance attr', /data-anim="rise"/.test(exp));
 
+  // —— Canvas FX engine (J · Canvas 特效): data-fx on a slide → a painted <canvas> in the live preview ——
+  const fxDeck = keynote.replace('class="slide', 'data-fx="gradient-blob" class="slide', 1);
+  await page.evaluate((html) => window.__SM_IMPORT__('fxdeck.html', html), fxDeck);
+  await page.waitForFunction(() => {
+    const d = document.getElementById('preview') && document.getElementById('preview').contentDocument;
+    return !!(d && d.querySelector('#deck .slide'));
+  }, { timeout: 8000 });
+  await page.waitForTimeout(1200); // canvas engine boots via IntersectionObserver + paints a frame
+  const canvas = await page.evaluate(() => {
+    const d = document.getElementById('preview').contentDocument;
+    const cs = d.querySelectorAll('canvas.sm-fx-canvas');
+    let painted = false;
+    if (cs[0]) { try { const cx = cs[0].getContext('2d'); const px = cx.getImageData(0, 0, Math.min(50, cs[0].width), Math.min(50, cs[0].height)).data; painted = [...px].some((v) => v !== 0); } catch (e) { painted = 'err:' + e.message; } }
+    return { count: cs.length, painted };
+  });
+  ok('canvas FX paints in preview (data-fx → <canvas>)', canvas.count >= 1 && canvas.painted === true, JSON.stringify(canvas));
+  const exp2 = await page.evaluate(() => window.__SM_EXPORT_HTML__());
+  ok('export carries canvas engine (HPX + sm-fx-canvas)', /window\.HPX/.test(exp2) && /id="sm-fx-canvas"/.test(exp2));
+  ok('export keeps data-fx', /data-fx="gradient-blob"/.test(exp2));
+
   await page.screenshot({ path: resolve(root, 'dist/fx/inspector.png') });
   ok('no page/console errors', errs.length === 0, errs.slice(0, 3).join(' | '));
 } finally {

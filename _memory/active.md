@@ -1,14 +1,16 @@
 # Active Memory: Slidesmith — AI-first HTML Slides System
 
-> Last updated: 2026-06-25
+> Last updated: 2026-06-26
 > 一句话: **高度 AI 整合的 HTML slides 编辑器**。人做高频细活(点字/换色/动画/移动删除元素,即时零 token)、AI 经**评论**做模糊重活;像 Claude Design comment→edit 但真 HTML 自有、只发相关页、可定制。已上 GitHub: `https://github.com/exception63/Agently-Slides.git`(remote origin,main)。
+> **近况(2026-06-26 一整天)**:做了 ① reveal/impress 调研 → 动画库(A-J 十类含 Canvas 特效)+ 所见即所得画廊 + Studio 子窗口选择器;② 借鉴 `../html-ppt-skill` → 14 张新薄皮(共 21)+ 概览网格 O 键 + 7 个新版式 + 换皮/版式两展厅;③ **修薄皮「页面溢出」**(CSS 注释嵌 `*/` 吞掉令牌默认块→padding 塌 0,见下);④ **dogfood 插曲**:封面加「思考的大脑」神经网络动画(走 bridge `slidesmith_apply_patch`);⑤ **3 个收尾全做完**(Canvas 接进 Studio · 7 厚皮补 P4 · 21 皮接进 Studio 换皮下拉,见下「✅ 3 个收尾」)。**全绿、全未提交**。详见下方各「✅ 完成」块 + `docs/RESEARCH-{reveal-impress,html-ppt-borrow}.md`、`docs/ANIMATION-LIBRARY-PLAN.md`。
 
-## 🔴 下个会话第一件事:反向连接测试(用户清空上下文后要做)
-**场景**: 用户先**双击打开离线 Studio**(`studio/slidesmith-studio.html`)→ 点顶栏蓝色 **🔌 连接 Claude** → 跳到连接版 → 留评论 → 我自动接活改回写。**我(下个会话)要做的**:
-1. 先 `mcp__plugin_slidesmith_slidesmith__slidesmith_status` 确认桥接在(8765)、有没有 Studio 连着、有没有 deck。`/clear` 不关 Claude Code,所以桥接通常还在。
-2. **挂上自动监听**:后台 `while: curl -s http://localhost:8765/api/requests?drain=0 | grep -q '"count":0' || break; sleep 3`(run_in_background)。**坑:超时和命中都 exit 0,必须读 task output 区分 `NEW_REQUEST_DETECTED` vs `idle-timeout`**。命中→`slidesmith_get_requests`(drain)读评论→按契约只改点名的页(保留 `data-id`)→`slidesmith_apply_patch`→重新挂监听。
-3. 用户从离线→连接版时,deck 经 `POST /api/open` 自动交接到桥接,所以**我不一定要 slidesmith_open**;但若桥接没 deck,就 `slidesmith_open <deck.html>` 帮他载入。
-4. 验收: 用户在连接版留一句评论→点🚀发送→我接到→改对那页→他看到蓝脉冲转✓。**注意桥接服的是启动时缓存的 studio**;若用户开的是旧 tab 没有🔌按钮,让他双击重新打开(已 `npm run build:studio` 的新文件 355KB 才有按钮)。
+## ✅ 3 个收尾全部完成(2026-06-26,本会话)
+三项全做完、全验证、**未提交**。全套 verify 绿:skins43 · showcases10 · anim-gallery16 · anim-picker15 · **studio-skins14(新)** · studio-tabs24 · editor22 · fx21(+canvas 3 项) · resilience23 · save13 · typecheck0。
+1. ✅ **Canvas 引擎接进 Studio 预览/导出**。`build-studio.mjs` 把 `_fx-canvas.js` 读成虚拟模块 `@slidesmith/fx-canvas`(+`skins.d.ts`/`fx-canvas.d.ts` 声明);`main.ts` 加 `FX_CANVAS_JS`,`assembleDeck` 在 `${FX_JS}` 后注入。**关键修了 `_fx-canvas.js` 两个真 bug**:① `initIn` 用 `root.querySelectorAll` 漏掉 root 自身→满屏 `data-fx`(挂 `.slide` 上)从不触发;抽 `fxEls()` 补上 root-self。② boot 只监 `.slide.active`,但 Studio 编辑预览是滚动态**没 .active**→canvas 永不跑;改成 **IntersectionObserver**(可见即跑),统一覆盖放映态(只 active 可见)+ 滚动/编辑态(看得见就跑)+ 更省。实测:预览里 1 个 canvas 在画(只可见页)、导出烘焙 HPX+data-fx。
+2. ✅ **原生 7 厚皮补 P4 版式**。抽出 **`assets/_layouts.css`**(kpi/vs/timeline/gantt/roadmap/diff/mindmap,token-generic + 缺失令牌就地兜底:`--accent-3→--accent-2` · `--good→--green→中性绿` · `--radius→0`);`build.py` 新 `{layouts}` 槽对**所有皮恒内联**;`_components.css` 删 P4 段(薄皮改从 _layouts 拿,单一真相)。实测 editorial(浅)+keynote-dark(暗)9 张 P4 全渲染、兜底解析成真颜色、零溢出。
+3. ✅ **21 张皮接进 Studio 换皮下拉**。`build-studio.mjs` 暴露 `@slidesmith/skins`=每皮一个**可注入 bundle**(薄皮=`_components+_layouts+skin`,厚皮=`_layouts+skin`)+ 名称/暗浅/字体 URL。`main.ts`:`H.skin` 状态、格式 pane 加「皮肤·换一套气质(21套)」下拉、`skinInject()` 在 `assembleDeck` 把 `<style id="sm-skin" data-skin>`+ 字体 link 叠加在 deck 自身 CSS 之后(后者被覆盖=重新着皮)、导出烘焙、再导入 `loadHtmlDeck` 识别 data-skin 并 strip 去重、undo Snap 加 skin。实测:cartesian→vaporwave 令牌真变(accent #8A8178→#ff6ec7,paper→#1a0938)、导出→再导入还原下拉且恰 1 个 sm-skin、切「保持原样」干净移除。**坑**:① CSS 注释别嵌 `*/`(见薄皮溢出修复);② 注入层必须排在 `${H.head}` 之后才压得过 deck 自带皮;③ Studio 单文件大小 511KB→1100KB(内嵌 21 皮 bundle)。
+
+> 下一步候选:图表(Chart.js 内联/预渲染,破单文件要权衡)、展厅/动画库挂进 Studio 入口、换皮下拉只在 html 模式有意义(IR 模式仍走 `#theme` 3 套)。**老的 bridge 反向连接闭环**仍可用(`mcp__plugin_slidesmith_slidesmith__*` + 后台轮询 `curl /api/requests?drain=0`,超时和命中都 exit 0 要读 output 区分)。
 
 ## Current State(已完成)
 - **Studio** `studio/slidesmith-studio.html`(单文件离线 355KB);源 `packages/studio/src/main.ts`,改后 `npm run build:studio`。
@@ -39,7 +41,35 @@
 - **下一批(未做,排期)**:harvest/单一数据真相重构、main.ts 拆模块、向上选一层、AI 端可见性;顺手:emoji→线性图标、SMWindow 类型集中、aria。详见 `_memory/optimization-roadmap.md`。
 - ✅ **排版 text-wrap(2026-06-26)**:标题 balance + 正文 pretty,Studio 注入 `TYPO_CSS` + core.css 两处。评估 `@chenglou/pretext` 后**暂不接入**(HTML-first 用不上其无浏览器测量,server-side 未出,v0.0.8 太早;触发回看点见 roadmap)。
 
-## 🎯 下个会话任务(用户 2026-06-26 指定,优先做这个)
+## 🎯 reveal/impress 调研 + 动画库(2026-06-26) — ✅ 大部完成
+**调研结论 = C(重心 B)**:把 reveal 的神奇移动/分步揭示/转场移植进引擎(单文件/离线/可编辑/AI可写),impress 只取缩放概览创意 + Prezi 逃生舱。详 `docs/RESEARCH-reveal-impress.md`。用户拍板"按推荐做"。
+**接着用户要"集众家所长的风格库式动画库"**:广泛调研(Animate.css/Animista/Magic · GSAP/Motion/Anime + **View Transitions API** · reveal/Slidev/Keynote/PPT · Rough Notation/confetti/SVG line-draw)→ 方案 `docs/ANIMATION-LIBRARY-PLAN.md`(9 类 ~60 编号 · 全标出处+实现 · 分核心/点睛/进阶层)。**最大发现:View Transitions API**(2025-10 Baseline,同文档版)让"神奇移动"几乎零 JS,`data-id→view-transition-name`,FLIP 兜底。
+**已建成(editorial-slides 这个 plugin skill 里)**:
+- **动画库引擎** `assets/_fx.css`(全 keyframes/类) + `_fx.js`(暴露 `window.SMFX`:onActive 入场/强调重播 · transition 神奇移动 View Transitions+FLIP · stepForward/Back 分步 · 点睛 init)。触发模型:页/台上 `.smfx-arm`(藏)/`.smfx-go`(播)/`.smfx-exit`(消失)。
+- **引擎钩子**:`_engine.js` 的 `setActive` 包了 `SMFX.transition`+`onActive`,`next/prev` 先问 `SMFX.stepForward/Back`(全 **gated 到 present 态**,编辑/滚动态不藏内容;SMFX 缺失则 no-op)。`build.py` 自动内联 `_fx.css`(skin 后)+`_fx.js`(engine 前)。
+- **所见即所得画廊** `gallery/animations.html`(单文件):9 类 · 57 卡 · 每卡 编号+实时预览+重播/下一步/播放+`属性写法`,顶部搜索+A–I 跳转。由 `assets/build-anim-gallery.py` 生成(内联 _fx.css/_fx.js,REG 数据驱动)。**像剪映效果面板**。
+- **AI 映射** `references/animations.md`(编号→属性:入场`data-anim`/强调`data-emph`/持续`data-motion`/消失`data-anim-out`/分步`class=fragment`/转场`data-transition`/神奇移动两页同`data-morph`)。SKILL.md 加 **Step 0.5 选动画** + description 含动画触发词 + 版本 1.4.0。7 张皮 gallery 已重建(都带 FX)。
+- **验证** `scripts/verify-anim-gallery.mjs` **12/12 过**。截图 `docs/screenshots/anim/{01-top,02-full,03-magic-move}.png`。本机 Chromium 支持原生 View Transitions。
+**坑记**:① playwright headless 派发键盘事件要在 **`document.body`** 上(engine handler 读 `e.target.matches`,document 无此法会抛);② MCP playwright **禁 file://**,起 http.server 或用 playwright-core node 脚本。
+**已实现编号**:A1-4/6-11 · B1-7 · C1-7 · D1-7 · E2/4-9 · F1/3/4 · G1-9 · H1/5/6/7 · I1/2。**规划中**:A5/A12 · E1/3/10/拼块 · F2 · H2/3/4/8-11(H4 RoughNotation/H11 confetti 零依赖) · I3/4。
+**① 已做(2026-06-26):动画库接进 Studio = 子窗口选择器**。用户拍板"用子窗口接画廊"。做法:`build-studio.mjs` 把 `gallery/animations.html` 内联成虚拟模块 `@slidesmith/anim-gallery`(+ `packages/studio/src/anim-gallery.d.ts` 声明);Studio「动画效果」tab 加红钮 **🎬 打开动画库** → `window.open` 一个 **Blob URL + #picker** 子窗口(就是那个画廊,picker 模式每卡多「应用到选中」)→ 卡片 `postMessage({type:'smfx-pick',spec})` 给 `opener` → Studio `applyPicked()` 落到 `htmlSelEl`(attr: data-anim/emph/motion/anim-out/transition;class: fragment/smfx-*;morph: 两次配对 pendingMorphId)→ `showHtmlSel` 渲染「当前动画」**chips**(✕ 移除)+ `previewPlayFx` 当场预览。画廊 picker 检测 `location.hash` 含 picker 或 `window.opener`。**Studio FX_CSS 扩了**新入场(tracking-in/focus-in/slide-blur/flip-in/back-in)+ 强调(data-emph 七个)+ 点睛(kenburns/draw/clip-wipe/spot),preview 能播。`packages/studio/src/main.ts`(import + openAnimGallery/applyPicked/applyMorph/renderAnimChips + FX_CSS + anim pane UI + CSS)。**`node scripts/build-studio.mjs` 重建**(455KB,内嵌画廊)。验证 `scripts/verify-studio-anim-picker.mjs` **15/15**(画廊回传 + Studio 选中→应用→chips→移除→神奇移动配对 + 0 错);回归 studio-tabs24/editor22/fx18/resilience23/anim-gallery12 全过 · typecheck 0。截图 `docs/screenshots/anim/04-studio-picker.png`。**坑**:Studio 是单文件,够不到磁盘上的画廊 → 必须 build 时内嵌;Blob 子窗口能 postMessage 给 opener(同源)。
+**下一步候选**:② 补规划中的明星(F2/H4 批注/H11 撒花/逐字浮现 split-reveal/cube/百叶窗);③ 用户在真 deck 里点名几个动画 dogfood;④ 弹窗被拦的 in-app 抽屉兜底(现仅提示);⑤ 转场/分步在 Studio 单页预览的保真(现属性照落、导出/放映生效)。
+
+## 🎬 借鉴 html-ppt-skill → Canvas 特效层(2026-06-26) — ✅ P0 完成
+用户给参考项目 `../html-ppt-skill`(模板/动画/换皮/showcase 都牛),要"集众家所长增强"。3 路 agent 编目 → 方案 `docs/RESEARCH-html-ppt-borrow.md`。**它的架构**:thin token 主题(36 皮,`base.css` 共享组件层)+ 两层动画(`animations.css` CSS keyframes + **`fx/*.js` 20 个零依赖 canvas 特效**,读主题色,`[data-fx]`+MutationObserver 生命周期)+ runtime(概览网格 O / 演讲者弹窗 S)+ 31 版式 + showcase(iframe 隔离同款 demo + copy-chip + scale(.5) 活缩略)。
+**借鉴优先级**:P0 Canvas 特效(最缺最炫)· P1 多换皮(~13 新气质,token 近兼容)· P2 主题/版式 showcase · P3 概览网格 O 键 · P4 版式库(KPI/对比/时间线/甘特/路线图/架构/思维导图)。**不取**:演讲者双屏深做 · Chart.js/highlight.js CDN(破单文件) · sparkle-trail/word-cascade。
+**✅ P0 已建成**:移植 13 个 canvas 模块 → `assets/_fx-canvas.js`(harness `_util` 改读我们 `--accent/--accent-2/--ink`;canvas `insertBefore` 作背景垫底;自带 MutationObserver 监 `.slide.active` init/stop)。动画库新增**第 10 类「J · Canvas 特效」**:J1 极光团 gradient-blob · J2 星座 constellation · J3 知识图谱 knowledge-graph · J4 神经网络 neural-net · J5 数字爆炸 counter-explosion · J6 粒子迸发 · J7 冲击波 · J8 星空 · J9 星系漩涡 · J10 矩阵雨 · J11 数据流 · J12 礼花 · J13 多行打字机。用法 `data-fx="名"`(满屏加 `.slide` 上 / 局部加盒子上)。`build.py` 内联 `_fx-canvas.js`(新 `{fx_canvas}` 槽);`build-anim-gallery.py` 加 J 类(canvas 卡 + IntersectionObserver 只跑可见的 + Replay)+ pickSpec canvas case;`references/animations.md` 加 J 表。**Studio**:rebuild 后 picker 子窗口直接展示 J 类**活 canvas**,应用落 `data-fx`(scope slide)+ 专属提示(canvas 在生成/导出 deck 放映时跑,Studio 预览暂不渲染)。验证 `verify-anim-gallery.mjs` **16/16**(J 类 13 卡 + 12 活 `<canvas>` 跑起来);picker15/tabs24/typecheck0 全过。截图 `docs/screenshots/anim/05-canvas-fx.png`(13 特效全渲染:星系/冲击波/知识图谱/2,386 数字爆/矩阵雨…)。**坑**:canvas 自带暗底,浅皮上会把区域压暗(也算用法);Studio 预览/导出跑 canvas = 待做(iframe srcdoc 重渲染会换文档,无跨渲染泄漏,可后续注入 _fx-canvas 进 buildExportHtml)。
+**✅ P1-P4 全做完(2026-06-26,用户"P1到P4全部做了")**：
+- **P1 多换皮(7→21)**：关键架构发现——原 7 皮是**厚皮**(每皮自带全套组件 CSS)，不像 html-ppt 的薄皮+共享 base。故抽出 **`assets/_components.css`**(token-generic 组件层 + P4 版式)，新薄皮只写 `:root` 令牌块 + `/* uses-base */`(build.py 据此内联 _components.css；原 7 厚皮无此标记、不内联、零回归)。新增 **14 薄皮**：dracula/nord/tokyo-night/catppuccin-mocha+latte/vaporwave/swiss-grid/bauhaus/cyberpunk-neon/glassmorphism/y2k-chrome/neo-brutalism/terminal-green/rose-pine(调色移植 html-ppt,签名微调如 vaporwave 渐变标题/swiss 12 栏网格底/bauhaus 硬阴影/neo-brutalism 粗框)。`skins/` 21 文件。
+- **P3 概览网格(O 键)**：`_engine.js` 加 toggleOverview——克隆每页→`scale` 成 16:9 缩略网格→点击 setActive 跳页，Esc/点背景关。同时加 **`?bare` 模式**(只显某页+去界面，供 showcase 缩略 iframe)。deckAPI 暴露 toggleOverview。
+- **P4 版式库**：`_components.css` 加 kpi-grid/vs 对比/timeline/gantt/roadmap/diff/mindmap(SVG)（纯 CSS,21 皮通用）+ 文档进 `references/components.md`。
+- **P2 展厅(所见即所得)**：`build-showcases.py` 生成 ① **`gallery/theme-showcase.html`**=21 皮**活封面 iframe 网格**(`skins/<skin>.html?bare` + transform scale,点击开全屏；借 html-ppt 的 scale-live-iframe)②**`gallery/layout-showcase.html`**=版式样板 deck(按 O 看全部 9 版式)③`gallery/skins/<skin>.html` 21 单皮样板。demo 原料 `demo/_showcase.slides.txt`+`_layouts.slides.txt`。
+- **验证**：`verify-skins.mjs` 15/15(14 皮构建+渲染+组件齐全+概览) · `verify-showcases.mjs` 4/4(21 iframe + 9 版式) · 回归 anim-gallery16/picker15/tabs24/typecheck0。截图 `docs/screenshots/skins/*.png`(vaporwave/neo-brutalism/theme-showcase/layout-overview…都漂亮)。方案 `docs/RESEARCH-html-ppt-borrow.md`。SKILL.md 1.5.0(21 皮+10 动画类+版式+概览)。**坑**：file:// 跨帧读 contentDocument 被拦(改判 iframe src);present 非全屏截图有淡重影(正常)。
+**下一步候选**：Studio 导出注入 canvas 引擎让其真跑 · Studio 换皮下拉接这 21 皮 · 原生 7 厚皮也补 P4 版式 · 图表(Chart.js 内联/预渲染)。
+**✅ 薄皮「页面溢出」修复(2026-06-26,用户报)**：用户看薄皮样张报"明显页面溢出"(KPI 卡顶到底边)。根因 = **CSS 注释不能嵌套**——`_components.css` 头部大注释块里写了字面量 `/* uses-base */`,那个内层 `*/` **提前闭合了整个注释**,把紧跟其后的 `:root{…默认令牌…}` 整条规则吞成无效选择器被浏览器丢弃 → 薄皮凡是没自定义的令牌(尤其 `--pad-x/--pad-y`、`--t-*` 字阶)全丢 → `.slide{padding:var(--pad-y) var(--pad-x)}` 因 var 为空而 invalid-at-computed-value→**padding 塌成 0**→内容贴边、`.fill` 顶到 1080 看着像溢出。**修**:把注释里的 `/* uses-base */` 改成「uses-base」纯文字(并加"本注释块严禁出现 `*/`"警示),`build.py` 检测薄皮仍读 skin 文件里那行独立完整的 `/* uses-base */`(不受影响)。重建 `gallery/skins/*`+showcases。**实测**(playwright deck 态量):root `--pad-y`=80px、slide padding=80px、6 页内容底 ≤1042 全 ok。**坑(非本 bug)**:present 放映态在 1280×760 这种非 16:9 视口下,引擎 transform 居中会把 slide 底部 padding/footer 切到视口外(slide 占 187–893 > 760)→**之前提交的 present 态截图看着仍卡底,实为视口裁切+已知重影,不是内容溢出**;故把 `verify-skins.mjs` 截图改为 **deck 态 slide-wrap 元素截图**(干净如实)。**回归守卫**:`verify-skins.mjs` 新增两断言——`--pad-y` 必须非空(注释 bug 的 canary)+ 每页内容底 ≤1084(通用溢出哨)——**43/43 过**(原 15);showcases4/anim-gallery16/picker15/typecheck0 全绿。**未提交**。
+
+---
+（原始任务说明留档：）
 **调研 reveal.js + impress.js,看能给 Slidesmith 加什么 —— 核心是 AI-first。**
 - 用户的真实问题:让 **AI 帮做"高端炫酷"的 HTML slides** 时,怎么把这两个项目用上?
 - **关键决策**(用户要我权衡给方案):是 **(A) 直接部署 reveal/impress,需要时让 AI 调用**,还是 **(B) 以某种方式整合进本项目**(借鉴/移植其能力到 Slidesmith 引擎),还是 **(C) 混合**。

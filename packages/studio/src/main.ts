@@ -21,6 +21,9 @@ import {
   renderPresenterHtml,
 } from '@slidesmith/engine';
 import { listThemes } from '@slidesmith/themes';
+import { galleryHtml } from '@slidesmith/anim-gallery';
+import { fxCanvasJs } from '@slidesmith/fx-canvas';
+import { SKINS, SKIN_ORDER } from '@slidesmith/skins';
 
 // ---- preview bridge: injected into the deck iframe for inline editing ----
 const BRIDGE = `
@@ -191,7 +194,7 @@ let fxMode: 'auto' | 'manual' = 'auto'; // 动效播放模式：auto=进入页�
 let dirty = false; // true when the deck has edits not yet written to the real file
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 const DRAFT_KEY = 'sm-studio-draft-v1';
-interface Snap { slides: string; overrides: Record<string, string>; theme: string; fx: 'auto' | 'manual'; cur: number }
+interface Snap { slides: string; overrides: Record<string, string>; theme: string; skin: string; fx: 'auto' | 'manual'; cur: number }
 let undoStack: Snap[] = [];
 let redoStack: Snap[] = [];
 let lastPushAt = 0, lastPushTag = '';
@@ -213,6 +216,7 @@ const H = {
   head: '', htmlAttrs: 'lang="zh"', bodyClass: '', prelude: '', trailing: '',
   baseTokens: {} as Record<string, string>, overrides: {} as Record<string, string>,
   themes: [] as string[], theme: '',
+  skin: '', // editorial-slides 换皮：''=保持原样，否则注入 SKINS[skin] 的 bundle 重新着皮
 };
 
 const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as T;
@@ -556,12 +560,20 @@ function loadHtmlDeck(name: string, html: string): void {
   });
   doc.documentElement.removeAttribute('style');
 
+  // recover a baked-in skin (our injected <style id="sm-skin" data-skin>) and strip it + its font
+  // link, so assembleDeck re-injects cleanly (no accumulation across export→import cycles)
+  const skinEl = doc.getElementById('sm-skin');
+  const detectedSkin = skinEl ? (skinEl.getAttribute('data-skin') || '') : '';
+  if (skinEl) skinEl.remove();
+  const skinFontEl = doc.getElementById('sm-skin-font'); if (skinFontEl) skinFontEl.remove();
+
   H.head = doc.head.innerHTML;
   H.htmlAttrs = attrsString(doc.documentElement);
   H.bodyClass = doc.body.getAttribute('class') || '';
   H.prelude = prelude; H.trailing = trailing;
   H.baseTokens = base; H.overrides = overrides; H.themes = themes;
   H.theme = doc.documentElement.getAttribute('data-theme') || '';
+  H.skin = (detectedSkin && (SKINS as Record<string, unknown>)[detectedSkin]) ? detectedSkin : '';
 
   mode = 'html'; cur = 0; selBid = null; htmlSelEl = null;
   $('#deckname').textContent = fileBase;
@@ -590,6 +602,14 @@ function htmlOpenTag(): string {
 // Render the FULL deck (head + prelude + #deck{all slides} + trailing engine) so it
 // looks exactly as designed — correct 16:9 AND the deck's OWN segnav + thumbnail nav.
 // Editing is layered on top of the live (same-origin) DOM; no aspect/nav loss.
+// editorial-slides 换皮：把选中皮的 bundle 作为一层 <style> 叠加在 deck 自身 CSS 之后（后者被覆盖），
+// 同时按需带上该皮的 web 字体 <link>。导出时一并烘焙，再导入时由 loadHtmlDeck 识别 data-skin 还原。
+function skinInject(): { style: string; font: string } {
+  const b = H.skin && (SKINS as Record<string, { css: string; font: string }>)[H.skin];
+  if (!b) return { style: '', font: '' };
+  const font = b.font ? `<link id="sm-skin-font" rel="stylesheet" href="${b.font}">` : '';
+  return { style: `<style id="sm-skin" data-skin="${H.skin}">${b.css}</style>`, font };
+}
 function assembleDeck(forEdit = false): string {
   const editCss = forEdit
     ? '<style id="sm-edit-css">[contenteditable]{cursor:text}'
@@ -605,7 +625,8 @@ function assembleDeck(forEdit = false): string {
   // <html> carries the auto/manual choice into the exported file; data-smfx-edit marks
   // the editing surface so the FX driver skips exit-on-nav (keeps Studio nav instant).
   const editAttr = forEdit ? ' data-smfx-edit="1"' : '';
-  return `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n</body>\n</html>`;
+  const skin = skinInject();
+  return `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
 }
 // <link> tags for user-picked Google fonts that the deck author didn't already include.
 // Detected from usedFontIds plus a scan of the deck HTML (so a re-imported deck that
@@ -702,7 +723,45 @@ const FX_CSS = '<style id="sm-fx">'
   + '@keyframes sm-o-zoom{from{opacity:1;transform:none}to{opacity:0;transform:scale(.86)}}'
   + '@keyframes sm-o-left{from{opacity:1;transform:none}to{opacity:0;transform:translateX(-64px)}}'
   + '@keyframes sm-o-right{from{opacity:1;transform:none}to{opacity:0;transform:translateX(64px)}}'
-  + '@media(prefers-reduced-motion:reduce){#deck .slide [data-motion],#deck .slide [data-anim],#deck .slide [data-anim] *,#deck .slide [data-anim-out]{animation:none!important;opacity:1!important}}'
+  // ── 动画库新增（集众家所长）：新入场 + 强调 + 点睛 ──
+  + '#deck .slide.sm-play{perspective:1400px}'
+  + '#deck .slide.sm-play [data-anim="tracking-in"]{animation-name:sm-a-tracking;animation-duration:.8s}'
+  + '#deck .slide.sm-play [data-anim="focus-in"]{animation-name:sm-a-focus;animation-duration:.7s}'
+  + '#deck .slide.sm-play [data-anim="slide-blur"]{animation-name:sm-a-slideblur;animation-duration:.55s}'
+  + '#deck .slide.sm-play [data-anim="flip-in"]{animation-name:sm-a-flip;animation-duration:.7s}'
+  + '#deck .slide.sm-play [data-anim="back-in"]{animation-name:sm-a-back;animation-duration:.7s}'
+  + '@keyframes sm-a-tracking{0%{opacity:0;letter-spacing:-.42em;filter:blur(6px)}40%{opacity:1}100%{opacity:1;letter-spacing:normal;filter:none}}'
+  + '@keyframes sm-a-focus{from{opacity:0;filter:blur(14px)}to{opacity:1;filter:none}}'
+  + '@keyframes sm-a-slideblur{from{opacity:0;transform:translateX(-64px);filter:blur(8px)}to{opacity:1;transform:none;filter:none}}'
+  + '@keyframes sm-a-flip{from{opacity:0;transform:rotateY(88deg)}to{opacity:1;transform:none}}'
+  + '@keyframes sm-a-back{from{opacity:0;transform:translateY(96px) scale(.86)}to{opacity:1;transform:none}}'
+  // 强调（一次性，元素本身可见，翻到本页时做个手势）
+  + '#deck .slide.sm-play [data-emph]{animation-fill-mode:both;animation-duration:.9s}'
+  + '#deck .slide.sm-play [data-emph="tada"]{animation-name:sm-e-tada}'
+  + '#deck .slide.sm-play [data-emph="rubber-band"]{animation-name:sm-e-rubber}'
+  + '#deck .slide.sm-play [data-emph="jello"]{animation-name:sm-e-jello;transform-origin:center}'
+  + '#deck .slide.sm-play [data-emph="heartbeat"]{animation-name:sm-e-heart;animation-duration:1.3s}'
+  + '#deck .slide.sm-play [data-emph="headshake"]{animation-name:sm-e-head;animation-duration:.8s}'
+  + '#deck .slide.sm-play [data-emph="shake"]{animation-name:sm-e-shake;animation-duration:.7s}'
+  + '#deck .slide.sm-play [data-emph="text-pop"]{animation-name:sm-e-textpop;animation-duration:.6s}'
+  + '@keyframes sm-e-tada{0%{transform:scale(1)}10%,20%{transform:scale(.9) rotate(-3deg)}30%,50%,70%,90%{transform:scale(1.1) rotate(3deg)}40%,60%,80%{transform:scale(1.1) rotate(-3deg)}100%{transform:scale(1)}}'
+  + '@keyframes sm-e-rubber{0%{transform:scale(1)}30%{transform:scaleX(1.25) scaleY(.75)}40%{transform:scaleX(.75) scaleY(1.25)}50%{transform:scaleX(1.15) scaleY(.85)}65%{transform:scaleX(.95) scaleY(1.05)}75%{transform:scaleX(1.05) scaleY(.95)}100%{transform:scale(1)}}'
+  + '@keyframes sm-e-jello{0%,11%,100%{transform:none}22%{transform:skewX(-12deg) skewY(-12deg)}33%{transform:skewX(6deg) skewY(6deg)}44%{transform:skewX(-3deg) skewY(-3deg)}55%{transform:skewX(1.5deg) skewY(1.5deg)}66%{transform:skewX(-.8deg) skewY(-.8deg)}}'
+  + '@keyframes sm-e-heart{0%,40%,80%,100%{transform:scale(1)}14%{transform:scale(1.22)}28%{transform:scale(1)}54%{transform:scale(1.22)}}'
+  + '@keyframes sm-e-head{0%{transform:translateX(0)}12.5%{transform:translateX(-7px) rotateY(-9deg)}37.5%{transform:translateX(6px) rotateY(7deg)}62.5%{transform:translateX(-4px) rotateY(-5deg)}87.5%{transform:translateX(2px) rotateY(3deg)}100%{transform:translateX(0)}}'
+  + '@keyframes sm-e-shake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-9px)}20%,40%,60%,80%{transform:translateX(9px)}}'
+  + '@keyframes sm-e-textpop{from{text-shadow:0 0 0 rgba(0,0,0,0);transform:none}to{text-shadow:0 6px 18px rgba(0,0,0,.28);transform:translateY(-4px)}}'
+  // 点睛：Ken Burns / 线条自绘 / 擦幕 / 聚光灯
+  + '#deck .slide [data-motion="ken-burns"],#deck .slide .smfx-kenburns img{animation:sm-kenburns 18s ease-in-out infinite alternate;transform-origin:center}'
+  + '@keyframes sm-kenburns{from{transform:scale(1) translate(0,0)}to{transform:scale(1.12) translate(-2%,-2%)}}'
+  + '#deck .slide .smfx-draw path,#deck .slide .smfx-draw line,#deck .slide .smfx-draw polyline{stroke-dasharray:1;stroke-dashoffset:1}'
+  + '#deck .slide.sm-play .smfx-draw path,#deck .slide.sm-play .smfx-draw line,#deck .slide.sm-play .smfx-draw polyline{animation:sm-draw 1.2s cubic-bezier(.4,0,.2,1) forwards}'
+  + '@keyframes sm-draw{to{stroke-dashoffset:0}}'
+  + '#deck .slide.sm-play [data-anim="clip-wipe"],#deck .slide.sm-play .smfx-wipe{animation:sm-wipe .8s cubic-bezier(.4,0,.2,1) both}'
+  + '@keyframes sm-wipe{from{opacity:1;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}'
+  + '#deck .slide.sm-play .smfx-spot>:not([data-focus]){opacity:.22;filter:saturate(.4);transition:opacity .4s,filter .4s}'
+  + '#deck .slide.sm-play .smfx-spot>[data-focus]{transform:scale(1.04)}'
+  + '@media(prefers-reduced-motion:reduce){#deck .slide [data-motion],#deck .slide [data-anim],#deck .slide [data-anim] *,#deck .slide [data-anim-out],#deck .slide [data-emph],#deck .slide .smfx-draw path{animation:none!important;opacity:1!important;letter-spacing:normal!important;filter:none!important;stroke-dashoffset:0!important}}'
   + '</style>';
 // FX driver — injected into preview + export. Watches which slide is active and, per
 // data-smfx mode, plays it (auto) or arms it for a click (manual). Exposes window hooks
@@ -748,6 +807,11 @@ const FX_JS = '<script id="sm-fx-js">(function(){'
   + 'try{new MutationObserver(tick).observe(deck,{attributes:true,subtree:true,attributeFilter:["class"]});}catch(e){}'
   + 'setTimeout(tick,60);setTimeout(tick,400);'
   + '})();</scr' + 'ipt>';
+// Canvas FX engine (J · Canvas 特效). Self-contained IIFE with its own MutationObserver that
+// boots data-fx effects on the active slide and tears them down on leave — so background canvas
+// effects run in the Studio preview AND the exported deck, exactly like a built editorial deck.
+// srcdoc re-render swaps the whole document, so the old canvas rAF dies with it (no leak).
+const FX_CANVAS_JS = '<script id="sm-fx-canvas">' + fxCanvasJs + '</scr' + 'ipt>';
 function isTextLeaf(el: Element): boolean {
   if (el.querySelector('div,section,ul,ol,li,figure,table,svg,img,canvas,iframe,p,h1,h2,h3,h4,h5,h6,blockquote')) return false;
   return (el.textContent || '').trim().length > 0;
@@ -862,6 +926,7 @@ function showHtmlSel(on: boolean, el?: HTMLElement): void {
   (($('#hAnim') as HTMLSelectElement)).value = el.getAttribute('data-anim') || 'none';
   (($('#hMotion') as HTMLSelectElement)).value = el.getAttribute('data-motion') || 'none';
   (($('#hAnimOut') as HTMLSelectElement)).value = el.getAttribute('data-anim-out') || 'none';
+  renderAnimChips(el);
   const wInp = $('#hElW') as HTMLInputElement | null; if (wInp) wInp.value = el.style.width ? String(parseInt(el.style.width, 10)) : '';
   positionGizmo();
   updateAiTarget();
@@ -903,7 +968,7 @@ function autosaveDraft(): void {
 function clearDraft(): void { try { localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ } dirty = false; updateDirtyBadge(); }
 
 // ---- undo / redo: snapshot the committed deck state before each mutation ----
-function snapshot(): Snap { return { slides: JSON.stringify(htmlSlides), overrides: { ...H.overrides }, theme: H.theme, fx: fxMode, cur }; }
+function snapshot(): Snap { return { slides: JSON.stringify(htmlSlides), overrides: { ...H.overrides }, theme: H.theme, skin: H.skin, fx: fxMode, cur }; }
 // call BEFORE a mutation. tag coalesces rapid same-kind edits (e.g. dragging a color) into one step.
 function pushHistory(tag = ''): void {
   if (mode !== 'html') return;
@@ -917,7 +982,7 @@ function pushHistory(tag = ''): void {
 }
 function restoreSnap(s: Snap): void {
   htmlSlides = JSON.parse(s.slides) as HtmlSlide[];
-  H.overrides = { ...s.overrides }; H.theme = s.theme; fxMode = s.fx;
+  H.overrides = { ...s.overrides }; H.theme = s.theme; H.skin = s.skin || ''; fxMode = s.fx;
   const fxSel = $('#hFxMode') as HTMLSelectElement | null; if (fxSel) fxSel.value = fxMode;
   htmlGotoAfterRender = Math.max(0, Math.min(s.cur, htmlSlides.length - 1));
   htmlSelEl = null; showHtmlSel(false);
@@ -1063,6 +1128,79 @@ function setHtmlAnimOut(val: string): void {
   if (val && val !== 'none') htmlSelEl.setAttribute('data-anim-out', val); else htmlSelEl.removeAttribute('data-anim-out');
   markDirty();
 }
+
+// ── 动画库子窗口（picker）：把 gallery/animations.html 当效果浏览器开成子窗口，
+//    点某效果的「应用到选中」→ postMessage 回来 → 落到当前选中元素 + 当场预览。──
+let animGalleryWin: Window | null = null;
+let pendingMorphId: string | null = null;
+let morphSeq = 0;
+function openAnimGallery(): void {
+  if (animGalleryWin && !animGalleryWin.closed) { animGalleryWin.focus(); return; }
+  let url = '';
+  try { url = URL.createObjectURL(new Blob([galleryHtml], { type: 'text/html' })) + '#picker'; } catch { url = ''; }
+  animGalleryWin = url ? window.open(url, 'smfx-gallery', 'width=960,height=920,menubar=no,toolbar=no') : null;
+  if (!animGalleryWin) setMorphHint('⚠️ 弹窗被拦截，请允许本页弹窗后再点「打开动画库」。');
+}
+function setMorphHint(msg: string): void {
+  const h = $('#hMorphHint'); if (!h) return;
+  (h as HTMLElement).style.display = msg ? '' : 'none'; h.textContent = msg;
+}
+function applyPicked(d: { code?: string; name?: string; spec?: Record<string, unknown> }): void {
+  if (mode !== 'html') { setMorphHint('请先导入一个 HTML deck 再加动画。'); return; }
+  const spec = (d.spec || {}) as { mode?: string; attr?: string; val?: string; add?: string[]; scope?: string };
+  if (spec.mode === 'morph') { applyMorph(d.name || '神奇移动'); return; }
+  if (!htmlSelEl) { setMorphHint('请先在预览里点选一个元素，再点效果。'); return; }
+  const el = htmlSelEl as HTMLElement;
+  const slide = el.closest('#deck .slide') as HTMLElement | null;
+  const target = spec.scope === 'slide' ? (slide || el) : el;
+  pushHistory('anim-pick');
+  if (spec.mode === 'attr' && spec.attr) {
+    if (spec.val) target.setAttribute(spec.attr, spec.val); else target.removeAttribute(spec.attr);
+  } else if (spec.mode === 'class' && spec.add) {
+    spec.add.forEach((c) => target.classList.add(c));
+  }
+  markDirty();
+  showHtmlSel(true, el);
+  previewPlayFx();
+  if (spec.attr === 'data-fx') setMorphHint('✓ 已加 Canvas 特效「' + (d.name || '') + '」到本页。它在生成 / 导出后的 deck 放映时跑（Studio 预览暂不渲染 canvas）。');
+  else setMorphHint('✓ 已应用「' + (d.name || d.code || '') + '」到选中元素。');
+}
+function applyMorph(name: string): void {
+  if (!htmlSelEl) { setMorphHint('请先选中要做「神奇移动」的元素。'); return; }
+  const el = htmlSelEl as HTMLElement;
+  pushHistory('morph');
+  if (!pendingMorphId) {
+    pendingMorphId = 'm' + (++morphSeq);
+    el.setAttribute('data-morph', pendingMorphId);
+    setMorphHint('已标记神奇移动「起点」(' + pendingMorphId + ')。翻到下一页、选中对应元素，再点一次「' + name + '」即可配对。');
+  } else {
+    el.setAttribute('data-morph', pendingMorphId);
+    setMorphHint('✓ 神奇移动已配对(' + pendingMorphId + ')。放映/导出后翻这两页时，元素会平滑飞过去。');
+    pendingMorphId = null;
+  }
+  markDirty();
+  showHtmlSel(true, el);
+}
+// the "当前动画" chips under the selected element — show what's applied, with ✕ to remove
+function renderAnimChips(el: Element): void {
+  const box = $('#hAnimChips'); if (!box) return;
+  box.innerHTML = '';
+  const items: Array<{ label: string; clear: () => void }> = [];
+  const attr = (name: string, label: string) => { const v = el.getAttribute(name); if (v) items.push({ label: label + '·' + v, clear: () => el.removeAttribute(name) }); };
+  attr('data-anim', '入场'); attr('data-emph', '强调'); attr('data-motion', '持续');
+  attr('data-anim-out', '消失'); attr('data-transition', '转场'); attr('data-morph', '神奇移动');
+  Array.from(el.classList).forEach((c) => {
+    if (c === 'fragment') items.push({ label: '分步·fragment', clear: () => ['fragment', 'up', 'down', 'left', 'right', 'grow', 'shrink', 'strike', 'highlight', 'current-visible', 'semi-out'].forEach((v) => el.classList.remove(v)) });
+    else if (c.startsWith('smfx-')) items.push({ label: '点睛·' + c, clear: () => el.classList.remove(c) });
+  });
+  if (!items.length) { box.innerHTML = '<span class="achint">还没加动画。点上面「🎬 打开动画库」挑一个。</span>'; return; }
+  items.forEach((it) => {
+    const chip = document.createElement('span'); chip.className = 'achip'; chip.textContent = it.label;
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕';
+    x.addEventListener('click', () => { pushHistory('anim-rm'); it.clear(); markDirty(); showHtmlSel(true, el as HTMLElement); previewPlayFx(); });
+    chip.appendChild(x); box.appendChild(chip);
+  });
+}
 // pick a typeface for the selected element; load the webfont into the live preview now
 function setHtmlFont(id: string): void {
   const f = FONT_BY_ID[id]; if (!f) return;
@@ -1118,6 +1256,7 @@ function refreshHtmlInspector(): void {
   // theme switching is handled by the deck's OWN control (visible in full-deck view),
   // so we don't duplicate it here (avoids a localStorage tug-of-war).
   const wrap = $('#hThemeWrap'); if (wrap) wrap.style.display = 'none';
+  const skinSel = $('#hSkin') as HTMLSelectElement | null; if (skinSel) skinSel.value = H.skin || '';
   const tk = (name: string, id: string) => { const inp = $(id) as HTMLInputElement; if (inp) inp.value = toHex(H.overrides[name] || H.baseTokens[name] || '') || '#888888'; };
   tk('--accent', '#hAccent'); tk('--paper', '#hPaper'); tk('--ink', '#hInk');
 }
@@ -1740,6 +1879,15 @@ body.dragging .drop{display:flex;background:rgba(181,64,42,.12);border-color:#B5
 .htab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:12px 0;font-size:13px;color:#6a6a6e;cursor:pointer;font-family:inherit}
 .htab:hover{background:#f6f6f7}.htab.active{color:#B5402A;border-bottom-color:#B5402A;font-weight:600}
 .hpane{flex:1;overflow:auto;padding:16px}
+.gallery-btn{width:100%;margin:6px 0 10px;padding:11px;border:0;border-radius:10px;background:#B5402A;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.gallery-btn:hover{background:#9a3522}.gallery-btn:active{transform:scale(.99)}
+body.dark .gallery-btn{background:#f0b34a;color:#1c1c1f}
+.animchips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.achip{display:inline-flex;align-items:center;gap:5px;background:#f1efe9;border:1px solid #e0dccf;border-radius:14px;padding:3px 6px 3px 10px;font-size:12px;color:#3a362e}
+.achip button{border:0;background:#d8d3c6;color:#5b574e;border-radius:50%;width:15px;height:15px;line-height:1;font-size:10px;cursor:pointer;padding:0}
+.achip button:hover{background:#B5402A;color:#fff}
+.achint{font-size:12px;color:#9a958a}
+body.dark .achip{background:#26262a;border-color:#34343a;color:#cfcfd4}body.dark .achip button{background:#3a3a40;color:#bbb}
 /* animation sub-tabs (进入 / 动作 / 消失) */
 .subtabs{display:flex;gap:5px;margin:6px 0 12px}
 .stab{flex:1;background:#f1f1f2;border:1px solid #e0e0e2;border-radius:7px;padding:6px 0;font-size:12px;color:#6a6a6e;cursor:pointer;font-family:inherit}
@@ -1857,6 +2005,7 @@ function buildUI(): void {
       <!-- ===== 格式 ===== -->
       <div class="pane hpane" data-hpane="fmt">
         <h3>主题 / 配色</h3>
+        <div class="field"><label>皮肤 · 换一套气质（21 套）</label><select id="hSkin"></select></div>
         <div class="field" id="hThemeWrap" style="display:none"><label>主题</label><select id="hTheme"></select></div>
         <div class="grid2">
           <div class="field"><label>强调色 accent</label><input id="hAccent" type="color"></div>
@@ -1904,6 +2053,10 @@ function buildUI(): void {
         <div class="nosel hseloff">在预览里<b>点选一个元素</b>，再给它加动画。</div>
         <div class="hselon" style="display:none">
           <div class="tag" id="hSelTag2">—</div>
+          <button id="hOpenGallery" class="gallery-btn" type="button">🎬 打开动画库（所见即所得，挑一个套用）</button>
+          <div id="hAnimChips" class="animchips"></div>
+          <div class="hint" id="hMorphHint" style="display:none"></div>
+          <h3 class="sub">快捷下拉</h3>
           <div class="subtabs">
             <button class="stab active" data-stab="in">进入</button>
             <button class="stab" data-stab="motion">动作</button>
@@ -2014,6 +2167,11 @@ function buildUI(): void {
   const th = fillSel('#theme', meta.themes);
   th.value = deck.theme || 'editorial';
   th.addEventListener('change', () => { deck.theme = th.value; reloadPreview(); });
+  // editorial-slides 换皮（html 模式）：选一套皮，叠加注入其 bundle 重新着皮
+  const skinLabels: Record<string, string> = {};
+  SKIN_ORDER.forEach((n) => { skinLabels[n] = (SKINS[n].label || n) + ' · ' + n + (SKINS[n].dark ? ' · 暗' : ' · 浅'); });
+  fillSel('#hSkin', SKIN_ORDER, skinLabels, '保持原样（不换皮）');
+  onChange('#hSkin', (v) => { harvestAll(); pushHistory('skin'); H.skin = v; renderHtmlEdit(); refreshHtmlInspector(); markDirty(); });
   ($('#layout') as HTMLSelectElement).addEventListener('change', () => { deck.slides[cur].layout = ($('#layout') as HTMLSelectElement).value; reloadPreview(); });
 
   fillSel('#fsize', meta.sizes, undefined, '默认'); onChange('#fsize', (v) => setStyle('size', v));
@@ -2063,6 +2221,12 @@ function buildUI(): void {
   $('#hAnimPlay').addEventListener('click', previewPlayFx);
   $('#hAnimPlay2').addEventListener('click', previewPlayFx);
   $('#hAnimPlayOut').addEventListener('click', previewPlayFxOut);
+  // 动画库子窗口：开 + 接收回传的效果
+  $('#hOpenGallery').addEventListener('click', openAnimGallery);
+  window.addEventListener('message', (e) => {
+    const d = e.data as { type?: string };
+    if (d && d.type === 'smfx-pick') applyPicked(d as { code?: string; name?: string; spec?: Record<string, unknown> });
+  });
   $('#hElUp').addEventListener('click', () => moveHtmlEl(-1));
   $('#hElDown').addEventListener('click', () => moveHtmlEl(1));
   $('#hElDel').addEventListener('click', delHtmlEl);
