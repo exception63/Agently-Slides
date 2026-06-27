@@ -3,16 +3,16 @@ name: editorial-slides
 description: |
   做"出版物级"的 HTML 演示 slides · 中文 · 多风格可选（每次调用先挑一种皮肤 skin）。
   原生风格：① editorial 杂志风（纸色 + 朱红 + 宋体大字 + 大数字冲击，抓眼）；② academic 学术汇报风（社科/人文 · 深靛青 + 衬线 + 概念模型图 + 规范参考文献，专业克制）；③ keynote-dark 暗场主旨风（近黑底 + 巨大白字 + 琥珀点睛，大场子/发布会感）。
-  另有从「风格银行」(beautiful-html-templates) 移植的皮：cartesian 极简 / signal 机构正式 / vellum 暗色文艺学术 / daisy-days 温暖活泼；还可按需现移植更多（见 references/external-templates.md）。
+  另有从「风格银行」(beautiful-html-templates) 移植的皮：cartesian 极简 / signal 机构正式 / vellum 暗色文艺学术 / daisy-days 温暖活泼；自有旗舰 acrylic 亚克力毛玻璃（微软 Fluent/Mica 感，发布会/科技产品）；以及 14 张流行色/设计流派薄皮，共 22 套（还可按需现移植更多，见 references/external-templates.md）。
   所有风格共用同一引擎：单文件、可移植、离线可用；固定 1920×1080 画布；自带全屏投屏、左侧段导航 + 实时缩略图、进度条、键盘控制、演讲者双屏钩子。
   还自带「动画库」：A 入场 / B 分步揭示 / C 强调 / D 持续动效 / E 跨页转场 / F 神奇移动(Magic Move) / G 消失 / H 点睛 / I 背景氛围 共九类、带编号、所见即所得预览（gallery/animations.html）；用户可按编号点名要某个动画/转场（"入场用 A8、大数字 F1 神奇移动、转场 E2"），见 references/animations.md。也在用户说"给 slides 加动画 / 加转场 / 加动效 / 神奇移动 / 分步出现 / Magic Move / 让某页动起来"时启用。
   当用户说 "做 slides / 做 PPT / 做演示 / 做讲演幻灯 / 学术 slides / 学术汇报 slides / 会议汇报 PPT / 杂志风 slides / keynote / 漂亮的 slides / 把讲稿做成 slides / 做 HTML slides / 换个风格的 slides" 时启用，即使没点名某个风格也要启用并先让用户挑风格。
   这个 skill 负责"从内容生成成品 slides"；若用户是"slides 已经有了、想加副屏讲稿同步"，那是 slides-presenter-mode skill。
 metadata:
-  version: 1.5.0
+  version: 1.6.0
   status: dogfood-validated
-  skins: [editorial, academic, keynote-dark, cartesian, signal, vellum, daisy-days, dracula, nord, tokyo-night, catppuccin-mocha, catppuccin-latte, vaporwave, swiss-grid, bauhaus, cyberpunk-neon, glassmorphism, y2k-chrome, neo-brutalism, terminal-green, rose-pine]
-  skins_note: 7 原生厚皮 + 14 薄皮（令牌 + 共享 _components.css）· 换皮展厅 gallery/theme-showcase.html
+  skins: [editorial, academic, keynote-dark, acrylic, cartesian, signal, vellum, daisy-days, dracula, nord, tokyo-night, catppuccin-mocha, catppuccin-latte, vaporwave, swiss-grid, bauhaus, cyberpunk-neon, glassmorphism, y2k-chrome, neo-brutalism, terminal-green, rose-pine]
+  skins_note: 22 套 = 7 原生厚皮 + acrylic 毛玻璃旗舰 + 14 薄皮（令牌 + 共享 _components.css）· 选皮流程见 Step 0（推荐→看总览图→真内容试皮→定）· 总览图 gallery/theme-contact-sheet.png · 活展厅 gallery/theme-showcase.html
   animations: 10 类编号库（入场/分步/强调/持续/转场/神奇移动/消失/点睛/背景/Canvas特效）· 所见即所得画廊 gallery/animations.html · 见 references/animations.md
   layouts: kpi-grid/vs/timeline/gantt/roadmap/diff/mindmap + cover/secdiv/cards/compare/steps/table/bignum… · 版式展厅 gallery/layout-showcase.html
   engine: 段导航 + 缩略图 + 进度 + 投屏 + 概览网格(O 键) + 演讲者钩子 + 动画引擎(_fx/_fx-canvas)
@@ -39,37 +39,52 @@ metadata:
 
 ---
 
-## Step 0 ·〔必做〕先选风格（skin）
+## Step 0 ·〔必做〕选呈现风格（skin）—— 推荐 → 看 → 试 → 定
 
-**每次都先确认用哪个风格再动手。** 读 `references/styles.md`（风格画廊），把可选风格的"一句话 DNA + 用在哪 + 预览路径"摆给用户挑：
+**每次动手前先定一个 skin。** 它决定字体 / 配色 / 版式气质；组件 class 契约（`.cover/.head/.cards/.kpi/.vs/.table/.figure`…）**所有皮通用**，所以写法一样、外观不同，选错也只是重 build 一次。**用户点名了风格（"做学术风 / 用杂志风 / 要毛玻璃"）就直接用，跳过下面①②③。** 没点名时走这条「推荐 → 看 → 试 → 定」：
 
-**原生皮（3 · 基建最全，含演讲者双屏）**
+**① 推荐**（按场合/受众先缩到 2–3 套候选，别甩 22 个让人挑）：
+
+| 场合 / 受众 | 首选 | 备选 |
+|---|---|---|
+| 学术会议 / 组会 / 答辩（社科人文） | academic | vellum |
+| 政企汇报 / 政策 / 年报 / 智库 | signal | cartesian |
+| 发布会 / 大场主旨 / 科技感 | keynote-dark | acrylic · cyberpunk-neon |
+| 课程 / 路演 / 抓眼 | editorial | daisy-days |
+| 开发者 / 技术分享 | tokyo-night | dracula · terminal-green |
+| 设计 / 品牌 / 潮流 | vaporwave | bauhaus · y2k-chrome · swiss-grid |
+| 沉稳暗色通用 | nord | catppuccin-mocha · rose-pine |
+| 高级毛玻璃质感（微软 Fluent 感） | **acrylic** | glassmorphism |
+
+**② 看**（皮肤呈现 · 主动给用户看，别让他自己翻文件）：在对话里直接贴 **全 22 皮总览图 `gallery/theme-contact-sheet.png`**（一张图看遍所有封面 + 明/暗 + 皮名）。要看活的 / 全屏样板 → `gallery/theme-showcase.html`（22 张活封面网格）或单皮 `gallery/skins/<skin>.html`。
+
+**③ 试**（用用户的**真实内容**试皮，最准 · 强烈推荐）：候选定到 2–3 套后，用真讲题各 build 一张封面、截图并排给用户对比：
+```bash
+python3 assets/build.py <skin> /tmp/try-<skin>.html --blank \
+    --title "真实讲题" --brand "机构 / 作者" --sub "真实副题"
+```
+（`--title/--sub` 现在会进**真封面**）→ 截 `/tmp/try-<skin>.html` 第一页 → 2–3 张并排让用户挑。
+
+**④ 定**：用户选定一套 → 进 Step 2 用该 skin 起 deck（起手式的封面会直接带上 `--title/--sub`）。
+
+---
+
+**全 22 皮清单**（明/暗 · 一句话 · 适合）：
+
 | skin | 明/暗 | 一句话 | 适合 |
 |---|---|---|---|
-| **editorial** 杂志风 | 浅 | 纸色 + 朱红 + 宋体大字 + 大数字冲击，抓眼 | keynote / 课程 / 路演 |
-| **academic** 学术汇报 | 浅 | 深靛青 + 衬线 + 概念模型图 + 编号图表 + 规范参考文献（社科/人文） | 学术会议 / 组会 / 答辩 |
-| **keynote-dark** 暗场主旨 | 深 | 近黑底 + 巨大白字 + 琥珀点睛 + 少字多势 | 大场子主旨 / 发布会感 |
+| **editorial** 杂志风〔原生〕 | 浅 | 纸色 + 朱红 + 宋体大字 + 大数字冲击，抓眼 | keynote / 课程 / 路演 |
+| **academic** 学术汇报〔原生〕 | 浅 | 深靛青 + 衬线 + 概念模型图 + 编号图表 + 规范参考文献 | 学术会议 / 组会 / 答辩 |
+| **keynote-dark** 暗场主旨〔原生〕 | 深 | 近黑底 + 巨大白字 + 琥珀点睛 + 少字多势 | 大场主旨 / 发布会感 |
+| **acrylic** 亚克力毛玻璃〔自有·旗舰〕 | 深 | 深邃光晕底 + 真磨砂卡片（Fluent/Mica 感），高级科技 | 发布会 / 科技产品 / 高端汇报 |
+| **cartesian** 极简 | 浅 | 暖灰极简 + 衬线 + 发丝线网格，强调靠字重不靠色 | 设计 / 研究 / 品牌随笔 |
+| **signal** 机构 | 浅 | 浅米 + 藏青 + 古金 · 高密度 + booktabs | 政策 / 年报 / 智库 / 政企 |
+| **vellum** 暗色学术 | 深 | 深靛蓝 + 羊皮金衬线，文艺学术 | 人文 / 思想史 / 文学讲座 |
+| **daisy-days** 活泼 | 浅 | 奶油 + 粉蜡笔 + 圆角贴纸卡 + coral 点睛 | 课堂 / 工作坊 / 亲子科普 |
 
-**移植自风格银行（4 · beautiful-html-templates，MIT）**
-| skin | 明/暗 | 一句话 | 适合 |
-|---|---|---|---|
-| **cartesian** 极简 | 浅 | 暖灰极简 + 衬线 + 发丝线网格，强调靠字重不靠色 | 设计/研究/品牌随笔 |
-| **signal** 机构 | 浅 | 浅米 + 藏青 + 古金 · 衬线 · 高密度 + booktabs | 政策/年报/智库/政企汇报 |
-| **vellum** 暗色学术 | 深 | 深靛蓝 + 羊皮金 Cormorant 衬线，文艺学术 | 人文/思想史/文学讲座 |
-| **daisy-days** 活泼 | 浅 | 奶油 + 粉蜡笔 + 圆角贴纸卡 + coral 点睛 | 课堂/工作坊/亲子科普 |
+**14 张薄皮（流行色 / AESTHETIC / 设计流派 · 令牌块 + 共享组件）**：dracula · nord · tokyo-night · catppuccin-mocha/latte · vaporwave · swiss-grid · bauhaus · cyberpunk-neon · glassmorphism · y2k-chrome · neo-brutalism · terminal-green · rose-pine。
 
-**移植自 html-ppt-skill（14 · 薄皮 = 令牌块 + 共享组件 `_components.css`，MIT 调色）**
-dracula · nord · tokyo-night · catppuccin-mocha/latte · vaporwave · swiss-grid · bauhaus · cyberpunk-neon · glassmorphism · y2k-chrome · neo-brutalism · terminal-green · rose-pine。
-暗场流行色（Dracula/Nord/东京夜/Catppuccin/Rosé Pine）、AESTHETIC（蒸汽波/Y2K铬/赛博朋克）、设计流派（瑞士网格/包豪斯/新野兽派/玻璃拟态/终端绿）。这 14 张是**薄皮**：只写一组 `:root` 令牌（+ 签名微调），版式组件来自 `_components.css`（声明 `/* uses-base */`，build.py 自动内联）。
-
-> **眼见为实挑皮 → 打开 `gallery/theme-showcase.html`（21 张皮活封面网格，点击开全屏）。** 单皮样板 `gallery/skins/<skin>.html` 或原生皮 `gallery/<skin>.html`。想要别的气质 → 风格银行 `references/external-templates.md`，或加薄皮（见 `references/design-system.md`）。
-
-- 用户**点名了**（"做学术风 / 用杂志风"）→ 直接用那个。
-- 用户**没点名** → 先把上表给他挑；他偏向哪种场合（学术汇报 vs. 主旨抓眼）就选哪个。
-- 想先**眼见为实** → 让用户打开对应 `gallery/<skin>.html` 看样板（每个都带成套 demo slides）。
-- 选定的 skin 决定字体、配色、版式气质；**组件 class 契约（`.cover/.secdiv/.head/.cards/.table/.figure`…）所有皮通用**，所以写法一样、外观不同。
-
-> 想加一个新风格？见 `references/design-system.md` 的"加一个皮肤"——写一份 `assets/skins/<名>.css` 即可，引擎不用动。
+> 薄皮 = 一组 `:root` 令牌（+ 签名微调），版式组件来自 `_components.css`（声明 `/* uses-base */`，build.py 自动内联）。想加新风格 → `references/design-system.md`「加一个皮肤」，写一份 `assets/skins/<名>.css` 即可，引擎不用动。
 
 ---
 

@@ -41,8 +41,8 @@ BLANK_SLIDES = """<!-- ═══════════════════
   <div class="cover__top"><div class="cover__brand">{{BRAND}}</div><div class="cover__seal">题</div></div>
   <div class="cover__main">
     <div class="cover__eyebrow">副标签 · Subtitle</div>
-    <h1 class="cover__title">主标题<br><em>关键词</em></h1>
-    <p class="cover__sub">一句副标题 · 点明这场讲什么、为谁讲。</p>
+    <h1 class="cover__title">{{COVER_TITLE}}</h1>
+    <p class="cover__sub">{{COVER_SUB}}</p>
   </div>
   <div class="cover__meta">
     <div class="cover__meta-item"><span class="cover__meta-k">Author</span><span class="cover__meta-v">讲者</span></div>
@@ -168,9 +168,13 @@ def main():
     d = DEFAULTS.get(a.skin, dict(title=a.skin, brand=a.skin, sub=a.skin + " skin", channel=a.skin + "-sync"))
     title = a.title or d["title"]; brand = a.brand or d["brand"]
     sub = a.sub or d["sub"]; channel = a.channel or d["channel"]
+    # 封面大标题/副题：给了 --title/--sub 就用真内容（"试皮"看真封面 + 新建真实 deck）；否则留占位
+    cover_title = a.title or "主标题<br><em>关键词</em>"
+    cover_sub = a.sub or "一句副标题 · 点明这场讲什么、为谁讲。"
 
     # 占位替换（slides 与 engine 里的 {{...}}）
-    for k, v in {"{{BRAND}}": brand, "{{BRAND_SUB}}": sub, "{{DECK_TITLE}}": title, "{{CHANNEL}}": channel}.items():
+    for k, v in {"{{BRAND}}": brand, "{{BRAND_SUB}}": sub, "{{DECK_TITLE}}": title, "{{CHANNEL}}": channel,
+                 "{{COVER_TITLE}}": cover_title, "{{COVER_SUB}}": cover_sub}.items():
         slides = slides.replace(k, v)
         engine = engine.replace(k, v)
 
