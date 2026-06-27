@@ -49,7 +49,7 @@ try {
     };
   });
   ok('3 top tabs = 格式/动画效果/AI 修改', shape.htabs.join(',') === '格式,动画效果,AI 修改', shape.htabs.join(','));
-  ok('animation sub-tabs = 进入/动作/消失', shape.stabs.join(',') === '进入,动作,消失', shape.stabs.join(','));
+  ok('animation sub-tabs = 进入/强调/动作/消失', shape.stabs.join(',') === '进入,强调,动作,消失', shape.stabs.join(','));
   ok('font picker populated (≥12 fonts)', shape.fontCount >= 12, 'got ' + shape.fontCount);
   ok('font picker has CJK (Noto SC) + EN (Inter)', shape.hasNoto && shape.hasInter);
   ok('motion has 流光溢彩 (shimmer)', shape.hasShimmer);

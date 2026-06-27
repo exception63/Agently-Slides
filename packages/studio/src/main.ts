@@ -8,6 +8,7 @@ import {
   ANIM_NAMES,
   ANIM_OUT_NAMES,
   MOTION_NAMES,
+  EMPH_NAMES,
   COLOR_TOKENS,
   SIZE_TOKENS,
   ALIGN_TOKENS,
@@ -120,6 +121,7 @@ const meta = {
   anims: ANIM_NAMES as readonly string[],
   animOuts: ANIM_OUT_NAMES as readonly string[],
   motions: MOTION_NAMES as readonly string[],
+  emphs: EMPH_NAMES as readonly string[],
   colors: COLOR_TOKENS as readonly string[],
   sizes: SIZE_TOKENS as readonly string[],
   aligns: ALIGN_TOKENS as readonly string[],
@@ -128,10 +130,14 @@ const meta = {
 
 // friendly Chinese labels for the inspector
 const MOTION_LABEL: Record<string, string> = {
-  none: '无', glow: '呼吸灯（发光）', breathe: '呼吸（缩放）', float: '漂浮', pulse: '闪烁', neon: '霓虹微闪', stress: '强调脉冲', shimmer: '流光溢彩',
+  none: '无', glow: '呼吸灯（发光）', breathe: '呼吸（缩放）', float: '漂浮', pulse: '闪烁', neon: '霓虹微闪', stress: '强调脉冲', shimmer: '流光溢彩', 'ken-burns': '缓慢推拉',
 };
 const ANIM_LABEL: Record<string, string> = {
   none: '无', fade: '淡入', rise: '上升淡入', 'fade-up': '上移淡入', pop: '弹出', 'in-left': '从左进', 'in-right': '从右进', 'stagger-list': '逐条浮现', 'counter-up': '数字滚动', morph: '形变',
+  'tracking-in': '字距展开', 'focus-in': '聚焦显影', 'slide-blur': '模糊滑入', 'flip-in': '翻牌入场', 'back-in': '纵深拉入', 'num-pop': '数字弹入', 'texts-reveal': '多行浮现', 'clip-wipe': '裁切揭示',
+};
+const EMPH_LABEL: Record<string, string> = {
+  none: '无', tada: '嗒哒', 'rubber-band': '橡皮筋', jello: '果冻', heartbeat: '心跳', headshake: '摇头', shake: '抖动', 'text-pop': '抬字',
 };
 const ANIM_OUT_LABEL: Record<string, string> = {
   none: '无', 'fade-out': '淡出', sink: '下沉淡出', 'zoom-out': '缩小淡出', 'out-left': '向左退出', 'out-right': '向右退出',
@@ -968,6 +974,7 @@ function showHtmlSel(on: boolean, el?: HTMLElement): void {
   const al = el.style.textAlign || '';
   toggleBtn('#hAlignL', al === 'left'); toggleBtn('#hAlignC', al === 'center'); toggleBtn('#hAlignR', al === 'right');
   (($('#hAnim') as HTMLSelectElement)).value = el.getAttribute('data-anim') || 'none';
+  (($('#hEmph') as HTMLSelectElement)).value = el.getAttribute('data-emph') || 'none';
   (($('#hMotion') as HTMLSelectElement)).value = el.getAttribute('data-motion') || 'none';
   (($('#hAnimOut') as HTMLSelectElement)).value = el.getAttribute('data-anim-out') || 'none';
   renderAnimChips(el);
@@ -1176,6 +1183,11 @@ function setHtmlMotion(val: string): void {
 function setHtmlAnimOut(val: string): void {
   if (!htmlSelEl) return; pushHistory('animout');
   if (val && val !== 'none') htmlSelEl.setAttribute('data-anim-out', val); else htmlSelEl.removeAttribute('data-anim-out');
+  markDirty();
+}
+function setHtmlEmph(val: string): void {
+  if (!htmlSelEl) return; pushHistory('emph');
+  if (val && val !== 'none') htmlSelEl.setAttribute('data-emph', val); else htmlSelEl.removeAttribute('data-emph');
   markDirty();
 }
 
@@ -1540,6 +1552,10 @@ ${FENCE}
 1. **每改一页输出一个 \`<section>\`，且必须保留原来的 \`data-id\`**（Slidesmith 靠它精准替换对应页）。
 2. 不要输出 \`<html>\`/\`<head>\`、不要整份 deck、不要解释文字——文件里只有这些 \`<section>\`。
 3. 通常你（Claude Code）会直接用 \`slidesmith_apply_patch\` 把这些 \`<section>\` 回写到 Studio，当场只替换对应页、其它页不动。
+4. **动画**：**优先**用声明式标准标签落在 slide 元素上——入场 \`data-anim\` · 强调 \`data-emph\` · 持续 \`data-motion\` · 退场 \`data-anim-out\` · canvas 特效 \`data-fx\` · 分步 \`class="fragment"\` · 神奇移动相邻两页同名 \`data-morph\`（编号 A–J → 属性值见技能内 \`references/animations.md\`，用户对你说编号即照表落）。
+   用标准标签的好处：Studio 渲染时自动注入引擎播放、选中元素时「快速设置」下拉能读回并继续微调、换肤与一键关闭都正常——所以**能用标签就别自己写 keyframes**。
+   **但你保留灵活性**：库里没有的新效果，可用页内 scoped \`<style>\` 自定义（务必 scope 到 \`[data-id="…"]\` 且加 \`@media (prefers-reduced-motion:reduce)\` 降级）。代价：自定义部分快速设置读不到（显示「无」），但仍能播。
+   提示：用户也可在 Studio「动画效果 → 打开动画库」里**可视化挑选直接套用**，那条路不经过你。
 `;
 }
 // single page (the current target)
@@ -2035,6 +2051,11 @@ body.dark .right h4.sub{color:#9a9a9e;border-color:#2c2c2f}
 body.dark .field label{color:#9a9a9e}
 body.dark .addrow button,body.dark .oprow button,body.dark button.mini,body.dark .stab,body.dark .tgl{background:#2c2c2f;border-color:#3a3a3d;color:#ddd}
 body.dark .addrow button:hover,body.dark .oprow button:hover,body.dark button.mini:hover,body.dark .stab:hover{background:#3a3a3d}
+/* the primary 发送/导出 button keeps its brand brick-red + white text inside .oprow/.addrow,
+   in both light and dark — otherwise the generic .oprow button bg (light gray / dark #2c2c2f)
+   overrides primary-mini's red while keeping its white text → white-on-light = unreadable. */
+.oprow button.primary-mini,.addrow button.primary-mini,body.dark .oprow button.primary-mini,body.dark .addrow button.primary-mini{background:#B5402A;color:#fff;border-color:#B5402A}
+.oprow button.primary-mini:hover,.addrow button.primary-mini:hover,body.dark .oprow button.primary-mini:hover,body.dark .addrow button.primary-mini:hover{background:#9a3623}
 body.dark .stab.active{background:#3a2417;border-color:#7a4a2c;color:#f0b34a}
 body.dark .tgl.on{background:#B5402A;border-color:#B5402A;color:#fff}
 body.dark .nosel,body.dark .hint{color:#8a8a8e}
@@ -2146,12 +2167,17 @@ function buildUI(): void {
           <h3 class="sub">快速设置</h3>
           <div class="subtabs">
             <button class="stab active" data-stab="in">进入</button>
+            <button class="stab" data-stab="emph">强调</button>
             <button class="stab" data-stab="motion">动作</button>
             <button class="stab" data-stab="out">消失</button>
           </div>
           <div class="spane" data-spane="in">
             <div class="field"><label title="翻到本页时播放一次">进入动画</label><select id="hAnim"></select></div>
             <div class="oprow"><button id="hAnimPlay" title="在本页重放进入 / 动作">▶ 预览</button></div>
+          </div>
+          <div class="spane" data-spane="emph" hidden>
+            <div class="field"><label title="翻到本页时，对已显示的元素做一次手势强调">强调动画</label><select id="hEmph"></select></div>
+            <div class="oprow"><button id="hAnimPlayE" title="在本页重放强调">▶ 预览</button></div>
           </div>
           <div class="spane" data-spane="motion" hidden>
             <div class="field"><label title="一直循环播放，如呼吸灯、流光">持续动作</label><select id="hMotion"></select></div>
@@ -2299,6 +2325,7 @@ function buildUI(): void {
   $('#hAlignC').addEventListener('click', () => setAlign('center'));
   $('#hAlignR').addEventListener('click', () => setAlign('right'));
   fillSel('#hAnim', meta.anims, ANIM_LABEL); onChange('#hAnim', (v) => { setHtmlAnim(v); previewPlayFx(); });
+  fillSel('#hEmph', meta.emphs, EMPH_LABEL); onChange('#hEmph', (v) => { setHtmlEmph(v); previewPlayFx(); });
   fillSel('#hMotion', meta.motions, MOTION_LABEL); onChange('#hMotion', (v) => { setHtmlMotion(v); previewPlayFx(); });
   fillSel('#hAnimOut', meta.animOuts, ANIM_OUT_LABEL); onChange('#hAnimOut', (v) => { setHtmlAnimOut(v); previewPlayFxOut(); });
   ($('#hFxMode') as HTMLSelectElement).value = fxMode;
@@ -2308,6 +2335,7 @@ function buildUI(): void {
     previewFxCall('__SM_FX_REARM__');
   });
   $('#hAnimPlay').addEventListener('click', previewPlayFx);
+  $('#hAnimPlayE').addEventListener('click', previewPlayFx);
   $('#hAnimPlay2').addEventListener('click', previewPlayFx);
   $('#hAnimPlayOut').addEventListener('click', previewPlayFxOut);
   // 动画库子窗口：开 + 接收回传的效果

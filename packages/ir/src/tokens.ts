@@ -44,8 +44,32 @@ export const ANIM_NAMES = [
   'stagger-list',
   'counter-up',
   'morph',
+  // full library entrances (A7–A12 + 点睛 clip-wipe) — all backed by the Studio FX engine
+  'tracking-in', // A7 字距展开
+  'focus-in', // A8 聚焦显影
+  'slide-blur', // A9 动感模糊滑入
+  'flip-in', // A10 翻牌入场
+  'back-in', // A11 纵深拉入
+  'num-pop', // A5 数字弹入（逐字）
+  'texts-reveal', // A12 多行浮现
+  'clip-wipe', // 裁切揭示
 ] as const;
 export type AnimName = (typeof ANIM_NAMES)[number];
+
+// One-shot EMPHASIS gestures (data-emph) — play once when the slide becomes active,
+// on an already-visible element. Library category C (tada/headshake/…). Backed by
+// the Studio FX engine (#deck .slide.sm-play [data-emph="…"]).
+export const EMPH_NAMES = [
+  'none',
+  'tada', // C1 嗒哒
+  'rubber-band', // C2 橡皮筋
+  'jello', // C3 果冻
+  'heartbeat', // C4 心跳
+  'headshake', // C5 摇头
+  'shake', // C6 抖动
+  'text-pop', // C7 抬字
+] as const;
+export type EmphName = (typeof EMPH_NAMES)[number];
 
 // One-shot EXIT animations (play on the OUTGOING slide when you navigate away).
 // Mirror of ANIM_NAMES; carried on [data-anim-out]. The deck's nav is intercepted
@@ -73,6 +97,7 @@ export const MOTION_NAMES = [
   'neon', // 霓虹微闪 (keynote neon-flicker)
   'stress', // 强调脉冲：周期性放大点睛 (keynote a-em-stress)
   'shimmer', // 流光溢彩：文字镂空彩虹液态流动
+  'ken-burns', // 缓慢推拉：图片/背景持续缩放平移 (Ken Burns)
 ] as const;
 export type MotionName = (typeof MOTION_NAMES)[number];
 
