@@ -252,9 +252,9 @@ function renderLeft(): void {
       const row = document.createElement('div');
       row.className = 'srow' + (i === cur ? ' active' : '');
       const seg = s.seg && s.seg !== '0' ? `<span class="sseg">${esc(s.seg)}</span>` : '';
-      const badge = aiApplied.has(s.id) ? '<span class="sbadge done" title="AI 已改过这一页">✓</span>'
-        : aiSent.has(s.id) ? '<span class="sbadge sent" title="已发送，等 Claude 改…">●</span>'
-        : aiInstructions[s.id] ? '<span class="sbadge todo" title="有待发送给 AI 的评论">●</span>' : '';
+      const badge = aiApplied.has(s.id) ? '<span class="sbadge done" title="AI 已修改本页">✓</span>'
+        : aiSent.has(s.id) ? '<span class="sbadge sent" title="已发送，等待 Claude 修改">●</span>'
+        : aiInstructions[s.id] ? '<span class="sbadge todo" title="有待发送给 AI 的修改说明">●</span>' : '';
       row.innerHTML = `<span class="snum">${i + 1}</span>${seg}<span class="stt">${esc(s.title)}</span>${badge}`;
       row.addEventListener('click', () => selectHtmlSlide(i));
       box.appendChild(row);
@@ -437,7 +437,7 @@ async function saveHtmlInPlace(): Promise<void> {
     try {
       const w = await fileHandle.createWritable();
       await w.write(html); await w.close();
-      toast('已保存 → ' + (fileHandle.name || fileBase + '.html'));
+      toast('已保存：' + (fileHandle.name || fileBase + '.html'));
       clearDraft(); syncExportToBridge();
       return;
     } catch { /* permission lost / file moved → fall through to picker */ fileHandle = null; }
@@ -453,7 +453,7 @@ async function saveHtmlInPlace(): Promise<void> {
       const ws = await h.createWritable();
       await ws.write(html); await ws.close();
       fileHandle = h;
-      toast('已保存 → ' + (h.name || fileBase + '.html'));
+      toast('已保存：' + (h.name || fileBase + '.html'));
       clearDraft(); syncExportToBridge();
       return;
     } catch (e) {
@@ -761,7 +761,29 @@ const FX_CSS = '<style id="sm-fx">'
   + '@keyframes sm-wipe{from{opacity:1;clip-path:inset(0 100% 0 0)}to{opacity:1;clip-path:inset(0 0 0 0)}}'
   + '#deck .slide.sm-play .smfx-spot>:not([data-focus]){opacity:.22;filter:saturate(.4);transition:opacity .4s,filter .4s}'
   + '#deck .slide.sm-play .smfx-spot>[data-focus]{transform:scale(1.04)}'
-  + '@media(prefers-reduced-motion:reduce){#deck .slide [data-motion],#deck .slide [data-anim],#deck .slide [data-anim] *,#deck .slide [data-anim-out],#deck .slide [data-emph],#deck .slide .smfx-draw path{animation:none!important;opacity:1!important;letter-spacing:normal!important;filter:none!important;stroke-dashoffset:0!important}}'
+  // ── 移植自 transitions.dev（自有实现，按放映态重写）：A5 数字弹入 / A12 多行浮现 / H8 成功对勾 ──
+  // A5 数字弹入：容器可见，逐字 .smfx-ch（FX_JS 的 play() 自动拆字）错落带模糊滑入
+  + '#deck .slide.sm-armed [data-anim="num-pop"],#deck .slide.sm-play [data-anim="num-pop"]{opacity:1;animation:none}'
+  + '#deck .slide.sm-armed [data-anim="num-pop"] .smfx-ch{display:inline-block;opacity:0}'
+  + '#deck .slide.sm-play [data-anim="num-pop"] .smfx-ch{display:inline-block;opacity:0;animation:sm-a-numpop .7s cubic-bezier(.34,1.5,.5,1) both;animation-delay:calc(var(--i,0)*.07s)}'
+  + '@keyframes sm-a-numpop{from{opacity:0;transform:translateY(.5em);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}'
+  // A12 多行浮现：容器可见，每个直接子元素依次带模糊上浮
+  + '#deck .slide.sm-armed [data-anim="texts-reveal"],#deck .slide.sm-play [data-anim="texts-reveal"]{opacity:1;animation:none}'
+  + '#deck .slide.sm-armed [data-anim="texts-reveal"]>*{opacity:0}'
+  + '#deck .slide.sm-play [data-anim="texts-reveal"]>*{opacity:0;animation:sm-a-textsrev .5s cubic-bezier(.16,1,.3,1) both}'
+  + '#deck .slide.sm-play [data-anim="texts-reveal"]>*:nth-child(2){animation-delay:.1s}'
+  + '#deck .slide.sm-play [data-anim="texts-reveal"]>*:nth-child(3){animation-delay:.2s}'
+  + '#deck .slide.sm-play [data-anim="texts-reveal"]>*:nth-child(4){animation-delay:.3s}'
+  + '#deck .slide.sm-play [data-anim="texts-reveal"]>*:nth-child(n+5){animation-delay:.4s}'
+  + '@keyframes sm-a-textsrev{from{opacity:0;transform:translateY(.55em);filter:blur(6px)}to{opacity:1;transform:none;filter:none}}'
+  // H8 成功对勾：圆环弹入 + 对勾描线（复用 sm-draw）
+  + '#deck .slide.sm-armed .smfx-check{opacity:0}'
+  + '#deck .slide.sm-play .smfx-check{display:inline-block;animation:sm-check-in .72s cubic-bezier(.34,1.5,.5,1) both}'
+  + '#deck .slide .smfx-check svg{overflow:visible}'
+  + '#deck .slide .smfx-check .smfx-check-tick{stroke-dasharray:1;stroke-dashoffset:1}'
+  + '#deck .slide.sm-play .smfx-check .smfx-check-tick{animation:sm-draw .5s cubic-bezier(.4,0,.2,1) .2s forwards}'
+  + '@keyframes sm-check-in{0%{opacity:0;transform:scale(.6) rotate(-12deg)}60%{opacity:1;transform:scale(1.08) rotate(2deg)}100%{opacity:1;transform:scale(1) rotate(0)}}'
+  + '@media(prefers-reduced-motion:reduce){#deck .slide [data-motion],#deck .slide [data-anim],#deck .slide [data-anim] *,#deck .slide [data-anim-out],#deck .slide [data-emph],#deck .slide .smfx-draw path,#deck .slide .smfx-check,#deck .slide .smfx-check .smfx-check-tick{animation:none!important;opacity:1!important;letter-spacing:normal!important;filter:none!important;stroke-dashoffset:0!important}}'
   + '</style>';
 // FX driver — injected into preview + export. Watches which slide is active and, per
 // data-smfx mode, plays it (auto) or arms it for a click (manual). Exposes window hooks
@@ -771,8 +793,10 @@ const FX_JS = '<script id="sm-fx-js">(function(){'
   + 'function mode(){return root.getAttribute("data-smfx")||"auto";}'
   + 'function reduce(){try{return matchMedia("(prefers-reduced-motion:reduce)").matches;}catch(e){return false;}}'
   + 'function active(){return deck.querySelector(".slide.active")||deck.querySelector(".slide");}'
-  + 'function arm(s){if(!s)return;s.classList.remove("sm-play");s.classList.add("sm-armed");}'
-  + 'function play(s){if(!s)return;s.classList.remove("sm-play");s.classList.remove("sm-armed");void s.offsetWidth;s.classList.add("sm-play");}'
+  + 'function arm(s){if(!s)return;splitNum(s);s.classList.remove("sm-play");s.classList.add("sm-armed");}'
+  // A5 数字弹入：把 [data-anim="num-pop"] 文本拆成逐字 .smfx-ch（带 --i 序号），只拆一次
+  + 'function splitNum(s){try{s.querySelectorAll(\'[data-anim="num-pop"]:not([data-smfx-split])\').forEach(function(el){var t=el.textContent;el.setAttribute("data-smfx-split","1");el.textContent="";var i=0;t.split("").forEach(function(ch){if(ch===" "){el.appendChild(document.createTextNode(" "));return;}var sp=document.createElement("span");sp.className="smfx-ch";sp.style.setProperty("--i",i++);sp.textContent=ch;el.appendChild(sp);});});}catch(e){}}'
+  + 'function play(s){if(!s)return;splitNum(s);s.classList.remove("sm-play");s.classList.remove("sm-armed");void s.offsetWidth;s.classList.add("sm-play");}'
   + 'function onShow(s){if(!s)return;if(mode()==="manual"){arm(s);}else{play(s);}}'
   + 'window.__SM_FX_PLAY__=function(){play(active());};'
   + 'window.__SM_FX_REARM__=function(){onShow(active());};'
@@ -823,12 +847,25 @@ function wireFullDeckEditing(d: Document): void {
   const deckEl = d.querySelector('#deck'); if (!deckEl) return;
   deckEl.addEventListener('click', (e) => {
     let t = e.target as Node | null; while (t && t.nodeType !== 1) t = (t as Node).parentNode;
-    const el = t as HTMLElement | null; if (!el || !el.closest('#deck .slide') || el.classList.contains('slide')) return;
+    const el = t as HTMLElement | null;
+    // a click on the slide background / empty area (not a leaf element) clears the selection, Keynote-style
+    if (!el || !el.closest('#deck .slide') || el.classList.contains('slide')) { deselectHtml(); return; }
     if (htmlSelEl) (htmlSelEl as HTMLElement).classList.remove('sm-sel');
     htmlSelEl = el; el.classList.add('sm-sel'); showHtmlSel(true, el); showGizmo(el);
   }, true);
-  // keep the move/resize gizmo aligned when the deck rescales
-  try { (d.defaultView as Window).addEventListener('resize', () => positionGizmo()); } catch { /* noop */ }
+  // a click anywhere outside the deck (iframe margins / gaps between slides) also clears it — but never on the gizmo handles
+  d.addEventListener('click', (e) => {
+    const tg = e.target as HTMLElement | null;
+    if (!tg || tg.closest('#deck') || tg.closest('.sm-gizmo')) return;
+    deselectHtml();
+  }, true);
+  // keep the move/resize gizmo glued to the element while the deck scrolls or rescales
+  // (the gizmo is position:fixed, so without this it detaches and floats on screen)
+  try {
+    const win = d.defaultView as Window;
+    win.addEventListener('scroll', () => positionGizmo(), true); // capture: also catch scroll on inner scrollers
+    win.addEventListener('resize', () => positionGizmo());
+  } catch { /* noop */ }
 }
 function renderHtmlEdit(): void {
   const ifr = $('#preview') as HTMLIFrameElement;
@@ -887,7 +924,7 @@ function harvestAll(): void {
 function selectHtmlSlide(i: number): void {
   cur = Math.max(0, Math.min(htmlSlides.length - 1, i));
   lastSyncIdx = cur; // we are the source of truth now; keep the nav-poll in step
-  if (htmlSelEl) { (htmlSelEl as HTMLElement).classList.remove('sm-sel'); htmlSelEl = null; showHtmlSel(false); } // a selection on the old page no longer applies
+  if (htmlSelEl) deselectHtml(); // a selection on the old page no longer applies
   [].forEach.call(document.querySelectorAll('.srow'), (r: Element, idx: number) => r.classList.toggle('active', idx === cur));
   const d = ($('#preview') as HTMLIFrameElement).contentDocument;
   if (d) {
@@ -932,6 +969,12 @@ function showHtmlSel(on: boolean, el?: HTMLElement): void {
   updateAiTarget();
 }
 function toggleBtn(sel: string, on: boolean): void { const b = $(sel); if (b) b.classList.toggle('on', on); }
+// central deselect: drop the sm-sel outline, clear state, and tear down the gizmo (showHtmlSel(false) hides it).
+function deselectHtml(): void {
+  if (htmlSelEl) (htmlSelEl as HTMLElement).classList.remove('sm-sel');
+  htmlSelEl = null;
+  showHtmlSel(false);
+}
 // map an element's inline font-family back to a FONT id (for the dropdown's value)
 function fontIdForStack(ff: string): string {
   if (!ff) return '';
@@ -1032,7 +1075,7 @@ function placeImage(dataUrl: string): void {
   if (htmlSelEl) (htmlSelEl as HTMLElement).classList.remove('sm-sel');
   htmlSelEl = img; img.classList.add('sm-sel'); showHtmlSel(true, img); showGizmo(img);
   harvestAll(); markDirty();
-  toast('已插入图片（拖蓝框上方 ✥ 移动、右下角改大小）');
+  toast('已插入图片，可拖动选框上方的 ✥ 移动、右下角调整大小');
 }
 
 // ---- move / resize the selected element directly on the canvas (Keynote-style gizmo) ----
@@ -1139,17 +1182,17 @@ function openAnimGallery(): void {
   let url = '';
   try { url = URL.createObjectURL(new Blob([galleryHtml], { type: 'text/html' })) + '#picker'; } catch { url = ''; }
   animGalleryWin = url ? window.open(url, 'smfx-gallery', 'width=960,height=920,menubar=no,toolbar=no') : null;
-  if (!animGalleryWin) setMorphHint('⚠️ 弹窗被拦截，请允许本页弹窗后再点「打开动画库」。');
+  if (!animGalleryWin) setMorphHint('弹窗被拦截，请允许本页弹窗后再点击「打开动画库」。');
 }
 function setMorphHint(msg: string): void {
   const h = $('#hMorphHint'); if (!h) return;
   (h as HTMLElement).style.display = msg ? '' : 'none'; h.textContent = msg;
 }
 function applyPicked(d: { code?: string; name?: string; spec?: Record<string, unknown> }): void {
-  if (mode !== 'html') { setMorphHint('请先导入一个 HTML deck 再加动画。'); return; }
+  if (mode !== 'html') { setMorphHint('请先导入一个 HTML deck，再添加动画。'); return; }
   const spec = (d.spec || {}) as { mode?: string; attr?: string; val?: string; add?: string[]; scope?: string };
   if (spec.mode === 'morph') { applyMorph(d.name || '神奇移动'); return; }
-  if (!htmlSelEl) { setMorphHint('请先在预览里点选一个元素，再点效果。'); return; }
+  if (!htmlSelEl) { setMorphHint('请先在预览中点选一个元素，再选择效果。'); return; }
   const el = htmlSelEl as HTMLElement;
   const slide = el.closest('#deck .slide') as HTMLElement | null;
   const target = spec.scope === 'slide' ? (slide || el) : el;
@@ -1162,20 +1205,20 @@ function applyPicked(d: { code?: string; name?: string; spec?: Record<string, un
   markDirty();
   showHtmlSel(true, el);
   previewPlayFx();
-  if (spec.attr === 'data-fx') setMorphHint('✓ 已加 Canvas 特效「' + (d.name || '') + '」到本页。它在生成 / 导出后的 deck 放映时跑（Studio 预览暂不渲染 canvas）。');
-  else setMorphHint('✓ 已应用「' + (d.name || d.code || '') + '」到选中元素。');
+  if (spec.attr === 'data-fx') setMorphHint('已为本页添加 Canvas 特效「' + (d.name || '') + '」，在导出后的 deck 放映时生效，Studio 预览暂不渲染 Canvas。');
+  else setMorphHint('已为选中元素应用「' + (d.name || d.code || '') + '」。');
 }
 function applyMorph(name: string): void {
-  if (!htmlSelEl) { setMorphHint('请先选中要做「神奇移动」的元素。'); return; }
+  if (!htmlSelEl) { setMorphHint('请先选中要进行「神奇移动」的元素。'); return; }
   const el = htmlSelEl as HTMLElement;
   pushHistory('morph');
   if (!pendingMorphId) {
     pendingMorphId = 'm' + (++morphSeq);
     el.setAttribute('data-morph', pendingMorphId);
-    setMorphHint('已标记神奇移动「起点」(' + pendingMorphId + ')。翻到下一页、选中对应元素，再点一次「' + name + '」即可配对。');
+    setMorphHint('已标记神奇移动起点（' + pendingMorphId + '）。翻到下一页选中对应元素，再次点击「' + name + '」即可配对。');
   } else {
     el.setAttribute('data-morph', pendingMorphId);
-    setMorphHint('✓ 神奇移动已配对(' + pendingMorphId + ')。放映/导出后翻这两页时，元素会平滑飞过去。');
+    setMorphHint('神奇移动已配对（' + pendingMorphId + '）。放映或导出后翻动这两页时，元素将平滑过渡。');
     pendingMorphId = null;
   }
   markDirty();
@@ -1193,7 +1236,7 @@ function renderAnimChips(el: Element): void {
     if (c === 'fragment') items.push({ label: '分步·fragment', clear: () => ['fragment', 'up', 'down', 'left', 'right', 'grow', 'shrink', 'strike', 'highlight', 'current-visible', 'semi-out'].forEach((v) => el.classList.remove(v)) });
     else if (c.startsWith('smfx-')) items.push({ label: '点睛·' + c, clear: () => el.classList.remove(c) });
   });
-  if (!items.length) { box.innerHTML = '<span class="achint">还没加动画。点上面「🎬 打开动画库」挑一个。</span>'; return; }
+  if (!items.length) { box.innerHTML = '<span class="achint">尚未添加动画。点击上方「打开动画库」选择一个。</span>'; return; }
   items.forEach((it) => {
     const chip = document.createElement('span'); chip.className = 'achip'; chip.textContent = it.label;
     const x = document.createElement('button'); x.type = 'button'; x.textContent = '✕';
@@ -1243,7 +1286,7 @@ function moveHtmlEl(dir: number): void {
 function delHtmlEl(): void {
   if (!htmlSelEl) return; pushHistory('del'); const el = htmlSelEl as HTMLElement;
   htmlSelEl = null; el.remove(); hideGizmo(); showHtmlSel(false); harvestAll(); markDirty();
-  toast('已删除该元素（可 Ctrl/⌘+Z 撤销）');
+  toast('已删除该元素，可按 Ctrl/⌘+Z 撤销');
 }
 function setHtmlToken(name: string, val: string): void {
   pushHistory('token:' + name);
@@ -1318,9 +1361,9 @@ async function embedFonts(html: string): Promise<string> {
 async function buildExportHtml(): Promise<string> {
   const html = exportHtmlDeck();
   if (!embedFontsChecked()) return html;
-  setBusy('正在下载并嵌入字体子集…（首次稍慢）');
-  try { const out = await embedFonts(html); setBusy(null); toast('已嵌入字体（离线可用）'); return out; }
-  catch (e) { setBusy(null); toast('嵌入字体失败（需联网下载），已按不嵌入导出：' + (e as Error).message, true); return html; }
+  setBusy('正在下载并嵌入字体子集，首次稍慢…');
+  try { const out = await embedFonts(html); setBusy(null); toast('已嵌入字体，离线可用'); return out; }
+  catch (e) { setBusy(null); toast('嵌入字体失败（需联网下载），已改为不嵌入字体导出：' + (e as Error).message, true); return html; }
 }
 
 // ======================= N3: Submit-to-AI single-slide loop =======================
@@ -1354,19 +1397,19 @@ function aiWaitingCount(): number { return [...aiSent].filter((id) => !aiApplied
 function aiTotalTasks(): number { return aiPendingCount() + (aiDeckInstruction.trim() ? 1 : 0); }
 function updateSendButton(): void {
   const n = aiTotalTasks(); const btn = $('#aiExportAll') as HTMLButtonElement | null; if (!btn) return;
-  btn.textContent = bridge.connected ? `🚀 发送 ${n} 个任务给 Claude` : `📦 导出 ${n} 个任务`;
+  btn.textContent = bridge.connected ? `发送 ${n} 个任务给 Claude` : `导出 ${n} 个任务`;
   btn.disabled = n === 0;
 }
 function refreshAiCount(): void {
   const n = aiTotalTasks();
-  const h = $('#aiCountHint'); if (h) h.textContent = n ? `${n} 个任务待发送给 Claude。逐页写好评论、或对整份说一句，一次性发送。` : '还没有待发送的任务。选一页写句评论，或在下面对整份 deck 说一句。';
+  const h = $('#aiCountHint'); if (h) h.textContent = n ? `${n} 个任务待发送给 Claude。逐页填写修改说明，或对整份 deck 提出要求，一次性发送。` : '暂无待发送的任务。可选择某一页填写修改说明，或在下方对整份 deck 提出要求。';
   updateSendButton();
 }
 // the queue: every page that has a comment, with its status, clickable to jump
 function renderAiQueue(): void {
   const box = $('#aiQueue'); if (!box) return; box.innerHTML = '';
   const rows = htmlSlides.map((s, i) => ({ s, i })).filter(({ s }) => aiInstructions[s.id]);
-  if (!rows.length) { box.innerHTML = '<div class="qempty">还没有任务。</div>'; return; }
+  if (!rows.length) { box.innerHTML = '<div class="qempty">暂无任务。</div>'; return; }
   rows.forEach(({ s, i }) => {
     const st = aiApplied.has(s.id) ? { c: 'done', t: '已改' } : aiSent.has(s.id) ? { c: 'sent', t: '已发送' } : { c: 'todo', t: '待发送' };
     const row = document.createElement('div'); row.className = 'qrow' + (i === cur ? ' active' : '');
@@ -1379,7 +1422,7 @@ function renderAiQueue(): void {
 function refreshSentBanner(): void {
   const el = $('#aiSentBanner'); if (!el) return;
   const n = aiWaitingCount();
-  if (n > 0) { el.style.display = ''; el.innerHTML = `<span class="aisent-dot">●</span><span>已发送 ${n} 个任务，Claude 正在改…改好会自动出现</span>`; }
+  if (n > 0) { el.style.display = ''; el.innerHTML = `<span class="aisent-dot">●</span><span>已发送 ${n} 个任务，Claude 正在修改，完成后将自动更新</span>`; }
   else el.style.display = 'none';
 }
 // one call to re-sync everything that depends on comments/status
@@ -1422,7 +1465,7 @@ function startHtmlNavSync(): void {
       const d = ($('#preview') as HTMLIFrameElement).contentDocument;
       const all = d ? Array.prototype.slice.call(d.querySelectorAll('#deck .slide')) as Element[] : [];
       if (all.indexOf((htmlSelEl as HTMLElement).closest('#deck .slide') as Element) !== idx) {
-        (htmlSelEl as HTMLElement).classList.remove('sm-sel'); htmlSelEl = null; showHtmlSel(false);
+        deselectHtml();
       }
     }
     renderLeft(); updateAiTarget();
@@ -1532,7 +1575,7 @@ function applyAiPatch(text: string): void {
   if (!applied) { toast('补丁的 data-id 不匹配任何页', true); return; }
   htmlGotoAfterRender = firstIdx; // stay on the patched slide after re-render
   renderHtmlEdit(); refreshTasks(); markDirty();
-  toast('AI 改好了 ' + applied + ' 页（左侧打勾的页，不满意可「还原本页」）');
+  toast('AI 已修改 ' + applied + ' 页（左侧带勾标记），如不满意可使用「还原本页」');
 }
 // revert one slide to the version it had right before AI changed it. The page's
 // comment stays, so it goes back to 待发送 (you can edit + re-send).
@@ -1601,7 +1644,7 @@ function renderAuditReport(findings: DeckFinding[]): void {
   const box = $('#auditOut'); if (!box) return; box.innerHTML = '';
   const e = findings.filter((f) => f.level === 'error').length;
   const sum = document.createElement('div'); sum.className = 'audit-sum';
-  sum.textContent = findings.length ? `${e} 处问题 · ${findings.length - e} 处提醒（点条目跳到该页）` : '✓ 没发现明显的溢出 / 对比度 / 坏图问题';
+  sum.textContent = findings.length ? `${e} 处问题 · ${findings.length - e} 处提醒（点击条目可跳转到对应页）` : '未发现明显的溢出 / 对比度 / 坏图问题';
   box.appendChild(sum);
   findings.forEach((f) => {
     const r = document.createElement('div'); r.className = 'audit-row ' + f.level;
@@ -1654,7 +1697,7 @@ function maybeOfferDraftRestore(): void {
   const when = d.ts ? new Date(d.ts).toLocaleString('zh-CN', { hour12: false }) : '';
   txt.innerHTML = '发现未保存的草稿 <b>' + esc(d.name || 'deck') + '</b>' + (when ? ' · ' + when : '');
   bar.style.display = '';
-  $('#restoreGo').onclick = () => { bar.style.display = 'none'; importFile((d.name || 'deck') + '.html', d.html as string); toast('已恢复草稿（保存前请重新选目标文件覆盖）'); };
+  $('#restoreGo').onclick = () => { bar.style.display = 'none'; importFile((d.name || 'deck') + '.html', d.html as string); toast('已恢复草稿，保存前请重新选择目标文件以覆盖'); };
   $('#restoreDrop').onclick = () => { bar.style.display = 'none'; clearDraft(); };
 }
 
@@ -1673,7 +1716,7 @@ function setBusy(msg: string | null): void {
 const THEME_KEY = 'sm-studio-theme';
 function applyStudioTheme(dark: boolean): void {
   document.body.classList.toggle('dark', dark);
-  const b = $('#themeTog'); if (b) b.textContent = dark ? '☀️' : '🌙';
+  const b = $('#themeTog'); if (b) b.title = dark ? '切换为浅色界面' : '切换为深色界面';
 }
 function initStudioTheme(): void {
   let dark = false; try { dark = localStorage.getItem(THEME_KEY) === 'dark'; } catch { /* noop */ }
@@ -1716,17 +1759,17 @@ async function openConnected(): Promise<void> {
 function renderConnectState(found: boolean): void {
   const box = $('#cstate'); if (!box) return;
   if (found) {
-    box.innerHTML = '<div class="cstatus ok">✅ 检测到本地服务，可以连上 Claude 了！</div>'
-      + '<button id="cgo" class="primary-mini" style="width:100%;margin-top:12px;padding:10px">🔗 打开「已连接」的 Studio（带上当前 deck）→</button>'
-      + '<div class="cfaint">会在 ' + bridgeUrl() + ' 打开连接版，自动连上 Claude；你当前的改动会一起带过去。</div>';
+    box.innerHTML = '<div class="cstatus ok">已检测到本地服务，可以连接 Claude。</div>'
+      + '<button id="cgo" class="primary-mini" style="width:100%;margin-top:12px;padding:10px">打开已连接的 Studio（携带当前 deck）</button>'
+      + '<div class="cfaint">将在 ' + bridgeUrl() + ' 打开已连接版本并自动连接 Claude，当前的修改会一并带入。</div>';
     const go = $('#cgo'); if (go) go.addEventListener('click', openConnected);
   } else {
-    box.innerHTML = '<div class="cstatus">⏳ 正在检测本地服务…（开着 Claude Code 就会自动连上）</div>'
-      + '<div class="chint">最简单的连法（小白也行）：</div>'
+    box.innerHTML = '<div class="cstatus">正在检测本地服务，启动 Claude Code 后会自动连接。</div>'
+      + '<div class="chint">连接方式</div>'
       + '<ol class="csteps"><li>打开 <b>Claude Code</b></li>'
-      + '<li>跟它说「<b>用 slidesmith 打开这份 slides</b>」，或敲 <code>/slidesmith</code></li>'
-      + '<li>它会自动把服务跑起来、弹出一个<b>已连接</b>的 Studio —— 在那一版里改就行</li></ol>'
-      + '<div class="cfaint">检测到服务后，上面会自动变绿、出现「打开连接版」按钮。<br>技术党也可在仓库目录运行 <code>npm run sm -- serve</code>。</div>';
+      + '<li>对它说「<b>用 slidesmith 打开这份 slides</b>」，或输入 <code>/slidesmith</code></li>'
+      + '<li>它会自动启动服务并弹出一个<b>已连接</b>的 Studio，在该版本中编辑即可</li></ol>'
+      + '<div class="cfaint">检测到服务后，上方会变为绿色并出现「打开已连接版本」按钮。<br>也可在仓库目录运行 <code>npm run sm -- serve</code>。</div>';
   }
 }
 function openConnectModal(): void {
@@ -1742,15 +1785,15 @@ function closeConnectModal(): void {
 // else fall back to downloading the prompt file for the human to hand to an AI.
 function submitRequests(): void {
   const r = buildAllAiRequests();
-  if (!r) { toast('还没有任务：选一页写句评论，或在「对整份 deck 说」里写一句', true); return; }
+  if (!r) { toast('暂无任务：请选择某一页填写修改说明，或在「对整份 deck 的要求」中填写', true); return; }
   // the pages going out now become "已发送 · 等待" until a patch comes back
   const sentNow = htmlSlides.filter((s) => aiInstructions[s.id] && !aiApplied.has(s.id)).map((s) => s.id);
   if (bridge.connected && bridge.ws && bridge.ws.readyState === WebSocket.OPEN) {
     bridge.ws.send(JSON.stringify({ type: 'requests', request: r }));
-    toast(`已发送给 Claude（已连接）：${r.count} 个任务，等他改…`);
+    toast(`已发送 ${r.count} 个任务给 Claude`);
   } else {
     download(r.name, r.content, 'text/markdown');
-    toast(`已导出 ${r.count} 个任务 → ${r.name}`);
+    toast(`已导出 ${r.count} 个任务：${r.name}`);
   }
   sentNow.forEach((id) => aiSent.add(id));
   // the deck-level ask is one-shot — clear it after sending so it isn't re-sent
@@ -1771,7 +1814,7 @@ function connectBridge(): void {
   bridge.ws = ws;
   ws.addEventListener('open', () => {
     bridge.connected = true; bridge.everConnected = true; bridge.tries = 0;
-    updateBridgeBadge(); toast('已连接 Claude Code（已连接模式）');
+    updateBridgeBadge(); toast('已连接 Claude Code');
   });
   ws.addEventListener('message', (e: MessageEvent) => {
     let m: { type?: string; name?: string; html?: string; text?: string };
@@ -1968,26 +2011,26 @@ function buildUI(): void {
   document.body.innerHTML = `
 <div class="ehead">
   <button id="navtog" class="iconbtn" title="折叠 / 展开页面列表">☰</button>
-  <button id="undoBtn" class="iconbtn" title="撤销 (⌘/Ctrl+Z)" disabled>↶</button>
-  <button id="redoBtn" class="iconbtn" title="重做 (⌘/Ctrl+⇧+Z)" disabled>↷</button>
-  <button id="themeTog" class="iconbtn" title="深色 / 浅色界面">🌙</button>
-  <span class="brand">✎ Slidesmith Studio</span>
+  <button id="undoBtn" class="iconbtn" title="撤销（⌘/Ctrl+Z）" disabled>↶</button>
+  <button id="redoBtn" class="iconbtn" title="重做（⌘/Ctrl+⇧+Z）" disabled>↷</button>
+  <button id="themeTog" class="iconbtn" title="切换深色 / 浅色界面">◐</button>
+  <span class="brand">Slidesmith Studio</span>
   <span class="dn" id="deckname">${esc(fileBase)}</span>
-  <span class="dirtydot" id="dirtyDot" title="有未保存的修改（已自动存草稿，按 ⌘/Ctrl+S 写回文件）" style="display:none">●未保存</span>
+  <span class="dirtydot" id="dirtyDot" title="有未保存的修改，已自动保存草稿，按 ⌘/Ctrl+S 写回文件" style="display:none">● 未保存</span>
   <span id="bridgeBadge" class="bridge-badge" title="与 Claude Code 的连接状态"></span>
-  <button id="connectBtn" class="connect-btn" title="一键连接 Claude Code">🔌 连接 Claude</button>
+  <button id="connectBtn" class="connect-btn" title="连接本地 Claude Code">连接 Claude Code</button>
   <span class="grow"></span>
   <button id="imp">导入 HTML / deck.json / .md</button>
   <span class="sep"></span>
-  <label class="embedck" title="勾选后，导出/保存时把用到的字体子集内嵌进 HTML —— 断网、换电脑也显示正确字体（文件略大）"><input id="embedFonts" type="checkbox"> 嵌入字体</label>
+  <label class="embedck" title="导出 / 保存时将用到的字体子集内嵌进 HTML，离线或更换设备也能正确显示，文件略大"><input id="embedFonts" type="checkbox"> 嵌入字体</label>
   <button id="expPdf">导出 PDF</button>
   <button id="expHtml">导出 HTML 副本</button>
-  <button id="saveHtml" class="primary" title="直接覆盖你导入的那个 HTML 文件">💾 保存 HTML</button>
+  <button id="saveHtml" class="primary" title="直接覆盖导入的源 HTML 文件">保存</button>
   <input id="file" type="file" accept=".html,.htm,.json,.md" style="display:none">
 </div>
 <div class="emain">
   <aside class="left">
-    <div class="lbar"><button id="add" title="加页">＋</button><button id="del" title="删页">🗑</button><button id="up" title="上移">↑</button><button id="down" title="下移">↓</button></div>
+    <div class="lbar"><button id="add" title="新增页">＋</button><button id="del" title="删除当前页">－</button><button id="up" title="上移">↑</button><button id="down" title="下移">↓</button></div>
     <div id="slides"></div>
   </aside>
   <main class="center">
@@ -2005,21 +2048,21 @@ function buildUI(): void {
       <!-- ===== 格式 ===== -->
       <div class="pane hpane" data-hpane="fmt">
         <h3>主题 / 配色</h3>
-        <div class="field"><label>皮肤 · 换一套气质（21 套）</label><select id="hSkin"></select></div>
+        <div class="field"><label>皮肤</label><select id="hSkin"></select></div>
         <div class="field" id="hThemeWrap" style="display:none"><label>主题</label><select id="hTheme"></select></div>
         <div class="grid2">
-          <div class="field"><label>强调色 accent</label><input id="hAccent" type="color"></div>
-          <div class="field"><label>背景 paper</label><input id="hPaper" type="color"></div>
+          <div class="field"><label>强调色</label><input id="hAccent" type="color"></div>
+          <div class="field"><label>背景色</label><input id="hPaper" type="color"></div>
         </div>
-        <div class="field"><label>文字 ink</label><input id="hInk" type="color"></div>
-        <button id="hTokReset" class="mini">↺ 复原配色</button>
+        <div class="field"><label>文字色</label><input id="hInk" type="color"></div>
+        <button id="hTokReset" class="mini">复原配色</button>
 
         <h3>插入</h3>
-        <div class="oprow"><button id="hInsertImg">🖼 插入图片</button></div>
-        <div class="hint" style="margin-top:6px">图片会内联进 HTML（导出即带，离线可用）。也可直接在预览里粘贴图片。选中某元素时插在它后面。</div>
+        <div class="oprow"><button id="hInsertImg">插入图片</button></div>
+        <div class="hint" style="margin-top:6px">图片以内联方式写入 HTML，导出后离线可用。也可在预览中直接粘贴图片；若已选中元素，将插入其后。</div>
 
         <h3>选中元素</h3>
-        <div class="nosel hseloff" id="hNoSel">在预览里<b>点一段文字</b>即可直接改字；选中后可调它的字体 / 字号 / 颜色。</div>
+        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑；选中后可调整字体、字号与颜色。</div>
         <div id="hSel" class="hselon" style="display:none">
           <div class="tag" id="hSelTag">—</div>
           <div class="field"><label>字体</label><select id="hFont"></select></div>
@@ -2033,72 +2076,72 @@ function buildUI(): void {
               <button id="hItalic" class="tgl" title="斜体"><i>I</i></button>
               <button id="hUnder" class="tgl" title="下划线"><span style="text-decoration:underline">U</span></button>
               <span class="bbsep"></span>
-              <button id="hAlignL" class="tgl" title="左对齐">⬅</button>
-              <button id="hAlignC" class="tgl" title="居中">↔</button>
-              <button id="hAlignR" class="tgl" title="右对齐">➡</button>
+              <button id="hAlignL" class="tgl" title="左对齐">左</button>
+              <button id="hAlignC" class="tgl" title="居中">中</button>
+              <button id="hAlignR" class="tgl" title="右对齐">右</button>
             </div>
           </div>
-          <div class="field"><label>粗细（精细）</label><select id="hWeight"><option value="">默认</option><option>300</option><option>400</option><option>500</option><option>600</option><option>700</option><option>900</option></select></div>
+          <div class="field"><label>粗细</label><select id="hWeight"><option value="">默认</option><option>300</option><option>400</option><option>500</option><option>600</option><option>700</option><option>900</option></select></div>
           <div class="grid2">
-            <div class="field"><label>宽度(px，空=自动)</label><input id="hElW" type="number" min="20" placeholder="自动"></div>
-            <div class="field"><label>位置 / 大小</label><button id="hBoxReset" class="mini" title="清除拖动产生的位移和尺寸">↺ 复位</button></div>
+            <div class="field"><label>宽度(px)</label><input id="hElW" type="number" min="20" placeholder="自动"></div>
+            <div class="field"><label>位置 / 大小</label><button id="hBoxReset" class="mini" title="清除拖动产生的位移与尺寸">复位</button></div>
           </div>
-          <div class="hint" style="margin-top:0">选中后：拖蓝框上方 <b>✥</b> 移动、拖右下角 <b>◢</b> 改大小。</div>
-          <div class="oprow"><button id="hElUp" title="次序上移">↑ 次序</button><button id="hElDown" title="次序下移">↓ 次序</button><button id="hElDel" class="danger" title="删除这个元素">🗑 删除</button></div>
+          <div class="hint" style="margin-top:0">拖动选框上方的 <b>✥</b> 可移动，拖动右下角的 <b>◢</b> 可调整大小。</div>
+          <div class="oprow"><button id="hElUp" title="次序上移">↑ 次序</button><button id="hElDown" title="次序下移">↓ 次序</button><button id="hElDel" class="danger" title="删除该元素">删除</button></div>
         </div>
       </div>
 
       <!-- ===== 动画效果 ===== -->
       <div class="pane hpane" data-hpane="anim" hidden>
-        <div class="nosel hseloff">在预览里<b>点选一个元素</b>，再给它加动画。</div>
+        <div class="nosel hseloff">在预览中<b>点选一个元素</b>，再为其添加动画。</div>
         <div class="hselon" style="display:none">
           <div class="tag" id="hSelTag2">—</div>
-          <button id="hOpenGallery" class="gallery-btn" type="button">🎬 打开动画库（所见即所得，挑一个套用）</button>
+          <button id="hOpenGallery" class="gallery-btn" type="button">打开动画库</button>
           <div id="hAnimChips" class="animchips"></div>
           <div class="hint" id="hMorphHint" style="display:none"></div>
-          <h3 class="sub">快捷下拉</h3>
+          <h3 class="sub">快速设置</h3>
           <div class="subtabs">
             <button class="stab active" data-stab="in">进入</button>
             <button class="stab" data-stab="motion">动作</button>
             <button class="stab" data-stab="out">消失</button>
           </div>
           <div class="spane" data-spane="in">
-            <div class="field"><label>进入动画（翻到本页时播一次）</label><select id="hAnim"></select></div>
-            <div class="oprow"><button id="hAnimPlay" title="在本页重放进入/动作">▶ 预览进入 / 动作</button></div>
+            <div class="field"><label title="翻到本页时播放一次">进入动画</label><select id="hAnim"></select></div>
+            <div class="oprow"><button id="hAnimPlay" title="在本页重放进入 / 动作">▶ 预览</button></div>
           </div>
           <div class="spane" data-spane="motion" hidden>
-            <div class="field"><label>持续动作（一直循环，如呼吸灯 / 流光）</label><select id="hMotion"></select></div>
-            <div class="oprow"><button id="hAnimPlay2" title="在本页重放进入/动作">▶ 预览进入 / 动作</button></div>
+            <div class="field"><label title="一直循环播放，如呼吸灯、流光">持续动作</label><select id="hMotion"></select></div>
+            <div class="oprow"><button id="hAnimPlay2" title="在本页重放进入 / 动作">▶ 预览</button></div>
           </div>
           <div class="spane" data-spane="out" hidden>
-            <div class="field"><label>消失动画（离开本页时播一次）</label><select id="hAnimOut"></select></div>
-            <div class="oprow"><button id="hAnimPlayOut" title="在本页预览消失动画">▶ 预览消失</button></div>
-            <div class="hint">放映时翻页会自动播放消失动画；编辑态用此按钮预览。</div>
+            <div class="field"><label title="离开本页时播放一次">消失动画</label><select id="hAnimOut"></select></div>
+            <div class="oprow"><button id="hAnimPlayOut" title="在本页预览消失动画">▶ 预览</button></div>
+            <div class="hint">放映翻页时自动播放消失动画；编辑时可用此按钮预览。</div>
           </div>
           <h3>触发方式</h3>
-          <div class="field"><select id="hFxMode"><option value="auto">自动（进入页面即播）</option><option value="manual">手动（点击页面才播）</option></select></div>
-          <div class="hint">触发方式作用于本 deck 的进入 / 动作；放映时按 <b>B</b> 可一键关掉所有动画。</div>
+          <div class="field"><select id="hFxMode"><option value="auto">自动 · 进入页面即播放</option><option value="manual">手动 · 点击页面才播放</option></select></div>
+          <div class="hint">触发方式作用于本 deck 的进入与动作动画；放映时按 <b>B</b> 可关闭全部动画。</div>
         </div>
       </div>
 
       <!-- ===== AI 修改 ===== -->
       <div class="pane hpane" data-hpane="ai" hidden>
-        <h3>✨ 让 AI 改（复杂 / 模糊的改动）</h3>
-        <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">✓ AI 已改过</span><button id="aiRevertOne" class="mini revert" style="display:none">↩︎ 还原本页</button></div>
-        <div class="field"><textarea id="aiInstruction" rows="4" placeholder="这一页想让 AI 怎么改？例如：把三个要点改成左右两栏对照，右栏给一个关键数字。写完自动记住，可切到别页继续写。"></textarea></div>
+        <h3>交给 AI 修改</h3>
+        <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">AI 已修改</span><button id="aiRevertOne" class="mini revert" style="display:none">还原本页</button></div>
+        <div class="field"><textarea id="aiInstruction" rows="4" placeholder="描述这一页希望 AI 如何修改。例如：将三个要点改为左右两栏对照，右栏突出一个关键数字。内容会自动保存，可切换到其他页继续编写。"></textarea></div>
         <div class="oprow"><button id="aiClearOne">清空本页</button></div>
-        <div class="hint" id="aiCountHint">还没有待发送的任务。选一页写句评论，或在下面对整份 deck 说一句。</div>
+        <div class="hint" id="aiCountHint">暂无待发送的任务。可选择某一页填写修改说明，或在下方对整份 deck 提出要求。</div>
         <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
 
-        <h4 class="sub">对整份 deck 说…</h4>
-        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的要求，AI 会挑相关页改。例如：统一所有页的标题字号；给内容过多的页瘦身。"></textarea></div>
+        <h4 class="sub">对整份 deck 的要求</h4>
+        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的整体要求，AI 会自动挑选相关页修改。例如：统一所有页的标题字号；精简内容过多的页面。"></textarea></div>
 
         <h4 class="sub">全部任务</h4>
         <div id="aiQueue" class="aiqueue"></div>
-        <div class="oprow"><button id="aiExportAll" class="primary-mini" disabled>📦 导出 0 个任务</button></div>
+        <div class="oprow"><button id="aiExportAll" class="primary-mini" disabled>导出 0 个任务</button></div>
 
         <h3>视觉自检</h3>
-        <div class="oprow"><button id="auditRun">🔍 检查这套 deck（溢出 / 对比度 / 坏图）</button></div>
+        <div class="oprow"><button id="auditRun">检查溢出 / 对比度 / 坏图</button></div>
         <div id="auditOut" class="auditout"></div>
       </div>
     </div>
@@ -2110,32 +2153,32 @@ function buildUI(): void {
     <div class="pane" data-pane="format">
       <h3>主题（配色）</h3><div class="field"><select id="theme"></select></div>
       <h3>本页布局</h3><div class="field"><select id="layout"></select></div>
-      <h3>加元素</h3><div class="addrow" id="addrow"></div>
-      <div class="nosel">在中间预览里<b>点选一个元素</b>，即可调它的字体 / 位置。</div>
+      <h3>添加元素</h3><div class="addrow" id="addrow"></div>
+      <div class="nosel">在中间预览中<b>点选一个元素</b>，即可调整其字体与位置。</div>
       <h3 class="needsel" style="display:none">选中元素 · <span class="tag" id="blktype">—</span></h3>
       <div class="needsel" style="display:none">
         <div class="field"><label>字号</label><select id="fsize"></select></div>
         <div class="field"><label>颜色</label><select id="fcolor"></select></div>
         <div class="grid2"><div class="field"><label>粗细</label><select id="fweight"></select></div><div class="field"><label>对齐</label><select id="falign"></select></div></div>
         <h3>元素操作</h3>
-        <div class="oprow"><button id="elUp">↑ 上移</button><button id="elDown">↓ 下移</button><button id="elDel" class="danger">🗑 删除</button></div>
+        <div class="oprow"><button id="elUp">↑ 上移</button><button id="elDown">↓ 下移</button><button id="elDel" class="danger">删除</button></div>
       </div>
     </div>
     <div class="pane" data-pane="anim" hidden>
-      <div class="nosel">在预览里<b>点选一个元素</b>，再给它加动画。</div>
+      <div class="nosel">在预览中<b>点选一个元素</b>，再为其添加动画。</div>
       <div class="needsel" style="display:none">
-        <h3>入场动画（翻到本页时播一次）</h3><div class="field"><select id="anim"></select></div>
-        <h3>持续动效（一直循环，如呼吸灯）</h3><div class="field"><select id="motion"></select></div>
-        <div class="hint">动效在预览/投屏里持续播放；放映时按 <b>B</b> 可一键关掉所有动画。</div>
+        <h3 title="翻到本页时播放一次">入场动画</h3><div class="field"><select id="anim"></select></div>
+        <h3 title="一直循环播放，如呼吸灯">持续动效</h3><div class="field"><select id="motion"></select></div>
+        <div class="hint">动效在预览与投屏中持续播放；放映时按 <b>B</b> 可关闭全部动画。</div>
       </div>
     </div>
     <div class="pane" data-pane="doc" hidden>
-      <h3>本页讲稿（逐字稿正文）</h3>
-      <div class="field"><textarea id="notes" rows="6" placeholder="这一页要讲的话…可用 **关键词** 提词"></textarea></div>
+      <h3>本页讲稿</h3>
+      <div class="field"><textarea id="notes" rows="6" placeholder="这一页要讲的内容，可用 **关键词** 标注提词。"></textarea></div>
       <h3>讲稿块</h3>
       <div id="noteblocks"></div>
-      <div class="oprow"><button id="addCue">+讲法</button><button id="addGolden">+金句</button><button id="addData">+数据</button></div>
-      <div class="hint">讲稿只进逐字稿 / 演讲者视图，不显示在幻灯片上。</div>
+      <div class="oprow"><button id="addCue">＋ 讲法</button><button id="addGolden">＋ 金句</button><button id="addData">＋ 数据</button></div>
+      <div class="hint">讲稿仅用于逐字稿与演讲者视图，不显示在幻灯片上。</div>
     </div>
   </aside>
 </div>
@@ -2148,7 +2191,7 @@ function buildUI(): void {
 </div>
 <div class="cmodal" id="connectModal" style="display:none">
   <div class="cbox">
-    <div class="ctitle">🔌 连接 Claude Code</div>
+    <div class="ctitle">连接 Claude Code</div>
     <div id="cstate"></div>
     <button class="mini cclose" id="cclose">关闭</button>
   </div>
@@ -2250,7 +2293,7 @@ function buildUI(): void {
     if (mode !== 'html') return;
     const ae = document.activeElement as HTMLElement | null;
     if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT' || ae.isContentEditable)) return;
-    if (e.key === 'Escape') { if (htmlSelEl) { (htmlSelEl as HTMLElement).classList.remove('sm-sel'); htmlSelEl = null; showHtmlSel(false); e.preventDefault(); } }
+    if (e.key === 'Escape') { if (htmlSelEl) { deselectHtml(); e.preventDefault(); } }
     else if (e.key === 'Delete') { if (htmlSelEl) { delHtmlEl(); e.preventDefault(); } }
     else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       const step = e.shiftKey ? 1 : 10;
