@@ -16,9 +16,9 @@
 > 一句话: **高度 AI 整合的 HTML slides 编辑器**。人做高频细活(点字/换色/动画/移动删除元素,即时零 token)、AI 经**评论**做模糊重活;像 Claude Design comment→edit 但真 HTML 自有、只发相关页、可定制。已上 GitHub: `https://github.com/exception63/Agently-Slides.git`(remote origin,main)。
 > **近况(2026-06-26 一整天)**:做了 ① reveal/impress 调研 → 动画库(A-J 十类含 Canvas 特效)+ 所见即所得画廊 + Studio 子窗口选择器;② 借鉴 `../html-ppt-skill` → 14 张新薄皮(共 21)+ 概览网格 O 键 + 7 个新版式 + 换皮/版式两展厅;③ **修薄皮「页面溢出」**(CSS 注释嵌 `*/` 吞掉令牌默认块→padding 塌 0,见下);④ **dogfood 插曲**:封面加「思考的大脑」神经网络动画(走 bridge `slidesmith_apply_patch`);⑤ **3 个收尾全做完**(Canvas 接进 Studio · 7 厚皮补 P4 · 21 皮接进 Studio 换皮下拉,见下「✅ 3 个收尾」)。**全绿,已 commit+push 到 origin/main**(277d89d/5d71663/a69fc00)。详见下方各「✅ 完成」块 + `docs/RESEARCH-{reveal-impress,html-ppt-borrow}.md`、`docs/ANIMATION-LIBRARY-PLAN.md`。**下个会话=讨论 v2「一站式 AI PPT 闭环」方向(见顶部 🎯)**。
 
-## 🎯 下个会话:讨论 v2 方向(用户 2026-06-26 指定)
-用户原话:"下一个会话我们讨论如何进一步优化本项目,变成一个更好用,更易用的**一站式 AI PPT 制作、修改、呈现的闭环系统**"。
-→ 这是**讨论+规划**会话(先聊方向再动手):围绕"制作(从 0 生成)→ 修改(Studio 人改细活 + AI 评论改重活)→ 呈现(放映/演讲者/导出)"三段闭环,找断点、找摩擦、定优先级。开工先读本文件 + `_memory/optimization-roadmap.md`(四视角评审清单)。可带的素材:21 皮 + 10 类动画 + Canvas + 换皮下拉 + bridge 闭环都已就位,缺的是"一站式入口/新手引导/从大纲一键成片/呈现态打磨"等串起来的体验。
+## 🎯 下个会话(用户 2026-06-27 指定):Studio↔Claude「握手式自动协作环」
+**完整交接见 `_memory/NEXT-SESSION.md`(必读)。** 目标=把桥接从"手动拉"升级成"一旦建立通讯双方握手→双向自动同步、零手动拉"。**借鉴 `claude-to-im` skill**(`~/.cc-switch/skills/claude-to-im`):它用**常驻守护进程 + `@anthropic-ai/claude-agent-sdk` 的 `query()`**(`resume` 续接 + `canUseTool` 权限网关 + 流式)做到 IM 消息自动喂给 agent、不用手动拉。用户要的流程:① 从 Claude 主动 `/slidesmith`→直接桥接好→Studio 发需求后**本 session 自动轮询到并主动改**,且 Studio 消息**在 session 内可见**;② 从 Studio 冷启动发请求→session 里冒明确提示→AI 经 slidesmith 拉取+建桥+开轮询。架构两条路(A 守护拥有 Agent / B 交互 session 自动轮询,**用户描述指向 B**,可 B 为主借 A 的握手/续接/权限),先讲取舍再做。起点=`packages/bridge/{bridge.ts,mcp.ts}`(现 pull 模型、单内存队列、无 session 归属)。
+> 此前的 v2 总目标(用户 2026-06-26):"一站式 AI PPT 制作、修改、呈现闭环"。三段诊断:制作=已补选皮入口·修改=本任务打通协作·呈现(演讲者视图)+讲稿同步=再下阶段。
 
 ## ✅ 3 个收尾全部完成(2026-06-26,本会话)— 已提交+推送
 三项全做完、全验证、**已 commit + push 到 origin/main**(commits 277d89d 动画库 · 5d71663 皮+版式 · a69fc00 Studio canvas+换皮)。全套 verify 绿:skins43 · showcases10 · anim-gallery16 · anim-picker15 · **studio-skins14(新)** · studio-tabs24 · editor22 · fx21(+canvas 3 项) · resilience23 · save13 · typecheck0。(注:repo 根有个 prior-session 遗留的 `anim-gallery-top.png` 未跟踪,无害,可删可留。)

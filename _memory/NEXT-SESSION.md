@@ -1,51 +1,46 @@
-# NEXT-SESSION 交接 (2026-06-25 · 插件+闭环+dogfood 已成)
+# 下个会话交接 · Studio↔Claude「握手式自动协作环」
 
-> `/clear` 之后:**先读 `_memory/active.md`,再读本文件 + `_memory/decisions.md`**。
+> 写于 2026-06-27 会话末（用户要清空上下文，新会话继续）。`/clear` 之后：先读 `_memory/active.md` 顶部各 ✅ 块 + 🎯，再读本文件。
 
-## 现状一句话
-"快速改 slides 编辑器" + **桥接闭环** + **Claude Code 插件**全部就位且实测通过。导入契约 HTML deck → Studio 就地编辑 → Submit-to-AI（手动文件 **或** 桥接直连）→ 视觉自检 + PDF 导出。插件已装好（`slidesmith@slidesmith-local`，user scope，已启用）。
+## 🎯 北极星（用户 2026-06-27 定）
+把 Studio↔Claude 的桥接从**手动拉**升级成**握手式自动协作环**，**借鉴 `claude-to-im` skill 的做法**——它能在飞书/Telegram 和 Claude 互动，且**不用手动在 session 里拉需求**。
 
-- Studio 成品 `studio/slidesmith-studio.html`；源 `packages/studio/src/main.ts`，改源后 `npm run build:studio`。
-- 桥接 `packages/bridge`：`slidesmith serve [deck]`（给人）/ `slidesmith mcp`（给 Claude Code）。HTTP 控制 API：`/api/status`、`/api/requests`(GET 取走)、`/api/patch`(POST)。
-- 插件 `plugin/`：marketplace `slidesmith-local` + 插件 `slidesmith`；MCP 在 `plugin/slidesmith/.mcp.json`（扁平格式，绝对路径 node+tsx+cli mcp）；命令 `commands/slidesmith.md`。
-- 文档：`AGENTS.md`(§4b 桥接)、`packages/bridge/README.md`、`plugin/slidesmith/README.md`、`docs/DECK-CONTRACT.md`。
-- 验证：`scripts/verify-bridge.mjs`(14/14) + `scripts/dogfood.mjs`(对实跑的 serve 黑盒闭环)。截图 `docs/screenshots/{bridge,dogfood}/`。
+## 用户原话描述的目标流程（照此实现）
+1. **从 Claude 发起**：用户在 session 里主动调用 `/slidesmith` → **直接桥接好**。此后所有需要 AI 改的：用户在 Studio 发出需求 → **这个 session 自动轮询到该需求 → 主动完成修改**。同时用户**要在 session 里看到 Studio 发来的信息**（才能掌握状态）。
+2. **从 Studio 发起（冷启动）**：用户先从 Studio 发请求 → session 里**以明确信息告知** → AI 通过 slidesmith 去拉这个需求 → 建立通讯 → 打开服务 → 主动轮询。
+3. **核心**：一旦建立通讯，**双方就握手了**，之后持续协作（双向自动同步、零手动拉）。
 
-## ✅ 这次做完了什么（插件 + 部署 + dogfood）
-1. 插件三件套：`plugin/.claude-plugin/marketplace.json`、`plugin/slidesmith/.claude-plugin/plugin.json`、`plugin/slidesmith/.mcp.json`（**MCP 必须放单独 .mcp.json，扁平 name→config**；plugin.json 里内联 `mcpServers` 这版**不识别**）。
-2. 部署：`claude` CLI（v2.1.162）`plugin marketplace add` + `plugin install --scope user`；`claude plugin details slidesmith` → MCP servers(1)。
-3. bridge：HTTP 控制 API + patch 回灌内存 deck（`syncExportToBridge`）+ EADDRINUSE 自动换端口。
-4. dogfood：真浏览器弹出（serve 的 `open` 没被沙箱挡）→ 全闭环跑通，第3页标题被精准改写、其它不动、晚到者也见。
+## claude-to-im 怎么做到"不用手动拉"（已读源码 `~/.cc-switch/skills/claude-to-im`）
+- **一个常驻后台守护进程（Node.js）**，关终端不停（带 supervisor 脚本 `scripts/supervisor-*`）。
+- 守护进程用 **`@anthropic-ai/claude-agent-sdk` 的 `query()`** 跑 Claude（headless/SDK，**不是交互终端会话**）。IM 来消息 → 守护把消息喂给 `query()` → **流式**跑一个 agent 回合 → 结果发回 IM。
+- **会话续接**：`query({ resume: sdkSessionId, permissionMode, canUseTool, ... })` 续同一会话（对话跨守护重启保留，消息按会话分文件存于 `~/.claude-to-im/`）。
+- **流式 + 权限网关**：`for await (const msg of q)` 流式回传；`canUseTool` 回调 → IM 内联"批准"按钮（**先批准再执行工具**）。
+- 关键文件：`src/llm-provider.ts`（`query()` 用法 / `resume` 续接 / `canUseTool`）、`src/main.ts`（守护入口）、`dist/daemon.mjs`（构建产物）、`README_CN.md`（架构图：IM ↔ 后台守护 ↔ Claude Agent SDK）。
+- **可借鉴的 4 点**：① 守护拥有一个长跑 Agent SDK 会话、自动喂入、零手动拉；② 进度/消息**流式回传到来源**（这里=Studio）；③ **权限网关**（改前批准）；④ **sessionId 续接 + 消息历史持久化**。
 
-## 🆕 2026-06-25 三续:一键「连接 Claude」按钮 + 文档清洗
-- **Studio 加了顶栏蓝色「🔌 连接 Claude」按钮**(未连接时显示)。点开弹 modal,**自动探测** `localhost:8765/healthz`(每 2s):检测到→绿 ✅ +「打开连接版」按钮(先 `POST /api/open` 把当前 deck 交给 bridge,再 `location.href` 跳过去,带着改动);没检测到→三步小白指引 + 自动重试。**浏览器不能自启服务**(沙箱),所以按钮做的是"探测+一键跳连接版"。`bridgeUrl()` 读 `window.__SM_BRIDGE_URL__`(测试可覆盖,默认 8765)。
-- **bridge 加了 CORS**(`*`,含 OPTIONS 预检)+ **`POST /api/open?name=`**(body=html → openHtml),供离线页探测/交接。`scripts/verify-connect.mjs` 7 项过,截图 `docs/screenshots/editor/04-connect-modal.png`。
-- **三份根文档(README/GUIDE/AGENTS)全部清洗**:按用户要求**删掉所有历史/版本记录**(v1/v2/M0-8/N1-5/里程碑/老路/legacy),只留现状。grep 已确认无残留。
-- (提醒仍然适用:运行中的 bridge 服缓存的旧 studio;用户当前 tab 要重开/重连才见新按钮。)
+## Slidesmith 桥接现状（起点）· 读 `packages/bridge/{bridge.ts,mcp.ts}`
+- 桥接 = 单进程、**一个内存请求队列**（`pending` 数组，**无 session/client 标签**）。
+- **pull 模型**：session 必须主动调 `slidesmith_get_requests`（或后台 `curl /api/requests` 轮询）才拿到；桥接**不会 push 给 session**。
+- Studio 绑定它连上的那个桥接（`ws://location.host`，即"开它的那次服务"）。MCP 工具：`slidesmith_open / get_requests / apply_patch / status`。
+- 当前"自动接活"= dogfood 用过的**后台 Bash 轮询** `curl /api/requests?drain=0`（超时与命中都 exit 0，读 output 区分）——手动搭的，非握手机制。
+- 多 session 时每个可能各起一个桥接（端口占用→EADDRINUSE 自动换端口），Studio 只连其一 → 需求只有那个桥接的"主人 session"能取。
+- **缺**：握手 / 会话归属、push 或自动轮询、双向状态在 session 可见、Studio-first 冷启动如何通知到 session。
 
-## 🆕 2026-06-25 再续:live dogfood + 进度提示 + GitHub
-- **项目已上 GitHub**:`https://github.com/exception63/Agently-Slides.git`(remote `origin`,main,commit 6ec69c6)。以后改完照常 `git add/commit/push`(凭据走 osxkeychain,无需我输密码)。
-- **进度提示已加**(用户要带动效):`aiSent` Set,徽标 3 态(待发送橙/**已发送蓝脉冲**/已改绿)+ 闪烁横幅 `#aiSentBanner`。状态机:send→sent、apply→done、edit/revert→回退。verify 8 项过。
-- **自动接活回路**:后台轮询 `curl http://localhost:8765/api/requests?drain=0`,命中即通知我去 `slidesmith_get_requests`+`apply`。**坑:超时和命中都 exit 0,必须读 task output 区分**(`NEW_REQUEST_DETECTED` vs `idle-timeout`)。监听一轮 ~20min,需要时重新挂。
-- **坑(重要)**:① **运行中的 bridge/MCP 服的是启动时缓存的 studio HTML**;重建 studio 后用户当前 tab 不会更新,要重启 bridge(kill `cli/src/index.ts mcp` 会被 Claude Code 重生)+ 重新 `slidesmith_open` 才生效。② **serve 的 deck 只在内存**,用户的直接手改(打字/移动)**不自动同步**到 bridge(只有 patch apply 后 `syncExportToBridge` 才同步);重启前先存盘:headless 连 bridge 调 `__SM_EXPORT_HTML__` 写文件,或让用户点「导出 HTML」。已存过 `dist/keynote-edited.html`。
-- **下一步候选**:把"自动接活"做成更稳的常驻(而非 20min 轮询);serve 加 `/api/deck` GET 或 `slidesmith_save` 工具直接存盘;按 mockup 把评论做成贴幻灯片下方的 docked card;deck 级 token 补丁。
+## 下个会话要做（设计 → 实现，按用户工作方式 demo 验证）
+1. **先定架构**（两条路，权衡后选或混合，先给用户讲清取舍再动手）：
+   - **A · 守护拥有 Agent（最贴 claude-to-im）**：起一个 Slidesmith 守护进程跑 `claude-agent-sdk query()`，Studio 发→守护喂 agent→agent 用 slidesmith MCP 工具改→回传 Studio。真·零手动拉、可常驻；但"用户的 session"变成守护里的 SDK 会话，"在 session 里看到"需另设计（状态回灌 Studio + 一个会话视图）。
+   - **B · 交互 session 自动轮询（最贴用户描述）**：用户在交互式 Claude Code session 里 `/slidesmith` → 建桥 + **在本 session 内起轮询循环**（用 `/loop` 机制或 ScheduleWakeup/后台任务自再调用）→ Studio 发→本 session 轮到→AI 改→Studio 消息**在 session 内联可见**→续循环。保留人类交互 session 为中心。**用户描述强烈指向 B**。
+   - 现实可能 **B 为主 + 借 A 的握手/续接/权限思想**。
+2. **握手协议**：双向标识——Studio 顶栏显示"已连接会话 X / 端口 Y"；桥接握手带会话 id；session 侧记"我负责哪个 Studio/deck"。彻底消除"需求落到哪个 session"的歧义（上个会话末用户问的正是这个）。
+3. **两种发起的体验**：
+   - Claude-first：`/slidesmith <deck>` 即建桥 + 自动轮询 + Studio 消息进 session。
+   - Studio-first：Studio 发请求 → 目标 session 冒出明确提示（"Studio 有新需求，我去拉"）→ AI 调 slidesmith 拉取 + 建桥 + 开轮询。
+4. **双向状态可见**：session 看到 Studio 发来的内容（需求/导出/连接事件）；Studio 看到 AI 在改/改完（已有 `aiSent`/`aiApplied` 徽标 + 回灌，可复用）。
+5. **权限**：AI 自动改前要不要用户确认？借 `canUseTool` 网关思路，给"自动应用 / 先确认"开关。
 
-## 🆕 2026-06-25 续:产品重定位 + 编辑器重构 ①-④ 已完成
-用户拍板项目 = **高度 AI 整合的 HTML slides 编辑器**(核心**分工**:人做高频细活、AI 经**评论**做模糊重活;像 Claude Design comment→edit 但真 HTML 自有/省 token/可定制)。给用户看 mockup 对齐了:AI 角色=**只按评论改**;①→④ 全做完且 `scripts/verify-editor.mjs` 22/22:
-- ① **页内评论闭环**:评论跟随当前页(`navSyncTimer` 轮询 deck `.active`;`updateAiTarget` 用 `cur`)、左列每页徽标(●待发送/✓已改)、右栏「全部任务」队列、apply 标✓不删评论。**修好了用户报的 bug**。
-- ② **deck 级评论**「对整份 deck 说」+ 请求带 36 页结构总览。③ **审阅/还原**(`aiBefore`→「还原本页」)。④ **直接编辑**(选中元素 ↑↓🗑)。
-- 插件 MCP 本会话**已连**(`mcp__plugin_slidesmith_slidesmith__*` 可用);AGENTS.md §4b 已更新请求新形态。
+## 本会话（2026-06-27）已完成 · 全部 commit+push 到 origin/main（HEAD=d9cc05e）
+选中框 bug 修复 · transitions.dev 动效（动效令牌 + A5 数字弹入 / A12 多行浮现 / H8 成功对勾）· Studio 界面文案专业化（去 emoji/口语）· acrylic 毛玻璃皮（第 22 套，Fluent，PDF 实测不丢）· 动画库画廊深色专业重设计（复制写法/明暗底/筛选/scrollspy/组合预览）· editorial-slides 选皮流程（推荐→看全 22 皮总览图→真内容试皮→定；build.py `--title`→真封面；`gallery/theme-contact-sheet.png` + `scripts/build-contact-sheet.mjs`；version 1.6.0）。详见 `active.md` 顶部各 ✅ 块。
+**闭环三段诊断**（对话里 show_widget 图）：制作=本会话补了选皮入口 · 修改=强（Studio 已完整）· 呈现=待补演讲者视图 · 讲稿同步=最后做。本"握手自动环"属**修改**段的协作打通；**呈现/讲稿**仍待下下阶段。
 
-**下一步候选**(未与用户最终敲定先后):用原生 MCP 把**新评论流**真跑一遍(slidesmith_open→用户逐页留评论+对整份说→get_requests→改→apply→用户审阅/还原);按 mockup 把「评论卡」做成贴在幻灯片下方的 docked card;加「已发送·等待中」中间态;deck 级 token 补丁(字体/配色,现 apply_patch 只换 section 不改 head 令牌);需要时再做「AI 主动提建议」(用户当前选不做)。
-
-## 🏁(旧)收尾 = 原生 MCP 实跑 + 打磨
-1. **重启 Claude Code 后**，插件的 MCP server `slidesmith` 才会连上（本会话内连不上，是预期）。届时跑 `/slidesmith docs/style-reference/keynote-target.html`：我应能调 `mcp__slidesmith__slidesmith_open`（弹 Studio+已连）→ 用户在 Studio 提交一句 → `mcp__slidesmith__slidesmith_get_requests` 读到 → 按 data-id 改 → `mcp__slidesmith__slidesmith_apply_patch` 回写 → 当场可见。**这是唯一还没经 Claude Code 自带 MCP 客户端实跑的链路**（本会话用 control-API 等价验过）。
-2. 可选：Studio 人类/AI 两套模式键位再清晰分离；serve deck 存盘 / `slidesmith_save` 工具；发布插件到真 marketplace；把 `mcp` 入口打包成自包含 bundle（免依赖 tsx/node_modules）。
-
-## 坑（已踩，别回退）
-- **插件 MCP 放单独 `.mcp.json`**（扁平），不是 plugin.json 内联。装插件会**拷贝到 `~/.claude/plugins/cache/...`**，所以 MCP 命令用**绝对路径指向仓库**（`${CLAUDE_PLUGIN_ROOT}` 指 cache，无 node_modules）。MCP 命令：`<abs>/.local/bin/node  <abs repo>/node_modules/tsx/dist/cli.mjs  <abs repo>/packages/cli/src/index.ts  mcp`，cwd=仓库。
-- 新 MCP server **下次启动**才连；本会话内 ToolSearch 搜不到 `slidesmith` 工具是正常的。
-- 改 deck 路由靠**同源 WS**（`ws://location.host`）。bridge **stdout 专给 MCP**，日志走 stderr（`log()` 已是）。CLI `--port 0` 会被 `||DEFAULT_PORT` 吃掉（0 falsy）。
-- `verify-bridge.mjs`/`dogfood.mjs` 用 **`npx tsx`** 跑；deck 在 `#preview` iframe，DOM 查询走 `contentDocument`，`__SM_*` 钩子在 top window。
-- **遗留 serve 别长开**:它占 8765，重启后插件 MCP 会 EADDRINUSE→已加自动换端口兜底，但最好先停掉旧 serve。
-- 用户非技术:每步要有能演示/截图的产物;自主推进。
+## 开工先读
+`_memory/active.md`（顶部 ✅ 块 + 🎯）· 本文件 · `packages/bridge/{bridge.ts,mcp.ts}` · `~/.cc-switch/skills/claude-to-im/{SKILL.md,src/llm-provider.ts,src/main.ts,README_CN.md}` · `AGENTS.md`（§4b 桥接接口）· `plugin/slidesmith/`（MCP 插件 + .mcp.json）。
