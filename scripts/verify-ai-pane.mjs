@@ -66,6 +66,14 @@ try {
   });
   check('order: 对整份 deck → 本页 → 配图 → 待办 → 一键发送 → 图片库', order);
 
+  // clean UI: explanations live in ⓘ popovers, not inline paragraphs
+  const helpN = await page.evaluate(() => document.querySelectorAll('.hpane[data-hpane="ai"] .ihelp').length);
+  await page.click('.hpane[data-hpane="ai"] .ihelp >> nth=3');
+  const popOpen = await page.evaluate(() => { const p = document.getElementById('helpPop'); return !!p && p.classList.contains('show') && p.textContent.length > 5; });
+  await page.click('#aiDeckInstruction'); // click away closes it
+  const popClosed = await page.evaluate(() => !document.getElementById('helpPop').classList.contains('show'));
+  check('ⓘ help popovers (≥6 icons, open with text, click-away closes)', helpN >= 6 && popOpen && popClosed, `${helpN} icons`);
+
   // segmented control toggles illType
   await page.click('#illSeg .segbtn[data-illtype="photo"]');
   const segPhoto = await page.evaluate(() => document.querySelector('#illSeg .segbtn[data-illtype="photo"]').classList.contains('on'));

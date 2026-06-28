@@ -1132,6 +1132,25 @@ function trayFilesPicker(): void {
 }
 function removeTrayImage(id: string): void { const i = trayImages.findIndex((t) => t.id === id); if (i >= 0) { trayImages.splice(i, 1); renderTray(); } }
 function setTrayOver(on: boolean): void { const z = $('#trayDrop'); if (z) z.classList.toggle('over', on); }
+// ⓘ help popovers: a single floating bubble shows a section's explanation on click of its
+// "?" icon (so the panel stays clean — no inline paragraphs). Click-away / Esc / scroll closes.
+function wireHelp(): void {
+  const pop = $('#helpPop') as HTMLElement | null; if (!pop) return;
+  let cur: HTMLElement | null = null;
+  const hide = (): void => { pop.classList.remove('show'); cur = null; };
+  document.addEventListener('click', (e) => {
+    const ih = (e.target as HTMLElement).closest('.ihelp') as HTMLElement | null;
+    if (!ih) { hide(); return; }
+    e.preventDefault(); e.stopPropagation();
+    if (cur === ih) { hide(); return; }
+    cur = ih; pop.textContent = ih.getAttribute('data-help') || ''; pop.classList.add('show');
+    const r = ih.getBoundingClientRect(); const pw = pop.offsetWidth;
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 8 - pw)) + 'px';
+    pop.style.top = (r.bottom + 6) + 'px';
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+  window.addEventListener('scroll', hide, true);
+}
 function renderTray(): void {
   const grid = $('#trayGrid'); if (!grid) return;
   grid.innerHTML = '';
@@ -2196,6 +2215,20 @@ body.dark .tray-name{color:#cfd2d8}
 body.dark .tray-note{background:#12151b;border-color:#2c323d;color:#cfd2d8}
 body.dark .tray-page-sel{background:#12151b;border-color:#2c323d;color:#cfd2d8}
 body.dark .oneclick{border-color:#2c323d}
+.sechead{display:flex;align-items:center;gap:6px;margin:17px 0 7px;font-size:12px;font-weight:600;color:#8a8a8e;letter-spacing:.02em}
+.sechead.sectop{margin-top:4px}
+.sechead .grow{flex:1}
+.sechead .confirm-tog{margin:0;font-weight:400;flex:0 0 auto;white-space:nowrap}
+.sechead .mini{font-weight:400}
+.ihelp{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;padding:0;border-radius:50%;border:1px solid #d3d1c7;background:transparent;color:#9a9a9e;font-size:10px;font-weight:700;line-height:1;cursor:pointer;flex:0 0 auto}
+.ihelp:hover{border-color:#B5402A;color:#B5402A;background:#fbeae6}
+.sendnote{font-size:10px;color:#993C1D;background:#FAEEDA;border-radius:999px;padding:1px 8px;font-weight:600;letter-spacing:0}
+.helppop{position:fixed;z-index:90;max-width:248px;background:#2a2a2d;color:#f1f1f3;font-size:12px;line-height:1.55;padding:9px 11px;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,.3);display:none;pointer-events:none}
+.helppop.show{display:block}
+body.dark .sechead{color:#8a8a8e}
+body.dark .ihelp{border-color:#3a3a3d}
+body.dark .ihelp:hover{background:#3a2417}
+body.dark .helppop{background:#0f0f12;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .illbox{border:0.5px solid #ececee;border-radius:9px;background:#faf8f4;padding:9px 10px;margin:6px 0 8px}
 .illrow{display:flex;align-items:center;gap:8px;margin-bottom:7px}
 .illrow:last-child{margin-bottom:0}
@@ -2460,43 +2493,36 @@ function buildUI(): void {
 
       <!-- ===== AI 修改 ===== -->
       <div class="pane hpane" data-hpane="ai" hidden>
-        <h3>交给 AI 修改</h3>
-        <label class="confirm-tog" title="开启后，AI 的改动会先以「提议」呈现，你点保留才算数；关闭则改完直接生效"><input id="aiConfirmTog" type="checkbox"> 改前先问我（默认自动应用）</label>
+        <div class="sechead sectop">交给 AI<button class="ihelp" type="button" data-help="人做细活（点字、换色、动画）；复杂的交给 AI——写修改意见、为页面配图，凑成一个待办，一键发送。">?</button><span class="grow"></span><label class="confirm-tog" title="开启后 AI 的改动先以「提议」呈现，点保留才算数；关闭则改完直接生效"><input id="aiConfirmTog" type="checkbox"> 先问我</label></div>
         <div class="proposal-bar" id="aiProposalBar" style="display:none"><span class="proposal-dot">●</span><span id="aiProposalTxt">AI 提议了改动，请确认</span><span class="grow"></span><button id="aiKeep" class="mini">保留</button><button id="aiRevertAll" class="mini revert">还原</button></div>
 
-        <h4 class="sub">对整份 deck 的要求</h4>
-        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的整体要求，AI 会挑选相关页修改。例如：统一所有页的标题字号；精简内容过多的页面。"></textarea></div>
+        <div class="sechead">整份 deck<button class="ihelp" type="button" data-help="对整份 deck 的统一要求，AI 自动挑相关页改。例：统一标题字号；精简过长的页。">?</button></div>
+        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的统一要求（可留空）"></textarea></div>
 
-        <h4 class="sub">本页 · 修改 / 配图</h4>
+        <div class="sechead">本页<button class="ihelp" type="button" data-help="给当前页写修改意见，或为它配图。切换页会自动保存。">?</button></div>
         <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">AI 已修改</span><button id="aiRevertOne" class="mini revert" style="display:none">还原本页</button></div>
-        <div class="field"><textarea id="aiInstruction" rows="3" placeholder="这一页想怎么改？例如：三个要点改为左右两栏对照，右栏突出一个数字。自动保存，可切换页继续写。"></textarea></div>
-        <div class="oprow"><button id="aiClearOne">清空本页修改</button></div>
+        <div class="field"><textarea id="aiInstruction" rows="3" placeholder="这一页想怎么改？例：三个要点改成左右两栏。"></textarea></div>
+        <div class="oprow"><button id="aiClearOne" title="清空本页的修改意见">清空</button></div>
         <div class="illbox">
-          <div class="illrow"><span class="illlabel">为本页配图</span>
-            <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量 SVG · 免费</button><button type="button" class="segbtn" data-illtype="photo">照片 · codex</button></div>
+          <div class="illrow"><span class="illlabel">配图<button class="ihelp" type="button" data-help="矢量＝Claude 直接画 SVG（免费、可编辑）；照片＝本机 codex 生成（按张计额度）。成品都进图片库。">?</button></span>
+            <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量</button><button type="button" class="segbtn" data-illtype="photo">照片</button></div>
           </div>
-          <div class="illrow"><input id="illHint" placeholder="想要什么画面（可留空）"><button id="illAdd" class="primary-mini">＋ 加入配图清单</button></div>
-          <div class="hint" id="illHintTip">矢量 = Claude 直接画 SVG（免费、可编辑）；照片 = 本机 codex 生成（按张计额度），都会进图片库。</div>
+          <div class="illrow"><input id="illHint" placeholder="想要什么画面（可留空）"><button id="illAdd" class="primary-mini" title="把本页 + 所选配图类型加入待办">＋ 加入</button></div>
         </div>
         <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
 
-        <h4 class="sub">图片素材 · 导入自己的图（AI 来排版）</h4>
-        <div class="hint">拖入或导入你已有的图片，先暂存到对应页；它们会作为「导入图」进入下面的待办，由 AI 排好版。</div>
+        <div class="sechead">导入图片<button class="ihelp" type="button" data-help="拖入或导入你已有的图片，暂存到对应页；它们作为「导入图」进待办，由 AI 排好版。">?</button></div>
         <div id="trayDrop" class="tray-drop"><div class="tray-drop-in"><b>拖拽图片到此处</b><span>或</span><button id="trayPick" class="mini">导入图片</button></div></div>
         <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
         <div id="trayGrid" class="tray-grid"></div>
 
-        <h3>AI 待办清单</h3>
+        <div class="sechead">待办<button class="ihelp" type="button" data-help="上面的「改字 / 配图 / 导入图」都汇总在这里。点「一键发送给 AI」一次全部交给 Claude。">?</button><span class="grow"></span><span class="sendnote" id="aiSendNote" style="display:none">含照片·计费</span></div>
         <div id="aiTodo" class="aitodo"></div>
-        <div class="hint" id="aiSendNote" style="display:none">含「照片」项：发送后我会用 codex 生成（按张消耗额度）。</div>
         <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
 
-        <h4 class="sub">图片库</h4>
-        <div class="oprow"><button id="genOpenLib">打开图片库</button></div>
-        <div class="hint">AI 生成过的矢量 / 照片都存在这里（~/.slidesmith/library/），可重新插入到对应页或删除。</div>
+        <div class="sechead">图片库<button class="ihelp" type="button" data-help="AI 生成过的矢量 / 照片都存在这里（~/.slidesmith/library/），可重新插入到对应页或删除。">?</button><span class="grow"></span><button id="genOpenLib" class="mini">打开</button></div>
 
-        <h3>视觉自检</h3>
-        <div class="oprow"><button id="auditRun">检查溢出 / 对比度 / 坏图</button></div>
+        <div class="sechead">视觉自检<button class="ihelp" type="button" data-help="检查每页的内容溢出、文字对比度、坏图，点结果可跳到对应页。">?</button><span class="grow"></span><button id="auditRun" class="mini">检查</button></div>
         <div id="auditOut" class="auditout"></div>
       </div>
     </div>
@@ -2557,7 +2583,8 @@ function buildUI(): void {
     <div class="libhint">本 deck 用 codex 生成过的图片（存于 ~/.slidesmith/library/）。可重新插入到对应页，或删除以便管理。</div>
     <div id="libGrid" class="libgrid"></div>
   </div>
-</div>`;
+</div>
+<div class="helppop" id="helpPop"></div>`;
 
   function fillSel(id: string, values: readonly string[], labels?: Record<string, string>, defaultLabel?: string): HTMLSelectElement {
     const sel = $(id) as HTMLSelectElement; sel.innerHTML = '';
@@ -2702,6 +2729,7 @@ function buildUI(): void {
   $('#libClose').addEventListener('click', closeLibrary);
   $('#libReload').addEventListener('click', loadLibrary);
   $('#libModal').addEventListener('click', (e) => { if (e.target === $('#libModal')) closeLibrary(); });
+  wireHelp();
   renderTodo();
   { const z = $('#trayDrop'); if (z) {
     z.addEventListener('dragenter', (e) => { e.preventDefault(); setTrayOver(true); });
