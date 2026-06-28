@@ -87,7 +87,13 @@ try {
   await page.evaluate(() => { const t = document.getElementById('aiDeckInstruction'); t.value = '统一所有标题字号'; t.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.evaluate((sid) => window.__SM_SET_INSTR__(sid, '标题改大、加副标题'), pC);
   await page.evaluate((sid) => window.__SM_GEN_MARK__(sid, 'vector', '一张上扬的增长曲线'), pA);
-  await page.evaluate((sid) => window.__SM_GEN_MARK__(sid, 'chart', '方法A 78、方法B 88、方法C 91，分组柱状图'), pE);
+  // 图表数据文件导入：选「图表」→ 导入数据 → 文本框被多行 CSV 填充 → 入队
+  await page.click('#illSeg .segbtn[data-illtype="chart"]');
+  const dpVisible = await page.evaluate(() => getComputedStyle(document.getElementById('illDataPick')).display !== 'none');
+  await page.evaluate(() => window.__SM_ILL_DATA__('method,acc\nBaseline,78\nOurs,88\nSOTA,91', 'results.csv'));
+  const dataLoaded = await page.evaluate(() => /Baseline,78/.test(document.getElementById('illHint').value) && /results\.csv/.test(document.getElementById('illDataNote').textContent));
+  check('图表 数据文件导入 (按钮显隐 + CSV 填进文本框 + 提示行数)', dpVisible && dataLoaded);
+  await page.evaluate((sid) => window.__SM_GEN_MARK__(sid, 'chart', 'method,acc\nBaseline,78\nOurs,88\nSOTA,91'), pE);
   await page.evaluate((sid) => window.__SM_GEN_MARK__(sid, 'photo', '团队协作的真实照片'), pB);
   const redPng = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 120; c.height = 80; const x = c.getContext('2d'); x.fillStyle = '#c0392b'; x.fillRect(0, 0, 120, 80); return c.toDataURL('image/png'); });
   await page.evaluate((u) => window.__SM_TRAY_ADD__('hero.png', u), redPng);
@@ -109,7 +115,7 @@ try {
   check('request: deck ask + SVG rules + codex rules + tray preamble all present', c.includes('统一所有标题字号') && c.includes('矢量配图规则') && c.includes('照片配图规则') && c.includes('图片素材'));
   check('request: per-page directives (改字 / 矢量 / 照片 / 插入图)', c.includes('标题改大') && c.includes('配图（矢量') && c.includes('配图（照片') && c.includes('__TRAY_DIR__'));
   check('request: vector page = pA, photo page = pB', pageOf(c, '矢量 SVG · 你直接画') === pA && pageOf(c, '照片级 · 用 codex') === pB);
-  check('request: 图表规则(A默认+C逃生舱) + chart directive + chart page = pE', c.includes('图表规则') && /A 默认|默认 = draw|直接画.*svg.*图表|直接画一张干净的内联/.test(c) && c.includes('matplotlib') && c.includes('图表（按数据') && pageOf(c, '图表（按数据') === pE, pageOf(c, '图表（按数据'));
+  check('request: 图表规则(A默认+C逃生舱) + 数据 fenced + chart page = pE', c.includes('图表规则') && c.includes('直接画一张干净的内联') && c.includes('matplotlib') && c.includes('图表（按以下数据') && c.includes('Baseline,78') && pageOf(c, '图表（按以下数据') === pE && pageOf(c, 'Baseline,78') === pE, pageOf(c, '图表（按以下数据'));
   check('request: base64-free (token-light)', !/data:image\/[a-z.+-]+;base64/i.test(c));
 
   // --- ONE send → bridge ---

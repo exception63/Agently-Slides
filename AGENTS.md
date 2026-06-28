@@ -181,7 +181,9 @@ data-id>` once. The kinds of per-page directive:
   `<svg>`* fitting the page: depict the actual topic (not generic blobs), color via tokens
   (`var(--accent)` / `var(--accent-2)` / `var(--ink)`, never hard hex), self-contained vector
   (no external refs / raster / fonts), restrained composition, placed without covering text.
-- **图表 (`**图表（按数据/描述…`)** — the human pasted data or a description; turn it into a chart.
+- **图表 (`**图表（按数据/描述…`)** — the human pasted a description, or imported a data file
+  (multi-line CSV/numbers arrive **fenced** under 「按以下数据…」); turn it into a chart, plotting the
+  real numbers.
   **Default = draw an inline `<svg>` chart yourself** (the A path, same DNA as 矢量): pick the
   right chart type (share→pie/donut; series/time→line/area; category compare→bar/grouped/stacked;
   multi-dim→radar; correlation/spread→scatter), include axes + ticks + axis titles + units +

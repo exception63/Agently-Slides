@@ -1212,7 +1212,7 @@ function aiIllustrateSpec(): string {
 // the chart rules (included once when any 图表 item is queued) — A default (SVG direct) + C escape hatch (matplotlib pre-render)
 function aiChartSpec(): string {
   return `## 图表规则（type=图表 的页：把数据/描述变成内联 <svg> 图表）
-读用户给的**数据或描述**（hint 里常是「方法A 78、方法B 88…分组柱状图」这类）→ 选对图型 → **直接画一张干净的内联 <svg> 图表**放进该页。务必：① **选对图型**（占比→饼/环；随时间或序列→折线/面积；类别对比→柱/分组柱/堆叠柱；多维对比→雷达；相关或分布→散点）；② **要素齐全且数据准确**：坐标轴 + 刻度 + 轴标题 + 单位 + 图例(多系列) + 必要数值标签，**按给的数算坐标别乱画**；③ 用设计令牌着色（\`var(--accent)\`/\`var(--accent-2)\`/\`var(--accent-3)\`/\`var(--ink)\`/\`var(--muted)\`，网格线浅灰），勿写死品牌色，浅/暗皮都好看；④ \`<svg viewBox>\` 纯路径/形状，**不引外部资源、不嵌位图、不依赖外部字体**，单文件离线；⑤ 克制专业、无 chartjunk、留白足；装饰元素 \`aria-hidden\`，图表整体给 \`aria-label\`；⑥ 放对位置不遮正文。图表 SVG 也存进图片库（同矢量配图）。返回含该 \`<svg>\` 的整页 \`<section data-id>\`。
+读用户给的**数据或描述**（可能是「方法A 78、方法B 88…分组柱状图」这类一句话，也可能是从文件导入的多行 CSV/数字）→ 选对图型 → **直接画一张干净的内联 <svg> 图表**放进该页，**务必按真实数值算坐标**。务必：① **选对图型**（占比→饼/环；随时间或序列→折线/面积；类别对比→柱/分组柱/堆叠柱；多维对比→雷达；相关或分布→散点）；② **要素齐全且数据准确**：坐标轴 + 刻度 + 轴标题 + 单位 + 图例(多系列) + 必要数值标签，**按给的数算坐标别乱画**；③ 用设计令牌着色（\`var(--accent)\`/\`var(--accent-2)\`/\`var(--accent-3)\`/\`var(--ink)\`/\`var(--muted)\`，网格线浅灰），勿写死品牌色，浅/暗皮都好看；④ \`<svg viewBox>\` 纯路径/形状，**不引外部资源、不嵌位图、不依赖外部字体**，单文件离线；⑤ 克制专业、无 chartjunk、留白足；装饰元素 \`aria-hidden\`，图表整体给 \`aria-label\`；⑥ 放对位置不遮正文。图表 SVG 也存进图片库（同矢量配图）。返回含该 \`<svg>\` 的整页 \`<section data-id>\`。
 **逃生舱（仅复杂图）**：当数据**密集或要精确统计**（箱线/小提琴/热力图/桑基/上百点散点/对数轴+误差棒）手绘易错时，改用本机 matplotlib 预渲染：写 Python（\`matplotlib.rcParams['font.sans-serif']=['PingFang SC','Noto Sans SC','Heiti SC']\` 防中文成□；配色用本 deck 令牌色的 hex 近似）→ \`savefig(format='svg')\` → 把生成的 \`<svg>\` 内联进该页并存图片库。注意预渲染 SVG 颜色是死 hex（换肤不跟着变）、体积较大，**仅复杂图才用**。
 `;
 }
@@ -1229,7 +1229,7 @@ function aiTaskBlock(s: HtmlSlide, i: number, o: { instr?: string; gen?: { type:
   let b = `### 第 ${i + 1} 页 · ${s.title}  (data-id: \`${s.id}\`)\n`;
   if (o.instr) b += `**修改要求：** ${o.instr}\n`;
   if (o.gen?.type === 'vector') b += `**配图（矢量 SVG · 你直接画内联 <svg>）：** ${o.gen.hint || '按本页内容画一张贴合的示意图'}\n`;
-  if (o.gen?.type === 'chart') b += `**图表（按数据/描述画内联 <svg> 图表）：** ${o.gen.hint || '按本页内容选图型并作图'}\n`;
+  if (o.gen?.type === 'chart') { const h = o.gen.hint || '按本页内容选图型并作图'; b += h.includes('\n') ? `**图表（按以下数据/描述画内联 <svg> 图表）：**\n${FENCE}\n${h}\n${FENCE}\n` : `**图表（按数据/描述画内联 <svg> 图表）：** ${h}\n`; }
   if (o.gen?.type === 'photo') b += `**配图（照片级 · 用 codex 生成→存图片库→内联）：** ${o.gen.hint || '按本页内容生成一张合适的照片'}\n`;
   if (trayImgs.length) b += `**在本页插入这些图片（占位 <img data-img-id>，勿写 src/base64）：**\n${aiImageLines(trayImgs)}\n`;
   b += `\n当前 HTML（在此基础上改写/插入/配图）：\n${FENCE}html\n${s.html}\n${FENCE}\n`;
@@ -1279,6 +1279,21 @@ function addIllustToQueue(): void {
   genQueue[s.id] = { type: illType, hint };
   const box = $('#illHint') as HTMLInputElement | null; if (box) box.value = '';
   refreshTasks(); toast(`已加入配图清单：第 ${i + 1} 页 · ${illType === 'vector' ? '矢量 SVG' : illType === 'chart' ? '图表' : '照片 codex'}`);
+}
+// 图表数据：导入一个 CSV / 数字 / 文本数据文件，内容填进「配图」文本框（供 AI 据此作图）
+function applyIllData(text: string, name: string): void {
+  const t = (text || '').trim(); if (!t) return;
+  const box = $('#illHint') as HTMLTextAreaElement | null; if (!box) return;
+  box.value = (box.value.trim() ? box.value.trim() + '\n' : '') + t;
+  const note = $('#illDataNote'); if (note) note.textContent = `已导入 ${name}（${t.split(/\r?\n/).length} 行）`;
+}
+function illDataPicker(): void {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.csv,.tsv,.tab,.txt,.json,.dat,.md,text/*';
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    const r = new FileReader(); r.onload = () => { applyIllData(String(r.result || ''), f.name); toast(`已导入数据文件：${f.name}`); }; r.readAsText(f);
+  };
+  inp.click();
 }
 function genUnmark(id: string): void { delete genQueue[id]; refreshTasks(); }
 // the unified 待办清单 = deck ask + per-page 改字 / 配图(矢量·照片) / 导入图
@@ -2243,7 +2258,11 @@ body.dark .helppop{background:#0f0f12;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .illrow{display:flex;align-items:center;gap:8px;margin-bottom:7px}
 .illrow:last-child{margin-bottom:0}
 .illlabel{font-size:12px;color:#6a6a6e;white-space:nowrap}
-.illrow #illHint{flex:1}
+.illbox #illHint{width:100%;box-sizing:border-box;resize:vertical;min-height:34px;font-family:inherit;font-size:12px;line-height:1.5;border:1px solid #d8d4cd;border-radius:7px;padding:6px 8px;background:#fff;color:#2a2a2d;margin-bottom:7px}
+.illbox #illHint:focus{outline:none;border-color:#B5402A}
+.illrow-act{margin-bottom:0}
+.illnote{font-size:11px;color:#0f6e56;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.dark .illbox #illHint{background:#202022;color:#e8e8ea;border-color:#3a3a3d}
 .seg{display:flex;border:1px solid #d8d4cd;border-radius:7px;overflow:hidden}
 .seg .segbtn{border:0;background:transparent;font-family:inherit;font-size:12px;padding:6px 10px;cursor:pointer;color:#6a6a6e}
 .seg .segbtn.on{background:#B5402A;color:#fff}
@@ -2518,7 +2537,8 @@ function buildUI(): void {
           <div class="illrow"><span class="illlabel">配图<button class="ihelp" type="button" data-help="矢量＝Claude 直接画 SVG（免费、可编辑）；图表＝按数据/描述画 SVG 图表（柱/折线/饼/雷达/散点…）；照片＝本机 codex 生成（按张计额度）。成品都进图片库。">?</button></span>
             <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量</button><button type="button" class="segbtn" data-illtype="chart">图表</button><button type="button" class="segbtn" data-illtype="photo">照片</button></div>
           </div>
-          <div class="illrow"><input id="illHint" placeholder="想要什么画面（可留空）"><button id="illAdd" class="primary-mini" title="把本页 + 所选配图类型加入待办">＋ 加入</button></div>
+          <textarea id="illHint" rows="2" placeholder="想要什么画面（可留空）"></textarea>
+          <div class="illrow illrow-act"><button id="illDataPick" class="mini" title="导入 CSV / 数字 / 文本数据文件，内容会填进上面的框" style="display:none">导入数据文件</button><span id="illDataNote" class="illnote"></span><span class="grow"></span><button id="illAdd" class="primary-mini" title="把本页 + 所选配图类型加入待办">＋ 加入</button></div>
         </div>
         <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
 
@@ -2732,10 +2752,12 @@ function buildUI(): void {
   document.querySelectorAll('#illSeg .segbtn').forEach((b) => b.addEventListener('click', () => {
     illType = ((b as HTMLElement).dataset.illtype as 'vector' | 'chart' | 'photo') || 'vector';
     document.querySelectorAll('#illSeg .segbtn').forEach((x) => x.classList.toggle('on', x === b));
-    const hint = $('#illHint') as HTMLInputElement | null;
-    if (hint) hint.placeholder = illType === 'chart' ? '粘贴数据或描述，例：方法A 78、方法B 88…分组柱状图' : '想要什么画面（可留空）';
+    const hint = $('#illHint') as HTMLTextAreaElement | null;
+    if (hint) hint.placeholder = illType === 'chart' ? '粘贴数据或描述，例：方法A 78、方法B 88…分组柱状图；或点「导入数据文件」' : '想要什么画面（可留空）';
+    const dp = $('#illDataPick'); if (dp) (dp as HTMLElement).style.display = illType === 'chart' ? '' : 'none';
   }));
   $('#illAdd').addEventListener('click', addIllustToQueue);
+  $('#illDataPick').addEventListener('click', illDataPicker);
   // image tray: import + the dedicated drop-zone highlight (drop handled at window level)
   $('#trayPick').addEventListener('click', trayFilesPicker);
   $('#genOpenLib').addEventListener('click', openLibrary);
@@ -2871,6 +2893,7 @@ function buildUI(): void {
   (window as unknown as { __SM_TRAY_LIST__: () => { id: string; name: string; note: string; placed: boolean; slideId: string }[] }).__SM_TRAY_LIST__ = () => trayImages.map((t) => ({ id: t.id, name: t.name, note: t.note, placed: t.placed, slideId: t.slideId }));
   // unified 配图清单 + 待办 + send hooks
   (window as unknown as { __SM_GEN_MARK__: (id: string, type?: 'vector' | 'chart' | 'photo', hint?: string) => void }).__SM_GEN_MARK__ = (id, type, hint) => { genQueue[id] = { type: type || 'vector', hint: hint || '' }; if (mode === 'html') refreshTasks(); };
+  (window as unknown as { __SM_ILL_DATA__: (text: string, name?: string) => void }).__SM_ILL_DATA__ = (text, name) => applyIllData(text, name || 'data.csv');
   (window as unknown as { __SM_GEN_LIST__: () => { id: string; type: string; hint: string }[] }).__SM_GEN_LIST__ = () => Object.keys(genQueue).map((id) => ({ id, type: genQueue[id].type, hint: genQueue[id].hint }));
   (window as unknown as { __SM_TODO__: () => { label: string; page: number; cls: string }[] }).__SM_TODO__ = () => todoItems().map((it) => ({ label: it.label, page: it.page, cls: it.cls }));
   (window as unknown as { __SM_ALL_REQUEST__: typeof buildAllRequest }).__SM_ALL_REQUEST__ = buildAllRequest;
