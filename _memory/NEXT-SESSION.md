@@ -1,28 +1,28 @@
-# 下个会话交接 · AI 图表 v1 已成,候选下一步见下
+# 下个会话交接 · 审视项目 → 找新的 AI-first 功能
 
-> 更新于 2026-06-28 续会话末。`/clear` 后：先读 `_memory/active.md` 顶部各 ✅ 块 + 本文件。
+> 更新于 2026-06-28 会话末。`/clear` 后先读 `_memory/active.md`（精简版·含启动须知 + Studio 机制），再读本文件。**别通读仓库**，省 token。
 
-## ✅ AI 图表功能 v1 已完成（A 默认 + C 逃生舱）
-调研 + 实现 + 验证全做完,详见 `_memory/active.md` 顶部 ✅ 块 + `docs/RESEARCH-ai-charts.md`。一句话:
-「配图」分段从「矢量/照片」扩到 **「矢量/图表/照片」**;选「图表」→ AI 默认直接画**内联 SVG 图表**(柱/折线/饼/雷达/散点…,令牌着色,零依赖),复杂统计图(箱线/热力/桑基…)走 **matplotlib 预渲染→SVG→内联** 逃生舱。规则在 `AGENTS.md §4c`「图表」指令。verify-ai-pane 22/22 + 全回归绿。
+## 🎯 下阶段任务：审视 Slidesmith，看还能接入什么 AI-first 功能
+用户想和我一起**审视整个项目**，盘点现状、找下一个值得做的「AI-first」功能。先别写代码——先一起讨论方向、出带优先级的候选清单（像当初 AI 图表那样：调研→A/B/C→拍板→做）。
 
-## 🎯 下一阶段候选(下会话先和用户确认选哪个)
-1. **真·握手环 dogfood 图表**:连上 Studio,让用户对某页选「图表」+ 贴真数据 → AI 实跑画一张 SVG 图表回灌。**这是图表 v1 唯一没现场跑的链路**(代码全验证过,但没在真握手环里让 AI 真画过图表)。最该先做。
-2. **C 逃生舱小工具**:若用户常用箱线/热力等复杂图,补一个「matplotlib 中文字体 + deck 令牌注入」helper,让逃生舱开箱即用(现在靠规则让 AI 临时写 Python)。
-3. **呈现态演讲者视图**:闭环三段的最后一段(制作 ✅ / 修改 ✅ / 呈现 缺)。HTML-first 主流程缺双屏/备注/计时,较 fuzzy。
-4. **制作→修改交接顺滑**:生成完一键进 Studio。
+### 开场建议
+1. 读 active.md 的「当前状态」摸清已有能力边界。
+2. 给用户一张**能力地图 + 候选清单**（show_widget 画一下更直观），按"价值 × 契合 Slidesmith DNA（单文件/离线/矢量/AI-first）× 成本"排序。
+3. 用 AskUserQuestion 让用户拍板先做哪个。
 
-## ✅ 本会话(2026-06-28)做完
-- 已 commit+push（4e18719）：图片暂存盘→AI排版 · 矢量配图 · 照片配图(codex)+图片库 · 统一「AI 待办」面板。
-- **本地 commit `d90d01b`(未 push)**：AI 面板视觉精简(分区标题 + ⓘ 弹出式说明 + 精简命名)。
-- **未 commit**：AI 图表 v1(上述)。**push 被 auto-mode 分类器拦**(直推 main 需用户授权)——两批改动等用户授权 push 或自己推。
-- 「先问我」竖排小瑕疵核实=当前 build 已修(19px 单行,nowrap 生效),无需改。
+### 候选种子（待和用户一起增删）
+- **演讲者视图 / 讲稿同步**：闭环最后一段（制作✅ 修改✅ 呈现缺）。HTML-first 主流程缺双屏/备注/计时，需从契约 deck 抽 notes（较 fuzzy）。
+- **AI 图表 dogfood + C 逃生舱工具化**：真握手环里让 AI 实跑画图表（v1 没现场跑过 live）；复杂图常用就补「matplotlib 中文字体 + 令牌注入」helper。
+- **editorial→Studio 渲染兜底入 build.py**：让所有学术 deck 自带兜底、不再黑屏（见 [[studio-drops-deck-engine]]）。
+- **制作→修改交接顺滑**：editorial-slides 生成完一键进 Studio。
+- **AI 审稿/优化建议**：AI 主动检查 deck（逻辑、过载、对比度、一页一事）给修改建议（现在只被动按评论改）。
+- **AI 大纲→整套 deck 一键生成**：用户给主题/讲稿 → AI 出结构 + 选皮 + 配图配表 一条龙。
+- **数据/表格 → 自动成图表页**：贴 CSV/Excel → AI 选图型批量出图表 slides。
 
-## 实时协作环（已验证 · 怎么挂）
-**正解 = 后台 `curl /api/wait` 自循环脚本**（`for i in seq 1 240; do R=$(curl --max-time 295 .../api/wait?timeout=280000); count>=1 就写 /tmp/sm_wait_bg.json + exit；空响应 sleep 8 退避; done`），用 **run_in_background（别 nohup，否则 harness 跟不住、不唤醒）**。
-- **省 token 关键**：自循环把"空闲超时"在后台内部消化，**只在真有请求时才 exit→唤醒我**；空闲≈零 token。
-- 别用前台 `slidesmith_wait`（卡死对话）。
-- **新会话要重新挂一次**。待办：是否把「一连上 Studio 就自动挂自循环」写进 `/slidesmith` 命令 + AGENTS（消除新会话空窗）——用户尚未拍板，可下个会话先问。
+## 📌 本会话（2026-06-28）做完
+- AI 图表 v1（A 默认 + C 逃生舱）`31be79a`；图表数据文件导入 `ce95c6f`；UI 视觉精简 `d90d01b`——均 push。
+- 真 dogfood：JBR《Virtual Journeys》→ 22 页 academic deck（5 真数据图表 + 动画），仓库根 `virtual-journeys.html`，Studio 渲染成功。
+- 挖到并修：editorial deck 导入 Studio 黑屏（Studio 丢弃 deck 引擎 → deck 级 CSS 兜底）。
 
-## 开工先读
-`_memory/active.md`（顶部 ✅）· 本文件 · `packages/studio/src/main.ts`（aiIllustrate/buildAllRequest 路子）· `AGENTS.md §4c`（统一 AI-tasks 请求）· docs 里 Chart.js 备注 · [[ai-charts-next-phase]]。
+## 实时协作环怎么挂（复制即用）
+后台 `run_in_background`（**别 nohup**）跑：`for i in $(seq 1 240); do R=$(curl -s --max-time 295 "http://localhost:8765/api/wait?timeout=280000"); echo "$R" | grep -q '"timedOut":false' && { echo "$R">/tmp/sm_wait.json; echo HIT; exit 0; }; sleep 8; done` —— 命中即 exit→唤醒我，空闲≈零 token。
