@@ -1190,9 +1190,9 @@ function aiImagePreamble(): string {
 `;
 }
 const trayPayload = (): { id: string; name: string; dataUrl: string }[] => trayImages.map((t) => ({ id: t.id, name: t.name, dataUrl: t.dataUrl }));
-// 配图清单：每页一个生成请求 + 类型（矢量 SVG = Claude 直出 / 照片 = codex 生成）+ 提示
-const genQueue: Record<string, { type: 'vector' | 'photo'; hint: string }> = {};
-let illType: 'vector' | 'photo' = 'vector'; // 本页「配图」当前选的类型
+// 配图清单：每页一个生成请求 + 类型（矢量 SVG = Claude 直出 / 图表 = 按数据画 SVG / 照片 = codex 生成）+ 提示
+const genQueue: Record<string, { type: 'vector' | 'chart' | 'photo'; hint: string }> = {};
+let illType: 'vector' | 'chart' | 'photo' = 'vector'; // 本页「配图」当前选的类型
 // send a request (optionally with its staged images) over the bridge, or explain how to connect
 function sendOverBridge(r: { name: string; count: number; content: string; images?: { id: string; name: string; dataUrl: string }[] }, okMsg: string): boolean {
   if (bridge.connected && bridge.ws && bridge.ws.readyState === WebSocket.OPEN) {
@@ -1209,6 +1209,13 @@ function aiIllustrateSpec(): string {
 画**一张贴合该页内容**的矢量示意图放进该页。务必：① 读懂主题，画相关概念图/示意/图标组合（「增长」→上扬线、「协作」→相连节点…），不要无关花纹或占位图；② 用设计令牌着色（\`var(--accent)\`/\`var(--accent-2)\`/\`var(--ink)\`），勿写死品牌色，浅/暗皮都好看；③ \`<svg viewBox>\` 纯路径/形状/渐变，**不引外部资源、不嵌位图**，保持单文件离线；④ 克制有构图，留白充足；装饰 svg 加 \`aria-hidden\`；⑤ 放对位置、不遮正文，必要时轻调布局。返回含该 \`<svg>\` 的整页 \`<section data-id>\`。
 `;
 }
+// the chart rules (included once when any 图表 item is queued) — A default (SVG direct) + C escape hatch (matplotlib pre-render)
+function aiChartSpec(): string {
+  return `## 图表规则（type=图表 的页：把数据/描述变成内联 <svg> 图表）
+读用户给的**数据或描述**（hint 里常是「方法A 78、方法B 88…分组柱状图」这类）→ 选对图型 → **直接画一张干净的内联 <svg> 图表**放进该页。务必：① **选对图型**（占比→饼/环；随时间或序列→折线/面积；类别对比→柱/分组柱/堆叠柱；多维对比→雷达；相关或分布→散点）；② **要素齐全且数据准确**：坐标轴 + 刻度 + 轴标题 + 单位 + 图例(多系列) + 必要数值标签，**按给的数算坐标别乱画**；③ 用设计令牌着色（\`var(--accent)\`/\`var(--accent-2)\`/\`var(--accent-3)\`/\`var(--ink)\`/\`var(--muted)\`，网格线浅灰），勿写死品牌色，浅/暗皮都好看；④ \`<svg viewBox>\` 纯路径/形状，**不引外部资源、不嵌位图、不依赖外部字体**，单文件离线；⑤ 克制专业、无 chartjunk、留白足；装饰元素 \`aria-hidden\`，图表整体给 \`aria-label\`；⑥ 放对位置不遮正文。图表 SVG 也存进图片库（同矢量配图）。返回含该 \`<svg>\` 的整页 \`<section data-id>\`。
+**逃生舱（仅复杂图）**：当数据**密集或要精确统计**（箱线/小提琴/热力图/桑基/上百点散点/对数轴+误差棒）手绘易错时，改用本机 matplotlib 预渲染：写 Python（\`matplotlib.rcParams['font.sans-serif']=['PingFang SC','Noto Sans SC','Heiti SC']\` 防中文成□；配色用本 deck 令牌色的 hex 近似）→ \`savefig(format='svg')\` → 把生成的 \`<svg>\` 内联进该页并存图片库。注意预渲染 SVG 颜色是死 hex（换肤不跟着变）、体积较大，**仅复杂图才用**。
+`;
+}
 // the codex+library rules (included once when any 照片 item is queued)
 function aiImageGenSpec(): string {
   return `## 照片配图规则（type=照片 的页：用本机 codex 生成 → 存图片库 → 内联）
@@ -1217,11 +1224,12 @@ function aiImageGenSpec(): string {
 `;
 }
 // a per-page block: optional 修改要求 + optional 配图(矢量/照片) + optional 待插入图片 + current HTML
-function aiTaskBlock(s: HtmlSlide, i: number, o: { instr?: string; gen?: { type: 'vector' | 'photo'; hint: string }; trayImgs?: TrayImage[] }): string {
+function aiTaskBlock(s: HtmlSlide, i: number, o: { instr?: string; gen?: { type: 'vector' | 'chart' | 'photo'; hint: string }; trayImgs?: TrayImage[] }): string {
   const trayImgs = o.trayImgs || [];
   let b = `### 第 ${i + 1} 页 · ${s.title}  (data-id: \`${s.id}\`)\n`;
   if (o.instr) b += `**修改要求：** ${o.instr}\n`;
   if (o.gen?.type === 'vector') b += `**配图（矢量 SVG · 你直接画内联 <svg>）：** ${o.gen.hint || '按本页内容画一张贴合的示意图'}\n`;
+  if (o.gen?.type === 'chart') b += `**图表（按数据/描述画内联 <svg> 图表）：** ${o.gen.hint || '按本页内容选图型并作图'}\n`;
   if (o.gen?.type === 'photo') b += `**配图（照片级 · 用 codex 生成→存图片库→内联）：** ${o.gen.hint || '按本页内容生成一张合适的照片'}\n`;
   if (trayImgs.length) b += `**在本页插入这些图片（占位 <img data-img-id>，勿写 src/base64）：**\n${aiImageLines(trayImgs)}\n`;
   b += `\n当前 HTML（在此基础上改写/插入/配图）：\n${FENCE}html\n${s.html}\n${FENCE}\n`;
@@ -1237,10 +1245,12 @@ function buildAllRequest(): { name: string; count: number; content: string; imag
     (aiInstructions[s.id] && !aiApplied.has(s.id)) || genQueue[s.id] || trayImagesForSlide(s.id).length);
   if (!pages.length && !hasDeck) return null;
   const anyVec = Object.values(genQueue).some((g) => g.type === 'vector');
+  const anyChart = Object.values(genQueue).some((g) => g.type === 'chart');
   const anyPhoto = Object.values(genQueue).some((g) => g.type === 'photo');
   let body = aiRequestHeader('AI 待办 · 修改与配图一次办');
   if (hasDeck) body += aiDeckBlock();
   if (anyVec) body += aiIllustrateSpec();
+  if (anyChart) body += aiChartSpec();
   if (anyPhoto) body += aiImageGenSpec();
   if (trayImages.length) body += aiImagePreamble();
   body += '\n## 需要处理的页\n' + pages.map(({ s, i }) => aiTaskBlock(s, i, {
@@ -1268,7 +1278,7 @@ function addIllustToQueue(): void {
   const hint = (($('#illHint') as HTMLInputElement | null)?.value || '').trim();
   genQueue[s.id] = { type: illType, hint };
   const box = $('#illHint') as HTMLInputElement | null; if (box) box.value = '';
-  refreshTasks(); toast(`已加入配图清单：第 ${i + 1} 页 · ${illType === 'vector' ? '矢量 SVG' : '照片 codex'}`);
+  refreshTasks(); toast(`已加入配图清单：第 ${i + 1} 页 · ${illType === 'vector' ? '矢量 SVG' : illType === 'chart' ? '图表' : '照片 codex'}`);
 }
 function genUnmark(id: string): void { delete genQueue[id]; refreshTasks(); }
 // the unified 待办清单 = deck ask + per-page 改字 / 配图(矢量·照片) / 导入图
@@ -1278,7 +1288,7 @@ function todoItems(): { label: string; desc: string; page: number; cls: string; 
   htmlSlides.forEach((s, i) => {
     if (aiInstructions[s.id] && !aiApplied.has(s.id)) items.push({ label: aiSent.has(s.id) ? '改字 · 已发送' : '改字', desc: aiInstructions[s.id], page: i + 1, cls: 'edit', remove: () => { delete aiInstructions[s.id]; aiSent.delete(s.id); if (aiCurId === s.id) { const b = $('#aiInstruction') as HTMLTextAreaElement | null; if (b) b.value = ''; } refreshTasks(); } });
     const g = genQueue[s.id];
-    if (g) items.push({ label: g.type === 'vector' ? '配图 · 矢量' : '配图 · 照片', desc: g.hint || '（按内容自动）', page: i + 1, cls: g.type === 'vector' ? 'vec' : 'photo', remove: () => genUnmark(s.id) });
+    if (g) { const lab = g.type === 'vector' ? '配图 · 矢量' : g.type === 'chart' ? '配图 · 图表' : '配图 · 照片'; const cls = g.type === 'vector' ? 'vec' : g.type === 'chart' ? 'chart' : 'photo'; items.push({ label: lab, desc: g.hint || '（按内容自动）', page: i + 1, cls, remove: () => genUnmark(s.id) }); }
     trayImagesForSlide(s.id).forEach((t) => items.push({ label: t.placed ? '导入图 · 已放置' : '导入图', desc: t.name, page: i + 1, cls: 'tray', remove: () => removeTrayImage(t.id) }));
   });
   return items;
@@ -2245,6 +2255,7 @@ body.dark .helppop{background:#0f0f12;box-shadow:0 10px 30px rgba(0,0,0,.5)}
 .todochip.deck{color:#0c447c;background:#e6f1fb}
 .todochip.edit{color:#5f5e5a;background:#f1efe8}
 .todochip.vec{color:#0f6e56;background:#e1f5ee}
+.todochip.chart{color:#2c6e7f;background:#e3f0f3}
 .todochip.photo{color:#854f0b;background:#faeeda}
 .todochip.tray{color:#993c1d;background:#faece7}
 .todopg{flex:0 0 auto;font-size:10px;color:#B5402A;font-weight:700;font-variant-numeric:tabular-nums}
@@ -2504,8 +2515,8 @@ function buildUI(): void {
         <div class="field"><textarea id="aiInstruction" rows="3" placeholder="这一页想怎么改？例：三个要点改成左右两栏。"></textarea></div>
         <div class="oprow"><button id="aiClearOne" title="清空本页的修改意见">清空</button></div>
         <div class="illbox">
-          <div class="illrow"><span class="illlabel">配图<button class="ihelp" type="button" data-help="矢量＝Claude 直接画 SVG（免费、可编辑）；照片＝本机 codex 生成（按张计额度）。成品都进图片库。">?</button></span>
-            <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量</button><button type="button" class="segbtn" data-illtype="photo">照片</button></div>
+          <div class="illrow"><span class="illlabel">配图<button class="ihelp" type="button" data-help="矢量＝Claude 直接画 SVG（免费、可编辑）；图表＝按数据/描述画 SVG 图表（柱/折线/饼/雷达/散点…）；照片＝本机 codex 生成（按张计额度）。成品都进图片库。">?</button></span>
+            <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量</button><button type="button" class="segbtn" data-illtype="chart">图表</button><button type="button" class="segbtn" data-illtype="photo">照片</button></div>
           </div>
           <div class="illrow"><input id="illHint" placeholder="想要什么画面（可留空）"><button id="illAdd" class="primary-mini" title="把本页 + 所选配图类型加入待办">＋ 加入</button></div>
         </div>
@@ -2520,7 +2531,7 @@ function buildUI(): void {
         <div id="aiTodo" class="aitodo"></div>
         <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
 
-        <div class="sechead">图片库<button class="ihelp" type="button" data-help="AI 生成过的矢量 / 照片都存在这里（~/.slidesmith/library/），可重新插入到对应页或删除。">?</button><span class="grow"></span><button id="genOpenLib" class="mini">打开</button></div>
+        <div class="sechead">图片库<button class="ihelp" type="button" data-help="AI 生成过的矢量 / 图表 / 照片都存在这里（~/.slidesmith/library/），可重新插入到对应页或删除。">?</button><span class="grow"></span><button id="genOpenLib" class="mini">打开</button></div>
 
         <div class="sechead">视觉自检<button class="ihelp" type="button" data-help="检查每页的内容溢出、文字对比度、坏图，点结果可跳到对应页。">?</button><span class="grow"></span><button id="auditRun" class="mini">检查</button></div>
         <div id="auditOut" class="auditout"></div>
@@ -2719,8 +2730,10 @@ function buildUI(): void {
   $('#aiSendAll').addEventListener('click', submitAll);
   // 本页 配图: pick type (segmented) + add to the 配图清单
   document.querySelectorAll('#illSeg .segbtn').forEach((b) => b.addEventListener('click', () => {
-    illType = ((b as HTMLElement).dataset.illtype as 'vector' | 'photo') || 'vector';
+    illType = ((b as HTMLElement).dataset.illtype as 'vector' | 'chart' | 'photo') || 'vector';
     document.querySelectorAll('#illSeg .segbtn').forEach((x) => x.classList.toggle('on', x === b));
+    const hint = $('#illHint') as HTMLInputElement | null;
+    if (hint) hint.placeholder = illType === 'chart' ? '粘贴数据或描述，例：方法A 78、方法B 88…分组柱状图' : '想要什么画面（可留空）';
   }));
   $('#illAdd').addEventListener('click', addIllustToQueue);
   // image tray: import + the dedicated drop-zone highlight (drop handled at window level)
@@ -2857,7 +2870,7 @@ function buildUI(): void {
   (window as unknown as { __SM_TRAY_SET_PAGE__: (id: string, slideId: string) => void }).__SM_TRAY_SET_PAGE__ = (id, slideId) => { const t = trayImages.find((x) => x.id === id); if (t) { t.slideId = slideId; renderTray(); } };
   (window as unknown as { __SM_TRAY_LIST__: () => { id: string; name: string; note: string; placed: boolean; slideId: string }[] }).__SM_TRAY_LIST__ = () => trayImages.map((t) => ({ id: t.id, name: t.name, note: t.note, placed: t.placed, slideId: t.slideId }));
   // unified 配图清单 + 待办 + send hooks
-  (window as unknown as { __SM_GEN_MARK__: (id: string, type?: 'vector' | 'photo', hint?: string) => void }).__SM_GEN_MARK__ = (id, type, hint) => { genQueue[id] = { type: type || 'vector', hint: hint || '' }; if (mode === 'html') refreshTasks(); };
+  (window as unknown as { __SM_GEN_MARK__: (id: string, type?: 'vector' | 'chart' | 'photo', hint?: string) => void }).__SM_GEN_MARK__ = (id, type, hint) => { genQueue[id] = { type: type || 'vector', hint: hint || '' }; if (mode === 'html') refreshTasks(); };
   (window as unknown as { __SM_GEN_LIST__: () => { id: string; type: string; hint: string }[] }).__SM_GEN_LIST__ = () => Object.keys(genQueue).map((id) => ({ id, type: genQueue[id].type, hint: genQueue[id].hint }));
   (window as unknown as { __SM_TODO__: () => { label: string; page: number; cls: string }[] }).__SM_TODO__ = () => todoItems().map((it) => ({ label: it.label, page: it.page, cls: it.cls }));
   (window as unknown as { __SM_ALL_REQUEST__: typeof buildAllRequest }).__SM_ALL_REQUEST__ = buildAllRequest;

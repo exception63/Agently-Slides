@@ -54,11 +54,11 @@ try {
   check('Studio connected + deck imported (html mode)', true);
 
   const ids = await page.evaluate(() => Array.from(document.querySelector('#preview').contentDocument.querySelectorAll('#deck .slide')).map((s) => s.getAttribute('data-id')));
-  const pA = ids[2], pB = ids[4], pC = ids[1], pD = ids[3];
+  const pA = ids[2], pB = ids[4], pC = ids[1], pD = ids[3], pE = ids[5];
 
   // --- layout: deck-ask top, then 本页, todo, library ---
-  const ui = await page.evaluate(() => ['aiDeckInstruction', 'illSeg', 'illHint', 'illAdd', 'aiTodo', 'aiSendAll', 'genOpenLib'].every((id) => !!document.getElementById(id)) && document.querySelectorAll('#illSeg .segbtn').length === 2);
-  check('unified UI present (deck-ask · 配图 segmented · 待办 · 一键发送 · 图片库)', ui);
+  const ui = await page.evaluate(() => ['aiDeckInstruction', 'illSeg', 'illHint', 'illAdd', 'aiTodo', 'aiSendAll', 'genOpenLib'].every((id) => !!document.getElementById(id)) && document.querySelectorAll('#illSeg .segbtn').length === 3);
+  check('unified UI present (deck-ask · 配图 segmented 3类 · 待办 · 一键发送 · 图片库)', ui);
   const order = await page.evaluate(() => {
     const seq = ['aiDeckInstruction', 'aiInstruction', 'illSeg', 'aiTodo', 'aiSendAll', 'genOpenLib'].map((id) => document.getElementById(id));
     for (let i = 1; i < seq.length; i++) if (!(seq[i - 1].compareDocumentPosition(seq[i]) & Node.DOCUMENT_POSITION_FOLLOWING)) return false;
@@ -74,16 +74,20 @@ try {
   const popClosed = await page.evaluate(() => !document.getElementById('helpPop').classList.contains('show'));
   check('ⓘ help popovers (≥6 icons, open with text, click-away closes)', helpN >= 6 && popOpen && popClosed, `${helpN} icons`);
 
-  // segmented control toggles illType
+  // segmented control toggles illType (矢量 / 图表 / 照片) + 图表 swaps the hint placeholder to a data prompt
   await page.click('#illSeg .segbtn[data-illtype="photo"]');
   const segPhoto = await page.evaluate(() => document.querySelector('#illSeg .segbtn[data-illtype="photo"]').classList.contains('on'));
+  await page.click('#illSeg .segbtn[data-illtype="chart"]');
+  const segChart = await page.evaluate(() => document.querySelector('#illSeg .segbtn[data-illtype="chart"]').classList.contains('on') && /数据|描述/.test(document.getElementById('illHint').placeholder));
   await page.click('#illSeg .segbtn[data-illtype="vector"]');
-  check('配图 type segmented toggles (矢量/照片)', segPhoto && await page.evaluate(() => document.querySelector('#illSeg .segbtn[data-illtype="vector"]').classList.contains('on')));
+  const segCount = await page.evaluate(() => document.querySelectorAll('#illSeg .segbtn').length);
+  check('配图 type segmented toggles (矢量/图表/照片) + 图表 prompts for data', segCount === 3 && segPhoto && segChart && await page.evaluate(() => document.querySelector('#illSeg .segbtn[data-illtype="vector"]').classList.contains('on')));
 
   // --- build the unified to-do: deck ask + 改字 + 配图矢量 + 配图照片 + 导入图 ---
   await page.evaluate(() => { const t = document.getElementById('aiDeckInstruction'); t.value = '统一所有标题字号'; t.dispatchEvent(new Event('input', { bubbles: true })); });
   await page.evaluate((sid) => window.__SM_SET_INSTR__(sid, '标题改大、加副标题'), pC);
   await page.evaluate((sid) => window.__SM_GEN_MARK__(sid, 'vector', '一张上扬的增长曲线'), pA);
+  await page.evaluate((sid) => window.__SM_GEN_MARK__(sid, 'chart', '方法A 78、方法B 88、方法C 91，分组柱状图'), pE);
   await page.evaluate((sid) => window.__SM_GEN_MARK__(sid, 'photo', '团队协作的真实照片'), pB);
   const redPng = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 120; c.height = 80; const x = c.getContext('2d'); x.fillStyle = '#c0392b'; x.fillRect(0, 0, 120, 80); return c.toDataURL('image/png'); });
   await page.evaluate((u) => window.__SM_TRAY_ADD__('hero.png', u), redPng);
@@ -93,7 +97,7 @@ try {
 
   const todo = await page.evaluate(() => window.__SM_TODO__());
   const has = (cls) => todo.some((t) => t.cls === cls);
-  check('待办清单 mixes all kinds (整份/改字/配图矢量/配图照片/导入图)', has('deck') && has('edit') && has('vec') && has('photo') && has('tray'), todo.map((t) => t.cls).join(','));
+  check('待办清单 mixes all kinds (整份/改字/配图矢量/配图图表/配图照片/导入图)', has('deck') && has('edit') && has('vec') && has('chart') && has('photo') && has('tray'), todo.map((t) => t.cls).join(','));
   const sendBtn = await page.evaluate(() => { const b = document.getElementById('aiSendAll'); return { on: !!b && !b.disabled, txt: b.textContent, note: document.getElementById('aiSendNote').style.display !== 'none' }; });
   check('一键发送 enabled + counts items + codex cost note shown', sendBtn.on && /\d 项/.test(sendBtn.txt) && sendBtn.note, sendBtn.txt);
   await page.screenshot({ path: resolve(shotDir, '01-unified-todo.png') });
@@ -105,6 +109,7 @@ try {
   check('request: deck ask + SVG rules + codex rules + tray preamble all present', c.includes('统一所有标题字号') && c.includes('矢量配图规则') && c.includes('照片配图规则') && c.includes('图片素材'));
   check('request: per-page directives (改字 / 矢量 / 照片 / 插入图)', c.includes('标题改大') && c.includes('配图（矢量') && c.includes('配图（照片') && c.includes('__TRAY_DIR__'));
   check('request: vector page = pA, photo page = pB', pageOf(c, '矢量 SVG · 你直接画') === pA && pageOf(c, '照片级 · 用 codex') === pB);
+  check('request: 图表规则(A默认+C逃生舱) + chart directive + chart page = pE', c.includes('图表规则') && /A 默认|默认 = draw|直接画.*svg.*图表|直接画一张干净的内联/.test(c) && c.includes('matplotlib') && c.includes('图表（按数据') && pageOf(c, '图表（按数据') === pE, pageOf(c, '图表（按数据'));
   check('request: base64-free (token-light)', !/data:image\/[a-z.+-]+;base64/i.test(c));
 
   // --- ONE send → bridge ---
@@ -122,11 +127,14 @@ try {
   const patch = '```html\n'
     + `<section class="slide" data-id="${pD}"><div class="fill"><h1>D</h1><img data-img-id="${tid}" alt="" style="max-width:30%"></div></section>\n`
     + `<section class="slide" data-id="${pA}"><div class="fill"><h1>A</h1><svg viewBox="0 0 100 60" class="sm-illus"><path d="M5 55 L50 20 L95 8" stroke="var(--accent)" fill="none"/></svg></div></section>\n`
+    + `<section class="slide" data-id="${pE}"><div class="fill"><h1>E</h1><svg viewBox="0 0 120 80" class="sm-chart" aria-label="grouped bar"><line x1="14" y1="70" x2="116" y2="70" stroke="var(--ink)"/><rect x="24" y="34" width="16" height="36" fill="var(--accent)"/><rect x="52" y="22" width="16" height="48" fill="var(--accent-2)"/><rect x="80" y="14" width="16" height="56" fill="var(--accent-3)"/></svg></div></section>\n`
     + '```';
   bridge.applyPatch(patch);
-  await page.waitForFunction(([d, a]) => { const doc = document.querySelector('#preview').contentDocument; return !!doc.querySelector(`#deck .slide[data-id="${d}"] img[data-img-id]`) && !!doc.querySelector(`#deck .slide[data-id="${a}"] svg.sm-illus`); }, [pD, pA], { timeout: 8000 });
+  await page.waitForFunction(([d, a, e]) => { const doc = document.querySelector('#preview').contentDocument; return !!doc.querySelector(`#deck .slide[data-id="${d}"] img[data-img-id]`) && !!doc.querySelector(`#deck .slide[data-id="${a}"] svg.sm-illus`) && !!doc.querySelector(`#deck .slide[data-id="${e}"] svg.sm-chart`); }, [pD, pA, pE], { timeout: 8000 });
   const back = await page.evaluate(([d]) => { const im = document.querySelector('#preview').contentDocument.querySelector(`#deck .slide[data-id="${d}"] img[data-img-id]`); return (im.getAttribute('src') || '').startsWith('data:image/'); }, [pD]);
   check('patch applied: tray img backfilled (base64) + inline svg landed', back);
+  const chartBack = await page.evaluate(([e]) => { const sv = document.querySelector('#preview').contentDocument.querySelector(`#deck .slide[data-id="${e}"] svg.sm-chart`); return !!sv && sv.querySelectorAll('rect').length === 3 && /var\(--accent/.test(sv.innerHTML); }, [pE]);
+  check('chart round-trip: token-colored <svg> chart landed on its page', chartBack);
 
   // --- 图片库 panel: seed + list + reinsert + delete ---
   const png = await page.evaluate(() => { const c = document.createElement('canvas'); c.width = 140; c.height = 90; const x = c.getContext('2d'); x.fillStyle = '#1f8a5b'; x.fillRect(0, 0, 140, 90); return c.toDataURL('image/png'); });

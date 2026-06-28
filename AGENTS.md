@@ -181,6 +181,18 @@ data-id>` once. The kinds of per-page directive:
   `<svg>`* fitting the page: depict the actual topic (not generic blobs), color via tokens
   (`var(--accent)` / `var(--accent-2)` / `var(--ink)`, never hard hex), self-contained vector
   (no external refs / raster / fonts), restrained composition, placed without covering text.
+- **图表 (`**图表（按数据/描述…`)** — the human pasted data or a description; turn it into a chart.
+  **Default = draw an inline `<svg>` chart yourself** (the A path, same DNA as 矢量): pick the
+  right chart type (share→pie/donut; series/time→line/area; category compare→bar/grouped/stacked;
+  multi-dim→radar; correlation/spread→scatter), include axes + ticks + axis titles + units +
+  legend (multi-series) + value labels, compute coordinates **accurately** from the given numbers,
+  color via tokens (`var(--accent)`/`-2`/`-3`/`var(--ink)`/`var(--muted)`), self-contained vector,
+  no chartjunk. Store the chart SVG in the image library too (like 矢量). **Escape hatch (C) — only
+  for dense/precise stats charts** (box/violin/heatmap/sankey/100+-point scatter/log+error-bars)
+  that are error-prone by hand: pre-render with local **matplotlib** (`rcParams['font.sans-serif']`
+  = a CJK font like `PingFang SC`/`Noto Sans SC` so 中文 isn't tofu; colors = hex approximations of
+  the deck tokens) → `savefig(format='svg')` → inline that `<svg>` + store it. Note: pre-rendered
+  SVG bakes hex colors (won't react to skin) and is heavier — use it **only** when A can't.
 - **配图 · 照片 (`**配图（照片级…`)** — generate a *photo* with the local `codex` CLI (its
   built-in imagegen; ChatGPT login, no API key). For each such page: write an English prompt
   from the content, run codex, store the PNG in the image library, then base64-inline it:
