@@ -9,8 +9,9 @@
 // drives it over MCP. User edit-requests flow UP (Studio→bridge→Claude); AI
 // patches flow DOWN (Claude→bridge→Studio). All state lives in memory.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { readFileSync, existsSync } from 'node:fs';
-import { dirname, resolve, basename } from 'node:path';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import { dirname, resolve, basename, join } from 'node:path';
+import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
@@ -22,9 +23,51 @@ const DEFAULT_STUDIO = resolve(REPO_ROOT, 'studio', 'slidesmith-studio.html');
 
 export const DEFAULT_PORT = 8765;
 
+// Persist staged tray images to a temp dir and return it. Each image is a data URL
+// (data:image/png;base64,…); we decode and write <id>.<ext> (ext matched to the
+// Studio's manifest naming) so a Claude Code session can Read the actual pixels.
+function saveTrayImages(reqId: string, images: { id?: string; name?: string; dataUrl?: string }[]): string {
+  const dir = join(tmpdir(), 'slidesmith-tray', reqId);
+  mkdirSync(dir, { recursive: true });
+  for (const im of images) {
+    if (!im || !im.dataUrl || !im.id) continue;
+    const m = /^data:image\/([a-z0-9.+-]+);base64,(.*)$/is.exec(im.dataUrl);
+    if (!m) continue;
+    const sub = m[1].toLowerCase();
+    const ext = sub === 'jpeg' ? 'jpg' : sub === 'svg+xml' ? 'svg' : sub;
+    writeFileSync(join(dir, `${im.id}.${ext}`), Buffer.from(m[2], 'base64'));
+  }
+  return dir;
+}
+
+// ---- generated-image library: ~/.slidesmith/library/<deck>/ (persistent, per-deck) ----
+// Files are written by the Claude Code session during codex generation (per AGENTS.md
+// §4e naming convention); the bridge only READS the index/files to serve the Studio's
+// 图片库 panel, and removes on request. index.json is the manageable "database".
+const LIB_ROOT = join(homedir(), '.slidesmith', 'library');
+const safeSeg = (s: string): string => (s || '').replace(/[^\w.\-一-鿿]+/g, '_').replace(/\.\.+/g, '_').replace(/^\.+/, '').slice(0, 120) || 'deck';
+const libraryDir = (deck: string): string => join(LIB_ROOT, safeSeg(deck));
+interface LibImage { id?: string; slideId?: string; slideTitle?: string; prompt?: string; style?: string; model?: string; file: string; w?: number; h?: number; bytes?: number; createdAt?: string; usedInDeck?: boolean }
+function readLibraryIndex(deck: string): { deck: string; images: LibImage[] } {
+  const f = join(libraryDir(deck), 'index.json');
+  if (existsSync(f)) { try { const j = JSON.parse(readFileSync(f, 'utf8')); if (j && Array.isArray(j.images)) return { deck, images: j.images }; } catch { /* corrupt → empty */ } }
+  return { deck, images: [] };
+}
+function writeLibraryIndex(deck: string, images: LibImage[]): void {
+  const dir = libraryDir(deck); mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, 'index.json'), JSON.stringify({ deck, updatedAt: new Date().toISOString(), images }, null, 2));
+}
+const IMG_MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' };
+const mimeForFile = (f: string): string => IMG_MIME[(f.split('.').pop() || '').toLowerCase()] || 'application/octet-stream';
+
 // ---- wire protocol (JSON over WebSocket) ----
 //   bridge → Studio : { type:'hello', hasDeck, owner, port } | { type:'import', name, html } | { type:'patch', text, preview }
-//   Studio → bridge : { type:'ready' } | { type:'requests', request } | { type:'exported', name, html }
+//   Studio → bridge : { type:'ready' } | { type:'requests', request, images? } | { type:'exported', name, html }
+//
+// An image-layout request carries images:[{id,name,dataUrl}]. The bridge writes each
+// to a temp dir and substitutes the __TRAY_DIR__ token in the request text with that
+// dir, so the Claude Code session can Read the actual pixels before deciding layout
+// (the request text itself stays base64-free / token-light).
 export interface BridgeRequest {
   id: string;
   ts: number;
@@ -212,6 +255,34 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
+    // ---- generated-image library (serves the Studio 图片库 panel) ----
+    const q = (name: string): string => decodeURIComponent((new RegExp('[?&]' + name + '=([^&]+)').exec(req.url || '') || [])[1] || '');
+    // GET /api/library?deck=<base> → the index (metadata only; no pixels)
+    if (url === '/api/library' && req.method === 'GET') {
+      const deck = q('deck') || (currentDeckBase());
+      sendJson(res, { ok: true, ...readLibraryIndex(deck) });
+      return;
+    }
+    // GET /api/library/file?deck=&file=  → raw image bytes (for <img src>); ?as=dataurl → {dataUrl}
+    if (url === '/api/library/file' && req.method === 'GET') {
+      const deck = q('deck') || currentDeckBase(); const file = safeSeg(q('file'));
+      const p = join(libraryDir(deck), file);
+      if (!file || !existsSync(p)) { sendJson(res, { ok: false, error: 'not found' }, 404); return; }
+      const buf = readFileSync(p); const mime = mimeForFile(file);
+      if (q('as') === 'dataurl') { sendJson(res, { ok: true, dataUrl: `data:${mime};base64,${buf.toString('base64')}` }); return; }
+      res.writeHead(200, { 'content-type': mime, 'cache-control': 'no-store', ...CORS }); res.end(buf);
+      return;
+    }
+    // POST /api/library/remove?deck=&file=  → delete the file + its index entry
+    if (url === '/api/library/remove' && req.method === 'POST') {
+      const deck = q('deck') || currentDeckBase(); const file = safeSeg(q('file'));
+      try {
+        const p = join(libraryDir(deck), file); if (existsSync(p)) unlinkSync(p);
+        const idx = readLibraryIndex(deck); writeLibraryIndex(deck, idx.images.filter((im) => im.file !== file));
+        sendJson(res, { ok: true, deck, file });
+      } catch (e) { sendJson(res, { ok: false, error: String(e) }, 400); }
+      return;
+    }
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
     res.end('not found');
   });
@@ -243,6 +314,8 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   function helloMsg(): { type: 'hello'; hasDeck: boolean; owner: BridgeOwner | null; port: number } {
     return { type: 'hello', hasDeck: !!deck, owner, port: handle.port };
   }
+  // the current deck's base name (no extension) — the image library's per-deck folder key
+  function currentDeckBase(): string { return deck ? basename(deck.name).replace(/\.[^.]+$/, '') : 'deck'; }
   // hand the freshly-queued requests to ONE blocked long-poll waiter (FIFO). Normal
   // operation has a single waiter (the owner session's loop); delivering to just one
   // keeps queue semantics if two ever overlap (no double-processing).
@@ -264,14 +337,22 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     emitter.emit('studio-connected');
 
     ws.on('message', (data) => {
-      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; name?: string; html?: string };
+      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; images?: { id?: string; name?: string; dataUrl?: string }[]; name?: string; html?: string };
       try { m = JSON.parse(String(data)); } catch { return; }
       if (m.type === 'requests' && m.request && typeof m.request.content === 'string') {
+        const id = 'req-' + (++reqSeq);
+        let content = m.request.content;
+        // image-layout request: persist the staged pixels to a temp dir so the AI can
+        // Read them, and point the __TRAY_DIR__ token in the prompt at that real dir.
+        if (Array.isArray(m.images) && m.images.length) {
+          try { content = content.replace(/__TRAY_DIR__/g, saveTrayImages(id, m.images)); }
+          catch (e) { emitter.emit('error', e); }
+        }
         const r: BridgeRequest = {
-          id: 'req-' + (++reqSeq),
+          id,
           ts: Date.now(),
           name: m.request.name || 'request.md',
-          content: m.request.content,
+          content,
           count: m.request.count || 1,
           confirm: !!m.request.confirm,
         };

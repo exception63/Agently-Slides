@@ -224,6 +224,15 @@ const aiApplied = new Set<string>(); // slide ids AI has already applied a patch
 const aiSent = new Set<string>(); // slide ids sent to Claude, waiting for a patch back (badge 已发送, pulsing)
 const aiBefore: Record<string, string> = {}; // pre-AI html per slide id, so a change can be reverted
 const proposed = new Set<string>(); // slide ids in a pending preview proposal (改前先问我), awaiting 保留/还原
+// ---- image tray: stage images, then hand the whole batch to the AI to lay out ----
+// AI-first: the user doesn't drop each image onto a page by hand. They collect images
+// in this tray (with an optional per-image note), then send ONE request. The AI decides
+// which page each image goes on and how to lay it out, returning <img data-img-id="…">
+// placeholders; Studio backfills the real base64 by id (so the request stays token-light,
+// and the bridge writes the pixels to disk so the AI can actually *see* each image).
+interface TrayImage { id: string; name: string; dataUrl: string; w: number; h: number; note: string; placed: boolean; slideId: string }
+const trayImages: TrayImage[] = []; // session-scoped (never persisted to the localStorage draft — base64 is huge)
+let traySeq = 0;
 // the deck's non-slide skeleton, kept verbatim so export re-emits a clean contract deck
 const H = {
   head: '', htmlAttrs: 'lang="zh"', bodyClass: '', prelude: '', trailing: '',
@@ -591,11 +600,12 @@ function loadHtmlDeck(name: string, html: string): void {
   mode = 'html'; cur = 0; selBid = null; htmlSelEl = null;
   $('#deckname').textContent = fileBase;
   Object.keys(aiInstructions).forEach((k) => delete aiInstructions[k]); aiApplied.clear(); aiSent.clear(); Object.keys(aiBefore).forEach((k) => delete aiBefore[k]); proposed.clear(); aiCurId = ''; aiDeckInstruction = ''; usedFontIds.clear();
+  trayImages.length = 0; Object.keys(genQueue).forEach((k) => delete genQueue[k]); // a new deck → drop staged images + photo-gen marks (they were deck-specific)
   undoStack = []; redoStack = []; lastPushTag = ''; dirty = false; updateUndoButtons(); updateDirtyBadge();
   const aiBox = $('#aiInstruction') as HTMLTextAreaElement | null; if (aiBox) aiBox.value = '';
   const aiDeckBox = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (aiDeckBox) aiDeckBox.value = '';
   const fxSel = $('#hFxMode') as HTMLSelectElement | null; if (fxSel) fxSel.value = fxMode; // reflect imported deck's play mode
-  renderLeft(); setHtmlMode(true); refreshHtmlInspector(); renderHtmlEdit();
+  renderLeft(); setHtmlMode(true); refreshHtmlInspector(); renderHtmlEdit(); renderTray(); renderTodo();
   toast('已导入 HTML deck：' + fileBase + '（' + htmlSlides.length + ' 页 · ' + new Set(htmlSlides.map((s) => s.seg)).size + ' 段）');
 }
 
@@ -1092,6 +1102,244 @@ function placeImage(dataUrl: string): void {
   toast('已插入图片，可拖动选框上方的 ✥ 移动、右下角调整大小');
 }
 
+// ---- image tray (stage → batch hand-off to AI) ----
+function extFromDataUrl(u: string): string {
+  const m = u.match(/^data:image\/([a-z0-9.+-]+);/i); const t = (m ? m[1] : 'png').toLowerCase();
+  return t === 'jpeg' ? 'jpg' : t === 'svg+xml' ? 'svg' : t;
+}
+// the page an image binds to = the page that's active when it's added (req: "在第7页加图→只排到第7页")
+function currentSlideId(): string { const i = currentHtmlSlideIndex(); return htmlSlides[i]?.id || htmlSlides[0]?.id || ''; }
+// load an image into the tray, measuring its natural pixel size (so the AI knows the aspect)
+function addTrayImage(name: string, dataUrl: string): void {
+  const sid = currentSlideId();
+  const im = new Image();
+  const finish = (w: number, h: number) => {
+    trayImages.push({ id: 'img-' + (++traySeq), name: name || ('image-' + traySeq), dataUrl, w, h, note: '', placed: false, slideId: sid });
+    renderTray();
+  };
+  im.onload = () => finish(im.naturalWidth || 0, im.naturalHeight || 0);
+  im.onerror = () => finish(0, 0); // still stage it (e.g. an SVG that didn't decode) — dims unknown
+  im.src = dataUrl;
+}
+function slideLabel(id: string): string { const i = htmlSlides.findIndex((s) => s.id === id); return i >= 0 ? `第 ${i + 1} 页 · ${htmlSlides[i].title}` : '（未指定页）'; }
+function trayFilesPicker(): void {
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+  inp.addEventListener('change', () => {
+    const fs = inp.files; if (!fs) return;
+    Array.prototype.forEach.call(fs, (f: File) => { const r = new FileReader(); r.onload = () => addTrayImage(f.name, String(r.result)); r.readAsDataURL(f); });
+  });
+  inp.click();
+}
+function removeTrayImage(id: string): void { const i = trayImages.findIndex((t) => t.id === id); if (i >= 0) { trayImages.splice(i, 1); renderTray(); } }
+function setTrayOver(on: boolean): void { const z = $('#trayDrop'); if (z) z.classList.toggle('over', on); }
+function renderTray(): void {
+  const grid = $('#trayGrid'); if (!grid) return;
+  grid.innerHTML = '';
+  const opts = htmlSlides.map((s, i) => `<option value="${s.id}">${esc(`第 ${i + 1} 页 · ${s.title}`)}</option>`).join('');
+  trayImages.forEach((t) => {
+    const cell = document.createElement('div'); cell.className = 'tray-cell' + (t.placed ? ' placed' : '');
+    const dims = t.w && t.h ? `${t.w}×${t.h}` : '尺寸未知';
+    cell.innerHTML = `<div class="tray-thumb"><img alt="" src="${t.dataUrl}">${t.placed ? '<span class="tray-badge">已放置</span>' : ''}<button class="tray-del" title="移出暂存盘">✕</button></div>`
+      + `<div class="tray-name" title="${esc(t.name)}">${esc(t.name)}</div><div class="tray-meta">${dims}</div>`
+      + `<label class="tray-page">排到：<select class="tray-page-sel">${opts}</select></label>`
+      + `<input class="tray-note" placeholder="说明（可留空）：怎么用 / 放页面哪个位置" value="${(t.note || '').replace(/"/g, '&quot;')}">`;
+    cell.querySelector('.tray-del')!.addEventListener('click', () => removeTrayImage(t.id));
+    const sel = cell.querySelector('.tray-page-sel') as HTMLSelectElement;
+    sel.value = t.slideId; sel.addEventListener('change', () => { t.slideId = sel.value; });
+    const note = cell.querySelector('.tray-note') as HTMLInputElement;
+    note.addEventListener('input', () => { t.note = note.value; });
+    grid.appendChild(cell);
+  });
+  const empty = $('#trayEmpty'); if (empty) (empty as HTMLElement).style.display = trayImages.length ? 'none' : '';
+  renderTodo();
+}
+function trayImagesForSlide(id: string): TrayImage[] { return trayImages.filter((t) => t.slideId === id); }
+// one image's manifest line: id · name · dims · note + a disk path (the bridge swaps
+// __TRAY_DIR__ for a real temp dir so the AI can Read the actual pixels).
+function aiImageLines(imgs: TrayImage[]): string {
+  return imgs.map((t) => {
+    const dims = t.w && t.h ? `${t.w}×${t.h}` : '尺寸未知';
+    return `  - id \`${t.id}\` · 文件 ${t.name} · 尺寸 ${dims}` + (t.note.trim() ? ` · 说明：${t.note.trim()}` : '')
+      + ` · 本地文件：__TRAY_DIR__/${t.id}.${extFromDataUrl(t.dataUrl)}（请用 Read 工具查看此图像）`;
+  }).join('\n');
+}
+// the shared rule for how placeholders work — included whenever a request carries images
+function aiImagePreamble(): string {
+  return `## 图片素材（按指定页插入）
+下面有页要插入用户暂存的图片。**每张图都已指定所属页**——请把它插入到所属页、并在该页内排好版式，**不要自行改放到别的页**。
+插入方式：在该页 \`<section data-id>\` 里用占位 \`<img data-img-id="img-N" alt="…" style="…">\`（**只写 data-img-id，不要写 src、不要塞 base64**）；Studio 会按 id 回填真实图片。大小/圆角/位置用 \`style\`/\`class\`（沿用令牌、勿写死颜色），一张图只插一次。
+`;
+}
+const trayPayload = (): { id: string; name: string; dataUrl: string }[] => trayImages.map((t) => ({ id: t.id, name: t.name, dataUrl: t.dataUrl }));
+// 配图清单：每页一个生成请求 + 类型（矢量 SVG = Claude 直出 / 照片 = codex 生成）+ 提示
+const genQueue: Record<string, { type: 'vector' | 'photo'; hint: string }> = {};
+let illType: 'vector' | 'photo' = 'vector'; // 本页「配图」当前选的类型
+// send a request (optionally with its staged images) over the bridge, or explain how to connect
+function sendOverBridge(r: { name: string; count: number; content: string; images?: { id: string; name: string; dataUrl: string }[] }, okMsg: string): boolean {
+  if (bridge.connected && bridge.ws && bridge.ws.readyState === WebSocket.OPEN) {
+    bridge.ws.send(JSON.stringify({ type: 'requests', request: { name: r.name, count: r.count, content: r.content, confirm: aiConfirm }, images: r.images }));
+    toast(aiConfirm ? `${okMsg}（改前先问我：会以提议预览返回）` : okMsg);
+    return true;
+  }
+  toast('需要先「连接 Claude Code」（桥接模式）；内容已保留，连接后再发送', true);
+  return false;
+}
+// the SVG rules (included once when any 矢量 item is queued)
+function aiIllustrateSpec(): string {
+  return `## 矢量配图规则（type=矢量 的页：你直接画内联 <svg>）
+画**一张贴合该页内容**的矢量示意图放进该页。务必：① 读懂主题，画相关概念图/示意/图标组合（「增长」→上扬线、「协作」→相连节点…），不要无关花纹或占位图；② 用设计令牌着色（\`var(--accent)\`/\`var(--accent-2)\`/\`var(--ink)\`），勿写死品牌色，浅/暗皮都好看；③ \`<svg viewBox>\` 纯路径/形状/渐变，**不引外部资源、不嵌位图**，保持单文件离线；④ 克制有构图，留白充足；装饰 svg 加 \`aria-hidden\`；⑤ 放对位置、不遮正文，必要时轻调布局。返回含该 \`<svg>\` 的整页 \`<section data-id>\`。
+`;
+}
+// the codex+library rules (included once when any 照片 item is queued)
+function aiImageGenSpec(): string {
+  return `## 照片配图规则（type=照片 的页：用本机 codex 生成 → 存图片库 → 内联）
+对每个 type=照片 的页：① 结合内容写英文图像提示词；② \`codex exec\` 生成 PNG；③ 存入图片库 \`~/.slidesmith/library/${fileBase}/\`（命名 \`<页id>__<slug>__<短码>.png\` + 更新 \`index.json\`）；④ base64 内联进该页 \`<img>\`。完整步骤见 \`AGENTS.md\` §4e。
+- codex 示例：\`codex exec --skip-git-repo-check -C <dir> -s workspace-write -c sandbox_workspace_write.network_access=true "Generate <prompt>. Save as out.png."\`（按张计 codex 额度）
+`;
+}
+// a per-page block: optional 修改要求 + optional 配图(矢量/照片) + optional 待插入图片 + current HTML
+function aiTaskBlock(s: HtmlSlide, i: number, o: { instr?: string; gen?: { type: 'vector' | 'photo'; hint: string }; trayImgs?: TrayImage[] }): string {
+  const trayImgs = o.trayImgs || [];
+  let b = `### 第 ${i + 1} 页 · ${s.title}  (data-id: \`${s.id}\`)\n`;
+  if (o.instr) b += `**修改要求：** ${o.instr}\n`;
+  if (o.gen?.type === 'vector') b += `**配图（矢量 SVG · 你直接画内联 <svg>）：** ${o.gen.hint || '按本页内容画一张贴合的示意图'}\n`;
+  if (o.gen?.type === 'photo') b += `**配图（照片级 · 用 codex 生成→存图片库→内联）：** ${o.gen.hint || '按本页内容生成一张合适的照片'}\n`;
+  if (trayImgs.length) b += `**在本页插入这些图片（占位 <img data-img-id>，勿写 src/base64）：**\n${aiImageLines(trayImgs)}\n`;
+  b += `\n当前 HTML（在此基础上改写/插入/配图）：\n${FENCE}html\n${s.html}\n${FENCE}\n`;
+  return b;
+}
+// THE unified request: deck-ask + every page that has a 改字 / 配图(矢量·照片) / 待插入图片.
+// One request, one send — Claude does text edits, draws SVGs, runs codex, places images.
+function buildAllRequest(): { name: string; count: number; content: string; images: { id: string; name: string; dataUrl: string }[] } | null {
+  if (mode !== 'html') return null;
+  harvestAll(); saveAiInstruction();
+  const hasDeck = !!aiDeckInstruction.trim();
+  const pages = htmlSlides.map((s, i) => ({ s, i })).filter(({ s }) =>
+    (aiInstructions[s.id] && !aiApplied.has(s.id)) || genQueue[s.id] || trayImagesForSlide(s.id).length);
+  if (!pages.length && !hasDeck) return null;
+  const anyVec = Object.values(genQueue).some((g) => g.type === 'vector');
+  const anyPhoto = Object.values(genQueue).some((g) => g.type === 'photo');
+  let body = aiRequestHeader('AI 待办 · 修改与配图一次办');
+  if (hasDeck) body += aiDeckBlock();
+  if (anyVec) body += aiIllustrateSpec();
+  if (anyPhoto) body += aiImageGenSpec();
+  if (trayImages.length) body += aiImagePreamble();
+  body += '\n## 需要处理的页\n' + pages.map(({ s, i }) => aiTaskBlock(s, i, {
+    instr: (aiInstructions[s.id] && !aiApplied.has(s.id)) ? aiInstructions[s.id] : '',
+    gen: genQueue[s.id],
+    trayImgs: trayImagesForSlide(s.id),
+  })).join('\n') + aiOutputSpec();
+  return { name: `${fileBase}.ai-tasks.md`, count: pages.length + (hasDeck ? 1 : 0), content: body, images: trayPayload() };
+}
+function submitAll(): void {
+  const r = buildAllRequest();
+  if (!r) { toast('待办清单是空的：写修改意见、加配图、或导入图片', true); return; }
+  const sentNow = htmlSlides.filter((s) => aiInstructions[s.id] && !aiApplied.has(s.id)).map((s) => s.id);
+  if (sendOverBridge(r, `已一键发送 ${r.count} 项给 Claude`)) {
+    sentNow.forEach((id) => aiSent.add(id)); // 改字 → 已发送（结果回灌后变 已改）
+    Object.keys(genQueue).forEach((k) => delete genQueue[k]); // 配图请求一次性，发出后清空（成品出现在页面 + 图片库）
+    if (aiDeckInstruction.trim()) { aiDeckInstruction = ''; const box = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (box) box.value = ''; }
+    refreshTasks();
+  }
+}
+// 本页「配图」：把当前页按所选类型 + 提示加入配图清单
+function addIllustToQueue(): void {
+  if (mode !== 'html') { toast('请先导入 HTML deck', true); return; }
+  const i = currentHtmlSlideIndex(); const s = htmlSlides[i]; if (!s) return;
+  const hint = (($('#illHint') as HTMLInputElement | null)?.value || '').trim();
+  genQueue[s.id] = { type: illType, hint };
+  const box = $('#illHint') as HTMLInputElement | null; if (box) box.value = '';
+  refreshTasks(); toast(`已加入配图清单：第 ${i + 1} 页 · ${illType === 'vector' ? '矢量 SVG' : '照片 codex'}`);
+}
+function genUnmark(id: string): void { delete genQueue[id]; refreshTasks(); }
+// the unified 待办清单 = deck ask + per-page 改字 / 配图(矢量·照片) / 导入图
+function todoItems(): { label: string; desc: string; page: number; cls: string; remove: () => void }[] {
+  const items: { label: string; desc: string; page: number; cls: string; remove: () => void }[] = [];
+  if (aiDeckInstruction.trim()) items.push({ label: '整份要求', desc: aiDeckInstruction.trim(), page: 0, cls: 'deck', remove: () => { aiDeckInstruction = ''; const b = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (b) b.value = ''; refreshTasks(); } });
+  htmlSlides.forEach((s, i) => {
+    if (aiInstructions[s.id] && !aiApplied.has(s.id)) items.push({ label: aiSent.has(s.id) ? '改字 · 已发送' : '改字', desc: aiInstructions[s.id], page: i + 1, cls: 'edit', remove: () => { delete aiInstructions[s.id]; aiSent.delete(s.id); if (aiCurId === s.id) { const b = $('#aiInstruction') as HTMLTextAreaElement | null; if (b) b.value = ''; } refreshTasks(); } });
+    const g = genQueue[s.id];
+    if (g) items.push({ label: g.type === 'vector' ? '配图 · 矢量' : '配图 · 照片', desc: g.hint || '（按内容自动）', page: i + 1, cls: g.type === 'vector' ? 'vec' : 'photo', remove: () => genUnmark(s.id) });
+    trayImagesForSlide(s.id).forEach((t) => items.push({ label: t.placed ? '导入图 · 已放置' : '导入图', desc: t.name, page: i + 1, cls: 'tray', remove: () => removeTrayImage(t.id) }));
+  });
+  return items;
+}
+function renderTodo(): void {
+  const box = $('#aiTodo'); if (!box) return; box.innerHTML = '';
+  const items = todoItems();
+  if (!items.length) box.innerHTML = '<div class="qempty">待办清单为空。写「本页修改意见」、在「本页 · 配图」加配图、或导入图片，都会出现在这里。</div>';
+  items.forEach((it) => {
+    const row = document.createElement('div'); row.className = 'todorow';
+    row.innerHTML = `<span class="todochip ${it.cls}">${it.label}</span>` + (it.page ? `<span class="todopg">第 ${it.page} 页</span>` : '')
+      + `<span class="tododesc" title="${esc(it.desc)}">${esc(it.desc)}</span><button class="tray-del" title="移除">✕</button>`;
+    row.querySelector('.tray-del')!.addEventListener('click', it.remove);
+    box.appendChild(row);
+  });
+  const photo = items.some((it) => it.cls === 'photo');
+  const btn = $('#aiSendAll') as HTMLButtonElement | null;
+  if (btn) { btn.disabled = items.length === 0; btn.textContent = items.length ? `一键发送给 AI · ${items.length} 项` : '一键发送给 AI'; }
+  const note = $('#aiSendNote'); if (note) (note as HTMLElement).style.display = photo ? '' : 'none';
+}
+
+// ---- 图片库 panel: browse / re-insert / delete the generated-image library ----
+interface LibEntry { file: string; slideId?: string; slideTitle?: string; prompt?: string; style?: string; createdAt?: string }
+function libBase(): string { return location.origin; }
+async function openLibrary(): Promise<void> {
+  if (!bridge.connected) { toast('图片库需要先连接 Claude（桥接模式）', true); return; }
+  const m = $('#libModal'); if (m) (m as HTMLElement).style.display = 'flex';
+  await loadLibrary();
+}
+function closeLibrary(): void { const m = $('#libModal'); if (m) (m as HTMLElement).style.display = 'none'; }
+async function loadLibrary(): Promise<void> {
+  const grid = $('#libGrid'); if (!grid) return;
+  grid.innerHTML = '<div class="qempty">加载中…</div>';
+  try {
+    const r = await fetch(`${libBase()}/api/library?deck=${encodeURIComponent(fileBase)}`);
+    if (!r.ok) { // older bridge without /api/library → tell the user to restart, don't crash on non-JSON
+      grid.innerHTML = '<div class="qempty">图片库接口未就绪。请重启桥接（新开一个 /slidesmith 会话或重新 slidesmith serve）后再打开。</div>'; return;
+    }
+    const j = await r.json(); const imgs: LibEntry[] = (j && j.images) || [];
+    const cnt = $('#libCount'); if (cnt) cnt.textContent = imgs.length ? `${imgs.length} 张` : '';
+    if (!imgs.length) { grid.innerHTML = '<div class="qempty">图片库还没有图片。在「本页 · 配图」加配图（矢量 / 照片）→「一键发送给 AI」生成后，成品会进这里。</div>'; return; }
+    grid.innerHTML = '';
+    imgs.forEach((im) => {
+      const cell = document.createElement('div'); cell.className = 'lib-cell';
+      const src = `${libBase()}/api/library/file?deck=${encodeURIComponent(fileBase)}&file=${encodeURIComponent(im.file)}`;
+      cell.innerHTML = `<div class="lib-thumb"><img loading="lazy" alt="" src="${src}"></div>`
+        + `<div class="lib-meta" title="${esc(im.prompt || im.file)}">${esc(im.prompt || im.file)}</div>`
+        + `<div class="lib-sub">${esc(im.slideId ? slideLabel(im.slideId) : '')}</div>`
+        + `<div class="oprow"><button class="lib-ins primary-mini">插入到该页</button><button class="lib-del">删除</button></div>`;
+      cell.querySelector('.lib-ins')!.addEventListener('click', () => libReinsert(im));
+      cell.querySelector('.lib-del')!.addEventListener('click', () => libDelete(im.file));
+      grid.appendChild(cell);
+    });
+  } catch (e) { grid.innerHTML = '<div class="qempty">加载失败：' + (e as Error).message + '</div>'; }
+}
+async function libReinsert(im: LibEntry): Promise<void> {
+  try {
+    const r = await fetch(`${libBase()}/api/library/file?deck=${encodeURIComponent(fileBase)}&file=${encodeURIComponent(im.file)}&as=dataurl`);
+    const j = await r.json(); if (!j || !j.dataUrl) throw new Error('no data');
+    if (im.slideId) { const idx = htmlSlides.findIndex((s) => s.id === im.slideId); if (idx >= 0) selectHtmlSlide(idx); }
+    placeImage(j.dataUrl); closeLibrary(); toast('已插入图片到当前页');
+  } catch (e) { toast('插入失败：' + (e as Error).message, true); }
+}
+async function libDelete(file: string): Promise<void> {
+  if (!confirm('确定从图片库删除这张图片？（不影响已插入到 deck 里的副本）')) return;
+  try { await fetch(`${libBase()}/api/library/remove?deck=${encodeURIComponent(fileBase)}&file=${encodeURIComponent(file)}`, { method: 'POST' }); await loadLibrary(); toast('已从图片库删除'); }
+  catch (e) { toast('删除失败：' + (e as Error).message, true); }
+}
+// after an AI patch lands, swap placeholder <img data-img-id> for the real staged image.
+// Runs on the parsed <section> (parent doc) before its outerHTML is harvested.
+function backfillTrayImages(root: Element): number {
+  let n = 0;
+  root.querySelectorAll('img[data-img-id]').forEach((el) => {
+    const im = el as HTMLImageElement; const tid = im.getAttribute('data-img-id');
+    const t = tid ? trayImages.find((x) => x.id === tid) : null;
+    if (t) { im.setAttribute('src', t.dataUrl); if (!im.getAttribute('alt')) im.setAttribute('alt', t.name); t.placed = true; n++; }
+  });
+  return n;
+}
+
 // ---- move / resize the selected element directly on the canvas (Keynote-style gizmo) ----
 // Move = inline transform translate (keeps the flow-layout slot, never breaks the contract);
 // resize = inline width/height (images keep aspect via height:auto). Both persist via harvest.
@@ -1412,31 +1660,6 @@ function onAiInput(): void { saveAiInstruction(); if (aiCurId) { aiApplied.delet
 function aiPendingCount(): number { return Object.keys(aiInstructions).filter((k) => aiInstructions[k] && !aiApplied.has(k) && !aiSent.has(k)).length; }
 // pages sent to Claude and still waiting for a patch back
 function aiWaitingCount(): number { return [...aiSent].filter((id) => !aiApplied.has(id) && aiInstructions[id]).length; }
-// total tasks to send = pending pages + the deck-level ask (if any)
-function aiTotalTasks(): number { return aiPendingCount() + (aiDeckInstruction.trim() ? 1 : 0); }
-function updateSendButton(): void {
-  const n = aiTotalTasks(); const btn = $('#aiExportAll') as HTMLButtonElement | null; if (!btn) return;
-  btn.textContent = bridge.connected ? `发送 ${n} 个任务给 Claude` : `导出 ${n} 个任务`;
-  btn.disabled = n === 0;
-}
-function refreshAiCount(): void {
-  const n = aiTotalTasks();
-  const h = $('#aiCountHint'); if (h) h.textContent = n ? `${n} 个任务待发送给 Claude。逐页填写修改说明，或对整份 deck 提出要求，一次性发送。` : '暂无待发送的任务。可选择某一页填写修改说明，或在下方对整份 deck 提出要求。';
-  updateSendButton();
-}
-// the queue: every page that has a comment, with its status, clickable to jump
-function renderAiQueue(): void {
-  const box = $('#aiQueue'); if (!box) return; box.innerHTML = '';
-  const rows = htmlSlides.map((s, i) => ({ s, i })).filter(({ s }) => aiInstructions[s.id]);
-  if (!rows.length) { box.innerHTML = '<div class="qempty">暂无任务。</div>'; return; }
-  rows.forEach(({ s, i }) => {
-    const st = aiApplied.has(s.id) ? { c: 'done', t: '已改' } : aiSent.has(s.id) ? { c: 'sent', t: '已发送' } : { c: 'todo', t: '待发送' };
-    const row = document.createElement('div'); row.className = 'qrow' + (i === cur ? ' active' : '');
-    row.innerHTML = `<span class="qnum">${i + 1}</span><span class="qtt">${esc(s.title)}</span><span class="qst ${st.c}">${st.t}</span>`;
-    row.addEventListener('click', () => selectHtmlSlide(i));
-    box.appendChild(row);
-  });
-}
 // the animated reminder banner: shows while tasks are out with Claude
 function refreshSentBanner(): void {
   const el = $('#aiSentBanner'); if (!el) return;
@@ -1444,8 +1667,8 @@ function refreshSentBanner(): void {
   if (n > 0) { el.style.display = ''; el.innerHTML = `<span class="aisent-dot">●</span><span>已发送 ${n} 个任务，Claude 正在修改，完成后将自动更新</span>`; }
   else el.style.display = 'none';
 }
-// one call to re-sync everything that depends on comments/status
-function refreshTasks(): void { renderLeft(); renderAiQueue(); refreshAiCount(); refreshSentBanner(); }
+// one call to re-sync everything that depends on comments/config/status
+function refreshTasks(): void { renderLeft(); renderTodo(); refreshSentBanner(); }
 function updateAiTarget(): void {
   if (mode !== 'html') return;
   saveAiInstruction(); // persist the page we're leaving
@@ -1457,7 +1680,7 @@ function updateAiTarget(): void {
   aiCurId = s ? s.id : '';
   const box = $('#aiInstruction') as HTMLTextAreaElement | null;
   if (box) box.value = aiCurId ? (aiInstructions[aiCurId] || '') : '';
-  renderAiQueue(); refreshAiCount();
+  renderTodo();
 }
 // the active slide as the DECK sees it (ignores any stale element selection), so
 // navigating with the deck's own nav reliably moves the comment box to that page.
@@ -1497,16 +1720,6 @@ function tokensForRequest(): string {
   return out.join('\n') || '（未解析到令牌）';
 }
 const FENCE = '```';
-function aiSlideBlock(s: HtmlSlide, i: number, instruction: string): string {
-  return `### 第 ${i + 1} 页 · ${s.title}  (data-id: \`${s.id}\`)
-**修改要求：** ${instruction || '（未填写——可不改这一页）'}
-
-当前 HTML（在此基础上改写）：
-${FENCE}html
-${s.html}
-${FENCE}
-`;
-}
 // This file IS the prompt handed to an AI. It frames the role/task and (critically)
 // tells the AI to PRODUCE a Slidesmith-importable patch file.
 function aiRequestHeader(scope: string): string {
@@ -1558,26 +1771,6 @@ ${FENCE}
    提示：用户也可在 Studio「动画效果 → 打开动画库」里**可视化挑选直接套用**，那条路不经过你。
 `;
 }
-// single page (the current target)
-function buildAiRequest(): { id: string; name: string; content: string } | null {
-  harvestAll(); saveAiInstruction();
-  const i = currentHtmlSlideIndex(); const s = htmlSlides[i]; if (!s) return null;
-  const content = aiRequestHeader('单页') + '## 需要修改的页\n' + aiSlideBlock(s, i, aiInstructions[s.id] || '') + aiOutputSpec();
-  return { id: s.id, name: `${fileBase}.${s.id}.ai-request.md`, content };
-}
-// all pending page-comments + any deck-level ask (one file, processed in one go)
-function buildAllAiRequests(): { count: number; name: string; content: string } | null {
-  harvestAll(); saveAiInstruction();
-  const blocks: string[] = [];
-  htmlSlides.forEach((s, i) => { if (aiInstructions[s.id] && !aiApplied.has(s.id)) blocks.push(aiSlideBlock(s, i, aiInstructions[s.id])); });
-  const hasDeck = !!aiDeckInstruction.trim();
-  if (!blocks.length && !hasDeck) return null;
-  const scope = hasDeck && blocks.length ? `整份 deck + ${blocks.length} 页` : hasDeck ? '整份 deck' : `共 ${blocks.length} 页`;
-  let body = aiRequestHeader(scope);
-  if (hasDeck) body += aiDeckBlock();
-  if (blocks.length) body += '## 需要修改的页（这些页有明确要求；上面的整份要求也请一并考虑）\n' + blocks.join('\n');
-  return { count: blocks.length + (hasDeck ? 1 : 0), name: `${fileBase}.all-requests.md`, content: body + aiOutputSpec() };
-}
 function applyAiPatch(text: string, preview = false): void {
   if (mode !== 'html') { toast('请先导入 HTML deck', true); return; }
   let html = text;
@@ -1588,14 +1781,15 @@ function applyAiPatch(text: string, preview = false): void {
   if (!secs.length) { toast('补丁里没找到 <section class="slide">', true); return; }
   pushHistory('ai'); // so the user can Ctrl/⌘+Z an AI change too
   harvestAll(); // preserve other slides' manual edits before re-render
-  let applied = 0, firstIdx = -1; const ids: string[] = [];
+  let applied = 0, firstIdx = -1, imgs = 0; const ids: string[] = [];
   secs.forEach((sec) => {
     let id = sec.getAttribute('data-id');
     let idx = id ? htmlSlides.findIndex((s) => s.id === id) : -1;
     if (idx < 0 && secs.length === 1) { idx = currentHtmlSlideIndex(); id = htmlSlides[idx]?.id || null; } // lenient fallback
-    if (idx >= 0 && htmlSlides[idx]) { if (id) { sec.setAttribute('data-id', id); if (aiBefore[id] === undefined) aiBefore[id] = htmlSlides[idx].html; aiApplied.add(id); aiSent.delete(id); ids.push(id); if (preview) proposed.add(id); } htmlSlides[idx].html = sec.outerHTML; applied++; if (firstIdx < 0) firstIdx = idx; }
+    if (idx >= 0 && htmlSlides[idx]) { if (id) { sec.setAttribute('data-id', id); if (aiBefore[id] === undefined) aiBefore[id] = htmlSlides[idx].html; aiApplied.add(id); aiSent.delete(id); ids.push(id); if (preview) proposed.add(id); } imgs += backfillTrayImages(sec); htmlSlides[idx].html = sec.outerHTML; applied++; if (firstIdx < 0) firstIdx = idx; }
   });
   if (!applied) { toast('补丁的 data-id 不匹配任何页', true); return; }
+  if (imgs) renderTray(); // mark just-placed tray images
   htmlGotoAfterRender = firstIdx; // stay on the patched slide after re-render
   renderHtmlEdit(); refreshTasks(); markDirty();
   if (preview) { refreshProposalBar(); toast('AI 提议修改 ' + applied + ' 页，请在顶部「保留 / 还原」'); }
@@ -1785,7 +1979,7 @@ function updateBridgeBadge(): void {
   }
   // when NOT connected, offer the one-click "连接 Claude" button (hidden once connected)
   const cb = $('#connectBtn'); if (cb) cb.style.display = bridge.connected ? 'none' : '';
-  updateSendButton();
+  renderTodo();
 }
 
 // ======================= one-click 连接 Claude (offline → connected hand-off) =======================
@@ -1832,25 +2026,6 @@ function openConnectModal(): void {
 function closeConnectModal(): void {
   const m = $('#connectModal'); if (m) m.style.display = 'none';
   if (cProbeTimer) { clearInterval(cProbeTimer); cProbeTimer = null; }
-}
-// the action behind the "submit" button: send over the bridge when connected,
-// else fall back to downloading the prompt file for the human to hand to an AI.
-function submitRequests(): void {
-  const r = buildAllAiRequests();
-  if (!r) { toast('暂无任务：请选择某一页填写修改说明，或在「对整份 deck 的要求」中填写', true); return; }
-  // the pages going out now become "已发送 · 等待" until a patch comes back
-  const sentNow = htmlSlides.filter((s) => aiInstructions[s.id] && !aiApplied.has(s.id)).map((s) => s.id);
-  if (bridge.connected && bridge.ws && bridge.ws.readyState === WebSocket.OPEN) {
-    bridge.ws.send(JSON.stringify({ type: 'requests', request: { ...r, confirm: aiConfirm } }));
-    toast(aiConfirm ? `已发送 ${r.count} 个任务（改前先问我：会以提议预览返回）` : `已发送 ${r.count} 个任务给 Claude`);
-  } else {
-    download(r.name, r.content, 'text/markdown');
-    toast(`已导出 ${r.count} 个任务：${r.name}`);
-  }
-  sentNow.forEach((id) => aiSent.add(id));
-  // the deck-level ask is one-shot — clear it after sending so it isn't re-sent
-  if (aiDeckInstruction.trim()) { aiDeckInstruction = ''; const box = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (box) box.value = ''; }
-  refreshTasks();
 }
 // push the current full deck html back to the bridge (keeps its copy authoritative)
 function syncExportToBridge(): void {
@@ -1959,6 +2134,95 @@ button.primary-mini:hover{background:#9a3623}
 .qrow .qst.todo{color:#993C1D;background:#FAEEDA}
 .qrow .qst.sent{color:#0c447c;background:#e6f1fb;animation:sm-blink 1.4s ease-in-out infinite}
 .qrow .qst.done{color:#0f6e56;background:#e1f5ee}
+.tray-drop{margin:6px 0 8px;border:2px dashed #d8d4cd;border-radius:10px;background:#faf8f4;text-align:center;padding:16px 10px;transition:border-color .12s,background .12s}
+.tray-drop.over{border-color:#B5402A;background:#fbeee9}
+.tray-drop-in{display:flex;flex-direction:column;align-items:center;gap:5px;color:#7a766e;font-size:12px}
+.tray-drop-in b{font-size:13px;color:#3a3a3e}
+.tray-empty{font-size:12px;color:#9a9a9e;padding:2px 2px 6px}
+.tray-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.tray-cell{border:1px solid #ececee;border-radius:9px;background:#fff;padding:6px;display:flex;flex-direction:column;gap:4px}
+.tray-cell.placed{border-color:#bfe3d5;background:#f4fbf8}
+.tray-thumb{position:relative;border-radius:6px;overflow:hidden;background:#f1efe9;height:74px;display:flex;align-items:center;justify-content:center}
+.tray-thumb img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.tray-badge{position:absolute;left:4px;top:4px;font-size:10px;color:#0f6e56;background:#e1f5ee;border-radius:999px;padding:1px 7px}
+.tray-del{position:absolute;right:3px;top:3px;width:20px;height:20px;line-height:18px;border-radius:999px;border:none;background:rgba(20,20,22,.55);color:#fff;font-size:11px;cursor:pointer;padding:0}
+.tray-del:hover{background:#B5402A}
+.tray-name{font-size:11px;color:#3a3a3e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tray-meta{font-size:10px;color:#9a9a9e;font-variant-numeric:tabular-nums}
+.tray-note{font-size:11px;border:1px solid #ececee;border-radius:5px;padding:4px 6px;font-family:inherit;color:#3a3a3e;width:100%;box-sizing:border-box}
+.tray-note:focus{outline:none;border-color:#e7b5aa}
+.tray-page{display:flex;align-items:center;gap:4px;font-size:10px;color:#9a9a9e}
+.tray-page-sel{flex:1;min-width:0;font-size:10px;border:1px solid #ececee;border-radius:5px;padding:3px 4px;font-family:inherit;color:#3a3a3e;background:#fff}
+.tray-page-sel:focus{outline:none;border-color:#e7b5aa}
+.oneclick{margin-top:18px;padding-top:14px;border-top:1px solid #ececee}
+button.primary-mini.big{width:100%;padding:11px 10px;font-size:14px;font-weight:600}
+.genlist{display:flex;flex-direction:column;gap:6px;margin:6px 0 8px}
+.genrow{border:1px solid #ececee;border-radius:8px;background:#fff;padding:7px 8px;display:flex;flex-direction:column;gap:5px}
+.genrow-h{display:flex;align-items:center;gap:7px}
+.genrow-h .qtt{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#3a3a3e}
+.gen-hint{font-size:11px;border:1px solid #ececee;border-radius:5px;padding:4px 6px;font-family:inherit;color:#3a3a3e;width:100%;box-sizing:border-box}
+.gen-hint:focus{outline:none;border-color:#e7b5aa}
+.genlist .qempty{font-size:12px;color:#9a9a9e;padding:4px 2px}
+body.dark .genrow{background:#1b1e25;border-color:#2c323d}
+body.dark .genrow-h .qtt{color:#cfd2d8}
+body.dark .gen-hint{background:#12151b;border-color:#2c323d;color:#cfd2d8}
+.libmodal{position:fixed;inset:0;z-index:60;background:rgba(20,20,24,.55);display:none;align-items:center;justify-content:center}
+.libbox{width:min(900px,92vw);max-height:86vh;display:flex;flex-direction:column;background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden}
+.libhead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #ececee}
+.libhead .ctitle{font-size:15px;font-weight:600;color:#3a3a3e}
+.lib-count{font-size:12px;color:#9a9a9e;font-variant-numeric:tabular-nums}
+.libhint{font-size:12px;color:#9a9a9e;padding:8px 16px 0}
+.libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;padding:14px 16px;overflow:auto}
+.libgrid .qempty{grid-column:1/-1;font-size:13px;color:#9a9a9e;padding:30px 0;text-align:center}
+.lib-cell{border:1px solid #ececee;border-radius:9px;background:#fbfbfc;padding:8px;display:flex;flex-direction:column;gap:5px}
+.lib-thumb{height:120px;border-radius:6px;overflow:hidden;background:#f1efe9;display:flex;align-items:center;justify-content:center}
+.lib-thumb img{max-width:100%;max-height:100%;object-fit:contain}
+.lib-meta{font-size:11px;color:#3a3a3e;line-height:1.35;max-height:2.7em;overflow:hidden}
+.lib-sub{font-size:10px;color:#9a9a9e}
+.lib-cell .oprow{margin-top:auto}
+body.dark .libbox{background:#181a1f}
+body.dark .libhead{border-color:#2c323d}
+body.dark .libhead .ctitle{color:#e6e6e8}
+body.dark .lib-cell{background:#1b1e25;border-color:#2c323d}
+body.dark .lib-meta{color:#cfd2d8}
+body.dark .lib-thumb{background:#12151b}
+body.dark .tray-drop{background:#1c1f26;border-color:#333a46}
+body.dark .tray-drop.over{border-color:#e7714f;background:#2a1f1b}
+body.dark .tray-drop-in b{color:#e7e7ea}
+body.dark .tray-cell{background:#1b1e25;border-color:#2c323d}
+body.dark .tray-cell.placed{background:#16241f;border-color:#2f5a4a}
+body.dark .tray-thumb{background:#12151b}
+body.dark .tray-name{color:#cfd2d8}
+body.dark .tray-note{background:#12151b;border-color:#2c323d;color:#cfd2d8}
+body.dark .tray-page-sel{background:#12151b;border-color:#2c323d;color:#cfd2d8}
+body.dark .oneclick{border-color:#2c323d}
+.illbox{border:0.5px solid #ececee;border-radius:9px;background:#faf8f4;padding:9px 10px;margin:6px 0 8px}
+.illrow{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.illrow:last-child{margin-bottom:0}
+.illlabel{font-size:12px;color:#6a6a6e;white-space:nowrap}
+.illrow #illHint{flex:1}
+.seg{display:flex;border:1px solid #d8d4cd;border-radius:7px;overflow:hidden}
+.seg .segbtn{border:0;background:transparent;font-family:inherit;font-size:12px;padding:6px 10px;cursor:pointer;color:#6a6a6e}
+.seg .segbtn.on{background:#B5402A;color:#fff}
+#illHintTip{margin-top:2px}
+.aitodo{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;max-height:240px;overflow:auto}
+.aitodo .qempty{font-size:12px;color:#9a9a9e;padding:8px 2px;line-height:1.5}
+.todorow{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:7px;border:1px solid #ececee;background:#fff}
+.todochip{flex:0 0 auto;font-size:10px;border-radius:999px;padding:2px 8px;font-weight:600}
+.todochip.deck{color:#0c447c;background:#e6f1fb}
+.todochip.edit{color:#5f5e5a;background:#f1efe8}
+.todochip.vec{color:#0f6e56;background:#e1f5ee}
+.todochip.photo{color:#854f0b;background:#faeeda}
+.todochip.tray{color:#993c1d;background:#faece7}
+.todopg{flex:0 0 auto;font-size:10px;color:#B5402A;font-weight:700;font-variant-numeric:tabular-nums}
+.tododesc{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#3a3a3e}
+body.dark .illbox{background:#1c1f26;border-color:#2c323d}
+body.dark .illlabel{color:#9a9a9e}
+body.dark .seg{border-color:#333a46}
+body.dark .seg .segbtn{color:#9a9a9e}
+body.dark .seg .segbtn.on{background:#B5402A;color:#fff}
+body.dark .todorow{background:#1b1e25;border-color:#2c323d}
+body.dark .tododesc{color:#cfd2d8}
 .auditout{margin-top:8px;display:flex;flex-direction:column;gap:5px}
 .audit-sum{font-size:12px;color:#3a3a3e;font-weight:600}
 .audit-row{font-size:12px;line-height:1.4;padding:6px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent}
@@ -2199,18 +2463,37 @@ function buildUI(): void {
         <h3>交给 AI 修改</h3>
         <label class="confirm-tog" title="开启后，AI 的改动会先以「提议」呈现，你点保留才算数；关闭则改完直接生效"><input id="aiConfirmTog" type="checkbox"> 改前先问我（默认自动应用）</label>
         <div class="proposal-bar" id="aiProposalBar" style="display:none"><span class="proposal-dot">●</span><span id="aiProposalTxt">AI 提议了改动，请确认</span><span class="grow"></span><button id="aiKeep" class="mini">保留</button><button id="aiRevertAll" class="mini revert">还原</button></div>
-        <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">AI 已修改</span><button id="aiRevertOne" class="mini revert" style="display:none">还原本页</button></div>
-        <div class="field"><textarea id="aiInstruction" rows="4" placeholder="描述这一页希望 AI 如何修改。例如：将三个要点改为左右两栏对照，右栏突出一个关键数字。内容会自动保存，可切换到其他页继续编写。"></textarea></div>
-        <div class="oprow"><button id="aiClearOne">清空本页</button></div>
-        <div class="hint" id="aiCountHint">暂无待发送的任务。可选择某一页填写修改说明，或在下方对整份 deck 提出要求。</div>
-        <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
 
         <h4 class="sub">对整份 deck 的要求</h4>
-        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的整体要求，AI 会自动挑选相关页修改。例如：统一所有页的标题字号；精简内容过多的页面。"></textarea></div>
+        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的整体要求，AI 会挑选相关页修改。例如：统一所有页的标题字号；精简内容过多的页面。"></textarea></div>
 
-        <h4 class="sub">全部任务</h4>
-        <div id="aiQueue" class="aiqueue"></div>
-        <div class="oprow"><button id="aiExportAll" class="primary-mini" disabled>导出 0 个任务</button></div>
+        <h4 class="sub">本页 · 修改 / 配图</h4>
+        <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">AI 已修改</span><button id="aiRevertOne" class="mini revert" style="display:none">还原本页</button></div>
+        <div class="field"><textarea id="aiInstruction" rows="3" placeholder="这一页想怎么改？例如：三个要点改为左右两栏对照，右栏突出一个数字。自动保存，可切换页继续写。"></textarea></div>
+        <div class="oprow"><button id="aiClearOne">清空本页修改</button></div>
+        <div class="illbox">
+          <div class="illrow"><span class="illlabel">为本页配图</span>
+            <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量 SVG · 免费</button><button type="button" class="segbtn" data-illtype="photo">照片 · codex</button></div>
+          </div>
+          <div class="illrow"><input id="illHint" placeholder="想要什么画面（可留空）"><button id="illAdd" class="primary-mini">＋ 加入配图清单</button></div>
+          <div class="hint" id="illHintTip">矢量 = Claude 直接画 SVG（免费、可编辑）；照片 = 本机 codex 生成（按张计额度），都会进图片库。</div>
+        </div>
+        <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
+
+        <h4 class="sub">图片素材 · 导入自己的图（AI 来排版）</h4>
+        <div class="hint">拖入或导入你已有的图片，先暂存到对应页；它们会作为「导入图」进入下面的待办，由 AI 排好版。</div>
+        <div id="trayDrop" class="tray-drop"><div class="tray-drop-in"><b>拖拽图片到此处</b><span>或</span><button id="trayPick" class="mini">导入图片</button></div></div>
+        <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
+        <div id="trayGrid" class="tray-grid"></div>
+
+        <h3>AI 待办清单</h3>
+        <div id="aiTodo" class="aitodo"></div>
+        <div class="hint" id="aiSendNote" style="display:none">含「照片」项：发送后我会用 codex 生成（按张消耗额度）。</div>
+        <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
+
+        <h4 class="sub">图片库</h4>
+        <div class="oprow"><button id="genOpenLib">打开图片库</button></div>
+        <div class="hint">AI 生成过的矢量 / 照片都存在这里（~/.slidesmith/library/），可重新插入到对应页或删除。</div>
 
         <h3>视觉自检</h3>
         <div class="oprow"><button id="auditRun">检查溢出 / 对比度 / 坏图</button></div>
@@ -2266,6 +2549,13 @@ function buildUI(): void {
     <div class="ctitle">连接 Claude Code</div>
     <div id="cstate"></div>
     <button class="mini cclose" id="cclose">关闭</button>
+  </div>
+</div>
+<div class="libmodal" id="libModal" style="display:none">
+  <div class="libbox">
+    <div class="libhead"><span class="ctitle">图片库</span><span id="libCount" class="lib-count"></span><span class="grow"></span><button id="libReload" class="mini">刷新</button><button id="libClose" class="mini cclose">关闭</button></div>
+    <div class="libhint">本 deck 用 codex 生成过的图片（存于 ~/.slidesmith/library/）。可重新插入到对应页，或删除以便管理。</div>
+    <div id="libGrid" class="libgrid"></div>
   </div>
 </div>`;
 
@@ -2397,8 +2687,27 @@ function buildUI(): void {
 
   // --- Submit-to-AI: per-page memory + batch send (apply comes back over the bridge) ---
   ($('#aiInstruction') as HTMLTextAreaElement).addEventListener('input', onAiInput);
-  ($('#aiDeckInstruction') as HTMLTextAreaElement).addEventListener('input', (e) => { aiDeckInstruction = (e.target as HTMLTextAreaElement).value; refreshAiCount(); });
-  $('#aiExportAll').addEventListener('click', submitRequests);
+  ($('#aiDeckInstruction') as HTMLTextAreaElement).addEventListener('input', (e) => { aiDeckInstruction = (e.target as HTMLTextAreaElement).value; renderTodo(); });
+  // unified send: one button does text edits + 配图(矢量/照片) + 导入图 for the whole deck
+  $('#aiSendAll').addEventListener('click', submitAll);
+  // 本页 配图: pick type (segmented) + add to the 配图清单
+  document.querySelectorAll('#illSeg .segbtn').forEach((b) => b.addEventListener('click', () => {
+    illType = ((b as HTMLElement).dataset.illtype as 'vector' | 'photo') || 'vector';
+    document.querySelectorAll('#illSeg .segbtn').forEach((x) => x.classList.toggle('on', x === b));
+  }));
+  $('#illAdd').addEventListener('click', addIllustToQueue);
+  // image tray: import + the dedicated drop-zone highlight (drop handled at window level)
+  $('#trayPick').addEventListener('click', trayFilesPicker);
+  $('#genOpenLib').addEventListener('click', openLibrary);
+  $('#libClose').addEventListener('click', closeLibrary);
+  $('#libReload').addEventListener('click', loadLibrary);
+  $('#libModal').addEventListener('click', (e) => { if (e.target === $('#libModal')) closeLibrary(); });
+  renderTodo();
+  { const z = $('#trayDrop'); if (z) {
+    z.addEventListener('dragenter', (e) => { e.preventDefault(); setTrayOver(true); });
+    z.addEventListener('dragover', (e) => { e.preventDefault(); setTrayOver(true); });
+    z.addEventListener('dragleave', () => setTrayOver(false));
+  } }
   $('#aiClearOne').addEventListener('click', () => {
     const box = $('#aiInstruction') as HTMLTextAreaElement; box.value = ''; onAiInput();
   });
@@ -2477,8 +2786,17 @@ function buildUI(): void {
   window.addEventListener('dragover', (e) => e.preventDefault());
   window.addEventListener('dragleave', () => { if (--dragN <= 0) document.body.classList.remove('dragging'); });
   window.addEventListener('drop', async (e) => {
-    e.preventDefault(); dragN = 0; document.body.classList.remove('dragging');
+    e.preventDefault(); dragN = 0; document.body.classList.remove('dragging'); setTrayOver(false);
     const dt = e.dataTransfer; if (!dt) return;
+    // image files → stage them in the tray (AI-first: don't import an image as a deck).
+    // Needs an open HTML deck to place into; otherwise tell the user to import one first.
+    const imgFiles = Array.prototype.filter.call(dt.files || [], (f: File) => f.type.indexOf('image/') === 0) as File[];
+    if (imgFiles.length && (!dt.files || imgFiles.length === dt.files.length)) {
+      if (mode !== 'html') { toast('请先导入 HTML deck，再拖入图片素材', true); return; }
+      imgFiles.forEach((f) => { const r = new FileReader(); r.onload = () => addTrayImage(f.name, String(r.result)); r.readAsDataURL(f); });
+      toast(`已暂存 ${imgFiles.length} 张图片到「图片素材」，备齐后交给 AI 排版`);
+      return;
+    }
     // prefer a file-system handle (drag-drop on Chromium) so 保存 HTML can overwrite in place
     const item = dt.items && dt.items[0];
     const getH = item && (item as unknown as { getAsFileSystemHandle?: () => Promise<FsFileHandle | null> }).getAsFileSystemHandle;
@@ -2503,15 +2821,24 @@ function buildUI(): void {
   (window as unknown as { __SM_BUILD_EXPORT__: () => Promise<string> }).__SM_BUILD_EXPORT__ = buildExportHtml;
   (window as unknown as { __SM_SAVE_HTML__: typeof saveHtmlInPlace }).__SM_SAVE_HTML__ = saveHtmlInPlace;
   (window as unknown as { __SM_HAS_FILE_HANDLE__: () => boolean }).__SM_HAS_FILE_HANDLE__ = () => !!fileHandle;
-  (window as unknown as { __SM_AI_REQUEST__: typeof buildAiRequest }).__SM_AI_REQUEST__ = buildAiRequest;
-  (window as unknown as { __SM_AI_REQUEST_ALL__: typeof buildAllAiRequests }).__SM_AI_REQUEST_ALL__ = buildAllAiRequests;
   (window as unknown as { __SM_SET_INSTR__: (id: string, t: string) => void }).__SM_SET_INSTR__ = (id, t) => { if (t) { aiInstructions[id] = t; aiApplied.delete(id); } else { delete aiInstructions[id]; } if (mode === 'html') refreshTasks(); };
   (window as unknown as { __SM_APPLY_PATCH__: typeof applyAiPatch }).__SM_APPLY_PATCH__ = applyAiPatch;
+  // image-tray hooks (for automation / headless verification)
+  (window as unknown as { __SM_TRAY_ADD__: typeof addTrayImage }).__SM_TRAY_ADD__ = addTrayImage;
+  (window as unknown as { __SM_TRAY_SET_NOTE__: (id: string, n: string) => void }).__SM_TRAY_SET_NOTE__ = (id, n) => { const t = trayImages.find((x) => x.id === id); if (t) { t.note = n; renderTray(); } };
+  (window as unknown as { __SM_TRAY_SET_PAGE__: (id: string, slideId: string) => void }).__SM_TRAY_SET_PAGE__ = (id, slideId) => { const t = trayImages.find((x) => x.id === id); if (t) { t.slideId = slideId; renderTray(); } };
+  (window as unknown as { __SM_TRAY_LIST__: () => { id: string; name: string; note: string; placed: boolean; slideId: string }[] }).__SM_TRAY_LIST__ = () => trayImages.map((t) => ({ id: t.id, name: t.name, note: t.note, placed: t.placed, slideId: t.slideId }));
+  // unified 配图清单 + 待办 + send hooks
+  (window as unknown as { __SM_GEN_MARK__: (id: string, type?: 'vector' | 'photo', hint?: string) => void }).__SM_GEN_MARK__ = (id, type, hint) => { genQueue[id] = { type: type || 'vector', hint: hint || '' }; if (mode === 'html') refreshTasks(); };
+  (window as unknown as { __SM_GEN_LIST__: () => { id: string; type: string; hint: string }[] }).__SM_GEN_LIST__ = () => Object.keys(genQueue).map((id) => ({ id, type: genQueue[id].type, hint: genQueue[id].hint }));
+  (window as unknown as { __SM_TODO__: () => { label: string; page: number; cls: string }[] }).__SM_TODO__ = () => todoItems().map((it) => ({ label: it.label, page: it.page, cls: it.cls }));
+  (window as unknown as { __SM_ALL_REQUEST__: typeof buildAllRequest }).__SM_ALL_REQUEST__ = buildAllRequest;
+  (window as unknown as { __SM_SEND_ALL__: () => void }).__SM_SEND_ALL__ = submitAll;
+  (window as unknown as { __SM_OPEN_LIBRARY__: () => Promise<void> }).__SM_OPEN_LIBRARY__ = openLibrary;
   (window as unknown as { __SM_AUDIT__: typeof auditImportedDeck }).__SM_AUDIT__ = auditImportedDeck;
   (window as unknown as { __SM_PDF_HTML__: typeof pdfPrintHtml }).__SM_PDF_HTML__ = pdfPrintHtml;
   // bridge hooks (for automation / headless verification)
   (window as unknown as { __SM_BRIDGE__: () => { connected: boolean; owner: { label: string; since: number } | null; port: number } }).__SM_BRIDGE__ = () => ({ connected: bridge.connected, owner: bridge.owner, port: bridge.port });
-  (window as unknown as { __SM_SEND_ALL__: () => void }).__SM_SEND_ALL__ = submitRequests;
   // permission mode + proposal state (for verification)
   (window as unknown as { __SM_SET_CONFIRM__: (v: boolean) => void }).__SM_SET_CONFIRM__ = (v) => { aiConfirm = v; const t = $('#aiConfirmTog') as HTMLInputElement | null; if (t) t.checked = v; };
   (window as unknown as { __SM_PROPOSAL__: () => { count: number; visible: boolean } }).__SM_PROPOSAL__ = () => ({ count: proposed.size, visible: ($('#aiProposalBar')?.style.display !== 'none') });

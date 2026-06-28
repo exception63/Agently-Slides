@@ -41,7 +41,7 @@ try {
   ck('① box empty on a page with no comment', (await val(p, '#aiInstruction')) === '');
   await p.fill('#aiInstruction', '把三个要点改成左右两栏对照，右栏给一个关键数字。'); await p.waitForTimeout(120);
   ck('① page-3 row gets a pending badge', await p.$eval('.srow:nth-child(3)', (r) => !!r.querySelector('.sbadge.todo')));
-  ck('① task queue lists it', (await p.$$('#aiQueue .qrow')).length === 1);
+  ck('① task queue lists it', (await p.$$('#aiTodo .todorow')).length === 1);
   await p.$$eval('.srow', (r) => r[5].click()); await p.waitForTimeout(150);
   ck('① switching pages clears the box', (await val(p, '#aiInstruction')) === '');
   await p.$$eval('.srow', (r) => r[2].click()); await p.waitForTimeout(150);
@@ -53,10 +53,10 @@ try {
 
   // ── ② deck-level comment ──
   await p.fill('#aiDeckInstruction', '统一所有页的标题字号，给内容过多的页瘦身。'); await p.waitForTimeout(120);
-  const req = await p.evaluate(() => window.__SM_AI_REQUEST_ALL__());
+  const req = await p.evaluate(() => window.__SM_ALL_REQUEST__());
   ck('② deck task carries a deck-level block', !!req && req.content.includes('对整份 deck 的要求'));
   ck('② request includes a full structure overview', !!req && (req.content.match(/- 第 \d+ 页 · `/g) || []).length >= 30);
-  ck('② send button counts page + deck tasks', await p.$eval('#aiExportAll', (b) => !b.disabled && /2 个任务/.test(b.textContent)), await p.$eval('#aiExportAll', (b) => b.textContent));
+  ck('② send button counts page + deck tasks', await p.$eval('#aiSendAll', (b) => !b.disabled && /2 项/.test(b.textContent)), await p.$eval('#aiSendAll', (b) => b.textContent));
   await p.screenshot({ path: resolve(shotDir, '01-comments-and-queue.png') });
 
   // ── ③ review / revert ──

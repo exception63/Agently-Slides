@@ -1,32 +1,30 @@
-# 下个会话交接 · 图片导入功能（AI-first 暂存盘 → 批量交给 AI 排版）
+# 下个会话交接 · 候选方向（图片排版已完成）
 
-> 写于 2026-06-27 会话末（用户要清空上下文）。`/clear` 后：先读 `_memory/active.md` 顶部各 ✅ 块 + 🎯，再读本文件。
+> 更新于 2026-06-28 会话末。`/clear` 后：先读 `_memory/active.md` 顶部各 ✅ 块 + 🎯，再读本文件。
 
-## 🎯 北极星（用户 2026-06-27 定）
-AI-first 软件**不逐张手加图**。要做一个**图片暂存 → 批量交给 AI 排版**的流程：
-1. **导入**：用户把图片**拖拽到指定区域**，或**手动导入**（选文件）。
-2. **暂存**：图片先**记录在工具栏 / 暂存盘（tray）**，**不立即插入某页**。可跨多次、多页攒一批。
-3. **批量交付**：图片备齐后，**发一个请求给 AI** → AI 把这些图片**插入到对应 slides 并做好排版**（走握手自动环 `slidesmith_apply_patch` 回写）。
-4. **保留手动**：现有的「html 模式插入图片」（选文件/粘贴 → base64 内联到选中处）**保留**——AI 做完后人还要微调（原话："原始的那个增加图片功能还是要保留，因为 AI 做完之后人还是要修改"）。
-5. **核心 = 给 AI 一个图片放置接口**：请求里带**暂存图片清单 + 元数据**，让 AI 高效决定每张放哪页、怎么排版。
+## ✅ 本会话（2026-06-28）已完成 · 未提交
+**图片暂存盘 → 交给 AI 排版**（NEXT-SESSION 上次指定的图片导入功能，已实现）。
+- 拖拽/导入图片 → 暂存 tray（每图可加说明）→「交给 AI 排版」→ AI 决定放哪页/怎么排 → Studio 回填真图。
+- 方案①（省 token）：请求只带清单+元数据+磁盘路径，**无 base64**；AI 用 `<img data-img-id>` 占位，Studio 按 id 回填。
+- 增强：桥接把暂存图写到临时盘，请求带真实路径 → **AI 能用 `Read` 真正看到图片像素**再排版。
+- 现有「选中处手动插图」保留不动。验证 `verify-image-tray.mjs` 17/17，回归全绿。
+- 详见 `active.md` 顶部 ✅ 块 + `AGENTS.md` §4c。**记得 commit + push。**
 
-## 现状（起点）
-- **现有图片插入**：roadmap「③ HTML 模式插入图片」已做（`packages/studio/src/main.ts`，选文件/粘贴 → base64 内联，入 undo）。grep `image`/`base64`/粘贴 找入口；保留它，tray 是其上的新层。
-- **AI 请求构造**：`buildAllAiRequests`/`aiSlideBlock`/`aiRequestHeader`/`aiOutputSpec`（main.ts ~1488–1560）——新「图片放置请求」可仿此或扩展它带图片清单。
-- **桥接/握手环**：已成（`slidesmith_open`/`connect`/`wait`/`apply_patch`，见 active.md ✅ 块）。图片请求走同一条环：用户在 tray 攒图 → 点「交给 AI 排版」→ Studio 构造带图请求 → 后台 `curl /api/wait` 唤醒 AI → AI 回 `<section data-id>` 含 `<img>`。
-- **tray 是全新的**：要新建 暂存盘 UI（工具栏一块区 + 缩略图列表 + 拖拽区 + 每图可加说明 + 删除）+ 状态（暂存图片数组：id/base64/文件名/尺寸/说明）+「全部交给 AI 排版」按钮。
+## 🎯 闭环三段现状（v2 一站式 AI PPT 制作/修改/呈现）
+- **制作** = 已补「选皮流程」（`editorial-slides` 技能 Step 0：推荐→看总览图→真题试皮→定）。
+- **修改** = 已打通：握手自动协作环（后台 `curl /api/wait` 唤醒，零手动拉）+ 动画快速设置接全库 + **图片排版**（本次）。
+- **呈现（演讲者视图）** = ⚠️ 仍只在旧 IR 模式（`renderPresenterHtml`），**HTML-first 主流程缺**双屏/备注/计时（需从契约 deck 抽 notes，较 fuzzy）。
+- **讲稿同步** = 用户说「最后再接」。
 
-## 设计要点（下个会话先想清再做）
-- **token 体积（关键权衡）**：base64 图多了请求会很大。两条路——① **AI 只决策**：请求给 AI 的是「图片清单 + 缩略说明 + deck 结构总览」，AI 返回「哪张图（id）放哪页、第几个位置、怎么排版」，**Studio 再把真 base64 填进 `<img>`**；② 直接把 base64 塞给 AI 让它写 `<img src=base64>`。**倾向 ①**（省 token、AI 专注决策、Studio 落图），需要 AI 输出里用图片 id 占位 + Studio 回填。
-- **tray UI 放哪**：顶部工具栏 / 左栏底部 / 新面板？拖拽区怎么标（高亮 drop zone）。
-- **AI 接口格式**：请求（图片 id/名/尺寸/用户说明 + 每页结构）+ 输出（每页 `<section data-id>` 里用 `<img data-img-id="…">` 占位，Studio 按 id 回填真 src）。
-- **保留手动**：tray 之外，选中元素仍能直接插图（不动现有路径）。
+## 下个会话候选（用户挑一个）
+1. **呈现态演讲者视图接 HTML-first 主流程**：双屏（当前页+下一页+备注+计时器），从契约 deck 的 notes 抽。闭环最后一段最缺。
+2. **制作→修改的交接顺滑**：AI 用 `editorial-slides` 生成初版后，一键进 Studio 开始改（现在要手动 `/slidesmith <deck>`）。
+3. **图片排版 v2 打磨**（若本次想继续深做）：① 真人 dogfood 跑一遍图片流；② 临时盘 close 时清理；③ tray 支持调整顺序/批量说明；④ 大图自动降采样省 AI vision token；⑤ 离线模式也能用（导出图片包）。
+4. **图表**（Chart.js 内联/预渲染，破单文件要权衡）。
 
-## 本会话（2026-06-27）已完成 · 已 commit+push 到 origin/main
-- **握手式自动协作环**（B 会话自动轮询，零手动拉）+ 真人 dogfood 跑通。
-- **动画快速设置接全库 + 强调 + round-trip** + AI 标签规范（优先标准标签、保留灵活）+ 发送按钮配色修复。
-- **关键经验**：后台环正解 = **后台 Bash `curl /api/wait`**（`run_in_background`，命中即退→自动唤醒），**不是前台 `slidesmith_wait`**（会卡死对话，用户痛点）。
-详见 `active.md` 顶部两个 ✅ 块。
+## 真跑握手环（怎么和用户协作改 deck）
+`/slidesmith <deck>` → `slidesmith_open` 握手 → **后台** Bash `curl "<url>api/wait?timeout=280000"`（`run_in_background`，命中即退→harness 自动唤醒我，对话不卡死）→ 用户在 Studio 发 → 我改 → `slidesmith_apply_patch`（`confirm` 则 `preview`）→ 回 wait。
+**注意**：别用前台 `slidesmith_wait`（会阻塞卡死对话，用户痛点）。
 
 ## 开工先读
-`_memory/active.md`（顶部 ✅ + 🎯）· 本文件 · `packages/studio/src/main.ts`（现有插图入口 + `buildAllAiRequests`）· `AGENTS.md` §4b（桥接/请求接口）· `_memory/optimization-roadmap.md`（③ 插图那条）。**真跑环**：`/slidesmith <deck>` → `slidesmith_open` 握手 → 后台 `curl "<url>api/wait?timeout=280000"` → 用户 Studio 发 → 改 → `slidesmith_apply_patch`。
+`_memory/active.md`（顶部 ✅ + 🎯）· 本文件 · `packages/studio/src/main.ts` · `packages/bridge/src/bridge.ts` · `AGENTS.md`（§4b 桥接/§4c 图片请求）· `_memory/optimization-roadmap.md`。

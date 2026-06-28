@@ -65,7 +65,7 @@ try {
     const animVisible = !document.querySelector('.hpane[data-hpane="anim"]').hidden && document.querySelector('.hpane[data-hpane="fmt"]').hidden;
     click('.htab[data-htab="ai"]');
     const aiVisible = !document.querySelector('.hpane[data-hpane="ai"]').hidden;
-    const aiHasSend = !!document.getElementById('aiExportAll') && !!document.getElementById('auditRun');
+    const aiHasSend = !!document.getElementById('aiSendAll') && !!document.getElementById('auditRun');
     click('.htab[data-htab="fmt"]');
     const fmtVisible = !document.querySelector('.hpane[data-hpane="fmt"]').hidden;
     return { animVisible, aiVisible, aiHasSend, fmtVisible };

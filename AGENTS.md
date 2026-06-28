@@ -167,6 +167,47 @@ pages it clearly implies. Every page you patch flips to **✓ 已改** in the St
 human can **还原本页** (revert) if they dislike it — so make the change worth keeping, and
 don't re-touch a page they reverted unless they ask again.
 
+### 4c. The unified AI-tasks request (`.ai-tasks.md`)
+
+The Studio's **AI 修改** pane funnels everything into one to-do list and one send. A submitted
+request (name ends `.ai-tasks.md`) bundles, in one file: the **deck-level ask** (+ a structure
+overview), and a per-page block for every page that has a **改字** (comment), a **配图**
+(illustration the human queued), and/or **导入图** (their own staged images). Each page block
+spells out exactly what it wants — apply them together and return that page's `<section
+data-id>` once. The kinds of per-page directive:
+
+- **改字 (`**修改要求：**`)** — rewrite the page per the comment. Tokens only, keep the contract.
+- **配图 · 矢量 (`**配图（矢量 SVG…`)** — Claude has no image model, so *you draw an inline
+  `<svg>`* fitting the page: depict the actual topic (not generic blobs), color via tokens
+  (`var(--accent)` / `var(--accent-2)` / `var(--ink)`, never hard hex), self-contained vector
+  (no external refs / raster / fonts), restrained composition, placed without covering text.
+- **配图 · 照片 (`**配图（照片级…`)** — generate a *photo* with the local `codex` CLI (its
+  built-in imagegen; ChatGPT login, no API key). For each such page: write an English prompt
+  from the content, run codex, store the PNG in the image library, then base64-inline it:
+  ```
+  codex exec --skip-git-repo-check -C <scratchdir> -s workspace-write \
+    -c sandbox_workspace_write.network_access=true -c approval_policy='"never"' \
+    "Generate <prompt>. Save it as out.png in the current working directory."
+  ```
+  (codex needs network → the Bash call wrapping it needs the sandbox off; do NOT use codex's
+  own `--dangerously-bypass…`. It writes to `~/.codex/generated_images/…` — copy/resize out.)
+  Cost ≈ tens of thousands of tokens + ~1 min **per image** — tell the user if it's a big batch.
+- **导入图 (`**在本页插入这些图片…`)** — the human's own staged images. Each line gives an
+  `id`, dims, note, and a **real disk path** (the bridge wrote the pixels there) — `Read` it to
+  see the picture. Insert a placeholder `<img data-img-id="img-N" …>` (no `src`/base64); the
+  Studio backfills the real image by id. Place each on its listed page only.
+
+**The image library** — `~/.slidesmith/library/<deckBase>/` is the persistent, manageable store
+for *every* AI-generated image (vector `.svg` and photo `.png`). Naming `<slideId>__<slug>__
+<id8>.ext`; append to `<dir>/index.json` (`{ deck, updatedAt, images:[{ id, slideId, slideTitle,
+prompt, style, model, file, w, h, bytes, createdAt, usedInDeck }] }`). The Studio 图片库 panel
+reads it via the bridge's `/api/library*` endpoints (browse / re-insert / delete). Keep the
+deck self-contained (inline base64 into the slide) while the library keeps the original.
+
+Then `slidesmith_apply_patch` (`preview: true` if the request had `confirm: true`). Pages flip
+to ✓ 已改; placed 导入图 show 已放置; the human fine-tunes after. Honor the division of labor —
+the human does high-frequency fine edits (text, color, size, animation, move/delete) themselves.
+
 ## 5. Hand-off to the human
 
 Best path: call `slidesmith_open(deckPath)` — the Studio opens in their browser already
