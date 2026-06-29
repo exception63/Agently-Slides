@@ -21,11 +21,15 @@
 - **真 dogfood**：用户 JBR 论文《Virtual Journeys》→ 22 页 academic 学术 deck（含概念模型 + 5 张真数据图表 + 动画），仓库根 `virtual-journeys.html`，已在 Studio 渲染。
 
 ## ⚠️ 已知坑（必读）
-- **editorial-slides deck 导入 Studio 会黑屏**：Studio 丢弃 deck 自带 `<script>` 引擎 → JS 排版的 slide（`position:absolute`）塌掉。修复=deck 注入 CSS 兜底（只在引擎缺席时生效）。详见自动记忆 [[studio-drops-deck-engine]]。**更优长期修**：把兜底加进 `editorial-slides/assets/build.py`，或修 Studio 保住导入引擎。
-- 提交：UI 精简 `d90d01b` + 图表 v1 `31be79a` 已 push；图表数据导入 `ce95c6f` 本会话 push。`virtual-journeys.html` 未跟踪（生成成品）。
+- **【已修 2026-06-29】Studio「加载特别慢 / 看不到 slides / 换肤黑屏」的真因＝外链 Google Fonts 阻塞渲染**。deck/皮肤用 `<link rel=stylesheet href=fonts.googleapis.com/css…>`（render-blocking），墙内没翻墙时拉不到 → 浏览器卡死等渲染。修法：`nonBlockFonts()` 把字体 link 改成 `media=print onload` 非阻塞（预览里）+ 换肤改 `applySkinLive()` 就地换不重建 iframe。Playwright 让字体永久 hang 实测：46 页 deck 159ms 渲染、换肤 9ms、全程不黑。详见自动记忆 [[studio-editorial-skin-black]]。**可选 follow-up**：让导出/保存(forEdit=false)也走 nonBlockFonts，使独立成品离线秒开。
+- **editorial-slides deck 的 FX 自动播放 / 合成层**（[[studio-drops-deck-engine]]）是另一回事，只在带 `data-smfx` 的 editorial deck（如 virtual-journeys）上；普通 deck（如 keynote-v3，无 FX）不受影响，真痛点是上面的字体阻塞。
+- 提交：UI 精简 `d90d01b` + 图表 v1 `31be79a` + 图表数据 `ce95c6f` 已 push；app化/顶栏 `0536a4f` 已 push。`virtual-journeys.html`/`vr-how-it-works.html` 未跟踪（生成成品/样本）。
 
 ## 🎯 下一阶段（见 NEXT-SESSION.md）
-**审视整个项目，找还能接入什么 AI-first 功能。** 用户非技术、按里程碑自主推进、用 demo/截图验证（非读代码）。
+**迭代：PDF 导出修正 + 导出 PPT。**
+- PDF：「导出 PDF/打印」OK，但「**另存为 PDF**」时 slide 不铺满页面、只占一小块（`@page size:1920px 1080px` 没被 Save-as-PDF 吃掉？）。要满版。见 `pdfPrintHtml()/exportPdf()`。
+- PPT：借鉴 `huashu-design` skill 加「导出 PPT/PPTX」（先调研）。
+用户非技术、按里程碑自主推进、用 demo/截图验证（非读代码）。
 
 ## 按需再读
 `_memory/history.md`（全部历史 ✅ 块）· `_memory/NEXT-SESSION.md` · `_memory/decisions.md` · `AGENTS.md`（agent 接口）· `GUIDE.md`（人类指南）· `docs/DECK-CONTRACT.md` · `docs/RESEARCH-{ai-charts,reveal-impress,html-ppt-borrow}.md`

@@ -1,28 +1,21 @@
-# 下个会话交接 · 审视项目 → 找新的 AI-first 功能
+# 下个会话交接 · 迭代：PDF 导出修正 + 导出 PPT
 
-> 更新于 2026-06-28 会话末。`/clear` 后先读 `_memory/active.md`（精简版·含启动须知 + Studio 机制），再读本文件。**别通读仓库**，省 token。
+> `/clear` 后先读 `_memory/active.md`（精简版·启动须知 + Studio 机制），再读本文件。**别通读仓库**，省 token。
 
-## 🎯 下阶段任务：审视 Slidesmith，看还能接入什么 AI-first 功能
-用户想和我一起**审视整个项目**，盘点现状、找下一个值得做的「AI-first」功能。先别写代码——先一起讨论方向、出带优先级的候选清单（像当初 AI 图表那样：调研→A/B/C→拍板→做）。
+## 🎯 本迭代两件事
+1. **PDF 导出修正（优先）**。Studio「**导出 PDF**」走浏览器打印（`window.print()` + `@page{size:1920px 1080px}`，见 `packages/studio/src/main.ts` 的 `pdfPrintHtml()` / `exportPdf()`）。
+   - 用户反馈：**「导出 PDF / 打印」那条 OK**；但在打印对话框里**选「另存为 PDF」时，slide 不铺满纸面、只占页面中一小块**（四周大白边）。
+   - 多半是 "Save as PDF" 用了默认纸张（A4/Letter）、没吃 `@page size:1920px 1080px`，于是 16:9 大画布被缩成小块。
+   - 目标：**每页 slide 满版填充 PDF 页（16:9）**。方向：调研浏览器 print-to-PDF 对 `@page size` 的支持；可能改用与 16:9 匹配的纸张/缩放，或给用户一键导出 + 设置说明。**先用 keynote-v3 或 virtual-journeys 复现，再定方案。**
+2. **导出 PPT / PPTX**。看能否**借鉴 `huashu-design`（花叔Design）skill** 给 Slidesmith 加「导出 PPT slides」；也可看 `pptx-generator` skill。难点：HTML slide → PPTX 保真（每页转图片塞进 PPTX？还是结构化重建？）。**先调研可行性 + 出方案再动手。**
 
-### 开场建议
-1. 读 active.md 的「当前状态」摸清已有能力边界。
-2. 给用户一张**能力地图 + 候选清单**（show_widget 画一下更直观），按"价值 × 契合 Slidesmith DNA（单文件/离线/矢量/AI-first）× 成本"排序。
-3. 用 AskUserQuestion 让用户拍板先做哪个。
+## ✅ 上个会话（2026-06-29）做完并已 commit/push
+- **根因修复**：Studio「加载特别慢 / 看不到 slides / 换肤黑屏」= **外链 Google Fonts 阻塞渲染**（墙内没翻墙拉不到 → 浏览器卡死等渲染）。修：`nonBlockFonts()` 把字体 `<link>` 改 `media=print onload` 非阻塞（预览里）+ 换肤改 `applySkinLive()` **就地换不重建 iframe**。Playwright 让字体永久 hang 实测：keynote-v3 46 页 **159ms 渲染、换肤 9ms、全程不黑**。详见自动记忆 [[studio-editorial-skin-black]]。
+- **左栏 tab 回归**：页面 / 换装 / 插入 + 22 套皮**可视化画廊**（就地换肤、秒换不黑）。
+- **「另存为」**按钮加回（下载 HTML 副本、不覆盖原文件；与「保存」并排）。
+- 之前的也都在：Chrome 应用模式、顶栏跟随日/夜主题、导入 HTML / 保存。
+- **可选 follow-up**：让导出/保存（`assembleDeck(forEdit=false)`）也走 `nonBlockFonts` → 用户**独立双击打开的成品 deck** 没翻墙也秒开（目前只在预览生效）。
 
-### 候选种子（待和用户一起增删）
-- **演讲者视图 / 讲稿同步**：闭环最后一段（制作✅ 修改✅ 呈现缺）。HTML-first 主流程缺双屏/备注/计时，需从契约 deck 抽 notes（较 fuzzy）。
-- **AI 图表 dogfood + C 逃生舱工具化**：真握手环里让 AI 实跑画图表（v1 没现场跑过 live）；复杂图常用就补「matplotlib 中文字体 + 令牌注入」helper。
-- **editorial→Studio 渲染兜底入 build.py**：让所有学术 deck 自带兜底、不再黑屏（见 [[studio-drops-deck-engine]]）。
-- **制作→修改交接顺滑**：editorial-slides 生成完一键进 Studio。
-- **AI 审稿/优化建议**：AI 主动检查 deck（逻辑、过载、对比度、一页一事）给修改建议（现在只被动按评论改）。
-- **AI 大纲→整套 deck 一键生成**：用户给主题/讲稿 → AI 出结构 + 选皮 + 配图配表 一条龙。
-- **数据/表格 → 自动成图表页**：贴 CSV/Excel → AI 选图型批量出图表 slides。
-
-## 📌 本会话（2026-06-28）做完
-- AI 图表 v1（A 默认 + C 逃生舱）`31be79a`；图表数据文件导入 `ce95c6f`；UI 视觉精简 `d90d01b`——均 push。
-- 真 dogfood：JBR《Virtual Journeys》→ 22 页 academic deck（5 真数据图表 + 动画），仓库根 `virtual-journeys.html`，Studio 渲染成功。
-- 挖到并修：editorial deck 导入 Studio 黑屏（Studio 丢弃 deck 引擎 → deck 级 CSS 兜底）。
-
-## 实时协作环怎么挂（复制即用）
-后台 `run_in_background`（**别 nohup**）跑：`for i in $(seq 1 240); do R=$(curl -s --max-time 295 "http://localhost:8765/api/wait?timeout=280000"); echo "$R" | grep -q '"timedOut":false' && { echo "$R">/tmp/sm_wait.json; echo HIT; exit 0; }; sleep 8; done` —— 命中即 exit→唤醒我，空闲≈零 token。
+## 🔌 Slidesmith 协作环提醒（本会话踩的坑）
+- `slidesmith_get_requests` 返回的请求**是用户主动提交的，照做**（按里面要求改对应页 → `slidesmith_apply_patch` 回写），**别因 deck 名不符/猜测就判 stale 拒绝**（用户可能在测、或正切 deck）。billed 动作（codex 配图）可先一句确认，但别直接拒。
+- 实时环：后台 `run_in_background` 跑 `curl /api/wait` 自循环（命令见 active.md），命中即唤醒、空闲≈零 token，新会话要重挂一次。

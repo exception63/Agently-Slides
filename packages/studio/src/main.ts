@@ -295,6 +295,65 @@ function selectSlide(i: number): void {
   selBid = null; clearSel(); gotoPreview(cur); refreshSlidePanel(); renderDoc();
 }
 
+// ---- 左栏「换装」：21 套皮做成可视化卡片，点一下整份 deck 换风格（就地换肤，瞬时、不黑） ----
+function matchCssVar(css: string, nm: string): string {
+  const m = new RegExp('--' + nm + '\\s*:\\s*([^;]+);').exec(css); return m ? m[1].trim() : '';
+}
+// 取第一个能解析成「具体颜色」的变量——跟随 var(--x) 跳转（皮肤常 --accent: var(--vermilion)）
+function pickCssVar(css: string, names: string[]): string {
+  for (const nm of names) {
+    let v = matchCssVar(css, nm); let hops = 0; let ref: RegExpExecArray | null;
+    while (v && hops < 4 && (ref = /^var\(\s*--([a-z0-9-]+)\s*\)/i.exec(v))) { v = matchCssVar(css, ref[1]); hops++; }
+    if (v && !/^var\(/i.test(v)) return v;
+  }
+  return '';
+}
+function skinSwatch(b: { css: string; dark: boolean }): { bg: string; ink: string; accent: string } {
+  const css = b.css || '';
+  return {
+    bg: pickCssVar(css, ['paper', 'bg', 'background', 'base', 'surface']) || (b.dark ? '#16181e' : '#ffffff'),
+    ink: pickCssVar(css, ['ink', 'text', 'fg', 'ink-1', 'foreground']) || (b.dark ? '#f5f6f8' : '#1c1c1f'),
+    accent: pickCssVar(css, ['accent', 'accent-ui', 'vermilion', 'gold', 'navy', 'green', 'accent-2', 'primary']) || '#B5402A',
+  };
+}
+function skinCardHtml(name: string, label: string, tag: string, sw: { bg: string; ink: string; accent: string }, active: boolean): string {
+  return `<button class="skincard${active ? ' on' : ''}" data-skin="${esc(name)}" title="${esc(label)}">`
+    + `<span class="skinprev" style="background:${sw.bg}">`
+    + `<span class="skinline" style="background:${sw.ink}"></span>`
+    + `<span class="skinline short" style="background:${sw.ink}"></span>`
+    + `<span class="skinbar" style="background:${sw.accent}"></span></span>`
+    + `<span class="skinmeta"><span class="skinname">${esc(label)}</span><span class="skintag">${esc(tag)}</span></span></button>`;
+}
+function renderSkinGallery(): void {
+  const box = document.getElementById('skinGallery'); if (!box) return;
+  if (mode !== 'html') { box.innerHTML = '<div class="lpane-soon">换装作用于导入的 HTML deck。<br>先导入一个 HTML，再来这里一键换风格。</div>'; return; }
+  let html = skinCardHtml('', '保持原样', '原始', { bg: '#ffffff', ink: '#1c1c1f', accent: '#c9c9cc' }, !H.skin);
+  SKIN_ORDER.forEach((n) => { const b = SKINS[n]; if (b) html += skinCardHtml(n, b.label || n, b.dark ? '暗' : '浅', skinSwatch(b), H.skin === n); });
+  box.innerHTML = '<div class="skingal">' + html + '</div>';
+  box.querySelectorAll('.skincard').forEach((el) => el.addEventListener('click', () => applySkinFromGallery((el as HTMLElement).dataset.skin || '')));
+}
+function applySkinFromGallery(n: string): void {
+  if (mode !== 'html' || n === H.skin) return;
+  harvestAll(); pushHistory('skin'); H.skin = n; applySkinLive(); refreshHtmlInspector(); markDirty();
+  const sel = $('#hSkin') as HTMLSelectElement | null; if (sel) sel.value = n;
+  renderSkinGallery();
+  toast(n ? '已换装：' + (SKINS[n] ? SKINS[n].label || n : n) : '已恢复原始皮肤');
+}
+// ---- 左栏「插入」：HTML 模式下真正可用的添加动作收成一个中枢 ----
+function renderInsertPane(): void {
+  const box = document.getElementById('insertPane'); if (!box) return;
+  if (mode !== 'html') { box.innerHTML = '<div class="lpane-soon">插入作用于导入的 HTML deck。<br>先导入一个 HTML 再用。</div>'; return; }
+  box.innerHTML = '<div class="insgrid">'
+    + '<button class="inscard" data-act="image"><b>插入图片</b><span>从本地选图，插入到当前页</span></button>'
+    + '<button class="inscard" data-act="ai"><b>AI 配图 / 图表</b><span>转到右侧「AI 修改」，描述要生成的配图或图表</span></button>'
+    + '</div><div class="lpane-soon" style="text-align:left;padding:10px 4px">更多插入项（新页 / 引用 / 表格）会随 HTML 模式增删页能力一起补上。</div>';
+  box.querySelectorAll('.inscard').forEach((el) => el.addEventListener('click', () => {
+    const act = (el as HTMLElement).dataset.act;
+    if (act === 'image') (document.getElementById('hInsertImg') as HTMLElement | null)?.click();
+    else if (act === 'ai') (document.querySelector('.htab[data-htab="ai"]') as HTMLElement | null)?.click();
+  }));
+}
+
 function refreshSlidePanel(): void {
   const s = deck.slides[cur]; const keys = Object.keys(s.slots);
   const lay = $('#layout') as HTMLSelectElement; lay.innerHTML = '';
@@ -630,6 +689,37 @@ function skinInject(): { style: string; font: string } {
   const font = b.font ? `<link id="sm-skin-font" rel="stylesheet" href="${b.font}">` : '';
   return { style: `<style id="sm-skin" data-skin="${H.skin}">${b.css}</style>`, font };
 }
+// 换肤就地生效：只替换活预览里的 <style id="sm-skin">（+皮肤字体 <link>），不重建整个 iframe。
+// 全量 renderHtmlEdit() 会用 srcdoc 重灌全部幻灯片——大 deck 又慢、又会触发缩放 slide 的合成层
+// 发黑。就地换皮则瞬时、无重渲染、不发黑。H.skin 已更新，导出/全量渲染时仍由 skinInject 一致烘焙。
+function applySkinLive(): void {
+  const ifr = $('#preview') as HTMLIFrameElement;
+  const d = ifr && ifr.contentDocument;
+  if (!d || !d.head || !d.querySelector('#deck .slide')) { renderHtmlEdit(); return; } // 预览没就绪 → 回退全量
+  const anchor = d.getElementById('sm-typo'); // 皮肤 CSS 排在 deck 自身 CSS 之后、typo/FX 之前（与 assembleDeck 一致）
+  const b = H.skin && (SKINS as Record<string, { css: string; font: string }>)[H.skin];
+  let st = d.getElementById('sm-skin') as HTMLStyleElement | null;
+  let fl = d.getElementById('sm-skin-font') as HTMLLinkElement | null;
+  if (b) {
+    if (!st) { st = d.createElement('style'); st.id = 'sm-skin'; if (anchor) d.head.insertBefore(st, anchor); else d.head.appendChild(st); }
+    st.setAttribute('data-skin', H.skin); st.textContent = b.css;
+    if (b.font) { if (!fl) { fl = d.createElement('link'); fl.id = 'sm-skin-font'; fl.rel = 'stylesheet'; fl.media = 'print'; fl.onload = function () { (this as HTMLLinkElement).media = 'all'; }; st.parentNode!.insertBefore(fl, st); } fl.href = b.font; }
+    else if (fl) { fl.remove(); }
+  } else {
+    if (st) st.remove();
+    if (fl) fl.remove();
+  }
+}
+// 把 render-blocking 的外链字体 <link rel=stylesheet href=fonts.googleapis.com/css…> 改成非阻塞：
+// 加 media="print" onload="this.media='all'" —— 浏览器照常后台拉，但不卡屏渲染。没翻墙拉不到时
+// 就一直用系统字体兜底，绝不发黑/卡死；拉到了再切回。preconnect/已带 media 的不动。
+function nonBlockFonts(html: string): string {
+  return html.replace(/<link\b[^>]*fonts\.googleapis\.com\/css[^>]*>/gi, (tag) => {
+    if (/\bmedia\s*=/.test(tag)) return tag;
+    if (!/\brel\s*=\s*["']?\s*stylesheet/i.test(tag)) return tag;
+    return tag.replace(/\s*\/?>\s*$/, ` media="print" onload="this.media='all'">`);
+  });
+}
 function assembleDeck(forEdit = false): string {
   const editCss = forEdit
     ? '<style id="sm-edit-css">[contenteditable]{cursor:text}'
@@ -646,7 +736,10 @@ function assembleDeck(forEdit = false): string {
   // the editing surface so the FX driver skips exit-on-nav (keeps Studio nav instant).
   const editAttr = forEdit ? ' data-smfx-edit="1"' : '';
   const skin = skinInject();
-  return `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
+  const doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
+  // 编辑预览：把外链 Google Fonts 改成「非阻塞」加载，否则没翻墙时浏览器会卡在 fonts.googleapis.com
+  // 等渲染 →「加载特别慢 / 看不到 slides / 换肤黑屏」。文字先用系统字体即时显示，字体到了再升级。
+  return forEdit ? nonBlockFonts(doc) : doc;
 }
 // <link> tags for user-picked Google fonts that the deck author didn't already include.
 // Detected from usedFontIds plus a scan of the deck HTML (so a re-imported deck that
@@ -2302,9 +2395,26 @@ body.dragging .drop{display:flex;background:rgba(181,64,42,.12);border-color:#B5
 .embedck{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:#cfcfd2;cursor:pointer;user-select:none}
 .embedck input{margin:0;cursor:pointer}
 /* HTML-mode Keynote-style top tabs */
-.htabs{display:flex;border-bottom:1px solid #e2e2e4;flex:0 0 auto}
-.htab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:12px 0;font-size:13px;color:#6a6a6e;cursor:pointer;font-family:inherit}
-.htab:hover{background:#f6f6f7}.htab.active{color:#B5402A;border-bottom-color:#B5402A;font-weight:600}
+.htabs,.ltabs{display:flex;border-bottom:1px solid #e2e2e4;flex:0 0 auto}
+.htab,.ltab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:12px 0;font-size:13px;color:#6a6a6e;cursor:pointer;font-family:inherit}
+.htab:hover,.ltab:hover{background:#f6f6f7}.htab.active,.ltab.active{color:#B5402A;border-bottom-color:#B5402A;font-weight:600}
+.lpane{flex:1;min-height:0;display:flex;flex-direction:column}.lpane[hidden]{display:none}
+.lscroll{flex:1;overflow:auto;padding:10px}
+.lpane-soon{color:#9a9a9e;font-size:13px;line-height:1.7;padding:18px 14px;text-align:center}
+.skingal{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.skincard{display:flex;flex-direction:column;gap:6px;padding:7px;background:#fff;border:1px solid #e2e2e4;border-radius:10px;cursor:pointer;text-align:left;font-family:inherit}
+.skincard:hover{border-color:#c9b3ac;background:#fbf7f6}.skincard.on{border-color:#B5402A;box-shadow:0 0 0 1px #B5402A inset}
+.skinprev{position:relative;height:52px;border-radius:6px;overflow:hidden;display:block;border:1px solid rgba(0,0,0,.06)}
+.skinline{position:absolute;left:10px;height:5px;border-radius:2px;top:13px;width:62%}
+.skinline.short{top:25px;width:40%;opacity:.55}
+.skinbar{position:absolute;left:10px;bottom:9px;height:6px;width:34%;border-radius:3px}
+.skinmeta{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.skinname{font-size:12px;color:#2a2a2e;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.skintag{font-size:10px;color:#8a8a8e;border:1px solid #e2e2e4;border-radius:999px;padding:0 6px;flex:0 0 auto}
+.insgrid{display:flex;flex-direction:column;gap:9px}
+.inscard{display:flex;flex-direction:column;gap:3px;padding:12px 13px;background:#fff;border:1px solid #e2e2e4;border-radius:10px;cursor:pointer;text-align:left;font-family:inherit}
+.inscard:hover{border-color:#c9b3ac;background:#fbf7f6}
+.inscard b{font-size:14px;color:#1c1c1f;font-weight:600}.inscard span{font-size:12px;color:#8a8a8e;line-height:1.5}
 .hpane{flex:1;overflow:auto;padding:16px}
 .gallery-btn{width:100%;margin:6px 0 10px;padding:11px;border:0;border-radius:10px;background:#B5402A;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
 .gallery-btn:hover{background:#9a3522}.gallery-btn:active{transform:scale(.99)}
@@ -2371,10 +2481,15 @@ body.dark .srow:hover{background:#242427}
 body.dark .srow.active{background:#3a2417;border-color:#7a4a2c}
 body.dark .srow .stt{color:#dcdce0}
 body.dark .srow .sseg{background:#2c2c2f;border-color:#3a3a3d;color:#aaa}
-body.dark .htabs,body.dark .tabs{border-color:#2c2c2f}
-body.dark .htab,body.dark .tab{color:#9a9a9e}
-body.dark .htab:hover,body.dark .tab:hover{background:#242427}
-body.dark .htab.active,body.dark .tab.active{color:#f0b34a;border-bottom-color:#f0b34a}
+body.dark .htabs,body.dark .tabs,body.dark .ltabs{border-color:#2c2c2f}
+body.dark .htab,body.dark .tab,body.dark .ltab{color:#9a9a9e}
+body.dark .htab:hover,body.dark .tab:hover,body.dark .ltab:hover{background:#242427}
+body.dark .htab.active,body.dark .tab.active,body.dark .ltab.active{color:#f0b34a;border-bottom-color:#f0b34a}
+body.dark .skincard,body.dark .inscard{background:#1b1e25;border-color:#2c323d}
+body.dark .skincard:hover,body.dark .inscard:hover{background:#242a36;border-color:#4a3a33}
+body.dark .skincard.on{border-color:#f0b34a;box-shadow:0 0 0 1px #f0b34a inset}
+body.dark .skinname,body.dark .inscard b{color:#e6e6e8}
+body.dark .skintag{color:#9a9a9e;border-color:#3a3a3d}body.dark .inscard span{color:#9a9a9e}
 body.dark .right h3{color:#7a7a7e}
 body.dark .right select,body.dark .right textarea,body.dark .right input{background:#242427;border-color:#3a3a3d;color:#e6e6e8}
 body.dark .right h4.sub{color:#9a9a9e;border-color:#2c2c2f}
@@ -2419,13 +2534,27 @@ function buildUI(): void {
   <span class="sep"></span>
   <label class="embedck" title="导出 / 保存时将用到的字体子集内嵌进 HTML，离线或更换设备也能正确显示，文件略大"><input id="embedFonts" type="checkbox"> 嵌入字体</label>
   <button id="expPdf">导出 PDF</button>
+  <button id="expHtml" title="另存为：下载一份新的 HTML 副本，不覆盖原文件">另存为</button>
   <button id="saveHtml" class="primary" title="保存：覆盖导入的源 HTML；首次保存会让你选一次文件，之后一键覆盖">保存</button>
   <input id="file" type="file" accept=".html,.htm" style="display:none">
 </div>
 <div class="emain">
   <aside class="left">
-    <div class="lbar"><button id="add" title="新增页">＋</button><button id="del" title="删除当前页">－</button><button id="up" title="上移">↑</button><button id="down" title="下移">↓</button></div>
-    <div id="slides"></div>
+    <div class="ltabs">
+      <button class="ltab active" data-ltab="pages" title="页面缩略图导航">页面</button>
+      <button class="ltab" data-ltab="skins" title="换一套皮肤风格，整份 deck 立刻变样">换装</button>
+      <button class="ltab" data-ltab="insert" title="插入新页 / 图片 / 图表 / 引用等">插入</button>
+    </div>
+    <div class="lpane" data-lpane="pages">
+      <div class="lbar"><button id="add" title="新增页">＋</button><button id="del" title="删除当前页">－</button><button id="up" title="上移">↑</button><button id="down" title="下移">↓</button></div>
+      <div id="slides"></div>
+    </div>
+    <div class="lpane" data-lpane="skins" hidden>
+      <div id="skinGallery" class="lscroll"><div class="lpane-soon">换装画廊加载中…</div></div>
+    </div>
+    <div class="lpane" data-lpane="insert" hidden>
+      <div id="insertPane" class="lscroll"><div class="lpane-soon">插入面板加载中…</div></div>
+    </div>
   </aside>
   <main class="center">
     <iframe id="preview"></iframe>
@@ -2636,7 +2765,7 @@ function buildUI(): void {
   const skinLabels: Record<string, string> = {};
   SKIN_ORDER.forEach((n) => { skinLabels[n] = (SKINS[n].label || n) + ' · ' + n + (SKINS[n].dark ? ' · 暗' : ' · 浅'); });
   fillSel('#hSkin', SKIN_ORDER, skinLabels, '保持原样（不换皮）');
-  onChange('#hSkin', (v) => { harvestAll(); pushHistory('skin'); H.skin = v; renderHtmlEdit(); refreshHtmlInspector(); markDirty(); });
+  onChange('#hSkin', (v) => { harvestAll(); pushHistory('skin'); H.skin = v; applySkinLive(); refreshHtmlInspector(); markDirty(); });
   ($('#layout') as HTMLSelectElement).addEventListener('change', () => { deck.slides[cur].layout = ($('#layout') as HTMLSelectElement).value; reloadPreview(); });
 
   fillSel('#fsize', meta.sizes, undefined, '默认'); onChange('#fsize', (v) => setStyle('size', v));
@@ -2738,6 +2867,14 @@ function buildUI(): void {
     document.querySelectorAll('.htab').forEach((x) => x.classList.toggle('active', x === tb));
     document.querySelectorAll('.hpane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.hpane !== name));
   }));
+  // 左栏多功能 tab：页面（缩略图导航）/ 换装（皮肤画廊，就地换肤）/ 插入（添加中枢）
+  document.querySelectorAll('.ltab').forEach((tb) => tb.addEventListener('click', () => {
+    const name = (tb as HTMLElement).dataset.ltab;
+    document.querySelectorAll('.ltab').forEach((x) => x.classList.toggle('active', x === tb));
+    document.querySelectorAll('.lpane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.lpane !== name));
+    if (name === 'skins') renderSkinGallery();
+    else if (name === 'insert') renderInsertPane();
+  }));
   document.querySelectorAll('.stab').forEach((tb) => tb.addEventListener('click', () => {
     const name = (tb as HTMLElement).dataset.stab;
     document.querySelectorAll('.stab').forEach((x) => x.classList.toggle('active', x === tb));
@@ -2836,6 +2973,12 @@ function buildUI(): void {
     f.text().then((t) => importFile(f.name, t)); // no handle from a plain <input> → save will prompt once
   });
   $('#saveHtml').addEventListener('click', () => { void saveHtmlInPlace(); });
+  // 另存为：下载一份新的 HTML 副本（不覆盖原文件，区别于「保存」）
+  $('#expHtml').addEventListener('click', async () => {
+    const html = mode === 'html' ? await buildExportHtml() : renderDeckHtml(deck);
+    download(fileBase + '.html', html, 'text/html');
+    toast('已另存为 ' + fileBase + '.html');
+  });
 
   // drag & drop import anywhere
   let dragN = 0;
