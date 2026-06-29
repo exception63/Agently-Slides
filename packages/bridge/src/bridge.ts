@@ -152,8 +152,47 @@ function loadStudioHtml(studioPath: string): string {
   return readFileSync(studioPath, 'utf8');
 }
 
-// open a url in the user's default browser, cross-platform, best-effort.
+// Find a Chromium-family browser binary so we can open Studio in "app mode"
+// (`--app=URL`): a standalone window with no tab strip, no address bar, no
+// bookmarks — just our page. Returns the executable path, or null if none found.
+// Any Chromium browser (Chrome / Edge / Brave / Chromium) supports --app.
+function findChromiumBinary(): string | null {
+  const candidates = process.platform === 'darwin'
+    ? [
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+        '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+        '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      ]
+    : process.platform === 'win32'
+    ? [
+        join(process.env['PROGRAMFILES'] || 'C:\\Program Files', 'Google\\Chrome\\Application\\chrome.exe'),
+        join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Google\\Chrome\\Application\\chrome.exe'),
+        join(process.env['LOCALAPPDATA'] || '', 'Google\\Chrome\\Application\\chrome.exe'),
+        join(process.env['PROGRAMFILES(X86)'] || 'C:\\Program Files (x86)', 'Microsoft\\Edge\\Application\\msedge.exe'),
+      ]
+    : [
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+        '/usr/bin/microsoft-edge',
+      ];
+  for (const p of candidates) { if (p && existsSync(p)) return p; }
+  return null;
+}
+
+// open Studio for the user, best-effort. Prefer Chrome "app mode" (chromeless
+// standalone window — feels like a native app). Fall back to the default
+// browser (`open` / `start` / `xdg-open`) if no Chromium browser is installed.
 function launchBrowser(url: string): void {
+  const chromium = findChromiumBinary();
+  if (chromium) {
+    // Calling the binary directly (vs `open -a`) reliably honours --app even
+    // when the browser is already running; it attaches to the existing profile
+    // and spawns a dedicated app window.
+    try { spawn(chromium, [`--app=${url}`], { stdio: 'ignore', detached: true }).unref(); return; } catch { /* fall through */ }
+  }
   const cmd = process.platform === 'darwin' ? 'open'
     : process.platform === 'win32' ? 'cmd'
     : 'xdg-open';

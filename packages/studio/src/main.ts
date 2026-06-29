@@ -1,7 +1,8 @@
 // Slidesmith Studio — a fully client-side editor bundled into one HTML file.
-// Open it (file:// or http), drag in a contract HTML deck (or deck.json / deck.md),
-// edit Keynote-style, then "保存 HTML" to overwrite the opened file in place (File
-// System Access API) or "导出 HTML 副本" to download a copy. No server, no CLI.
+// Open it (file:// or http), import a contract HTML deck, edit Keynote-style, then
+// "保存" to overwrite the opened file in place (File System Access API; first save
+// picks the file once, then one-click overwrite). "导出 PDF" for a shareable artifact.
+// No server, no CLI.
 import {
   validateDeck,
   LAYOUTS,
@@ -16,11 +17,7 @@ import {
 } from '@slidesmith/ir';
 import type { Deck, Block, Slide, NoteBlock } from '@slidesmith/ir';
 import { parseMarkdownToIR } from '@slidesmith/parser-md';
-import {
-  renderDeckHtml,
-  renderTranscriptHtml,
-  renderPresenterHtml,
-} from '@slidesmith/engine';
+import { renderDeckHtml } from '@slidesmith/engine';
 import { listThemes } from '@slidesmith/themes';
 import { galleryHtml } from '@slidesmith/anim-gallery';
 import { fxCanvasJs } from '@slidesmith/fx-canvas';
@@ -106,7 +103,7 @@ const EXAMPLE: Deck = {
     { id: 's2', layout: 'bullets', seg: '1', segName: '段1 · 怎么用',
       slots: { main: [
         { id: 'b4', type: 'heading', text: '三步走', level: 2 },
-        { id: 'b5', type: 'list', items: ['拖入 deck.json 或 deck.md', '点文字直接改、右侧换主题', '导出 HTML 投屏'],
+        { id: 'b5', type: 'list', items: ['导入 HTML deck', '点文字直接改、右侧换主题', '保存 / 导出 PDF 投屏'],
           build: { anim: 'stagger-list', mode: 'by-item', stagger: 90 } },
       ] } },
     { id: 's3', layout: 'quote', seg: '2', segName: '段2 · 收尾',
@@ -2111,14 +2108,14 @@ function connectBridge(): void {
 const CSS = `
 *{box-sizing:border-box}html,body{margin:0;height:100%}
 body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;color:#1c1c1f;display:flex;flex-direction:column;background:#f4f4f5}
-.ehead{height:50px;flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:0 16px;background:#1b1b1d;color:#eee;font-size:14px}
+.ehead{height:50px;flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:0 16px;background:#fff;color:#1c1c1f;border-bottom:1px solid #e2e2e4;font-size:14px}
 .ehead .brand{font-weight:700}.ehead .dn{opacity:.6;font-size:13px}.ehead .grow{flex:1}
-.ehead button{background:#2c2c2f;color:#eee;border:1px solid #3a3a3d;border-radius:7px;padding:7px 13px;font-size:13px;cursor:pointer}
-.ehead button:hover{background:#3a3a3d}.ehead button.primary{background:#B5402A;border-color:#B5402A}
+.ehead button{background:#f4f4f5;color:#1c1c1f;border:1px solid #e2e2e4;border-radius:7px;padding:7px 13px;font-size:13px;cursor:pointer}
+.ehead button:hover{background:#e9e9eb}.ehead button.primary{background:#B5402A;border-color:#B5402A;color:#fff}.ehead button.primary:hover{background:#9c3623}
 .ehead .iconbtn{padding:6px 10px;font-size:15px;line-height:1}
-.ehead .sep{width:1px;height:22px;background:#3a3a3d;margin:0 2px}
+.ehead .sep{width:1px;height:22px;background:#e2e2e4;margin:0 2px}
 .ehead .bridge-badge{font-size:12px;padding:3px 10px;border-radius:11px;line-height:1.4}
-.ehead .bridge-badge.on{background:#13321f;color:#7fe0a0;border:1px solid #2c6b48}
+.ehead .bridge-badge.on{background:#e7f6ee;color:#1f7a4d;border:1px solid #b9e3cc}
 .ehead .connect-btn{background:#185FA5;border-color:#185FA5;color:#fff;font-weight:600}
 .ehead .connect-btn:hover{background:#0c447c}
 .cmodal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100}
@@ -2348,7 +2345,8 @@ body.dark .achip{background:#26262a;border-color:#34343a;color:#cfcfd4}body.dark
 .hint{font-size:12px;color:#9a9a9e;line-height:1.7;margin-top:18px;border-top:1px solid #eee;padding-top:12px}.hint b{color:#6a6a6e}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1b1b1d;color:#9bd29b;padding:10px 18px;border-radius:7px;font-size:13px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
 .toast.show{opacity:1}.toast.bad{color:#ff8a7a}
-.ehead .dirtydot{font-size:12px;color:#f0b34a;padding:2px 9px;border-radius:11px;background:#3a2f15;border:1px solid #7a5e22;line-height:1.4}
+.ehead .dirtydot{font-size:12px;color:#9a6a12;padding:2px 9px;border-radius:11px;background:#fdf3d6;border:1px solid #f0d28a;line-height:1.4}
+body.dark .ehead .dirtydot{color:#f0b34a;background:#3a2f15;border-color:#7a5e22}
 .ehead button:disabled{opacity:.35;cursor:not-allowed}
 .restorebar{position:fixed;top:58px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #e7b5aa;border-left:4px solid #B5402A;border-radius:9px;padding:10px 14px;box-shadow:0 10px 34px rgba(0,0,0,.18);font-size:13px;color:#3a3a3e}
 .restorebar b{color:#B5402A}
@@ -2360,6 +2358,11 @@ body.dark .achip{background:#26262a;border-color:#34343a;color:#cfcfd4}body.dark
 @keyframes sm-spin{to{transform:rotate(360deg)}}
 /* ===== dark Studio chrome (toggle 🌙, persisted) ===== */
 body.dark{background:#151517;color:#e6e6e8}
+body.dark .ehead{background:#1b1b1d;color:#eee;border-bottom-color:#2c2c2f}
+body.dark .ehead button{background:#2c2c2f;color:#eee;border-color:#3a3a3d}
+body.dark .ehead button:hover{background:#3a3a3d}
+body.dark .ehead .sep{background:#3a3a3d}
+body.dark .ehead .bridge-badge.on{background:#13321f;color:#7fe0a0;border-color:#2c6b48}
 body.dark .left,body.dark .right{background:#1b1b1d;border-color:#2c2c2f}
 body.dark .lbar{border-color:#2c2c2f}
 body.dark .lbar button{background:#2c2c2f;border-color:#3a3a3d;color:#ddd}
@@ -2412,13 +2415,12 @@ function buildUI(): void {
   <span id="bridgeBadge" class="bridge-badge" title="与 Claude Code 的连接状态"></span>
   <button id="connectBtn" class="connect-btn" title="连接本地 Claude Code">连接 Claude Code</button>
   <span class="grow"></span>
-  <button id="imp">导入 HTML / deck.json / .md</button>
+  <button id="imp">导入 HTML</button>
   <span class="sep"></span>
   <label class="embedck" title="导出 / 保存时将用到的字体子集内嵌进 HTML，离线或更换设备也能正确显示，文件略大"><input id="embedFonts" type="checkbox"> 嵌入字体</label>
   <button id="expPdf">导出 PDF</button>
-  <button id="expHtml">导出 HTML 副本</button>
-  <button id="saveHtml" class="primary" title="直接覆盖导入的源 HTML 文件">保存</button>
-  <input id="file" type="file" accept=".html,.htm,.json,.md" style="display:none">
+  <button id="saveHtml" class="primary" title="保存：覆盖导入的源 HTML；首次保存会让你选一次文件，之后一键覆盖">保存</button>
+  <input id="file" type="file" accept=".html,.htm" style="display:none">
 </div>
 <div class="emain">
   <aside class="left">
@@ -2427,7 +2429,7 @@ function buildUI(): void {
   </aside>
   <main class="center">
     <iframe id="preview"></iframe>
-    <div class="drop">松开即可导入 HTML / deck.json / deck.md</div>
+    <div class="drop">松开即可导入 HTML</div>
   </main>
   <aside class="right">
     <div id="htmlpanel" style="display:none">
@@ -2819,7 +2821,7 @@ function buildUI(): void {
     if (w.showOpenFilePicker) {
       try {
         const [h] = await w.showOpenFilePicker({
-          types: [{ description: 'Deck', accept: { 'text/html': ['.html', '.htm'], 'application/json': ['.json'], 'text/markdown': ['.md'] } }],
+          types: [{ description: 'HTML deck', accept: { 'text/html': ['.html', '.htm'] } }],
         });
         const file = await h.getFile();
         importFile(file.name, await file.text()); // clears fileHandle…
@@ -2834,14 +2836,6 @@ function buildUI(): void {
     f.text().then((t) => importFile(f.name, t)); // no handle from a plain <input> → save will prompt once
   });
   $('#saveHtml').addEventListener('click', () => { void saveHtmlInPlace(); });
-  $('#expHtml').addEventListener('click', async () => {
-    if (mode === 'html') { download(fileBase + '.html', await buildExportHtml(), 'text/html'); toast('已导出编辑后的 HTML'); return; }
-    const tn = fileBase + '.transcript.html', pn = fileBase + '.presenter.html';
-    download(fileBase + '.html', renderDeckHtml(deck, { presenterUrl: pn }), 'text/html');
-    setTimeout(() => download(tn, renderTranscriptHtml(deck), 'text/html'), 250);
-    setTimeout(() => download(pn, renderPresenterHtml(deck, { transcriptUrl: tn }), 'text/html'), 500);
-    toast('已导出 投屏HTML + 讲稿 + 演讲者视图');
-  });
 
   // drag & drop import anywhere
   let dragN = 0;
