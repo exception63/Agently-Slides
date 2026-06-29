@@ -2033,11 +2033,38 @@ function pdfPrintHtml(): string {
   const full = mode === 'html' ? (harvestAll(), assembleDeck(false)) : renderDeckHtml(deck);
   return full.replace('</head>', printCss + '</head>');
 }
-function exportPdf(): void {
+// Fallback: the old browser-print path (for standalone file:// use, no bridge). The
+// user must pick 另存为 PDF + Margins:None — and even then Chrome leaves white margins
+// because Save-as-PDF ignores @page{size} unless preferCSSPageSize is set, which only
+// the bridge route below can do. So this is the lesser path, used only when no bridge.
+function exportPdfViaPrint(): void {
   const w = window.open('', '_blank'); if (!w) { toast('请允许弹窗以导出 PDF', true); return; }
   w.document.open(); w.document.write(pdfPrintHtml()); w.document.close();
   setTimeout(() => { try { w.focus(); w.print(); } catch { /* noop */ } }, 700);
-  toast('已打开打印窗口：在对话框里把「目标」选为「另存为 PDF」');
+  toast('已打开打印窗口：目标选「另存为 PDF」、边距选「无」（连上 Claude 后可一键满版导出）');
+}
+async function exportPdf(): Promise<void> {
+  // Preferred: when Studio is served by the bridge, render the PDF there with
+  // preferCSSPageSize → pixel-exact full-bleed 16:9, one click, no dialog fiddling.
+  if (location.protocol.startsWith('http')) {
+    const btn = $('#expPdf') as HTMLButtonElement | null;
+    const old = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '导出中…'; }
+    toast('正在生成满版 PDF…');
+    try {
+      const r = await fetch(`${libBase()}/api/export-pdf?name=${encodeURIComponent(fileBase)}.html`, {
+        method: 'POST', headers: { 'content-type': 'text/html;charset=utf-8' }, body: pdfPrintHtml(),
+      });
+      const j = await r.json() as { ok: boolean; path?: string; error?: string };
+      if (j.ok && j.path) { toast('✅ 已导出满版 PDF：' + j.path + '（已自动打开）'); return; }
+      toast('PDF 导出失败：' + (j.error || '未知错误') + '，改用打印窗口', true);
+    } catch {
+      // older bridge without the endpoint, or network hiccup → fall through to print
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = old; }
+    }
+  }
+  exportPdfViaPrint();
 }
 function setHtmlMode(on: boolean): void {
   const p = $('#htmlpanel'); if (p) p.style.display = on ? '' : 'none';

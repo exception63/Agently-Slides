@@ -14,6 +14,7 @@
 4. **分工**：人做高频细活（点字/换色/字号/动画/移删元素，即时零 token）；AI 做模糊重活（经待办）。
 
 ## ✅ 当前状态（已完成，详见 history.md）
+- **【新 2026-06-29】PDF 导出满版修正**：「导出 PDF」改走 **bridge headless 渲染**（`playwright-core` + `preferCSSPageSize:true`）→ 精确 16:9 满版矢量 PDF、一键、自动打开、存在 deck 同目录（无 deck 路径则 `~/.slidesmith/exports/`）。standalone file:// 保留 `window.print()` 兜底。实测 virtual-journeys 22 页全 20×11.25in 满版、矢量文字。详见 [[pdf-export-via-bridge]]。**改了 bridge.ts，新端点要重启 MCP/bridge 进程才生效（下个会话自动生效）**。
 - **Studio** 单文件离线编辑器（`studio/slidesmith-studio.html`，源 `packages/studio/src/main.ts`）+ **bridge** MCP（`packages/bridge`）+ **plugin**（已装，`/slidesmith:*` 技能 + MCP）。
 - **AI 待办面板**：对整份 deck / 本页改字 / 配图（**矢量 SVG · 图表 · 照片 codex**）/ 导入图 → 统一一键发送；ⓘ 弹出式说明；图片库（`~/.slidesmith/library/`）；视觉自检。
 - **AI 图表 v1**（A=Claude 直接画内联 SVG 默认，覆盖柱/折线/饼/雷达/散点；C=matplotlib 预渲染逃生舱给箱线/热力等复杂图；B 内联库搁置）+ **图表数据可导入文件**（CSV/数字/文本→textarea）。
@@ -26,9 +27,9 @@
 - 提交：UI 精简 `d90d01b` + 图表 v1 `31be79a` + 图表数据 `ce95c6f` 已 push；app化/顶栏 `0536a4f` 已 push。`virtual-journeys.html`/`vr-how-it-works.html` 未跟踪（生成成品/样本）。
 
 ## 🎯 下一阶段（见 NEXT-SESSION.md）
-**迭代：PDF 导出修正 + 导出 PPT。**
-- PDF：「导出 PDF/打印」OK，但「**另存为 PDF**」时 slide 不铺满页面、只占一小块（`@page size:1920px 1080px` 没被 Save-as-PDF 吃掉？）。要满版。见 `pdfPrintHtml()/exportPdf()`。
-- PPT：借鉴 `huashu-design` skill 加「导出 PPT/PPTX」（先调研）。
+**导出 PPT/PPTX（上迭代用户选「以后再说」，已搁置）。** PDF 满版已做完。
+- PPT 调研已定方案：**每页转图（headless 截 1920×1080 PNG → python-pptx 满版塞 16:9 PPTX，复用 PDF 渲染管线）**，像素级保真但 PPT 里不可改字；结构化重建可编辑但跨皮肤/图表大失真、不做。`python-pptx 1.0.2` 已系统装好。动手前跟用户确认「图片版可接受 / 还是要可编辑」。
+- 可选 follow-up：让导出/保存（`assembleDeck(false)`）也走 `nonBlockFonts`，独立成品离线秒开 + headless PDF 不被外链字体拖慢。
 用户非技术、按里程碑自主推进、用 demo/截图验证（非读代码）。
 
 ## 按需再读

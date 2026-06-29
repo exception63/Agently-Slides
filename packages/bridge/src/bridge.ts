@@ -200,6 +200,15 @@ function launchBrowser(url: string): void {
   try { spawn(cmd, args, { stdio: 'ignore', detached: true }).unref(); } catch { /* noop */ }
 }
 
+// Open a finished file (e.g. the exported PDF) in the OS default app, best-effort.
+function openFile(path: string): void {
+  const cmd = process.platform === 'darwin' ? 'open'
+    : process.platform === 'win32' ? 'cmd'
+    : 'xdg-open';
+  const args = process.platform === 'win32' ? ['/c', 'start', '""', path] : [path];
+  try { spawn(cmd, args, { stdio: 'ignore', detached: true }).unref(); } catch { /* noop */ }
+}
+
 export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   const host = opts.host || '127.0.0.1';
   const port = opts.port ?? DEFAULT_PORT;
@@ -216,6 +225,10 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   const emitter = new EventEmitter();
   const sockets = new Set<WebSocket>();
   let deck: { name: string; html: string } | null = null;
+  // absolute path of the deck file when opened from disk (via handle.open / MCP
+  // slidesmith_open) — lets PDF export save the file right next to the deck. Null
+  // for in-memory decks (openHtml / file:// hand-off), which fall back to ~/.slidesmith.
+  let deckAbsPath: string | null = null;
   let owner: BridgeOwner | null = null; // set by the handshake (which session owns this bridge)
   const pending: BridgeRequest[] = [];
   // long-poll waiters: callers blocked in waitForRequests / GET /api/wait. Resolved
@@ -294,6 +307,20 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
+    // POST /api/export-pdf?name=<base>  body: the print-ready deck HTML → render it
+    // headlessly with preferCSSPageSize and save a full-bleed 16:9 PDF beside the deck.
+    // ?open=1 (default) also opens the finished PDF in the OS default viewer.
+    if (url === '/api/export-pdf' && req.method === 'POST') {
+      const nm = decodeURIComponent((/[?&]name=([^&]+)/.exec(req.url || '') || [])[1] || '') || (deck ? deck.name : 'deck');
+      const wantOpen = !/[?&]open=0\b/.test(req.url || '');
+      readBody(req).then(async (body) => {
+        if (!body.trim()) { sendJson(res, { ok: false, error: 'empty html' }, 400); return; }
+        const r = await renderDeckPdf(body, nm);
+        if (r.ok && wantOpen) openFile(r.path);
+        sendJson(res, r, r.ok ? 200 : 500);
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
+      return;
+    }
     // ---- generated-image library (serves the Studio 图片库 panel) ----
     const q = (name: string): string => decodeURIComponent((new RegExp('[?&]' + name + '=([^&]+)').exec(req.url || '') || [])[1] || '');
     // GET /api/library?deck=<base> → the index (metadata only; no pixels)
@@ -332,6 +359,46 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   }
   function readBody(req: IncomingMessage): Promise<string> {
     return new Promise((res, rej) => { let d = ''; req.on('data', (c) => (d += c)); req.on('end', () => res(d)); req.on('error', rej); });
+  }
+
+  // ---- PDF export: render the print-ready deck HTML headlessly with preferCSSPageSize
+  // so the browser HONORS `@page{size:1920px 1080px;margin:0}` → every slide fills a
+  // pixel-exact 16:9 PDF page. This is the one switch the interactive Save-as-PDF dialog
+  // can't be made to flip from CSS, which is why the dialog leaves white margins; doing it
+  // here makes export one-click and deterministic (no paper-size / margins / scale fiddling).
+  async function renderDeckPdf(html: string, base: string): Promise<{ ok: true; path: string } | { ok: false; error: string }> {
+    let chromium: { launch(opts?: unknown): Promise<{ newPage(): Promise<unknown>; close(): Promise<void> }> };
+    try {
+      ({ chromium } = (await import('playwright-core')) as unknown as { chromium: typeof chromium });
+    } catch {
+      return { ok: false, error: 'playwright-core 未安装：在仓库根 `npm i` 后重启 bridge' };
+    }
+    // save beside the deck if we know its real path, else into ~/.slidesmith/exports
+    const safeBase = safeSeg(base.replace(/\.[^.]+$/, '')) || 'deck';
+    const outDir = deckAbsPath ? dirname(deckAbsPath) : join(homedir(), '.slidesmith', 'exports');
+    mkdirSync(outDir, { recursive: true });
+    const outPath = join(outDir, safeBase + '.pdf');
+    let browser: { newPage(): Promise<unknown>; close(): Promise<void> } | null = null;
+    try {
+      browser = await chromium.launch({ headless: true });
+      const page = (await browser.newPage()) as {
+        setContent(html: string, opts?: unknown): Promise<void>;
+        waitForTimeout(ms: number): Promise<void>;
+        pdf(opts?: unknown): Promise<Buffer>;
+        evaluate(fn: unknown): Promise<unknown>;
+      };
+      await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+      // give embedded fonts / data-URI images a beat to settle so text metrics are final
+      try { await page.evaluate(() => (document as unknown as { fonts?: { ready?: Promise<unknown> } }).fonts?.ready); } catch { /* no fonts API */ }
+      await page.waitForTimeout(350);
+      const buf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+      writeFileSync(outPath, buf);
+      return { ok: true, path: outPath };
+    } catch (e) {
+      return { ok: false, error: String((e as Error)?.message || e) };
+    } finally {
+      try { await browser?.close(); } catch { /* noop */ }
+    }
   }
 
   const wss = new WebSocketServer({ noServer: true });
@@ -426,6 +493,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
 
   handle.openHtml = (name, html) => {
     deck = { name, html };
+    deckAbsPath = null; // in-memory deck: no on-disk source (handle.open re-sets it after)
     broadcast({ type: 'import', name, html });
     return { url: handle.url, name, bytes: Buffer.byteLength(html) };
   };
@@ -433,6 +501,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     const html = readFileSync(deckPath, 'utf8');
     const name = basename(deckPath);
     const r = handle.openHtml(name, html);
+    deckAbsPath = resolve(deckPath); // remember real location for PDF export beside the deck
     if (openBrowser) launchBrowser(handle.url);
     return r;
   };
