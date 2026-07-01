@@ -1408,8 +1408,8 @@ function renderTodo(): void {
   items.forEach((it) => {
     const row = document.createElement('div'); row.className = 'todorow';
     row.innerHTML = `<span class="todochip ${it.cls}">${it.label}</span>` + (it.page ? `<span class="todopg">第 ${it.page} 页</span>` : '')
-      + `<span class="tododesc" title="${esc(it.desc)}">${esc(it.desc)}</span><button class="tray-del" title="移除">✕</button>`;
-    row.querySelector('.tray-del')!.addEventListener('click', it.remove);
+      + `<span class="tododesc" title="${esc(it.desc)}">${esc(it.desc)}</span><button class="todo-del" title="从待办移除此项（不影响页面内容）" aria-label="移除">✕</button>`;
+    row.querySelector('.todo-del')!.addEventListener('click', it.remove);
     box.appendChild(row);
   });
   const photo = items.some((it) => it.cls === 'photo');
@@ -2476,6 +2476,10 @@ body.dark .illbox #illHint{background:#202022;color:#e8e8ea;border-color:#3a3a3d
 .todochip.tray{color:#993c1d;background:#faece7}
 .todopg{flex:0 0 auto;font-size:10px;color:#B5402A;font-weight:700;font-variant-numeric:tabular-nums}
 .tododesc{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#3a3a3e}
+.todo-del{flex:0 0 auto;width:22px;height:22px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border:1px solid #e0ded7;border-radius:6px;background:#f6f5f1;color:#8a8a8e;font-size:12px;cursor:pointer;padding:0;transition:background .12s,color .12s,border-color .12s}
+.todo-del:hover{background:#B5402A;border-color:#B5402A;color:#fff}
+body.dark .todo-del{background:#242832;border-color:#333a45;color:#9a9a9e}
+body.dark .todo-del:hover{background:#B5402A;border-color:#B5402A;color:#fff}
 body.dark .illbox{background:#1c1f26;border-color:#2c323d}
 body.dark .illlabel{color:#9a9a9e}
 body.dark .seg{border-color:#333a46}
