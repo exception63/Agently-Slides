@@ -2958,7 +2958,9 @@ function buildUI(): void {
     <div class="libhead">
       <span class="ctitle">搜图</span>
       <input id="imgSearchQ" class="searchq" type="text" placeholder="描述画面，例：森林 晨雾 / teamwork office">
-      <select id="imgSearchSrc" class="searchsrc" title="图源"><option value="">默认</option><option value="pexels">Pexels · 精美</option><option value="google">Google · 网络图最多</option><option value="openverse">Openverse · 免密 CC</option></select>
+      <!-- Google 源已隐藏：其「搜索整个网络」被 Google 弃用、Custom Search API 将于 2027-01 停用。
+           bridge 仍支持 source=google（需 googleApiKey+googleSearchCx），要用把该 option 加回即可。 -->
+      <select id="imgSearchSrc" class="searchsrc" title="图源"><option value="">默认</option><option value="pexels">Pexels · 精美</option><option value="openverse">Openverse · 免密 CC</option></select>
       <button id="imgSearchGo" class="primary-mini">搜索</button>
       <button id="imgSearchClose" class="mini cclose">关闭</button>
     </div>
