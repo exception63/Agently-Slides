@@ -1244,23 +1244,45 @@ function wireHelp(): void {
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
   window.addEventListener('scroll', hide, true);
 }
+// 暂存盘：按「所属 slide」分组展示（缩略图自动换行，绝不横向滚动）。图片在导入时就绑定到
+// 当时选中的页（addTrayImage 用 currentSlideId），所以不再需要每张图选页——顶部提示「导入到第 N 页」
+// 跟随左侧选中；个别放错的用缩略图角上「⤴」一键移到当前选中页。
+function updateTrayTarget(): void {
+  const el = $('#trayTargetTxt'); if (!el) return;
+  const i = currentHtmlSlideIndex(); const s = htmlSlides[i];
+  el.textContent = s ? `第 ${i + 1} 页 · ${clip(s.title)}` : '（先在左侧选一页）';
+}
 function renderTray(): void {
   const grid = $('#trayGrid'); if (!grid) return;
   grid.innerHTML = '';
-  const opts = htmlSlides.map((s, i) => `<option value="${s.id}">${esc(`第 ${i + 1} 页 · ${s.title}`)}</option>`).join('');
-  trayImages.forEach((t) => {
-    const cell = document.createElement('div'); cell.className = 'tray-cell' + (t.placed ? ' placed' : '');
-    const dims = t.w && t.h ? `${t.w}×${t.h}` : '尺寸未知';
-    cell.innerHTML = `<div class="tray-thumb"><img alt="" src="${t.dataUrl}">${t.placed ? '<span class="tray-badge">已放置</span>' : ''}<button class="tray-del" title="移出暂存盘">✕</button></div>`
-      + `<div class="tray-name" title="${esc(t.name)}">${esc(t.name)}</div><div class="tray-meta">${dims}</div>`
-      + `<label class="tray-page">排到：<select class="tray-page-sel">${opts}</select></label>`
-      + `<input class="tray-note" placeholder="说明（可留空）：怎么用 / 放页面哪个位置" value="${(t.note || '').replace(/"/g, '&quot;')}">`;
-    cell.querySelector('.tray-del')!.addEventListener('click', () => removeTrayImage(t.id));
-    const sel = cell.querySelector('.tray-page-sel') as HTMLSelectElement;
-    sel.value = t.slideId; sel.addEventListener('change', () => { t.slideId = sel.value; });
-    const note = cell.querySelector('.tray-note') as HTMLInputElement;
-    note.addEventListener('input', () => { t.note = note.value; });
-    grid.appendChild(cell);
+  updateTrayTarget();
+  const bySlide = new Map<string, TrayImage[]>();
+  trayImages.forEach((t) => { const k = t.slideId || ''; if (!bySlide.has(k)) bySlide.set(k, []); bySlide.get(k)!.push(t); });
+  const inDeck = htmlSlides.map((s) => s.id).filter((id) => bySlide.has(id));
+  const orphans = [...bySlide.keys()].filter((k) => !htmlSlides.some((s) => s.id === k));
+  inDeck.concat(orphans).forEach((sid) => {
+    const imgs = bySlide.get(sid) || [];
+    const idx = htmlSlides.findIndex((s) => s.id === sid);
+    const label = idx >= 0 ? `第 ${idx + 1} 页 · ${htmlSlides[idx].title}` : '页面已删 · 请移到当前页或移除';
+    const group = document.createElement('div'); group.className = 'tray-group';
+    const head = document.createElement('div'); head.className = 'tray-group-head' + (idx >= 0 ? ' clickable' : '');
+    head.innerHTML = `<span class="tgh-label" title="${esc(label)}">${esc(label)}</span><span class="tgh-count">${imgs.length} 张</span>`;
+    if (idx >= 0) head.addEventListener('click', () => selectHtmlSlide(idx));
+    group.appendChild(head);
+    const wrap = document.createElement('div'); wrap.className = 'tray-imgs';
+    imgs.forEach((t) => {
+      const cell = document.createElement('div'); cell.className = 'tray-cell' + (t.placed ? ' placed' : '');
+      cell.innerHTML = `<div class="tray-thumb"><img alt="" src="${t.dataUrl}">${t.placed ? '<span class="tray-badge">已放置</span>' : ''}`
+        + `<button class="tray-move" title="移到当前选中的页">⤴</button><button class="tray-del" title="移出暂存盘">✕</button></div>`
+        + `<input class="tray-note" placeholder="说明（可留空）" value="${(t.note || '').replace(/"/g, '&quot;')}">`;
+      cell.querySelector('.tray-del')!.addEventListener('click', () => removeTrayImage(t.id));
+      cell.querySelector('.tray-move')!.addEventListener('click', () => { t.slideId = currentSlideId(); renderTray(); toast('已移到：' + slideLabel(t.slideId)); });
+      const note = cell.querySelector('.tray-note') as HTMLInputElement;
+      note.addEventListener('input', () => { t.note = note.value; });
+      wrap.appendChild(cell);
+    });
+    group.appendChild(wrap);
+    grid.appendChild(group);
   });
   const empty = $('#trayEmpty'); if (empty) (empty as HTMLElement).style.display = trayImages.length ? 'none' : '';
   renderTodo();
@@ -1956,6 +1978,7 @@ function updateAiTarget(): void {
   aiCurId = s ? s.id : '';
   const box = $('#aiInstruction') as HTMLTextAreaElement | null;
   if (box) box.value = aiCurId ? (aiInstructions[aiCurId] || '') : '';
+  updateTrayTarget();
   renderTodo();
 }
 // the active slide as the DECK sees it (ignores any stale element selection), so
@@ -2442,11 +2465,23 @@ button.primary-mini:hover{background:#9a3623}
 .tray-drop-in{display:flex;flex-direction:column;align-items:center;gap:5px;color:#7a766e;font-size:12px}
 .tray-drop-in b{font-size:13px;color:#3a3a3e}
 .tray-empty{font-size:12px;color:#9a9a9e;padding:2px 2px 6px}
-.tray-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
-.tray-cell{border:1px solid #ececee;border-radius:9px;background:#fff;padding:6px;display:flex;flex-direction:column;gap:4px}
+.tray-target{font-size:11px;color:#8a8a8e;margin:2px 0 6px}
+.tray-target b{color:#B5402A;font-weight:600}
+.tray-grid{display:flex;flex-direction:column;gap:12px;margin-bottom:8px}
+.tray-group{display:flex;flex-direction:column;gap:6px}
+.tray-group-head{display:flex;align-items:center;gap:8px;font-size:11px;color:#6a6a6e;padding:2px 2px 4px;border-bottom:1px solid #ececee}
+.tray-group-head.clickable{cursor:pointer}
+.tray-group-head.clickable:hover .tgh-label{color:#B5402A}
+.tgh-label{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.tgh-count{flex:0 0 auto;font-size:10px;color:#9a9a9e;font-variant-numeric:tabular-nums}
+.tray-imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.tray-cell{border:1px solid #ececee;border-radius:9px;background:#fff;padding:5px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .tray-cell.placed{border-color:#bfe3d5;background:#f4fbf8}
-.tray-thumb{position:relative;border-radius:6px;overflow:hidden;background:#f1efe9;height:74px;display:flex;align-items:center;justify-content:center}
+.tray-thumb{position:relative;border-radius:6px;overflow:hidden;background:#f1efe9;height:66px;display:flex;align-items:center;justify-content:center}
 .tray-thumb img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.tray-move{position:absolute;left:3px;top:3px;width:20px;height:20px;line-height:18px;border-radius:999px;border:none;background:rgba(20,20,22,.55);color:#fff;font-size:12px;cursor:pointer;padding:0;opacity:0;transition:opacity .12s}
+.tray-cell:hover .tray-move{opacity:1}
+.tray-move:hover{background:#0f6e56}
 .tray-badge{position:absolute;left:4px;top:4px;font-size:10px;color:#0f6e56;background:#e1f5ee;border-radius:999px;padding:1px 7px}
 .tray-del{position:absolute;right:3px;top:3px;width:20px;height:20px;line-height:18px;border-radius:999px;border:none;background:rgba(20,20,22,.55);color:#fff;font-size:11px;cursor:pointer;padding:0}
 .tray-del:hover{background:#B5402A}
@@ -2884,7 +2919,8 @@ function buildUI(): void {
         </div>
         <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
 
-        <div class="sechead">导入图片<button class="ihelp" type="button" data-help="拖入或导入你已有的图片，暂存到对应页；它们作为「导入图」进待办，由 AI 排好版。也可点右侧「搜图」直接从免费图库搜一张加入。">?</button><span class="grow"></span><button id="imgSearchOpen" class="mini" title="从免费图库搜图，点一下即加入暂存盘（无需手动下载导入）">搜图</button></div>
+        <div class="sechead">导入图片<button class="ihelp" type="button" data-help="流程：先在左侧点你要配图的那一页 → 再导入 / 搜图，图片就自动归到那一页 → 多页都配好后一键发给 AI 排版。放错了？点缩略图角上的「⤴」即可移到当前选中页。">?</button><span class="grow"></span><button id="imgSearchOpen" class="mini" title="从免费图库搜图，点一下即加入暂存盘（无需手动下载导入）">搜图</button></div>
+        <div class="tray-target" id="trayTarget">导入 / 搜图将加到：<b id="trayTargetTxt">（先在左侧选一页）</b></div>
         <div id="trayDrop" class="tray-drop"><div class="tray-drop-in"><b>拖拽图片到此处</b><span>或</span><button id="trayPick" class="mini">导入图片</button></div></div>
         <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
         <div id="trayGrid" class="tray-grid"></div>
