@@ -416,8 +416,11 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
           sendJson(res, { ok: true, source, hasPexels: hasKey, images });
         } catch (e) {
           const msg = String((e as Error).message || e);
-          if (source === 'pexels' && msg === 'no-pexels-key') { // asked for pexels but no key → fall back to key-free
-            try { const images = await searchOpenverse(query, page); sendJson(res, { ok: true, source: 'openverse', hasPexels: false, images }); return; } catch { /* fall through */ }
+          // Pexels failed for any reason (no key / bad-or-placeholder key / rate limit / network)
+          // → fall back to the key-free Openverse so search still works. The response's `source`
+          // field tells the UI it fell back, so the user sees they're on Openverse not Pexels.
+          if (source === 'pexels') {
+            try { const images = await searchOpenverse(query, page); sendJson(res, { ok: true, source: 'openverse', hasPexels: hasKey, fellBack: true, images }); return; } catch { /* fall through */ }
           }
           sendJson(res, { ok: false, error: msg, hasPexels: hasKey }, 502);
         }
