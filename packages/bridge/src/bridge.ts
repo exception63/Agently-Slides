@@ -60,6 +60,59 @@ function writeLibraryIndex(deck: string, images: LibImage[]): void {
 const IMG_MIME: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' };
 const mimeForFile = (f: string): string => IMG_MIME[(f.split('.').pop() || '').toLowerCase()] || 'application/octet-stream';
 
+// ---- stock photo search: Pexels (free key) + Openverse (key-free, CC / public-domain) ----
+// Lets the Studio search real photos and drop the picked one straight into the 暂存盘 (tray),
+// which base64-inlines it into the deck → the exported single-file HTML stays offline.
+// Pexels key resolves from PEXELS_API_KEY env or ~/.slidesmith/config.json {"pexelsApiKey":"…"}.
+function readSlidesmithConfig(): Record<string, unknown> {
+  const f = join(homedir(), '.slidesmith', 'config.json');
+  if (existsSync(f)) { try { return JSON.parse(readFileSync(f, 'utf8')) as Record<string, unknown>; } catch { /* corrupt → ignore */ } }
+  return {};
+}
+function pexelsKey(): string {
+  return (process.env['PEXELS_API_KEY'] || (readSlidesmithConfig()['pexelsApiKey'] as string) || '').trim();
+}
+interface StockImage { id: string; thumb: string; full: string; w: number; h: number; author: string; authorUrl: string; license: string; pageUrl: string; source: string; alt: string }
+async function searchPexels(query: string, page: number): Promise<StockImage[]> {
+  const key = pexelsKey(); if (!key) throw new Error('no-pexels-key');
+  const r = await fetch(`https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&per_page=24&page=${page}`, { headers: { Authorization: key } });
+  if (!r.ok) throw new Error('pexels ' + r.status);
+  const j = await r.json() as { photos?: Array<Record<string, unknown>> };
+  return (j.photos || []).map((p) => { const src = (p['src'] || {}) as Record<string, string>; return {
+    id: 'px-' + String(p['id']), thumb: src['medium'] || src['small'] || '', full: src['large2x'] || src['large'] || src['original'] || '',
+    w: Number(p['width']) || 0, h: Number(p['height']) || 0, author: String(p['photographer'] || ''), authorUrl: String(p['photographer_url'] || ''),
+    license: 'Pexels（免费可商用·无需署名）', pageUrl: String(p['url'] || ''), source: 'pexels', alt: String(p['alt'] || ''),
+  }; });
+}
+async function searchOpenverse(query: string, page: number): Promise<StockImage[]> {
+  // page_size ≤ 20 for anonymous callers (21+ → 401); license_type=commercial,modification keeps
+  // results safe for slides you present (commercially usable + croppable, attribution only).
+  const r = await fetch(`https://api.openverse.org/v1/images/?q=${encodeURIComponent(query)}&page_size=20&page=${page}&mature=false&license_type=commercial,modification`, { headers: { 'User-Agent': 'Slidesmith/1.0 (+studio image search)' } });
+  if (!r.ok) throw new Error('openverse ' + r.status);
+  const j = await r.json() as { results?: Array<Record<string, unknown>> };
+  return (j.results || []).map((p) => ({
+    // thumb from the source CDN (p.url), NOT the api.openverse.org /thumb/ proxy — the proxy is
+    // rate-limited to 5/hr for anonymous callers, so a 20-image grid mostly 401s → blank cells.
+    id: 'ov-' + String(p['id']), thumb: String(p['url'] || p['thumbnail'] || ''), full: String(p['url'] || ''),
+    w: Number(p['width']) || 0, h: Number(p['height']) || 0, author: String(p['creator'] || ''), authorUrl: String(p['creator_url'] || ''),
+    license: (String(p['license'] || '') + ' ' + String(p['license_version'] || '')).toUpperCase().trim() || 'CC', pageUrl: String(p['foreign_landing_url'] || ''), source: 'openverse', alt: String(p['title'] || ''),
+  }));
+}
+// download the picked image server-side (avoids CORS + canvas tainting) → data URL for the tray.
+async function fetchImageDataUrl(rawUrl: string): Promise<{ dataUrl: string; bytes: number }> {
+  let u: URL; try { u = new URL(rawUrl); } catch { throw new Error('bad url'); }
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('bad protocol');
+  const host = u.hostname.toLowerCase(); // SSRF guard: no loopback / private ranges
+  if (host === 'localhost' || host.endsWith('.local') || /^(0\.0\.0\.0|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) throw new Error('blocked host');
+  const r = await fetch(rawUrl, { headers: { 'User-Agent': 'Slidesmith/1.0' } });
+  if (!r.ok) throw new Error('fetch ' + r.status);
+  const ct = (r.headers.get('content-type') || '').toLowerCase();
+  if (!ct.startsWith('image/')) throw new Error('not an image');
+  const ab = await r.arrayBuffer();
+  if (ab.byteLength > 20 * 1024 * 1024) throw new Error('image too large (>20MB)');
+  return { dataUrl: `data:${ct.split(';')[0]};base64,${Buffer.from(ab).toString('base64')}`, bytes: ab.byteLength };
+}
+
 // ---- wire protocol (JSON over WebSocket) ----
 //   bridge → Studio : { type:'hello', hasDeck, owner, port } | { type:'import', name, html } | { type:'patch', text, preview }
 //   Studio → bridge : { type:'ready' } | { type:'requests', request, images? } | { type:'exported', name, html }
@@ -347,6 +400,38 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
         const idx = readLibraryIndex(deck); writeLibraryIndex(deck, idx.images.filter((im) => im.file !== file));
         sendJson(res, { ok: true, deck, file });
       } catch (e) { sendJson(res, { ok: false, error: String(e) }, 400); }
+      return;
+    }
+    // GET /api/image-search?q=&source=pexels|openverse&page=N → stock photo search.
+    // Default source = pexels if a key is configured, else openverse (key-free). Never leaks the key.
+    if (url === '/api/image-search' && req.method === 'GET') {
+      const query = q('q').trim();
+      const page = Math.max(1, parseInt(q('page') || '1', 10) || 1);
+      const hasKey = !!pexelsKey();
+      let source = q('source'); if (source !== 'pexels' && source !== 'openverse') source = hasKey ? 'pexels' : 'openverse';
+      if (!query) { sendJson(res, { ok: false, error: 'empty query', hasPexels: hasKey }, 400); return; }
+      void (async () => {
+        try {
+          const images = source === 'pexels' ? await searchPexels(query, page) : await searchOpenverse(query, page);
+          sendJson(res, { ok: true, source, hasPexels: hasKey, images });
+        } catch (e) {
+          const msg = String((e as Error).message || e);
+          if (source === 'pexels' && msg === 'no-pexels-key') { // asked for pexels but no key → fall back to key-free
+            try { const images = await searchOpenverse(query, page); sendJson(res, { ok: true, source: 'openverse', hasPexels: false, images }); return; } catch { /* fall through */ }
+          }
+          sendJson(res, { ok: false, error: msg, hasPexels: hasKey }, 502);
+        }
+      })();
+      return;
+    }
+    // GET /api/image-fetch?url=<encoded> → download the picked image server-side → { dataUrl }
+    if (url === '/api/image-fetch' && req.method === 'GET') {
+      const raw = q('url');
+      if (!raw) { sendJson(res, { ok: false, error: 'no url' }, 400); return; }
+      void (async () => {
+        try { const { dataUrl, bytes } = await fetchImageDataUrl(raw); sendJson(res, { ok: true, dataUrl, bytes }); }
+        catch (e) { sendJson(res, { ok: false, error: String((e as Error).message || e) }, 502); }
+      })();
       return;
     }
     res.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });

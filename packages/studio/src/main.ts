@@ -1203,11 +1203,11 @@ function extFromDataUrl(u: string): string {
 // the page an image binds to = the page that's active when it's added (req: "在第7页加图→只排到第7页")
 function currentSlideId(): string { const i = currentHtmlSlideIndex(); return htmlSlides[i]?.id || htmlSlides[0]?.id || ''; }
 // load an image into the tray, measuring its natural pixel size (so the AI knows the aspect)
-function addTrayImage(name: string, dataUrl: string): void {
+function addTrayImage(name: string, dataUrl: string, note = ''): void {
   const sid = currentSlideId();
   const im = new Image();
   const finish = (w: number, h: number) => {
-    trayImages.push({ id: 'img-' + (++traySeq), name: name || ('image-' + traySeq), dataUrl, w, h, note: '', placed: false, slideId: sid });
+    trayImages.push({ id: 'img-' + (++traySeq), name: name || ('image-' + traySeq), dataUrl, w, h, note, placed: false, slideId: sid });
     renderTray();
   };
   im.onload = () => finish(im.naturalWidth || 0, im.naturalHeight || 0);
@@ -1464,6 +1464,60 @@ async function libDelete(file: string): Promise<void> {
   if (!confirm('确定从图片库删除这张图片？（不影响已插入到 deck 里的副本）')) return;
   try { await fetch(`${libBase()}/api/library/remove?deck=${encodeURIComponent(fileBase)}&file=${encodeURIComponent(file)}`, { method: 'POST' }); await loadLibrary(); toast('已从图片库删除'); }
   catch (e) { toast('删除失败：' + (e as Error).message, true); }
+}
+// ---- 搜图: stock photo search (via bridge) → pick → 暂存盘 (tray) ----
+interface SearchImage { id: string; thumb: string; full: string; w: number; h: number; author: string; authorUrl: string; license: string; pageUrl: string; source: string; alt: string }
+function openImageSearch(): void {
+  const m = $('#searchModal'); if (!m) return;
+  m.style.display = 'flex';
+  const q = $('#imgSearchQ') as HTMLInputElement | null;
+  if (q) { if (!q.value.trim()) q.value = (mode === 'html' && htmlSlides[cur]) ? htmlSlides[cur].title : ''; q.focus(); q.select(); }
+}
+function closeImageSearch(): void { const m = $('#searchModal'); if (m) m.style.display = 'none'; }
+async function runImageSearch(): Promise<void> {
+  const q = ($('#imgSearchQ') as HTMLInputElement).value.trim();
+  const src = ($('#imgSearchSrc') as HTMLSelectElement).value;
+  const grid = $('#imgSearchGrid'); if (!grid) return;
+  if (!q) { grid.innerHTML = '<div class="qempty">先输入关键词，再点搜索。</div>'; return; }
+  grid.innerHTML = '<div class="qempty">搜索中…</div>';
+  try {
+    const r = await fetch(`${libBase()}/api/image-search?q=${encodeURIComponent(q)}${src ? `&source=${src}` : ''}`);
+    if (!r.ok && r.status === 404) { grid.innerHTML = '<div class="qempty">搜图接口未就绪。请重启桥接（新开一个 /slidesmith 会话或重新 slidesmith serve）后再试。</div>'; return; }
+    const j = await r.json() as { ok: boolean; source?: string; hasPexels?: boolean; images?: SearchImage[]; error?: string };
+    if (!j.ok) {
+      const pex = /pexels/i.test(j.error || '');
+      grid.innerHTML = `<div class="qempty">搜索失败：${esc(j.error || '未知错误')}${pex ? '<br>（未配置 Pexels key：改用上方「Openverse」图源，或在 <code>~/.slidesmith/config.json</code> 填 <code>{"pexelsApiKey":"你的key"}</code> 后重启桥接）' : ''}</div>`;
+      return;
+    }
+    const imgs = j.images || [];
+    const hint = $('#imgSearchHint');
+    if (hint) hint.innerHTML = `来自 <b>${j.source === 'pexels' ? 'Pexels（免费可商用·无需署名）' : 'Openverse（CC·会自动带上署名）'}</b> · 点缩略图即加入暂存盘。`;
+    if (!imgs.length) { grid.innerHTML = '<div class="qempty">没找到相关图片，换个关键词或图源试试。</div>'; return; }
+    grid.innerHTML = '';
+    imgs.forEach((im) => {
+      const cell = document.createElement('div'); cell.className = 'lib-cell searchcell';
+      cell.innerHTML = `<div class="lib-thumb"><img loading="lazy" alt="" src="${esc(im.thumb)}"></div>`
+        + `<div class="lib-meta">${esc(im.author || im.alt || '—')}</div>`
+        + `<div class="searchlic">${esc(im.license || '')}</div>`
+        + `<span class="searchbadge">已加入 ✓</span>`;
+      cell.addEventListener('click', () => pickSearchImage(im, cell));
+      grid.appendChild(cell);
+    });
+  } catch (e) { grid.innerHTML = '<div class="qempty">搜索失败：' + esc(String((e as Error).message || e)) + '</div>'; }
+}
+async function pickSearchImage(im: SearchImage, cell: HTMLElement): Promise<void> {
+  if (cell.classList.contains('picking') || cell.classList.contains('picked')) return;
+  cell.classList.add('picking');
+  try {
+    const r = await fetch(`${libBase()}/api/image-fetch?url=${encodeURIComponent(im.full || im.thumb)}`);
+    const j = await r.json() as { ok: boolean; dataUrl?: string; error?: string };
+    if (!j.ok || !j.dataUrl) { toast('下载失败：' + (j.error || '未知'), true); cell.classList.remove('picking'); return; }
+    const name = ((im.alt || im.author || 'photo').slice(0, 40).replace(/[^\w一-鿿]+/g, '-').replace(/^-+|-+$/g, '')) || 'photo';
+    const credit = im.source === 'pexels' ? `Pexels / ${im.author}` : (im.author ? `${im.author}（${im.license}）` : im.license);
+    addTrayImage(name, j.dataUrl, credit);
+    cell.classList.remove('picking'); cell.classList.add('picked');
+    toast('已加入暂存盘：' + name + '（在「导入图片」下方，含署名）');
+  } catch (e) { cell.classList.remove('picking'); toast('下载失败：' + String((e as Error).message || e), true); }
 }
 // after an AI patch lands, swap placeholder <img data-img-id> for the real staged image.
 // Runs on the parsed <section> (parent doc) before its outerHTML is harvested.
@@ -2421,6 +2475,16 @@ body.dark .gen-hint{background:#12151b;border-color:#2c323d;color:#cfd2d8}
 .lib-meta{font-size:11px;color:#3a3a3e;line-height:1.35;max-height:2.7em;overflow:hidden}
 .lib-sub{font-size:10px;color:#9a9a9e}
 .lib-cell .oprow{margin-top:auto}
+.searchq{flex:1;min-width:120px;height:32px;border:1px solid #d8d6cf;border-radius:7px;padding:0 11px;font-size:13px;font-family:inherit;background:#fff;color:#222}
+.searchsrc{height:32px;border:1px solid #d8d6cf;border-radius:7px;font-size:12px;font-family:inherit;background:#fff;color:#333}
+.searchcell{position:relative;cursor:pointer;transition:transform .1s,box-shadow .1s}
+.searchcell:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(0,0,0,.12)}
+.searchcell.picked{outline:2px solid #0f6e56;outline-offset:1px}
+.searchcell .searchbadge{position:absolute;top:12px;right:12px;background:#0f6e56;color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;opacity:0;transition:opacity .12s}
+.searchcell.picked .searchbadge{opacity:1}
+.searchcell.picking{opacity:.6;pointer-events:none}
+.searchlic{font-size:10px;color:#8a8a8e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.dark .searchq,body.dark .searchsrc{background:#12151b;border-color:#333a45;color:#e6e6e8}
 body.dark .libbox{background:#181a1f}
 body.dark .libhead{border-color:#2c323d}
 body.dark .libhead .ctitle{color:#e6e6e8}
@@ -2812,7 +2876,7 @@ function buildUI(): void {
         </div>
         <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
 
-        <div class="sechead">导入图片<button class="ihelp" type="button" data-help="拖入或导入你已有的图片，暂存到对应页；它们作为「导入图」进待办，由 AI 排好版。">?</button></div>
+        <div class="sechead">导入图片<button class="ihelp" type="button" data-help="拖入或导入你已有的图片，暂存到对应页；它们作为「导入图」进待办，由 AI 排好版。也可点右侧「搜图」直接从免费图库搜一张加入。">?</button><span class="grow"></span><button id="imgSearchOpen" class="mini" title="从免费图库搜图，点一下即加入暂存盘（无需手动下载导入）">搜图</button></div>
         <div id="trayDrop" class="tray-drop"><div class="tray-drop-in"><b>拖拽图片到此处</b><span>或</span><button id="trayPick" class="mini">导入图片</button></div></div>
         <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
         <div id="trayGrid" class="tray-grid"></div>
@@ -2883,6 +2947,19 @@ function buildUI(): void {
     <div class="libhead"><span class="ctitle">图片库</span><span id="libCount" class="lib-count"></span><span class="grow"></span><button id="libReload" class="mini">刷新</button><button id="libClose" class="mini cclose">关闭</button></div>
     <div class="libhint">本 deck 用 codex 生成过的图片（存于 ~/.slidesmith/library/）。可重新插入到对应页，或删除以便管理。</div>
     <div id="libGrid" class="libgrid"></div>
+  </div>
+</div>
+<div class="libmodal" id="searchModal" style="display:none">
+  <div class="libbox">
+    <div class="libhead">
+      <span class="ctitle">搜图</span>
+      <input id="imgSearchQ" class="searchq" type="text" placeholder="描述画面，例：森林 晨雾 / teamwork office">
+      <select id="imgSearchSrc" class="searchsrc" title="图源"><option value="">默认</option><option value="pexels">Pexels · 精美</option><option value="openverse">Openverse · 免密 CC</option></select>
+      <button id="imgSearchGo" class="primary-mini">搜索</button>
+      <button id="imgSearchClose" class="mini cclose">关闭</button>
+    </div>
+    <div class="libhint" id="imgSearchHint">点缩略图即下载并加入「暂存盘」，随后在待办里交给 AI 排版；图片内联进 HTML，导出后离线可用。默认走 Pexels（需一次性免费 key），未配置则自动用 Openverse（免密·CC，需署名）。</div>
+    <div id="imgSearchGrid" class="libgrid"></div>
   </div>
 </div>
 <div class="helppop" id="helpPop"></div>`;
@@ -3052,6 +3129,12 @@ function buildUI(): void {
   $('#libClose').addEventListener('click', closeLibrary);
   $('#libReload').addEventListener('click', loadLibrary);
   $('#libModal').addEventListener('click', (e) => { if (e.target === $('#libModal')) closeLibrary(); });
+  $('#imgSearchOpen').addEventListener('click', openImageSearch);
+  $('#imgSearchClose').addEventListener('click', closeImageSearch);
+  $('#imgSearchGo').addEventListener('click', () => { void runImageSearch(); });
+  $('#imgSearchSrc').addEventListener('change', () => { if (($('#imgSearchQ') as HTMLInputElement).value.trim()) void runImageSearch(); });
+  $('#imgSearchQ').addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') { e.preventDefault(); void runImageSearch(); } });
+  $('#searchModal').addEventListener('click', (e) => { if (e.target === $('#searchModal')) closeImageSearch(); });
   wireHelp();
   renderTodo();
   { const z = $('#trayDrop'); if (z) {
