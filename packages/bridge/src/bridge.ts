@@ -98,6 +98,26 @@ async function searchOpenverse(query: string, page: number): Promise<StockImage[
     license: (String(p['license'] || '') + ' ' + String(p['license_version'] || '')).toUpperCase().trim() || 'CC', pageUrl: String(p['foreign_landing_url'] || ''), source: 'openverse', alt: String(p['title'] || ''),
   }));
 }
+// Google Images via the Custom Search JSON API — searches the whole web (largest pool).
+// Needs a Google API key + a Programmable Search Engine id (cx, "search entire web" + image on).
+// Results are arbitrary web images (licensing not filtered) → for internal / no-copyright-issue use.
+function googleKey(): string { return (process.env['GOOGLE_API_KEY'] || (readSlidesmithConfig()['googleApiKey'] as string) || '').trim(); }
+function googleCx(): string { return (process.env['GOOGLE_SEARCH_CX'] || (readSlidesmithConfig()['googleSearchCx'] as string) || '').trim(); }
+async function searchGoogle(query: string, page: number): Promise<StockImage[]> {
+  const key = googleKey(), cx = googleCx();
+  if (!key || !cx) throw new Error('no-google-config');
+  const start = (page - 1) * 10 + 1; // CSE: 10/page, 1-based start, max start=91 (100 results)
+  if (start > 91) return [];
+  const params = new URLSearchParams({ key, cx, q: query, searchType: 'image', num: '10', start: String(start), safe: 'active' });
+  const r = await fetch(`https://www.googleapis.com/customsearch/v1?${params.toString()}`);
+  if (!r.ok) { const t = await r.text().catch(() => ''); throw new Error('google ' + r.status + (t ? ' ' + t.slice(0, 200) : '')); }
+  const j = await r.json() as { items?: Array<Record<string, unknown>> };
+  return (j.items || []).map((it) => { const img = (it['image'] || {}) as Record<string, unknown>; return {
+    id: 'gg-' + String(it['link'] || ''), thumb: String(img['thumbnailLink'] || it['link'] || ''), full: String(it['link'] || ''),
+    w: Number(img['width']) || 0, h: Number(img['height']) || 0, author: String(it['displayLink'] || ''), authorUrl: String(img['contextLink'] || ''),
+    license: 'Google · 网络来源（自行确认版权）', pageUrl: String(img['contextLink'] || ''), source: 'google', alt: String(it['title'] || ''),
+  }; });
+}
 // download the picked image server-side (avoids CORS + canvas tainting) → data URL for the tray.
 async function fetchImageDataUrl(rawUrl: string): Promise<{ dataUrl: string; bytes: number }> {
   let u: URL; try { u = new URL(rawUrl); } catch { throw new Error('bad url'); }
@@ -407,22 +427,24 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     if (url === '/api/image-search' && req.method === 'GET') {
       const query = q('q').trim();
       const page = Math.max(1, parseInt(q('page') || '1', 10) || 1);
-      const hasKey = !!pexelsKey();
-      let source = q('source'); if (source !== 'pexels' && source !== 'openverse') source = hasKey ? 'pexels' : 'openverse';
-      if (!query) { sendJson(res, { ok: false, error: 'empty query', hasPexels: hasKey }, 400); return; }
+      const hasKey = !!pexelsKey(); const hasGoogle = !!(googleKey() && googleCx());
+      let source = q('source'); if (source !== 'pexels' && source !== 'openverse' && source !== 'google') source = hasKey ? 'pexels' : 'openverse';
+      const meta = { hasPexels: hasKey, hasGoogle };
+      if (!query) { sendJson(res, { ok: false, error: 'empty query', ...meta }, 400); return; }
       void (async () => {
         try {
-          const images = source === 'pexels' ? await searchPexels(query, page) : await searchOpenverse(query, page);
-          sendJson(res, { ok: true, source, hasPexels: hasKey, images });
+          const images = source === 'pexels' ? await searchPexels(query, page) : source === 'google' ? await searchGoogle(query, page) : await searchOpenverse(query, page);
+          sendJson(res, { ok: true, source, ...meta, images });
         } catch (e) {
           const msg = String((e as Error).message || e);
           // Pexels failed for any reason (no key / bad-or-placeholder key / rate limit / network)
           // → fall back to the key-free Openverse so search still works. The response's `source`
           // field tells the UI it fell back, so the user sees they're on Openverse not Pexels.
+          // Google is opt-in: surface its error (esp. no-google-config) so the user sets it up.
           if (source === 'pexels') {
-            try { const images = await searchOpenverse(query, page); sendJson(res, { ok: true, source: 'openverse', hasPexels: hasKey, fellBack: true, images }); return; } catch { /* fall through */ }
+            try { const images = await searchOpenverse(query, page); sendJson(res, { ok: true, source: 'openverse', ...meta, fellBack: true, images }); return; } catch { /* fall through */ }
           }
-          sendJson(res, { ok: false, error: msg, hasPexels: hasKey }, 502);
+          sendJson(res, { ok: false, error: msg, ...meta }, 502);
         }
       })();
       return;

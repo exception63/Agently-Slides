@@ -1483,15 +1483,19 @@ async function runImageSearch(): Promise<void> {
   try {
     const r = await fetch(`${libBase()}/api/image-search?q=${encodeURIComponent(q)}${src ? `&source=${src}` : ''}`);
     if (!r.ok && r.status === 404) { grid.innerHTML = '<div class="qempty">搜图接口未就绪。请重启桥接（新开一个 /slidesmith 会话或重新 slidesmith serve）后再试。</div>'; return; }
-    const j = await r.json() as { ok: boolean; source?: string; hasPexels?: boolean; images?: SearchImage[]; error?: string };
+    const j = await r.json() as { ok: boolean; source?: string; hasPexels?: boolean; hasGoogle?: boolean; images?: SearchImage[]; error?: string };
     if (!j.ok) {
-      const pex = /pexels/i.test(j.error || '');
-      grid.innerHTML = `<div class="qempty">搜索失败：${esc(j.error || '未知错误')}${pex ? '<br>（未配置 Pexels key：改用上方「Openverse」图源，或在 <code>~/.slidesmith/config.json</code> 填 <code>{"pexelsApiKey":"你的key"}</code> 后重启桥接）' : ''}</div>`;
+      const err = j.error || '未知错误';
+      let extra = '';
+      if (/google|no-google-config/i.test(err)) extra = '<br>（未配置 Google：在 <code>~/.slidesmith/config.json</code> 填 <code>googleApiKey</code> 与 <code>googleSearchCx</code> 后重启桥接；或先用其它图源）';
+      else if (/pexels/i.test(err)) extra = '<br>（未配置 Pexels key：改用其它图源，或在 <code>~/.slidesmith/config.json</code> 填 <code>pexelsApiKey</code> 后重启桥接）';
+      grid.innerHTML = `<div class="qempty">搜索失败：${esc(err)}${extra}</div>`;
       return;
     }
     const imgs = j.images || [];
     const hint = $('#imgSearchHint');
-    if (hint) hint.innerHTML = `来自 <b>${j.source === 'pexels' ? 'Pexels（免费可商用·无需署名）' : 'Openverse（CC·会自动带上署名）'}</b> · 点缩略图即加入暂存盘。`;
+    const srcLabel = j.source === 'pexels' ? 'Pexels（免费可商用·无需署名）' : j.source === 'google' ? 'Google 图片（网络来源·自行确认版权）' : 'Openverse（CC·会自动带上署名）';
+    if (hint) hint.innerHTML = `来自 <b>${srcLabel}</b> · 点缩略图即加入暂存盘。`;
     if (!imgs.length) { grid.innerHTML = '<div class="qempty">没找到相关图片，换个关键词或图源试试。</div>'; return; }
     grid.innerHTML = '';
     imgs.forEach((im) => {
@@ -2954,7 +2958,7 @@ function buildUI(): void {
     <div class="libhead">
       <span class="ctitle">搜图</span>
       <input id="imgSearchQ" class="searchq" type="text" placeholder="描述画面，例：森林 晨雾 / teamwork office">
-      <select id="imgSearchSrc" class="searchsrc" title="图源"><option value="">默认</option><option value="pexels">Pexels · 精美</option><option value="openverse">Openverse · 免密 CC</option></select>
+      <select id="imgSearchSrc" class="searchsrc" title="图源"><option value="">默认</option><option value="pexels">Pexels · 精美</option><option value="google">Google · 网络图最多</option><option value="openverse">Openverse · 免密 CC</option></select>
       <button id="imgSearchGo" class="primary-mini">搜索</button>
       <button id="imgSearchClose" class="mini cclose">关闭</button>
     </div>
