@@ -14,6 +14,7 @@
 4. **分工**：人做高频细活（点字/换色/字号/动画/移删元素，即时零 token）；AI 做模糊重活（经待办）。
 
 ## ✅ 当前状态（已完成，详见 history.md）
+- **【新 2026-06-30】设计旋钮面板（借鉴 BuilderIO/agent-native 的 Tweaks）**：Studio 右栏 `#htmlpanel` 新增「设计」tab（在 格式 与 动画效果 之间），deck 级全局旋钮：主色/强调2/背景/文字（复用 `setHtmlToken`）+ 标题/正文字体（`setHtmlTokenFont` → `--font-display`/`--font-sans`，google 字体进 `usedFontIds` 一并导出）+ 字号/留白滑块（`applyTweakScale` 按当前皮肤 `:root` 基准 `tweakBaseMap()` 整体缩放 `--t-*` / `--pad-*`，70–130%）+ 复原。**即时生效·零 token·写入 H.overrides → 经 htmlOpenTag 烘焙进导出**。换皮时 `reapplyTweaksForSkin` 按新皮基准保持比例。已知边界：少数皮肤封面巨标题用硬编码 px（如 editorial `.cover__title:168px`、academic `.secdiv__lead:30px`），不随字号旋钮变（提示已写明）；走令牌的（academic `.title`=`--t-h2`、`.eyebrow`、`.body` 等）正常缩放。Playwright 全验证：4 tab 正常、老功能 9/9·6/6·4/4 全在、undo/redo + 复原 OK、导出 `<html style>` 含全部覆盖。源 `packages/studio/src/main.ts`，已 `build-studio.mjs` 重建。
 - **【新 2026-06-29】PDF 导出满版修正**：「导出 PDF」改走 **bridge headless 渲染**（`playwright-core` + `preferCSSPageSize:true`）→ 精确 16:9 满版矢量 PDF、一键、自动打开、存在 deck 同目录（无 deck 路径则 `~/.slidesmith/exports/`）。standalone file:// 保留 `window.print()` 兜底。实测 virtual-journeys 22 页全 20×11.25in 满版、矢量文字。详见 [[pdf-export-via-bridge]]。**改了 bridge.ts，新端点要重启 MCP/bridge 进程才生效（下个会话自动生效）**。
 - **Studio** 单文件离线编辑器（`studio/slidesmith-studio.html`，源 `packages/studio/src/main.ts`）+ **bridge** MCP（`packages/bridge`）+ **plugin**（已装，`/slidesmith:*` 技能 + MCP）。
 - **AI 待办面板**：对整份 deck / 本页改字 / 配图（**矢量 SVG · 图表 · 照片 codex**）/ 导入图 → 统一一键发送；ⓘ 弹出式说明；图片库（`~/.slidesmith/library/`）；视觉自检。

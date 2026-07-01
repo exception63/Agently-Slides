@@ -334,7 +334,10 @@ function renderSkinGallery(): void {
 }
 function applySkinFromGallery(n: string): void {
   if (mode !== 'html' || n === H.skin) return;
-  harvestAll(); pushHistory('skin'); H.skin = n; applySkinLive(); refreshHtmlInspector(); markDirty();
+  const tf = tweakFactor('--t-body'), pf = tweakFactor('--pad-x'); // 旧皮基准下的当前缩放比例
+  harvestAll(); pushHistory('skin'); H.skin = n; applySkinLive();
+  reapplyTweaksForSkin(tf, pf); // 按新皮基准重算字号/留白，保持比例
+  refreshHtmlInspector(); markDirty();
   const sel = $('#hSkin') as HTMLSelectElement | null; if (sel) sel.value = n;
   renderSkinGallery();
   toast(n ? '已换装：' + (SKINS[n] ? SKINS[n].label || n : n) : '已恢复原始皮肤');
@@ -1696,6 +1699,72 @@ function setHtmlToken(name: string, val: string): void {
   if (d) d.documentElement.style.setProperty(name, val);
   markDirty();
 }
+// —— 设计旋钮（deck 级）：字体 / 字号 / 留白，全部落到 H.overrides（与配色同一条覆盖通道，
+// 经 htmlOpenTag 烘焙进导出）。字号 / 留白按「设计令牌整体缩放」实现：从当前皮肤（或 deck 原始）
+// 的 :root 基准值乘以系数，对所有用令牌的文本一致生效，可逆、可撤销、可导出。
+const TWEAK_TYPE_TOKENS = ['--t-display', '--t-h1', '--t-h2', '--t-h3', '--t-h4', '--t-lead', '--t-body', '--t-small', '--t-eyebrow'];
+const TWEAK_PAD_TOKENS = ['--pad-x', '--pad-y'];
+function scaleLen(v: string, f: number): string | null {
+  const m = String(v).trim().match(/^(-?\d*\.?\d+)(px|rem|em)$/);
+  if (!m) return null;
+  return (Math.round(parseFloat(m[1]) * f * 100) / 100) + m[2];
+}
+// 缩放基准 = 当前皮肤 bundle 的 :root 令牌（合并所有 :root 块，后者覆盖前者）；无皮肤时用 deck 原始 baseTokens。
+function tweakBaseMap(): Record<string, string> {
+  const css = (H.skin && (SKINS as Record<string, { css: string }>)[H.skin]) ? (SKINS as Record<string, { css: string }>)[H.skin].css : '';
+  if (!css) return H.baseTokens;
+  const out: Record<string, string> = {};
+  const re = /:root[^{]*\{([^}]*)\}/g; let m: RegExpExecArray | null;
+  while ((m = re.exec(css))) m[1].split(';').forEach((d) => { const i = d.indexOf(':'); if (i > 0) { const k = d.slice(0, i).trim(); if (k.startsWith('--')) out[k] = d.slice(i + 1).trim(); } });
+  return out;
+}
+function setHtmlTokenFont(token: string, id: string): void {
+  const f = FONT_BY_ID[id];
+  if (!id || !f) { // 默认（回到皮肤字体）
+    pushHistory('token:' + token);
+    delete H.overrides[token];
+    const d = ($('#preview') as HTMLIFrameElement).contentDocument;
+    if (d) d.documentElement.style.removeProperty(token);
+    markDirty(); return;
+  }
+  setHtmlToken(token, f.stack);
+  if (f.google) { usedFontIds.add(f.id); ensureFontLoaded(f); }
+}
+function writeTweakScale(kind: 'type' | 'pad', f: number): void {
+  const base = tweakBaseMap();
+  const toks = kind === 'type' ? TWEAK_TYPE_TOKENS : TWEAK_PAD_TOKENS;
+  const d = ($('#preview') as HTMLIFrameElement).contentDocument;
+  toks.forEach((T) => {
+    const b = base[T]; if (!b) return;
+    if (Math.abs(f - 1) < 0.005) { delete H.overrides[T]; if (d) d.documentElement.style.removeProperty(T); return; }
+    const v = scaleLen(b, f); if (!v) return;
+    H.overrides[T] = v; if (d) d.documentElement.style.setProperty(T, v);
+  });
+}
+function applyTweakScale(kind: 'type' | 'pad', f: number): void {
+  pushHistory('tweak:' + kind); // 同 tag 700ms 内合并 → 整次拖动只占一步撤销
+  writeTweakScale(kind, f);
+  markDirty();
+}
+// 换皮时调用：保持「当前缩放比例」不变，按新皮的 :root 基准重算字号/留白的绝对值（否则旧皮算出的
+// 绝对 px 相对新皮基准比例会失真）。在 pushHistory('skin') 之后、与换皮同属一步撤销。
+function reapplyTweaksForSkin(typeF: number, padF: number): void {
+  writeTweakScale('type', typeF);
+  writeTweakScale('pad', padF);
+}
+function tweakFactor(repToken: string): number {
+  const b = tweakBaseMap()[repToken]; const ov = H.overrides[repToken];
+  if (!b || !ov) return 1;
+  const nb = parseFloat(b), no = parseFloat(ov);
+  return nb ? no / nb : 1;
+}
+function resetDesignKnobs(): void {
+  pushHistory('tweak:reset');
+  const d = ($('#preview') as HTMLIFrameElement).contentDocument;
+  ['--accent', '--accent-2', '--paper', '--ink', '--font-display', '--font-sans'].concat(TWEAK_TYPE_TOKENS, TWEAK_PAD_TOKENS)
+    .forEach((T) => { delete H.overrides[T]; if (d) d.documentElement.style.removeProperty(T); });
+  refreshHtmlInspector(); markDirty();
+}
 function refreshHtmlInspector(): void {
   // theme switching is handled by the deck's OWN control (visible in full-deck view),
   // so we don't duplicate it here (avoids a localStorage tug-of-war).
@@ -1703,6 +1772,17 @@ function refreshHtmlInspector(): void {
   const skinSel = $('#hSkin') as HTMLSelectElement | null; if (skinSel) skinSel.value = H.skin || '';
   const tk = (name: string, id: string) => { const inp = $(id) as HTMLInputElement; if (inp) inp.value = toHex(H.overrides[name] || H.baseTokens[name] || '') || '#888888'; };
   tk('--accent', '#hAccent'); tk('--paper', '#hPaper'); tk('--ink', '#hInk');
+  // 设计旋钮 tab：颜色镜像 H.overrides，字体下拉按覆盖的字体栈反查，字号/留白滑块按基准比值反推
+  tk('--accent', '#dAccent'); tk('--accent-2', '#dAccent2'); tk('--paper', '#dPaper'); tk('--ink', '#dInk');
+  const fontSel = (id: string, name: string) => { const s = $(id) as HTMLSelectElement | null; if (s) s.value = fontIdForStack(H.overrides[name] || ''); };
+  fontSel('#dFontDisplay', '--font-display'); fontSel('#dFontSans', '--font-sans');
+  const rng = (id: string, out: string, rep: string) => {
+    const s = $(id) as HTMLInputElement | null; const o = $(out) as HTMLElement | null;
+    const pct = Math.round(tweakFactor(rep) * 100);
+    if (s) s.value = String(Math.max(70, Math.min(130, pct)));
+    if (o) o.textContent = pct + '%';
+  };
+  rng('#dType', '#dTypeOut', '--t-body'); rng('#dPad', '#dPadOut', '--pad-x');
 }
 function exportHtmlDeck(): string {
   harvestAll();
@@ -2443,6 +2523,11 @@ body.dragging .drop{display:flex;background:rgba(181,64,42,.12);border-color:#B5
 .inscard:hover{border-color:#c9b3ac;background:#fbf7f6}
 .inscard b{font-size:14px;color:#1c1c1f;font-weight:600}.inscard span{font-size:12px;color:#8a8a8e;line-height:1.5}
 .hpane{flex:1;overflow:auto;padding:16px}
+#htmlpanel input[type=range]{width:100%;margin:6px 0 2px;accent-color:#B5402A;cursor:pointer}
+body.dark #htmlpanel input[type=range]{accent-color:#f0b34a}
+.tweakout{font-weight:700;color:#B5402A;font-variant-numeric:tabular-nums;margin-left:4px}
+body.dark .tweakout{color:#f0b34a}
+.dghint{font-size:11px;color:#8a8a8e;line-height:1.55;margin-top:10px}
 .gallery-btn{width:100%;margin:6px 0 10px;padding:11px;border:0;border-radius:10px;background:#B5402A;color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
 .gallery-btn:hover{background:#9a3522}.gallery-btn:active{transform:scale(.99)}
 body.dark .gallery-btn{background:#f0b34a;color:#1c1c1f}
@@ -2591,6 +2676,7 @@ function buildUI(): void {
     <div id="htmlpanel" style="display:none">
       <div class="htabs">
         <button class="htab active" data-htab="fmt">格式</button>
+        <button class="htab" data-htab="design">设计</button>
         <button class="htab" data-htab="anim">动画效果</button>
         <button class="htab" data-htab="ai">AI 修改</button>
       </div>
@@ -2639,6 +2725,28 @@ function buildUI(): void {
           <div class="hint" style="margin-top:0">拖动选框上方的 <b>✥</b> 可移动，拖动右下角的 <b>◢</b> 可调整大小。</div>
           <div class="oprow"><button id="hElUp" title="次序上移">↑ 次序</button><button id="hElDown" title="次序下移">↓ 次序</button><button id="hElDel" class="danger" title="删除该元素">删除</button></div>
         </div>
+      </div>
+
+      <!-- ===== 设计旋钮（deck 级 · 即时生效 · 零 token） ===== -->
+      <div class="pane hpane" data-hpane="design" hidden>
+        <div class="sechead sectop">整份 deck 的设计旋钮<button class="ihelp" type="button" data-help="对整份 deck 生效的「全局旋钮」：主色 / 字体 / 字号 / 留白。拖一下立刻变、零 token、不经过 AI——人手高频细活就在这里调。">?</button></div>
+        <h3>配色</h3>
+        <div class="grid2">
+          <div class="field"><label>主色</label><input id="dAccent" type="color"></div>
+          <div class="field"><label>强调色 2</label><input id="dAccent2" type="color"></div>
+        </div>
+        <div class="grid2">
+          <div class="field"><label>背景色</label><input id="dPaper" type="color"></div>
+          <div class="field"><label>文字色</label><input id="dInk" type="color"></div>
+        </div>
+        <h3>字体</h3>
+        <div class="field"><label>标题字体</label><select id="dFontDisplay"></select></div>
+        <div class="field"><label>正文字体</label><select id="dFontSans"></select></div>
+        <h3>字号 / 留白</h3>
+        <div class="field"><label>字号 <span class="tweakout" id="dTypeOut">100%</span></label><input id="dType" type="range" min="70" max="130" step="1" value="100"></div>
+        <div class="field"><label>留白 <span class="tweakout" id="dPadOut">100%</span></label><input id="dPad" type="range" min="70" max="130" step="1" value="100"></div>
+        <div class="oprow"><button id="dReset" class="mini">复原设计旋钮</button></div>
+        <div class="dghint">字号 / 留白按设计令牌整体缩放，对正文、引言、说明等一致生效；少数皮肤的封面巨标题用固定字号，不随此旋钮变化。所有改动均写入 HTML，导出后离线一致。</div>
       </div>
 
       <!-- ===== 动画效果 ===== -->
@@ -2792,7 +2900,7 @@ function buildUI(): void {
   const skinLabels: Record<string, string> = {};
   SKIN_ORDER.forEach((n) => { skinLabels[n] = (SKINS[n].label || n) + ' · ' + n + (SKINS[n].dark ? ' · 暗' : ' · 浅'); });
   fillSel('#hSkin', SKIN_ORDER, skinLabels, '保持原样（不换皮）');
-  onChange('#hSkin', (v) => { harvestAll(); pushHistory('skin'); H.skin = v; applySkinLive(); refreshHtmlInspector(); markDirty(); });
+  onChange('#hSkin', (v) => { const tf = tweakFactor('--t-body'), pf = tweakFactor('--pad-x'); harvestAll(); pushHistory('skin'); H.skin = v; applySkinLive(); reapplyTweaksForSkin(tf, pf); refreshHtmlInspector(); markDirty(); });
   ($('#layout') as HTMLSelectElement).addEventListener('change', () => { deck.slides[cur].layout = ($('#layout') as HTMLSelectElement).value; reloadPreview(); });
 
   fillSel('#fsize', meta.sizes, undefined, '默认'); onChange('#fsize', (v) => setStyle('size', v));
@@ -2817,6 +2925,16 @@ function buildUI(): void {
   onInput('#hPaper', (v) => setHtmlToken('--paper', v));
   onInput('#hInk', (v) => setHtmlToken('--ink', v));
   $('#hTokReset').addEventListener('click', () => { harvestAll(); H.overrides = {}; renderHtmlEdit(); refreshHtmlInspector(); });
+  // —— 设计旋钮 tab：deck 级配色 / 字体 / 字号 / 留白（即时生效、零 token、写入 H.overrides 一并导出）
+  onInput('#dAccent', (v) => setHtmlToken('--accent', v));
+  onInput('#dAccent2', (v) => setHtmlToken('--accent-2', v));
+  onInput('#dPaper', (v) => setHtmlToken('--paper', v));
+  onInput('#dInk', (v) => setHtmlToken('--ink', v));
+  populateFontSelect('#dFontDisplay'); onChange('#dFontDisplay', (v) => setHtmlTokenFont('--font-display', v));
+  populateFontSelect('#dFontSans'); onChange('#dFontSans', (v) => setHtmlTokenFont('--font-sans', v));
+  onInput('#dType', (v) => { const f = (parseInt(v, 10) || 100) / 100; const o = $('#dTypeOut'); if (o) o.textContent = Math.round(f * 100) + '%'; applyTweakScale('type', f); });
+  onInput('#dPad', (v) => { const f = (parseInt(v, 10) || 100) / 100; const o = $('#dPadOut'); if (o) o.textContent = Math.round(f * 100) + '%'; applyTweakScale('pad', f); });
+  $('#dReset').addEventListener('click', resetDesignKnobs);
   onChange('#hTheme', (v) => { harvestAll(); H.theme = v; renderHtmlEdit(); refreshHtmlInspector(); });
   populateFontSelect('#hFont'); onChange('#hFont', (v) => setHtmlFont(v));
   onInput('#hFs', (v) => applyHtmlStyle('font-size', v ? v + 'px' : ''));
