@@ -1494,7 +1494,11 @@ async function runImageSearch(): Promise<void> {
     }
     const imgs = j.images || [];
     const hint = $('#imgSearchHint');
-    const srcLabel = j.source === 'pexels' ? 'Pexels（免费可商用·无需署名）' : j.source === 'google' ? 'Google 图片（网络来源·自行确认版权）' : 'Openverse（CC·会自动带上署名）';
+    const srcLabel = j.source === 'pexels' ? 'Pexels（免费可商用·无需署名）'
+      : j.source === 'baidu' ? '百度图片（中文·网络来源，自行确认版权）'
+        : j.source === 'wikimedia' ? '维基共享（多为 CC/公有领域·会带署名）'
+          : j.source === 'google' ? 'Google 图片（网络来源·自行确认版权）'
+            : 'Openverse（CC·会自动带上署名）';
     if (hint) hint.innerHTML = `来自 <b>${srcLabel}</b> · 点缩略图即加入暂存盘。`;
     if (!imgs.length) { grid.innerHTML = '<div class="qempty">没找到相关图片，换个关键词或图源试试。</div>'; return; }
     grid.innerHTML = '';
@@ -2960,7 +2964,7 @@ function buildUI(): void {
       <input id="imgSearchQ" class="searchq" type="text" placeholder="描述画面，例：森林 晨雾 / teamwork office">
       <!-- Google 源已隐藏：其「搜索整个网络」被 Google 弃用、Custom Search API 将于 2027-01 停用。
            bridge 仍支持 source=google（需 googleApiKey+googleSearchCx），要用把该 option 加回即可。 -->
-      <select id="imgSearchSrc" class="searchsrc" title="图源"><option value="">默认</option><option value="pexels">Pexels · 精美</option><option value="openverse">Openverse · 免密 CC</option></select>
+      <select id="imgSearchSrc" class="searchsrc" title="图源"><option value="">默认</option><option value="baidu">百度 · 中文最多</option><option value="wikimedia">维基共享 · 中文文化</option><option value="pexels">Pexels · 精美英文</option><option value="openverse">Openverse · 免密 CC</option></select>
       <button id="imgSearchGo" class="primary-mini">搜索</button>
       <button id="imgSearchClose" class="mini cclose">关闭</button>
     </div>

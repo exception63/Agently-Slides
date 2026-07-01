@@ -118,13 +118,51 @@ async function searchGoogle(query: string, page: number): Promise<StockImage[]> 
     license: 'Google · 网络来源（自行确认版权）', pageUrl: String(img['contextLink'] || ''), source: 'google', alt: String(it['title'] || ''),
   }; });
 }
+// ---- 中文图源（免密）：百度图片（全网最广）+ 维基共享（文化/史地·稳定官方）----
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36';
+function stripTags(s: string): string { return (s || '').replace(/<[^>]*>/g, '').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 80); }
+// 百度：无官方关键词图搜 API → 用网页版内部 acjson。必须先访问首页拿到真 BAIDUID cookie（假的不认），
+// 再带 cookie 调 acjson。缩略图在 img*.baidu.com CDN（下载需带 Referer，见 fetchImageDataUrl）。非官方，可能变。
+async function searchBaidu(query: string, page: number): Promise<StockImage[]> {
+  const boot = await fetch('https://image.baidu.com/', { headers: { 'User-Agent': BROWSER_UA } });
+  const cookie = ((boot.headers as unknown as { getSetCookie?: () => string[] }).getSetCookie?.() || []).map((c) => c.split(';')[0]).join('; ');
+  const params = new URLSearchParams({ tn: 'resultjson_com', ipn: 'rj', ct: '201326592', word: query, pn: String((page - 1) * 30), rn: '30', gsm: '1e', ie: 'utf-8' });
+  const r = await fetch('https://image.baidu.com/search/acjson?' + params.toString(), { headers: { 'User-Agent': BROWSER_UA, 'Referer': 'https://image.baidu.com/', ...(cookie ? { Cookie: cookie } : {}) } });
+  if (!r.ok) throw new Error('baidu ' + r.status);
+  const text = await r.text();
+  let j: { data?: Array<Record<string, unknown>> };
+  try { j = JSON.parse(text); } catch { try { j = JSON.parse(text.replace(/\\'/g, "'").replace(/[\u0000-\u001f]+/g, " ")); } catch { throw new Error('baidu parse failed'); } }
+  return (j.data || []).filter((x) => x && (x['thumbURL'] || x['middleURL'])).map((x) => ({
+    id: 'bd-' + String(x['thumbURL'] || x['middleURL'] || ''), thumb: String(x['thumbURL'] || x['middleURL'] || ''), full: String(x['middleURL'] || x['hoverURL'] || x['thumbURL'] || ''),
+    w: Number(x['width']) || 0, h: Number(x['height']) || 0, author: String(x['fromURLHost'] || ''), authorUrl: x['fromURLHost'] ? 'https://' + String(x['fromURLHost']) : '',
+    license: '百度图片 · 网络来源（自行确认版权）', pageUrl: x['fromURLHost'] ? 'https://' + String(x['fromURLHost']) : '', source: 'baidu', alt: stripTags(String(x['fromPageTitleEnc'] || '')),
+  }));
+}
+async function searchWikimedia(query: string, page: number): Promise<StockImage[]> {
+  const params = new URLSearchParams({ action: 'query', format: 'json', generator: 'search', gsrsearch: query, gsrnamespace: '6', gsrlimit: '20', gsroffset: String((page - 1) * 20), prop: 'imageinfo', iiprop: 'url|size|extmetadata', iiurlwidth: '480' });
+  const r = await fetch('https://commons.wikimedia.org/w/api.php?' + params.toString(), { headers: { 'User-Agent': 'Slidesmith/1.0 (+studio image search)' } });
+  if (!r.ok) throw new Error('wikimedia ' + r.status);
+  const j = await r.json() as { query?: { pages?: Record<string, Record<string, unknown>> } };
+  const pages = (j.query && j.query.pages) ? Object.values(j.query.pages) : [];
+  pages.sort((a, b) => (Number(a['index']) || 0) - (Number(b['index']) || 0));
+  return pages.filter((p) => Array.isArray(p['imageinfo'])).map((p) => {
+    const ii = (p['imageinfo'] as Array<Record<string, unknown>>)[0]; const em = (ii['extmetadata'] || {}) as Record<string, { value?: string }>;
+    return {
+      id: 'wm-' + String(p['pageid'] || p['title'] || ''), thumb: String(ii['thumburl'] || ii['url'] || ''), full: String(ii['url'] || ''),
+      w: Number(ii['width']) || 0, h: Number(ii['height']) || 0, author: stripTags(String(em['Artist']?.value || '')), authorUrl: String(ii['descriptionurl'] || ''),
+      license: stripTags(String(em['LicenseShortName']?.value || 'Wikimedia')), pageUrl: String(ii['descriptionurl'] || ''), source: 'wikimedia', alt: stripTags(String(p['title'] || '')).replace(/^File:/, ''),
+    };
+  });
+}
 // download the picked image server-side (avoids CORS + canvas tainting) → data URL for the tray.
 async function fetchImageDataUrl(rawUrl: string): Promise<{ dataUrl: string; bytes: number }> {
   let u: URL; try { u = new URL(rawUrl); } catch { throw new Error('bad url'); }
   if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('bad protocol');
   const host = u.hostname.toLowerCase(); // SSRF guard: no loopback / private ranges
   if (host === 'localhost' || host.endsWith('.local') || /^(0\.0\.0\.0|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host)) throw new Error('blocked host');
-  const r = await fetch(rawUrl, { headers: { 'User-Agent': 'Slidesmith/1.0' } });
+  const dlHeaders: Record<string, string> = { 'User-Agent': BROWSER_UA };
+  if (host.endsWith('baidu.com')) dlHeaders['Referer'] = 'https://image.baidu.com/'; // Baidu CDN needs a Referer
+  const r = await fetch(rawUrl, { headers: dlHeaders });
   if (!r.ok) throw new Error('fetch ' + r.status);
   const ct = (r.headers.get('content-type') || '').toLowerCase();
   if (!ct.startsWith('image/')) throw new Error('not an image');
@@ -428,12 +466,16 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       const query = q('q').trim();
       const page = Math.max(1, parseInt(q('page') || '1', 10) || 1);
       const hasKey = !!pexelsKey(); const hasGoogle = !!(googleKey() && googleCx());
-      let source = q('source'); if (source !== 'pexels' && source !== 'openverse' && source !== 'google') source = hasKey ? 'pexels' : 'openverse';
+      let source = q('source'); if (!['pexels', 'openverse', 'google', 'baidu', 'wikimedia'].includes(source)) source = hasKey ? 'pexels' : 'openverse';
       const meta = { hasPexels: hasKey, hasGoogle };
       if (!query) { sendJson(res, { ok: false, error: 'empty query', ...meta }, 400); return; }
       void (async () => {
         try {
-          const images = source === 'pexels' ? await searchPexels(query, page) : source === 'google' ? await searchGoogle(query, page) : await searchOpenverse(query, page);
+          const images = source === 'pexels' ? await searchPexels(query, page)
+            : source === 'google' ? await searchGoogle(query, page)
+              : source === 'baidu' ? await searchBaidu(query, page)
+                : source === 'wikimedia' ? await searchWikimedia(query, page)
+                  : await searchOpenverse(query, page);
           sendJson(res, { ok: true, source, ...meta, images });
         } catch (e) {
           const msg = String((e as Error).message || e);
