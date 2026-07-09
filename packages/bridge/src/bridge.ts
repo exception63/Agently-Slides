@@ -319,6 +319,16 @@ function openFile(path: string): void {
   const args = process.platform === 'win32' ? ['/c', 'start', '""', path] : [path];
   try { spawn(cmd, args, { stdio: 'ignore', detached: true }).unref(); } catch { /* noop */ }
 }
+// Reveal a finished file in the OS file manager (highlight it), best-effort. Used by 另存为
+// so the user actually sees where the file went (browser blob-download is unreliable in
+// some app-window setups — flashes and silently drops the file).
+function revealFile(path: string): void {
+  try {
+    if (process.platform === 'darwin') spawn('open', ['-R', path], { stdio: 'ignore', detached: true }).unref();
+    else if (process.platform === 'win32') spawn('cmd', ['/c', 'explorer', '/select,', path], { stdio: 'ignore', detached: true }).unref();
+    else spawn('xdg-open', [dirname(path)], { stdio: 'ignore', detached: true }).unref();
+  } catch { /* noop */ }
+}
 
 export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   const host = opts.host || '127.0.0.1';
@@ -429,6 +439,25 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
         const r = await renderDeckPdf(body, nm);
         if (r.ok && wantOpen) openFile(r.path);
         sendJson(res, r, r.ok ? 200 : 500);
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
+      return;
+    }
+    // POST /api/export-html?name=<base>  body: assembled deck HTML → save a copy beside the
+    // deck (or ~/.slidesmith/exports) and reveal it in Finder. A reliable 另存为 that doesn't
+    // rely on the browser blob-download (which some --app windows silently drop).
+    if (url === '/api/export-html' && req.method === 'POST') {
+      const nm = decodeURIComponent((/[?&]name=([^&]+)/.exec(req.url || '') || [])[1] || '') || (deck ? deck.name : 'deck');
+      readBody(req).then((body) => {
+        if (!body.trim()) { sendJson(res, { ok: false, error: 'empty html' }, 400); return; }
+        try {
+          const safeBase = safeSeg(nm.replace(/\.[^.]+$/, '')) || 'deck';
+          const outDir = deckAbsPath ? dirname(deckAbsPath) : join(homedir(), '.slidesmith', 'exports');
+          mkdirSync(outDir, { recursive: true });
+          const outPath = join(outDir, safeBase + '.html');
+          writeFileSync(outPath, body);
+          revealFile(outPath);
+          sendJson(res, { ok: true, path: outPath });
+        } catch (e) { sendJson(res, { ok: false, error: String((e as Error)?.message || e) }, 500); }
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }

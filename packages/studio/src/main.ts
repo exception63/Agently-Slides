@@ -21,6 +21,7 @@ import { renderDeckHtml } from '@slidesmith/engine';
 import { listThemes } from '@slidesmith/themes';
 import { galleryHtml } from '@slidesmith/anim-gallery';
 import { fxCanvasJs } from '@slidesmith/fx-canvas';
+import { cloudRelay as PR_CLOUD, qrLibJs, pairClientJs } from '@slidesmith/phone-remote';
 import { SKINS, SKIN_ORDER } from '@slidesmith/skins';
 
 // ---- preview bridge: injected into the deck iframe for inline editing ----
@@ -196,6 +197,7 @@ let htmlSlides: HtmlSlide[] = [];
 let htmlSelEl: Element | null = null; // currently selected element inside the edit iframe
 let htmlGotoAfterRender = -1; // restore this slide after a re-render (e.g. after applying a patch)
 let fxMode: 'auto' | 'manual' = 'auto'; // 动效播放模式：auto=进入页面即播 / manual=点击页面才播（写进导出的 <html data-smfx>）
+let embedPhoneRemote = false; // 勾选「嵌入手机遥控」后，导出的 deck 会烘进「📱 手机遥控」按钮 + 配对客户端（云端/局域网可选）
 
 // ---- never-lose-work: a dirty flag + debounced localStorage draft + undo/redo history.
 // All HTML-mode mutations route through markDirty()/pushHistory() so edits survive a
@@ -739,7 +741,15 @@ function assembleDeck(forEdit = false): string {
   // the editing surface so the FX driver skips exit-on-nav (keeps Studio nav instant).
   const editAttr = forEdit ? ' data-smfx-edit="1"' : '';
   const skin = skinInject();
-  const doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
+  let doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
+  // 手机遥控：先剥离任何旧注入（幂等，防 re-import 累积），再按需（仅导出、勾选时）烘进。
+  // 注意：注入内容含 `$`（qr 库/客户端里有），必须用「函数替换」——字符串替换会把 $'/$&/$1 当特殊
+  // 记号解释，导致注入的 JS 被腐蚀（曾致「二维码生成失败」）。
+  doc = doc.replace(/<!--sm-phone-remote-start-->[\s\S]*?<!--sm-phone-remote-end-->/g, '');
+  if (!forEdit && embedPhoneRemote) {
+    const inject = PHONE_REMOTE_JS.replace('__SM_ROOMVAL__', smRoomId()); // 固定房间号 → 二维码不变
+    doc = doc.replace('</body>', () => inject + '\n</body>');
+  }
   // 编辑预览：把外链 Google Fonts 改成「非阻塞」加载，否则没翻墙时浏览器会卡在 fonts.googleapis.com
   // 等渲染 →「加载特别慢 / 看不到 slides / 换肤黑屏」。文字先用系统字体即时显示，字体到了再升级。
   return forEdit ? nonBlockFonts(doc) : doc;
@@ -952,6 +962,21 @@ const FX_JS = '<script id="sm-fx-js">(function(){'
 // effects run in the Studio preview AND the exported deck, exactly like a built editorial deck.
 // srcdoc re-render swaps the whole document, so the old canvas rAF dies with it (no leak).
 const FX_CANVAS_JS = '<script id="sm-fx-canvas">' + fxCanvasJs + '</scr' + 'ipt>';
+
+// 「手机遥控」注入块（仅导出、且勾选时）：配置(云中转地址) + 浏览器二维码库 + 配对客户端。
+// 用 HTML 注释作首尾标记，assembleDeck 每次导出先剥离旧的再按需注入，避免 re-import 后重复。
+// __SM_ROOM__ 占位符在导出时被替换成一个固定房间号（每份导出各一个），使这份 HTML 的配对二维码永久不变。
+const PHONE_REMOTE_JS =
+  '<!--sm-phone-remote-start-->\n'
+  + '<script>window.__SM_CLOUD_RELAY__=' + JSON.stringify(PR_CLOUD) + ';window.__SM_ROOM__="__SM_ROOMVAL__";</scr' + 'ipt>\n'
+  + '<script>' + qrLibJs + '</scr' + 'ipt>\n'
+  + '<script>' + pairClientJs + '</scr' + 'ipt>\n'
+  + '<!--sm-phone-remote-end-->';
+// 生成一个固定房间号（浏览器内），烘进导出件 → 二维码永久不变、可截图复用。
+function smRoomId(): string {
+  const a = new Uint8Array(12); (window.crypto || crypto).getRandomValues(a);
+  return Array.from(a).map((b) => ('0' + b.toString(16)).slice(-2)).join('');
+}
 function isTextLeaf(el: Element): boolean {
   if (el.querySelector('div,section,ul,ol,li,figure,table,svg,img,canvas,iframe,p,h1,h2,h3,h4,h5,h6,blockquote')) return false;
   return (el.textContent || '').trim().length > 0;
@@ -2756,6 +2781,7 @@ function buildUI(): void {
   <button id="imp">导入 HTML</button>
   <span class="sep"></span>
   <label class="embedck" title="导出 / 保存时将用到的字体子集内嵌进 HTML，离线或更换设备也能正确显示，文件略大"><input id="embedFonts" type="checkbox"> 嵌入字体</label>
+  <label class="embedck" title="导出的 HTML 里加一个「📱 手机遥控」按钮：任何电脑打开→点它→手机扫码配对→用手机翻页（云端任意网络 / 局域网离线可选）"><input id="embedRemote" type="checkbox"> 嵌入手机遥控</label>
   <button id="expPdf">导出 PDF</button>
   <button id="expHtml" title="另存为：下载一份新的 HTML 副本，不覆盖原文件">另存为</button>
   <button id="saveHtml" class="primary" title="保存：覆盖导入的源 HTML；首次保存会让你选一次文件，之后一键覆盖">保存</button>
@@ -3198,6 +3224,8 @@ function buildUI(): void {
   $('#aiRevertAll').addEventListener('click', revertProposed);
   $('#auditRun').addEventListener('click', () => renderAuditReport(auditImportedDeck()));
   $('#expPdf').addEventListener('click', exportPdf);
+  const remoteTog = $('#embedRemote') as HTMLInputElement | null;
+  if (remoteTog) { remoteTog.checked = embedPhoneRemote; remoteTog.addEventListener('change', () => { embedPhoneRemote = remoteTog.checked; if (embedPhoneRemote) toast('导出的 HTML 将带「📱 手机遥控」按钮'); }); }
 
   // --- 文稿: notes + note blocks ---
   ($('#notes') as HTMLTextAreaElement).addEventListener('input', (e) => {
@@ -3251,11 +3279,39 @@ function buildUI(): void {
     f.text().then((t) => importFile(f.name, t)); // no handle from a plain <input> → save will prompt once
   });
   $('#saveHtml').addEventListener('click', () => { void saveHtmlInPlace(); });
-  // 另存为：下载一份新的 HTML 副本（不覆盖原文件，区别于「保存」）
+  // 另存为：导出一份新的 HTML 副本（不覆盖原文件）。三级兜底，避免「闪一下找不到文件」：
+  //   ① 连了 Claude（bridge）→ 存到 deck 同目录并在访达高亮（最稳，不靠浏览器下载）
+  //   ② 原生「保存到…」对话框（能自己选文件夹）
+  //   ③ 退回 blob 下载，并明确告知落到「下载」文件夹
   $('#expHtml').addEventListener('click', async () => {
     const html = mode === 'html' ? await buildExportHtml() : renderDeckHtml(deck);
+    if (location.protocol.startsWith('http')) {
+      try {
+        const r = await fetch(`${libBase()}/api/export-html?name=${encodeURIComponent(fileBase)}.html`, {
+          method: 'POST', headers: { 'content-type': 'text/html;charset=utf-8' }, body: html,
+        });
+        const j = await r.json() as { ok: boolean; path?: string; error?: string };
+        if (j.ok && j.path) { toast('✅ 已另存为：' + j.path + '（已在访达高亮）'); return; }
+      } catch { /* bridge 不可用 → 往下走 */ }
+    }
+    const w = window as unknown as { showSaveFilePicker?: (o?: unknown) => Promise<FsFileHandle> };
+    if (w.showSaveFilePicker) {
+      try {
+        const h = await w.showSaveFilePicker({
+          suggestedName: fileBase + '.html',
+          types: [{ description: 'HTML deck', accept: { 'text/html': ['.html', '.htm'] } }],
+        });
+        const ws = await h.createWritable();
+        await ws.write(html); await ws.close();
+        toast('已保存：' + (h.name || fileBase + '.html'));
+        return;
+      } catch (e) {
+        if ((e as Error).name === 'AbortError') return; // 用户取消对话框
+        /* 其它错误 → 退回下载 */
+      }
+    }
     download(fileBase + '.html', html, 'text/html');
-    toast('已另存为 ' + fileBase + '.html');
+    toast('已下载到「下载」文件夹：' + fileBase + '.html', false);
   });
 
   // drag & drop import anywhere

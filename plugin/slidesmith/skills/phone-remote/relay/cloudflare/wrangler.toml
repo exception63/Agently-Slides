@@ -1,0 +1,19 @@
+name = "slidesmith-remote"
+main = "worker.mjs"
+compatibility_date = "2025-01-01"
+
+# 把 deck 和手机的 WebSocket 配对放进 Durable Object（每个 room 一个实例）
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+# SQLite-backed DO —— 免费额度即可用
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
+
+# 让 worker 能 import remote.html 当文本
+[[rules]]
+type = "Text"
+globs = ["**/*.html"]
+fallthrough = true

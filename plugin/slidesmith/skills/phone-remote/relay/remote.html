@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0c">
+<title>Slidesmith 遥控</title>
+<style>
+  :root { --bg:#0a0a0c; --panel:#16161c; --panel2:#1e1e26; --line:#2a2a34; --fg:#f4f4f6; --amber:#f5b73f; --green:#39d353; --red:#ff5a5a; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:-apple-system,system-ui,"PingFang SC",sans-serif; overflow:hidden; overscroll-behavior:none; }
+  body { display:flex; flex-direction:column; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; font-size:13px; }
+  #status { display:flex; align-items:center; gap:7px; font-weight:600; }
+  #dot { width:9px; height:9px; border-radius:50%; background:var(--amber); box-shadow:0 0 8px currentColor; color:var(--amber); }
+  #dot.ok { background:var(--green); color:var(--green); } #dot.bad { background:var(--red); color:var(--red); }
+  main { flex:1; display:flex; gap:10px; padding:6px 12px 12px; min-height:0; }
+  .page { flex:1; border:none; border-radius:22px; background:var(--panel); color:var(--fg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:15px; letter-spacing:.06em; transition:transform .06s, background .15s; }
+  .page:active { transform:scale(.97); background:var(--panel2); }
+  .page .arrow { font-size:76px; line-height:1; font-weight:300; }
+  .page.next { background:linear-gradient(160deg,#26262f,#191921); } .page.next:active { background:#2f2f3a; }
+  footer { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:0 12px calc(12px + env(safe-area-inset-bottom)); }
+  .tool { border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--fg); padding:14px 4px; font-size:13px; display:flex; flex-direction:column; align-items:center; gap:5px; transition:transform .06s, background .15s; }
+  .tool:active { transform:scale(.95); background:var(--panel2); } .tool .ic { font-size:22px; line-height:1; } .tool.on { border-color:var(--amber); color:var(--amber); }
+  #warn { margin:0 12px 8px; padding:9px 12px; border-radius:12px; background:#3a2a12; color:var(--amber); font-size:12.5px; line-height:1.5; display:none; }
+  #warn.show { display:block; }
+</style>
+</head>
+<body>
+  <header>
+    <div id="status"><span id="dot"></span><span id="statusText">连接中…</span></div>
+    <div style="opacity:.5">Slidesmith 遥控</div>
+  </header>
+  <div id="warn">已连上中转，但<b>放映端还没打开</b>。请在电脑上打开这份 slides 并点「手机遥控」。</div>
+  <main>
+    <button class="page prev" data-a="prev"><span class="arrow">‹</span><span>上一页</span></button>
+    <button class="page next" data-a="next"><span class="arrow">›</span><span>下一页</span></button>
+  </main>
+  <footer>
+    <button class="tool" data-a="first"><span class="ic">⤒</span><span>首页</span></button>
+    <button class="tool" data-a="last"><span class="ic">⤓</span><span>末页</span></button>
+    <button class="tool" id="blackBtn" data-a="black"><span class="ic">◼</span><span>黑屏</span></button>
+    <button class="tool" data-a="present"><span class="ic">▦</span><span>放映态</span></button>
+  </footer>
+<script>
+  var ROOM = __ROOM__;
+  var dot = document.getElementById('dot'), stext = document.getElementById('statusText'), warn = document.getElementById('warn');
+  var blackOn = false, ws = null, deckPresent = false;
+  // WebRTC 直连（P2P）——手机是 answerer；连上后指令走数据通道，否则回落 WS 云中转
+  var pc = null, dc = null, p2p = false, pendingIce = [];
+  var ICE = [{ urls: 'stun:stun.l.google.com:19302' }];
+
+  function wsUrl() {
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return proto + '//' + location.host + '/ws?room=' + encodeURIComponent(ROOM) + '&role=remote';
+  }
+  function setState(kind, text) { dot.className = (kind==='ok')?'ok':(kind==='bad'?'bad':''); stext.textContent = text; }
+  function connLabel() { return deckPresent ? ('已连接放映端 · ' + (p2p ? '直连' : '云端')) : '等待放映端'; }
+  function reflectPeers(peers) {
+    deckPresent = peers && peers.deck > 0;
+    if (deckPresent) { setState('ok', connLabel()); warn.classList.remove('show'); }
+    else { setState('', '等待放映端'); warn.classList.add('show'); p2p = false; closePc(); }
+  }
+  function signal(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'signal', kind: obj.kind, data: obj.data })); }
+  function closePc() { try { if (dc) dc.close(); if (pc) pc.close(); } catch (e) {} dc = null; pc = null; }
+
+  function onOffer(sdp) {
+    closePc(); p2p = false;
+    pc = new RTCPeerConnection({ iceServers: ICE });
+    pc.onicecandidate = function (e) { if (e.candidate) signal({ kind: 'ice', data: e.candidate }); };
+    pc.ondatachannel = function (e) {
+      dc = e.channel;
+      dc.onopen = function () { p2p = true; if (deckPresent) setState('ok', connLabel()); };
+      dc.onclose = function () { p2p = false; if (deckPresent) setState('ok', connLabel()); };
+    };
+    pc.setRemoteDescription(new RTCSessionDescription(sdp)).then(function () {
+      pendingIce.forEach(function (c) { try { pc.addIceCandidate(c); } catch (e) {} }); pendingIce = [];
+      return pc.createAnswer();
+    }).then(function (ans) { return pc.setLocalDescription(ans).then(function () { signal({ kind: 'answer', data: ans }); }); })
+      .catch(function () {});
+  }
+  function onIce(cand) {
+    if (!pc || !pc.remoteDescription) { pendingIce.push(cand); return; }
+    try { pc.addIceCandidate(cand); } catch (e) {}
+  }
+
+  function connect() {
+    setState('', '连接中…');
+    ws = new WebSocket(wsUrl());
+    ws.onopen = function () { setState('', '等待放映端'); };
+    ws.onmessage = function (e) { var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if (m.type === 'joined' || m.type === 'peer') reflectPeers(m.peers);
+      else if (m.type === 'signal') { if (m.kind === 'offer') onOffer(m.data); else if (m.kind === 'ice') onIce(m.data); }
+    };
+    ws.onclose = function () { setState('bad', '连接断开，重连中…'); setTimeout(connect, 1500); };
+    ws.onerror = function () { try { ws.close(); } catch (x) {} };
+  }
+  connect();
+
+  function haptic() { try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
+  function cmd(action) {
+    var msg = JSON.stringify({ type: 'cmd', action: action });
+    if (dc && dc.readyState === 'open') { try { dc.send(msg); return; } catch (e) {} }   // 直连优先
+    if (ws && ws.readyState === 1) ws.send(msg);                                            // 回落云中转
+  }
+
+  document.querySelectorAll('[data-a]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var a = el.getAttribute('data-a'); haptic();
+      if (a === 'black') { blackOn = !blackOn; document.getElementById('blackBtn').classList.toggle('on', blackOn); }
+      cmd(a);
+    });
+  });
+  document.addEventListener('touchmove', function (e) { if (e.scale !== 1) e.preventDefault(); }, { passive: false });
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+</script>
+</body>
+</html>

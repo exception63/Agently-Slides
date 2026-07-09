@@ -75,6 +75,15 @@ const fxCanvasJs = read(
 );
 const fxCanvasMod = `export const fxCanvasJs = ${JSON.stringify(fxCanvasJs)};`;
 
+// phone-remote：「手机遥控」客户端（浏览器端二维码库 + 配对客户端）做成可注入 bundle，
+// Studio 勾选「嵌入手机遥控」后烘进导出的 deck；默认指向用户已部署的 Cloudflare 云中转。
+const prDir = join(root, 'plugin/slidesmith/skills/phone-remote/baked');
+const phoneRemoteMod = `
+export const cloudRelay = ${JSON.stringify('https://slidesmith-remote.zly-scu.workers.dev')};
+export const qrLibJs = ${JSON.stringify(read(join(prDir, 'vendor-qrcode.js')))};
+export const pairClientJs = ${JSON.stringify(read(join(prDir, 'pair-client.js')))};
+`;
+
 // editorial-slides 的 21 张皮，做成「可注入 bundle」：Studio 换皮下拉选一个，就把这套 CSS 叠加
 // 到当前 deck 上重新着皮。薄皮需要共享的组件层 + 版式层；厚皮自带组件，但仍要版式层（P4）。
 const edDir = join(root, 'plugin/slidesmith/skills/editorial-slides/assets');
@@ -111,10 +120,11 @@ const virtualPlugin = {
       '@slidesmith/themes': themesMod,
       '@slidesmith/anim-gallery': animGalleryMod,
       '@slidesmith/fx-canvas': fxCanvasMod,
+      '@slidesmith/phone-remote': phoneRemoteMod,
       '@slidesmith/skins': skinsMod,
       'gray-matter': grayMatterShim,
     };
-    build.onResolve({ filter: /^(@slidesmith\/(runtime|themes|anim-gallery|fx-canvas|skins)|gray-matter)$/ }, (args) => ({
+    build.onResolve({ filter: /^(@slidesmith\/(runtime|themes|anim-gallery|fx-canvas|phone-remote|skins)|gray-matter)$/ }, (args) => ({
       path: args.path,
       namespace: 'sm-virtual',
     }));

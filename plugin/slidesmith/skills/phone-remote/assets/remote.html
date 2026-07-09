@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0a0a0c">
+<title>Slidesmith 遥控</title>
+<style>
+  :root { --bg:#0a0a0c; --panel:#16161c; --panel2:#1e1e26; --line:#2a2a34; --fg:#f4f4f6; --amber:#f5b73f; --green:#39d353; --red:#ff5a5a; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,system-ui,"PingFang SC",sans-serif; overflow:hidden; overscroll-behavior:none; }
+  body { display:flex; flex-direction:column; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; font-size:13px; }
+  #status { display:flex; align-items:center; gap:7px; font-weight:600; }
+  #dot { width:9px; height:9px; border-radius:50%; background:var(--amber); box-shadow:0 0 8px currentColor; color:var(--amber); }
+  #dot.ok { background:var(--green); color:var(--green); }
+  #dot.bad { background:var(--red); color:var(--red); }
+  .room { opacity:.5; font-variant-numeric:tabular-nums; }
+  /* 大翻页区：左右两半占满 */
+  main { flex:1; display:flex; gap:10px; padding:6px 12px 12px; min-height:0; }
+  .page { flex:1; border:none; border-radius:22px; background:var(--panel); color:var(--fg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
+    font-size:15px; letter-spacing:.06em; transition:transform .06s, background .15s; }
+  .page:active { transform:scale(.97); background:var(--panel2); }
+  .page .arrow { font-size:76px; line-height:1; font-weight:300; }
+  .page.next { background:linear-gradient(160deg,#26262f,#191921); }
+  .page.next:active { background:#2f2f3a; }
+  /* 底部工具行 */
+  footer { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:0 12px calc(12px + env(safe-area-inset-bottom)); }
+  .tool { border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--fg);
+    padding:14px 4px; font-size:13px; display:flex; flex-direction:column; align-items:center; gap:5px;
+    transition:transform .06s, background .15s; }
+  .tool:active { transform:scale(.95); background:var(--panel2); }
+  .tool .ic { font-size:22px; line-height:1; }
+  .tool.on { border-color:var(--amber); color:var(--amber); }
+  #warn { margin:0 12px 8px; padding:9px 12px; border-radius:12px; background:#3a2a12; color:var(--amber);
+    font-size:12.5px; line-height:1.5; display:none; }
+  #warn.show { display:block; }
+</style>
+</head>
+<body>
+  <header>
+    <div id="status"><span id="dot"></span><span id="statusText">连接中…</span></div>
+    <div class="room">房间码 <b id="roomv">—</b></div>
+  </header>
+
+  <div id="warn">还没有放映端连上。请在<b>电脑浏览器</b>打开控制台页 → 点「开始全屏放映」。</div>
+
+  <main>
+    <button class="page prev" data-a="prev"><span class="arrow">‹</span><span>上一页</span></button>
+    <button class="page next" data-a="next"><span class="arrow">›</span><span>下一页</span></button>
+  </main>
+
+  <footer>
+    <button class="tool" data-a="first"><span class="ic">⤒</span><span>首页</span></button>
+    <button class="tool" data-a="last"><span class="ic">⤓</span><span>末页</span></button>
+    <button class="tool" id="blackBtn" data-a="black"><span class="ic">◼</span><span>黑屏</span></button>
+    <button class="tool" data-a="present"><span class="ic">▦</span><span>放映态</span></button>
+  </footer>
+
+<script>
+  var CODE = new URLSearchParams(location.search).get('code') || '';
+  document.getElementById('roomv').textContent = CODE || '—';
+  var dot = document.getElementById('dot'), stext = document.getElementById('statusText'), warn = document.getElementById('warn');
+  var blackOn = false;
+
+  function haptic() { try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
+
+  function send(action) {
+    return fetch('/cmd', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: CODE, action: action }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { reflect(j); return j; })
+      .catch(function () { setState('bad', '网络断开'); });
+  }
+
+  function reflect(j) {
+    if (!j || !j.ok) { setState('bad', j && j.err === 'bad code' ? '房间码错误' : '出错'); return; }
+    if (typeof j.decks === 'number') {
+      if (j.decks > 0) { setState('ok', '已连接 · ' + j.decks + ' 屏'); warn.classList.remove('show'); }
+      else { setState('warnc', '等待放映端'); warn.classList.add('show'); }
+    }
+  }
+  function setState(kind, text) {
+    dot.className = (kind === 'ok') ? 'ok' : (kind === 'bad' ? 'bad' : '');
+    stext.textContent = text;
+  }
+
+  // 按钮
+  document.querySelectorAll('[data-a]').forEach(function (el) {
+    el.addEventListener('click', function () {
+      var a = el.getAttribute('data-a');
+      haptic();
+      if (a === 'black') { blackOn = !blackOn; document.getElementById('blackBtn').classList.toggle('on', blackOn); }
+      send(a);
+    });
+  });
+
+  // 心跳：每 3s ping 一次，反映放映端是否在线
+  function ping() { send('ping'); }
+  ping();
+  setInterval(ping, 3000);
+
+  // 防止双击缩放 / 下拉刷新
+  document.addEventListener('touchmove', function (e) { if (e.scale !== 1) e.preventDefault(); }, { passive: false });
+  document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
+</script>
+</body>
+</html>

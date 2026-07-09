@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Slidesmith 手机遥控 · 放映控制台</title>
+<style>
+  :root { --bg:#0c0c10; --panel:#17171e; --line:#2a2a34; --fg:#f4f4f6; --mut:#9a9aa6; --amber:#f5b73f; --green:#39d353; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--fg);
+    font-family:-apple-system,system-ui,"PingFang SC",sans-serif; display:flex; align-items:center; justify-content:center; padding:32px; }
+  .wrap { width:100%; max-width:860px; display:grid; grid-template-columns:300px 1fr; gap:34px; align-items:start; }
+  @media (max-width:720px){ .wrap{ grid-template-columns:1fr; } }
+  .qrcard { background:#fff; border-radius:20px; padding:20px; text-align:center; }
+  .qrcard svg, .qrcard img { width:240px; height:240px; display:block; margin:0 auto; }
+  .qrcard .cap { color:#111; font-size:13px; margin-top:12px; font-weight:600; }
+  h1 { font-size:24px; margin:0 0 4px; letter-spacing:.01em; }
+  .sub { color:var(--mut); font-size:14px; margin-bottom:22px; }
+  .room { display:inline-flex; align-items:baseline; gap:8px; background:var(--panel); border:1px solid var(--line);
+    padding:8px 14px; border-radius:12px; margin-bottom:22px; }
+  .room b { font-size:26px; letter-spacing:.14em; font-variant-numeric:tabular-nums; color:var(--amber); }
+  .steps { list-style:none; padding:0; margin:0 0 22px; display:grid; gap:14px; }
+  .steps li { display:grid; grid-template-columns:26px 1fr; gap:12px; align-items:start; font-size:15px; line-height:1.55; }
+  .steps .n { width:26px; height:26px; border-radius:50%; background:var(--amber); color:#111; font-weight:700;
+    display:flex; align-items:center; justify-content:center; font-size:14px; }
+  .start { display:inline-flex; align-items:center; gap:10px; background:var(--amber); color:#111; border:none;
+    text-decoration:none; font-weight:700; font-size:17px; padding:14px 24px; border-radius:14px; cursor:pointer; }
+  .start:hover { filter:brightness(1.06); }
+  .urls { margin-top:22px; border-top:1px solid var(--line); padding-top:16px; }
+  .urls h3 { font-size:13px; color:var(--mut); font-weight:600; margin:0 0 10px; text-transform:uppercase; letter-spacing:.08em; }
+  .urls .u { display:flex; align-items:center; gap:10px; font-size:13.5px; padding:6px 0; color:var(--fg); }
+  .urls .u code { background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:3px 8px; font-size:13px; }
+  .urls .u .if { color:var(--mut); font-size:12px; }
+  .tip { margin-top:16px; font-size:13px; color:var(--mut); line-height:1.6; background:var(--panel);
+    border:1px solid var(--line); border-radius:12px; padding:12px 14px; }
+  .tip b { color:var(--amber); }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div>
+      <div class="qrcard">
+        <div id="qrbox">扫码区</div>
+        <div class="cap">手机扫码 → 直接打开遥控</div>
+      </div>
+    </div>
+    <div>
+      <h1>📱 手机遥控已就绪</h1>
+      <div class="sub" id="deckname">deck</div>
+      <div class="room">房间码 <b id="code">····</b></div>
+
+      <ol class="steps">
+        <li><span class="n">1</span><span>点下面「开始全屏放映」，本机进入全屏放映（这一步必须在电脑上点一次）。</span></li>
+        <li><span class="n">2</span><span>手机连<b style="color:var(--amber)">同一个 Wi-Fi</b> → 扫左边二维码。连不上就看下方兜底。</span></li>
+        <li><span class="n">3</span><span>手机上点 ◀ ▶ 翻页。可离开电脑走动。</span></li>
+      </ol>
+
+      <a class="start" href="/present">▶ 开始全屏放映</a>
+
+      <div class="urls">
+        <h3>手机遥控地址（同 Wi-Fi 任选其一）</h3>
+        <div id="urllist"></div>
+      </div>
+
+      <div class="tip">
+        <b>手机连不上？</b>（会场 Wi-Fi 常隔离设备）——iPhone 打开<b>「个人热点」</b>，让<b>电脑连这个热点</b>，
+        然后重跑本遥控命令；此时地址会变成 <code>172.20.10.x</code> 网段，扫码即通、纯离线也行。
+      </div>
+    </div>
+  </div>
+
+<script>
+  var DATA = /*__DATA__*/null/*__END__*/;
+  if (DATA) {
+    document.getElementById('code').textContent = DATA.code;
+    document.getElementById('deckname').textContent = DATA.deck;
+    // 二维码：走服务端 /qr.svg（qrencode），指向最佳候选的 remote url
+    var best = DATA.candidates.find(function (c) { return c.ip === DATA.best; }) || DATA.candidates[0];
+    var qrbox = document.getElementById('qrbox');
+    if (best && DATA.hasQr) {
+      var img = document.createElement('img');
+      img.src = '/qr.svg?u=' + encodeURIComponent(best.remote);
+      img.alt = 'QR'; qrbox.replaceChildren(img);
+    } else if (best) {
+      qrbox.innerHTML = '<div style="color:#111;font-size:13px;line-height:1.6">未装二维码工具<br>请手输右侧网址</div>';
+    } else {
+      qrbox.innerHTML = '<div style="color:#111;font-size:13px">未检测到局域网地址</div>';
+    }
+    // 候选地址列表
+    var list = document.getElementById('urllist');
+    (DATA.candidates.length ? DATA.candidates : [{ ip: '(无)', iface: '', remote: '' }]).forEach(function (c) {
+      var row = document.createElement('div'); row.className = 'u';
+      row.innerHTML = '<code>' + c.remote.replace('?code=' + DATA.code, '') + '</code>' +
+        '<span class="if">' + (c.iface || '') + '</span>';
+      list.appendChild(row);
+    });
+  }
+</script>
+</body>
+</html>
