@@ -38,6 +38,7 @@
 - **`apps/SlidesmithRemote/`**（xcodegen · `project.yml` → `xcodegen generate`）：watchOS + iOS 双 target。手表以 `role=remote` 接入**现有云中转**，发的就是既有 `{"type":"cmd","action":"next"}` 协议 → **中转和 deck 端一行未改**，纯增量。
 - **手势（用户选定"分区"方案）**：下方大区=下一页、上方小区=上一页（零延迟、可盲按）；「下一页」同时 `.handGestureShortcut(.primaryAction)` → **捏合双击**翻页。触觉区分成功/失败。
 - **关键限制（查 SDK 实证，别再重新调研）**：watchOS 27 的 `HandGestureShortcut` **只有 `primaryAction` 一个槽位**（`.../WatchOS.sdk/.../SwiftUI.swiftinterface`）；watchOS 27 新增的"单击捏合"被系统占用（Smart Stack 选 widget），第三方拿不到 → **"捏合单击=下页+捏合双击=上页"做不到**。
+- **捏合手势要求屏幕是亮的**（Apple 官方文档实证，2026-08-07 用户问）：手腕垂下、屏幕熄灭时手势不工作，属系统设计，非本 App 问题。现场用法＝轻抬腕点亮屏幕再捏合。缓解：设置→显示与亮度→唤醒时长=70秒；设置→通用→返回时钟=1小时（关键：捏合触发的是**最前台 App** 的主操作，跳回表盘就变成操作 Smart Stack）。另需关低电量/剧院/睡眠专注。**结论：做不到「手完全垂着不动就翻页」**，那是物理 clicker 的场景。
 - **捏合手势的高亮动画 + 震动＝watchOS 系统自带，App 抑制不了**（2026-08-07 用户反馈后查证）：完整签名只有 `handGestureShortcut(_:isEnabled:)`，**没有任何关闭视觉/触觉反馈的参数**，只能整体开/关；Apple 文档亦明说系统会自动高亮按钮轮廓表示"这就是捏合会触发的动作"。→ 用户已知情并**选择保留**。屏幕点击那条路才是零反馈快路径（我方的动画/成功震动已删，只保留失败震动）。
 - **未用 `WKExtendedRuntimeSession`**：其类别只有健身/正念/闹钟等，无"演示遥控"适配项，硬套＝滥用 API。改为文档指引用户设「返回时钟→1 小时」。
 - **配对**：iPhone 扫二维码拿 room → `WCSession.updateApplicationContext` 同步给表 → 表存 `UserDefaults` 后**直连中转**（不依赖手机在身边）。因 room 已固定烘进导出 HTML，**一份 deck 只配对一次**。
