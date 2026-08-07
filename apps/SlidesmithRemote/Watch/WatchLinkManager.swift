@@ -19,6 +19,7 @@ final class WatchLinkManager: NSObject, ObservableObject {
     /// 经手机这条路时，放映端在不在线（由手机回报）
     @Published private(set) var phoneDeckPresent = false
     private var statusTimer: Timer?
+    private var unreachableTicks = 0
 
     private weak var relay: RelayClient?
     private var started = false
@@ -129,6 +130,7 @@ final class WatchLinkManager: NSObject, ObservableObject {
         DispatchQueue.main.async {
             self.phoneDeckPresent = (reply["deck"] as? Bool) ?? false
             self.transport = .phone
+            self.unreachableTicks = 0
         }
     }
 
@@ -140,11 +142,17 @@ final class WatchLinkManager: NSObject, ObservableObject {
             guard WCSession.isSupported() else { return }
             let s = WCSession.default
             guard s.activationState == .activated, s.isReachable else {
+                // 蓝牙偶尔抖一下很常见，连续两轮（约 6 秒）都不可达才改状态，
+                // 否则会时不时闪出「等待 iPhone 或网络」，看着像坏了其实没事。
                 DispatchQueue.main.async {
-                    if self.transport == .phone { self.transport = (self.relay?.isConnected ?? false) ? .direct : .none }
+                    self.unreachableTicks += 1
+                    if self.unreachableTicks >= 2, self.transport == .phone {
+                        self.transport = (self.relay?.isConnected ?? false) ? .direct : .none
+                    }
                 }
                 return
             }
+            DispatchQueue.main.async { self.unreachableTicks = 0 }
             s.sendMessage(["ping": true], replyHandler: { [weak self] reply in
                 self?.absorb(reply: reply)
             }, errorHandler: { _ in })

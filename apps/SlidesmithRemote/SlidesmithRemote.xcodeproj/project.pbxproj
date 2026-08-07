@@ -13,7 +13,9 @@
 		67362BEF9756E101CAA0EB20 /* SlidesmithRemoteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */; };
 		711A3EED8C80B311FF67F1E6 /* PairingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC64B9D0970F97259EC56682 /* PairingStore.swift */; };
 		7AE360DF2BA8849EF4B2634D /* PhoneLinkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */; };
+		8F147BDD71B4E288D00B0E77 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AE98A6A7AA629EBFF430F8CF /* Assets.xcassets */; };
 		91D9CE34561F0525C7DBE30B /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A265377A0BE3DC30B82E979E /* RelayClient.swift */; };
+		AD04AF8FAEA111FC3C8A182C /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3EC310BA3339FE23DA065BA4 /* Assets.xcassets */; };
 		B63226275E095DF52D005E19 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F81243D292E21CD80DE322 /* QRScannerView.swift */; };
 		CE635A779AFCDBD5D9E61880 /* WatchLinkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65751D0E62E2083AE8F5C8E3 /* WatchLinkManager.swift */; };
 		D0E8AFF7B3A63FD4EE8F94D9 /* SlidesmithRemoteWatch.app in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 6B60713DC0CDBEB9569634FB /* SlidesmithRemoteWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -47,13 +49,15 @@
 
 /* Begin PBXFileReference section */
 		0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidesmithRemoteApp.swift; sourceTree = "<group>"; };
-		4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlidesmithRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		3EC310BA3339FE23DA065BA4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SlidesmithRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		65751D0E62E2083AE8F5C8E3 /* WatchLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLinkManager.swift; sourceTree = "<group>"; };
 		6B60713DC0CDBEB9569634FB /* SlidesmithRemoteWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlidesmithRemoteWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLinkManager.swift; sourceTree = "<group>"; };
 		9216D3562B37BFB876EDF7A4 /* WatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchApp.swift; sourceTree = "<group>"; };
 		A265377A0BE3DC30B82E979E /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
 		A8F81243D292E21CD80DE322 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
+		AE98A6A7AA629EBFF430F8CF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CC64B9D0970F97259EC56682 /* PairingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingStore.swift; sourceTree = "<group>"; };
 		E53340568672513DB596FABE /* WatchRemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRemoteView.swift; sourceTree = "<group>"; };
 		E75C109CF2BA0962C5F1FC64 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -63,6 +67,7 @@
 		2AFA2DAD6F627754416CA25D /* Watch */ = {
 			isa = PBXGroup;
 			children = (
+				3EC310BA3339FE23DA065BA4 /* Assets.xcassets */,
 				9216D3562B37BFB876EDF7A4 /* WatchApp.swift */,
 				65751D0E62E2083AE8F5C8E3 /* WatchLinkManager.swift */,
 				E53340568672513DB596FABE /* WatchRemoteView.swift */,
@@ -101,6 +106,7 @@
 		B661E349681043566FC0A72D /* iOS */ = {
 			isa = PBXGroup;
 			children = (
+				AE98A6A7AA629EBFF430F8CF /* Assets.xcassets */,
 				E75C109CF2BA0962C5F1FC64 /* ContentView.swift */,
 				703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */,
 				A8F81243D292E21CD80DE322 /* QRScannerView.swift */,
@@ -117,6 +123,7 @@
 			buildConfigurationList = 2FD2B008810078CBBBFD3AF9 /* Build configuration list for PBXNativeTarget "SlidesmithRemote" */;
 			buildPhases = (
 				B6B0F823BE6DB1A1BDE483C0 /* Sources */,
+				FB4A21BB2685D73AB08737A0 /* Resources */,
 				CEE02E16C613FF20BE685897 /* Embed Dependencies */,
 			);
 			buildRules = (
@@ -136,6 +143,7 @@
 			buildConfigurationList = 5F863EB5E82680BB0CE2805F /* Build configuration list for PBXNativeTarget "SlidesmithRemoteWatch" */;
 			buildPhases = (
 				86BFD609F77AAFD6C5699355 /* Sources */,
+				BC0EBCF5244DFC2ACCD1A7E8 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -184,6 +192,25 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BC0EBCF5244DFC2ACCD1A7E8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AD04AF8FAEA111FC3C8A182C /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		FB4A21BB2685D73AB08737A0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8F147BDD71B4E288D00B0E77 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		86BFD609F77AAFD6C5699355 /* Sources */ = {
@@ -296,7 +323,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = "Slidesmith 遥控";
 				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上 slides 的配对二维码";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -316,7 +342,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = Slidesmith;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(SM_APP_ID)";
@@ -395,7 +420,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = "Slidesmith 遥控";
 				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上 slides 的配对二维码";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -415,7 +439,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = Slidesmith;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(SM_APP_ID)";

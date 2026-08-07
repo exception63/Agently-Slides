@@ -8,7 +8,6 @@ import WatchKit
 struct WatchRemoteView: View {
     @EnvironmentObject private var relay: RelayClient
     @EnvironmentObject private var link: WatchLinkManager
-    @State private var flash: RemoteAction?
 
     var body: some View {
         VStack(spacing: 6) {
@@ -110,20 +109,18 @@ struct WatchRemoteView: View {
         .buttonStyle(.plain)
         .background(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(tint.opacity(flash == action ? 0.55 : 0.22))
+                .fill(tint.opacity(0.22))
         )
         .foregroundStyle(deckOnline ? Color.white : Color.white.opacity(0.45))
-        .animation(.easeOut(duration: 0.12), value: flash)
     }
 
-    /// 发指令 + 触觉反馈。发不出去（没连上/放映端不在）给 failure 震动，避免「按了以为翻了」。
+    /// 只做一件事：把指令发出去。
+    /// 刻意**不做**成功动画、不做成功震动 —— 讲课时要的是「按下即翻页」，
+    /// 任何多余反馈都是延迟感的来源。只有发不出去时才震一下（failure），
+    /// 免得你以为翻了其实没翻。
     private func fire(_ action: RemoteAction) {
-        let ok = link.send(action)
-        WKInterfaceDevice.current().play(ok ? .click : .failure)
-        guard ok else { return }
-        flash = action
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14) {
-            if flash == action { flash = nil }
+        if !link.send(action) {
+            WKInterfaceDevice.current().play(.failure)
         }
     }
 }

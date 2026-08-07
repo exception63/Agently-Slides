@@ -37,6 +37,8 @@ final class RelayClient: NSObject, ObservableObject {
     private var wantsConnection = false
     private var reconnectAttempt = 0
     private var pingTimer: Timer?
+    /// 连接就绪前排队的指令（含入队时间，过期不补发）
+    private var pendingCmds: [(RemoteAction, Date)] = []
 
     override init() {
         super.init()
@@ -155,6 +157,7 @@ final class RelayClient: NSObject, ObservableObject {
                 self.deckPresent = deck > 0
                 self.statusText = deck > 0 ? "已连接放映端" : "等待放映端"
                 self.lastError = nil
+                self.flushPending()   // 补发唤醒期间排队的指令
             }
         }
     }
@@ -163,7 +166,17 @@ final class RelayClient: NSObject, ObservableObject {
 
     @discardableResult
     func send(_ action: RemoteAction) -> Bool {
-        guard let task = task, isConnected else { return false }
+        if let task = task, isConnected { return rawSend(action, on: task) }
+        // 还没连上（典型：手机 App 刚被手表唤醒，WebSocket 还没建好）。
+        // 以前这里直接 return false → **第一条指令被丢掉**，表现为「按了没反应 / 要按两次」。
+        // 改为排队，连上后立刻补发；只保留很短时间内的指令，避免久等后突然连翻好几页。
+        pendingCmds.append((action, Date()))
+        if pendingCmds.count > 4 { pendingCmds.removeFirst() }
+        if wantsConnection, task == nil { openSocket() }
+        return true
+    }
+
+    private func rawSend(_ action: RemoteAction, on task: URLSessionWebSocketTask) -> Bool {
         let payload: [String: Any] = ["type": "cmd", "action": action.rawValue]
         guard let data = try? JSONSerialization.data(withJSONObject: payload),
               let text = String(data: data, encoding: .utf8) else { return false }
@@ -174,6 +187,15 @@ final class RelayClient: NSObject, ObservableObject {
             }
         }
         return true
+    }
+
+    /// 连接建立后补发刚才排队的指令（只补 4 秒内的，过期的丢弃）
+    private func flushPending() {
+        guard let task = task, isConnected, !pendingCmds.isEmpty else { return }
+        let now = Date()
+        let fresh = pendingCmds.filter { now.timeIntervalSince($0.1) < 4 }
+        pendingCmds.removeAll()
+        for (action, _) in fresh { _ = rawSend(action, on: task) }
     }
 
     private func publish(_ work: @escaping () -> Void) {
