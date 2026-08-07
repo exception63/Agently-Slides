@@ -34,6 +34,22 @@
 - **【关键 bug 已修】Studio 导出件「二维码生成失败」真因＝`String.replace('</body>', PHONE_REMOTE_JS)` 把注入内容里的 `$`（qr 库 `case '$'`→`$'` 是 replace 的"匹配后文本"特殊记号）解释掉了 → 注入的 qr 库 JS 被腐蚀 → `qrcode` 坏。手搓 desktop 文件用 slice 拼接没这问题，故只在 Studio 导出复现。修法：改「函数替换」`doc.replace('</body>', () => inject+'</body>')`（函数返回值不做 `$` 解释）。教训：拼接大段含 `$` 的代码进 HTML，别用字符串 `.replace`。**已 Playwright 验证 Studio 导出件 qr 正常渲染。**
 - **固定二维码（回应用户"为何每次生成"）**：房间号原来每次点击随机 → 二维码每次变。改成：Studio 导出时烘一个固定 `window.__SM_ROOM__`（`smRoomId()` 生成、`__SM_ROOMVAL__` 占位符替换——注意占位符不能叫 `__SM_ROOM__`否则先撞到变量名）；pair-client `roomId()` 优先用 `window.__SM_ROOM__`，没有则首次生成并缓存。→ 同一导出件二维码永久不变、可截图复用。已验证 qrUsesBakedRoom=true。
 
+## ✅ Apple Watch 遥控 App（2026-08-07 · v0.1 已提交 16fc07d）
+- **`apps/SlidesmithRemote/`**（xcodegen · `project.yml` → `xcodegen generate`）：watchOS + iOS 双 target。手表以 `role=remote` 接入**现有云中转**，发的就是既有 `{"type":"cmd","action":"next"}` 协议 → **中转和 deck 端一行未改**，纯增量。
+- **手势（用户选定"分区"方案）**：下方大区=下一页、上方小区=上一页（零延迟、可盲按）；「下一页」同时 `.handGestureShortcut(.primaryAction)` → **捏合双击**翻页。触觉区分成功/失败。
+- **关键限制（查 SDK 实证，别再重新调研）**：watchOS 27 的 `HandGestureShortcut` **只有 `primaryAction` 一个槽位**（`.../WatchOS.sdk/.../SwiftUI.swiftinterface`）；watchOS 27 新增的"单击捏合"被系统占用（Smart Stack 选 widget），第三方拿不到 → **"捏合单击=下页+捏合双击=上页"做不到**。
+- **捏合手势的高亮动画 + 震动＝watchOS 系统自带，App 抑制不了**（2026-08-07 用户反馈后查证）：完整签名只有 `handGestureShortcut(_:isEnabled:)`，**没有任何关闭视觉/触觉反馈的参数**，只能整体开/关；Apple 文档亦明说系统会自动高亮按钮轮廓表示"这就是捏合会触发的动作"。→ 用户已知情并**选择保留**。屏幕点击那条路才是零反馈快路径（我方的动画/成功震动已删，只保留失败震动）。
+- **未用 `WKExtendedRuntimeSession`**：其类别只有健身/正念/闹钟等，无"演示遥控"适配项，硬套＝滥用 API。改为文档指引用户设「返回时钟→1 小时」。
+- **配对**：iPhone 扫二维码拿 room → `WCSession.updateApplicationContext` 同步给表 → 表存 `UserDefaults` 后**直连中转**（不依赖手机在身边）。因 room 已固定烘进导出 HTML，**一份 deck 只配对一次**。
+- **验证**：Ultra 3 (49mm)·watchOS 27 模拟器 → 真实 Cloudflare → 浏览器 22 页 deck：下一页 1→2→3、上一页 3→2 全对。**注意模拟器 tap 坐标要用「点」不是截图像素**（Watch @2x，截图 422×514 ⇒ 点 211×257）。**真机装机 + 捏合手势待用户确认**（模拟器没有捏合手势）。
+- 环境：Xcode 27.0 beta + watchOS 27 SDK 已装；用户有开发者账号 zly.scu@gmail.com。
+- **【真机反馈后的修复三连 · 2026-08-07 · commit 901496a】**
+  1. **手表永远「未配对」的根因＝手表 App 没被嵌进 iPhone App**：`project.yml` 的 embed `subpath` 必须是 `$(CONTENTS_FOLDER_PATH)/Watch`，只写 `Watch` 会拷到产物目录旁边 → 系统不认伴侣关系 → WatchConnectivity 报 `Companion app is not installed`。检查方法：`ls SlidesmithRemote.app/Watch/`。另把两个 bundle id 收敛为 `$(SM_APP_ID)` 派生（防 companion 声明漂移），并显式声明 schemes（xcodegen 重生成后不丢）。
+  2. **手表没开蜂窝就连不上中转**：原设计让手表自己跑 WebSocket，没蜂窝时只能靠蓝牙代理，长连接不可靠 → 卡「连接中」。改为 **手机优先、直连兜底**：手表 `sendMessage(["cmd":…])` 交给 iPhone，由手机的 WebSocket 发往中转；手机不可达才用手表直连。状态栏显示「经 iPhone」/「直连」，并每 3s ping 手机同步放映端在线状态。**结论：手表不需要蜂窝**。
+  3. **一次点击翻多页**：deck 端 `pair-client.js` 每次点「手机遥控」都新建 WebSocket 却不关旧的 → 连接累积 → 一条指令被多条连接各执行一次。修：`startPairing()` 开头 `closePc()` + 关旧 `ws`。（这个 bug 也影响纯手机遥控场景。）
+  验证：故意点 3 次配对后，手表点一次＝恰好 1 次方向键＝翻 1 页；上一页也对。
+  **用户重装提示：务必先把手机和手表上的旧 App 都删掉**（旧的孤立手表 App 会继续占用伴侣位）。
+
 ## ⚠️ 已知坑（必读）
 - **【已修 2026-06-29】Studio「加载特别慢 / 看不到 slides / 换肤黑屏」的真因＝外链 Google Fonts 阻塞渲染**。deck/皮肤用 `<link rel=stylesheet href=fonts.googleapis.com/css…>`（render-blocking），墙内没翻墙时拉不到 → 浏览器卡死等渲染。修法：`nonBlockFonts()` 把字体 link 改成 `media=print onload` 非阻塞（预览里）+ 换肤改 `applySkinLive()` 就地换不重建 iframe。Playwright 让字体永久 hang 实测：46 页 deck 159ms 渲染、换肤 9ms、全程不黑。详见自动记忆 [[studio-editorial-skin-black]]。**可选 follow-up**：让导出/保存(forEdit=false)也走 nonBlockFonts，使独立成品离线秒开。
 - **editorial-slides deck 的 FX 自动播放 / 合成层**（[[studio-drops-deck-engine]]）是另一回事，只在带 `data-smfx` 的 editorial deck（如 virtual-journeys）上；普通 deck（如 keynote-v3，无 FX）不受影响，真痛点是上面的字体阻塞。
