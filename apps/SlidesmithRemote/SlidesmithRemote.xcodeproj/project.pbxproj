@@ -1,0 +1,457 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		022C9E8CBFCE72DCDDBC955A /* WatchRemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53340568672513DB596FABE /* WatchRemoteView.swift */; };
+		038929B6D9A4A5315D924C5B /* PairingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC64B9D0970F97259EC56682 /* PairingStore.swift */; };
+		19CC7E176566F07FC91856D5 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A265377A0BE3DC30B82E979E /* RelayClient.swift */; };
+		67362BEF9756E101CAA0EB20 /* SlidesmithRemoteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */; };
+		711A3EED8C80B311FF67F1E6 /* PairingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC64B9D0970F97259EC56682 /* PairingStore.swift */; };
+		7AE360DF2BA8849EF4B2634D /* PhoneLinkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */; };
+		91D9CE34561F0525C7DBE30B /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A265377A0BE3DC30B82E979E /* RelayClient.swift */; };
+		B63226275E095DF52D005E19 /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F81243D292E21CD80DE322 /* QRScannerView.swift */; };
+		CE635A779AFCDBD5D9E61880 /* WatchLinkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 65751D0E62E2083AE8F5C8E3 /* WatchLinkManager.swift */; };
+		D0E8AFF7B3A63FD4EE8F94D9 /* SlidesmithRemoteWatch.app in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 6B60713DC0CDBEB9569634FB /* SlidesmithRemoteWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		E8427A853604E032163725FD /* WatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9216D3562B37BFB876EDF7A4 /* WatchApp.swift */; };
+		F5CAE00E25916869CE975B17 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E75C109CF2BA0962C5F1FC64 /* ContentView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		3E009AF89875AD1915EB4EEF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0303A1004A82A4297E507DE5 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = D8C79F91B51CF7D4CE2C51FB;
+			remoteInfo = SlidesmithRemoteWatch;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		CEE02E16C613FF20BE685897 /* Embed Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Watch;
+			dstSubfolderSpec = 16;
+			files = (
+				D0E8AFF7B3A63FD4EE8F94D9 /* SlidesmithRemoteWatch.app in Embed Dependencies */,
+			);
+			name = "Embed Dependencies";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidesmithRemoteApp.swift; sourceTree = "<group>"; };
+		4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SlidesmithRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		65751D0E62E2083AE8F5C8E3 /* WatchLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLinkManager.swift; sourceTree = "<group>"; };
+		6B60713DC0CDBEB9569634FB /* SlidesmithRemoteWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlidesmithRemoteWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLinkManager.swift; sourceTree = "<group>"; };
+		9216D3562B37BFB876EDF7A4 /* WatchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchApp.swift; sourceTree = "<group>"; };
+		A265377A0BE3DC30B82E979E /* RelayClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RelayClient.swift; sourceTree = "<group>"; };
+		A8F81243D292E21CD80DE322 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
+		CC64B9D0970F97259EC56682 /* PairingStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PairingStore.swift; sourceTree = "<group>"; };
+		E53340568672513DB596FABE /* WatchRemoteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchRemoteView.swift; sourceTree = "<group>"; };
+		E75C109CF2BA0962C5F1FC64 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		2AFA2DAD6F627754416CA25D /* Watch */ = {
+			isa = PBXGroup;
+			children = (
+				9216D3562B37BFB876EDF7A4 /* WatchApp.swift */,
+				65751D0E62E2083AE8F5C8E3 /* WatchLinkManager.swift */,
+				E53340568672513DB596FABE /* WatchRemoteView.swift */,
+			);
+			path = Watch;
+			sourceTree = "<group>";
+		};
+		32234299906DE6601BC529DB /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				CC64B9D0970F97259EC56682 /* PairingStore.swift */,
+				A265377A0BE3DC30B82E979E /* RelayClient.swift */,
+			);
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		485F874BB0D7512BBDFDBE63 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */,
+				6B60713DC0CDBEB9569634FB /* SlidesmithRemoteWatch.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		882FB7A489D129CADA184958 = {
+			isa = PBXGroup;
+			children = (
+				B661E349681043566FC0A72D /* iOS */,
+				32234299906DE6601BC529DB /* Shared */,
+				2AFA2DAD6F627754416CA25D /* Watch */,
+				485F874BB0D7512BBDFDBE63 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		B661E349681043566FC0A72D /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				E75C109CF2BA0962C5F1FC64 /* ContentView.swift */,
+				703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */,
+				A8F81243D292E21CD80DE322 /* QRScannerView.swift */,
+				0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		18E4C92E47EB90DADC3D93CF /* SlidesmithRemote */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2FD2B008810078CBBBFD3AF9 /* Build configuration list for PBXNativeTarget "SlidesmithRemote" */;
+			buildPhases = (
+				B6B0F823BE6DB1A1BDE483C0 /* Sources */,
+				CEE02E16C613FF20BE685897 /* Embed Dependencies */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				B766D401E95569CEE4BF1F72 /* PBXTargetDependency */,
+			);
+			name = SlidesmithRemote;
+			packageProductDependencies = (
+			);
+			productName = SlidesmithRemote;
+			productReference = 4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */;
+			productType = "com.apple.product-type.application";
+		};
+		D8C79F91B51CF7D4CE2C51FB /* SlidesmithRemoteWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5F863EB5E82680BB0CE2805F /* Build configuration list for PBXNativeTarget "SlidesmithRemoteWatch" */;
+			buildPhases = (
+				86BFD609F77AAFD6C5699355 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SlidesmithRemoteWatch;
+			packageProductDependencies = (
+			);
+			productName = SlidesmithRemoteWatch;
+			productReference = 6B60713DC0CDBEB9569634FB /* SlidesmithRemoteWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0303A1004A82A4297E507DE5 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					18E4C92E47EB90DADC3D93CF = {
+						ProvisioningStyle = Automatic;
+					};
+					D8C79F91B51CF7D4CE2C51FB = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 5FAD8E1225A6F015010C90C3 /* Build configuration list for PBXProject "SlidesmithRemote" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 882FB7A489D129CADA184958;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 485F874BB0D7512BBDFDBE63 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				18E4C92E47EB90DADC3D93CF /* SlidesmithRemote */,
+				D8C79F91B51CF7D4CE2C51FB /* SlidesmithRemoteWatch */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		86BFD609F77AAFD6C5699355 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				711A3EED8C80B311FF67F1E6 /* PairingStore.swift in Sources */,
+				19CC7E176566F07FC91856D5 /* RelayClient.swift in Sources */,
+				E8427A853604E032163725FD /* WatchApp.swift in Sources */,
+				CE635A779AFCDBD5D9E61880 /* WatchLinkManager.swift in Sources */,
+				022C9E8CBFCE72DCDDBC955A /* WatchRemoteView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		B6B0F823BE6DB1A1BDE483C0 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F5CAE00E25916869CE975B17 /* ContentView.swift in Sources */,
+				038929B6D9A4A5315D924C5B /* PairingStore.swift in Sources */,
+				7AE360DF2BA8849EF4B2634D /* PhoneLinkManager.swift in Sources */,
+				B63226275E095DF52D005E19 /* QRScannerView.swift in Sources */,
+				91D9CE34561F0525C7DBE30B /* RelayClient.swift in Sources */,
+				67362BEF9756E101CAA0EB20 /* SlidesmithRemoteApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		B766D401E95569CEE4BF1F72 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = D8C79F91B51CF7D4CE2C51FB /* SlidesmithRemoteWatch */;
+			targetProxy = 3E009AF89875AD1915EB4EEF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		2ACE90A90AB04E9E364F193B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		780F1327EEE80D0CCD3EC48A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_CFBundleDisplayName = "Slidesmith 遥控";
+				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上 slides 的配对二维码";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.zlyscu.slidesmithremote;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7A022BA8CAC44830A347AE33 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_CFBundleDisplayName = Slidesmith;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.zlyscu.slidesmithremote;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zlyscu.slidesmithremote.watchkitapp;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Debug;
+		};
+		BE12818AE945712C73DBA8B8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		D2B2FC04F50C86AB9BE27FFE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_KEY_CFBundleDisplayName = "Slidesmith 遥控";
+				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上 slides 的配对二维码";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = UIInterfaceOrientationPortrait;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.zlyscu.slidesmithremote;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		EC54D34B0802DED902FD56FC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				INFOPLIST_KEY_CFBundleDisplayName = Slidesmith;
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.zlyscu.slidesmithremote;
+				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.zlyscu.slidesmithremote.watchkitapp;
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 4;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		2FD2B008810078CBBBFD3AF9 /* Build configuration list for PBXNativeTarget "SlidesmithRemote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				780F1327EEE80D0CCD3EC48A /* Debug */,
+				D2B2FC04F50C86AB9BE27FFE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5F863EB5E82680BB0CE2805F /* Build configuration list for PBXNativeTarget "SlidesmithRemoteWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A022BA8CAC44830A347AE33 /* Debug */,
+				EC54D34B0802DED902FD56FC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		5FAD8E1225A6F015010C90C3 /* Build configuration list for PBXProject "SlidesmithRemote" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2ACE90A90AB04E9E364F193B /* Debug */,
+				BE12818AE945712C73DBA8B8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0303A1004A82A4297E507DE5 /* Project object */;
+}

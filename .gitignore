@@ -5,3 +5,8 @@ coverage/
 .DS_Store
 *.log
 .playwright-mcp/
+
+# Xcode
+apps/**/*.xcodeproj/xcuserdata/
+apps/**/*.xcworkspace/xcuserdata/
+DerivedData/
