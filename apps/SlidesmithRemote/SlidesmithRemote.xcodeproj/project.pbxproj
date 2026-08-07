@@ -35,7 +35,7 @@
 		CEE02E16C613FF20BE685897 /* Embed Dependencies */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
-			dstPath = Watch;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
 			dstSubfolderSpec = 16;
 			files = (
 				D0E8AFF7B3A63FD4EE8F94D9 /* SlidesmithRemoteWatch.app in Embed Dependencies */,
@@ -47,7 +47,7 @@
 
 /* Begin PBXFileReference section */
 		0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidesmithRemoteApp.swift; sourceTree = "<group>"; };
-		4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SlidesmithRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlidesmithRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		65751D0E62E2083AE8F5C8E3 /* WatchLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLinkManager.swift; sourceTree = "<group>"; };
 		6B60713DC0CDBEB9569634FB /* SlidesmithRemoteWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlidesmithRemoteWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLinkManager.swift; sourceTree = "<group>"; };
@@ -257,7 +257,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -278,11 +278,12 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.2;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SM_APP_ID = com.zlyscu.slidesmithremote;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
@@ -295,6 +296,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = "Slidesmith 遥控";
 				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上 slides 的配对二维码";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -304,7 +306,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.zlyscu.slidesmithremote;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SM_APP_ID)";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -314,11 +316,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = Slidesmith;
 				INFOPLIST_KEY_WKApplication = YES;
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.zlyscu.slidesmithremote;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(SM_APP_ID)";
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.zlyscu.slidesmithremote.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SM_APP_ID).watchkitapp";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 4;
@@ -360,7 +363,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -375,10 +378,11 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 0.1;
+				MARKETING_VERSION = 0.2;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SM_APP_ID = com.zlyscu.slidesmithremote;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
@@ -391,6 +395,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = "Slidesmith 遥控";
 				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上 slides 的配对二维码";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -400,7 +405,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.zlyscu.slidesmithremote;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SM_APP_ID)";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -410,11 +415,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = Slidesmith;
 				INFOPLIST_KEY_WKApplication = YES;
-				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.zlyscu.slidesmithremote;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(SM_APP_ID)";
 				INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.zlyscu.slidesmithremote.watchkitapp;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SM_APP_ID).watchkitapp";
 				SDKROOT = watchos;
 				SKIP_INSTALL = YES;
 				TARGETED_DEVICE_FAMILY = 4;

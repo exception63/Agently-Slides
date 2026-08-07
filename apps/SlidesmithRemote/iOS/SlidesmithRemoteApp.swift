@@ -11,6 +11,7 @@ struct SlidesmithRemoteApp: App {
                 .environmentObject(relay)
                 .environmentObject(link)
                 .onAppear {
+                    link.relay = relay   // 手表把指令交给手机代发时要用
                     if let p = link.pairing {
                         relay.connect(room: p.room, relayBase: p.relayBase)
                     }

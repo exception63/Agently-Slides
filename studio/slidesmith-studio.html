@@ -5046,6 +5046,10 @@ var qrcode = function() {
 
   // \u2014\u2014 \u7B2C\u4E8C\u5C4F\uFF1A\u51FA\u4E8C\u7EF4\u7801 + \u7B49\u5F85/\u5DF2\u914D\u5BF9 \u2014\u2014
   function startPairing(wsBaseHttp, phoneBase, label) {
+    // \u5148\u5173\u6389\u4E0A\u4E00\u6B21\u7684\u8FDE\u63A5\uFF1A\u5426\u5219\u6BCF\u70B9\u4E00\u6B21\u300C\u624B\u673A\u9065\u63A7\u300D\u5C31\u591A\u4E00\u6761 WebSocket\uFF0C
+    // \u540C\u4E00\u6761\u6307\u4EE4\u4F1A\u88AB\u6BCF\u6761\u8FDE\u63A5\u5404\u6267\u884C\u4E00\u6B21 \u2192 \u4E00\u6B21\u70B9\u51FB\u7FFB\u597D\u51E0\u9875\u3002
+    closePc();
+    if (ws) { try { ws.onmessage = null; ws.onerror = null; ws.close(); } catch (e) {} ws = null; }
     var room = roomId();
     var phoneUrl = phoneBase + '/r/' + room;
     overlay.style.display = 'flex';

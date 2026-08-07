@@ -2,11 +2,17 @@ import Foundation
 import WatchConnectivity
 
 /// 手机侧：保存配对信息，并把 room 同步给手表。
-/// 用 updateApplicationContext —— 它会被系统缓存，手表 App 下次打开也能拿到，
-/// 不要求「此刻手表 App 正开着」。再配一发 transferUserInfo 提高送达率。
+/// 三条路都走，任何一条通就行：
+///  - updateApplicationContext：系统缓存最新状态，手表 App 下次打开也拿得到
+///  - transferUserInfo：排队投递，可靠但可能有延迟
+///  - 回应手表的主动索取（replyHandler）：手表那边点「重试」时的即时通道
 final class PhoneLinkManager: NSObject, ObservableObject {
     @Published private(set) var pairing: RoomLink?
     @Published private(set) var watchStatusText = "未检测手表"
+
+    /// 手表把指令交给手机代发时要用到 —— 手表（尤其没蜂窝的）自己连长连接不可靠，
+    /// 走「手表→蓝牙→iPhone→云中转」这条路才稳。
+    weak var relay: RelayClient?
 
     override init() {
         super.init()
@@ -32,15 +38,32 @@ final class PhoneLinkManager: NSObject, ObservableObject {
         refreshWatchStatus()
     }
 
-    /// 把 room 推给手表
+    /// 把 room 推给手表。三管齐下，并把失败原因显示出来。
     func pushToWatch() {
-        guard WCSession.isSupported(), let p = pairing else { return }
+        guard WCSession.isSupported() else {
+            publish { self.watchStatusText = "此设备不支持手表连接" }; return
+        }
+        guard let p = pairing else { refreshWatchStatus(); return }
         let s = WCSession.default
-        guard s.activationState == .activated else { return }
+        guard s.activationState == .activated else {
+            publish { self.watchStatusText = "正在连接手表…" }; return
+        }
         let payload: [String: Any] = ["room": p.room, "relay": p.relayBase]
-        try? s.updateApplicationContext(payload)
+
+        var problems: [String] = []
+        do { try s.updateApplicationContext(payload) }
+        catch { problems.append(error.localizedDescription) }
         s.transferUserInfo(payload)
-        refreshWatchStatus()
+        if s.isReachable {
+            s.sendMessage(payload, replyHandler: nil, errorHandler: { _ in })
+        }
+
+        publish {
+            if !s.isPaired { self.watchStatusText = "没有配对的 Apple Watch" }
+            else if !s.isWatchAppInstalled { self.watchStatusText = "手表上还没装遥控 App" }
+            else if problems.isEmpty { self.watchStatusText = "已同步到手表 #\(p.shortId)" }
+            else { self.watchStatusText = "同步手表失败：\(problems.joined(separator: " / "))" }
+        }
     }
 
     private func refreshWatchStatus() {
@@ -49,15 +72,21 @@ final class PhoneLinkManager: NSObject, ObservableObject {
         }
         let s = WCSession.default
         publish {
-            if !s.isPaired { self.watchStatusText = "没有配对的 Apple Watch" }
+            if s.activationState != .activated { self.watchStatusText = "正在连接手表…" }
+            else if !s.isPaired { self.watchStatusText = "没有配对的 Apple Watch" }
             else if !s.isWatchAppInstalled { self.watchStatusText = "手表上还没装遥控 App" }
-            else if self.pairing != nil { self.watchStatusText = "已同步到手表" }
+            else if let p = self.pairing { self.watchStatusText = "已同步到手表 #\(p.shortId)" }
             else { self.watchStatusText = "手表已就绪，等待配对" }
         }
     }
 
     private func publish(_ work: @escaping () -> Void) {
         if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
+    }
+
+    private func pairingPayload() -> [String: Any] {
+        guard let p = pairing else { return [:] }
+        return ["room": p.room, "relay": p.relayBase]
     }
 }
 
@@ -68,5 +97,43 @@ extension PhoneLinkManager: WCSessionDelegate {
     }
     func sessionDidBecomeInactive(_ session: WCSession) {}
     func sessionDidDeactivate(_ session: WCSession) { WCSession.default.activate() }
-    func sessionWatchStateDidChange(_ session: WCSession) { refreshWatchStatus() }
+    func sessionWatchStateDidChange(_ session: WCSession) {
+        refreshWatchStatus()
+        if pairing != nil { pushToWatch() }
+    }
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        if pairing != nil, session.isReachable { pushToWatch() }
+    }
+
+    /// 手表来消息：① 代发遥控指令 ② 查状态 ③ 要配对信息
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any],
+                 replyHandler: @escaping ([String: Any]) -> Void) {
+        DispatchQueue.main.async {
+            // ① 代发指令：手表按了键 → 由手机的 WebSocket 发给中转
+            if let raw = message["cmd"] as? String, let action = RemoteAction(rawValue: raw) {
+                // 手机自己可能还没连上（刚被唤醒）——先确保连接再发
+                if let p = self.pairing, self.relay?.isConnected != true {
+                    self.relay?.connect(room: p.room, relayBase: p.relayBase)
+                }
+                let ok = self.relay?.send(action) ?? false
+                replyHandler(["ok": ok,
+                              "deck": self.relay?.deckPresent ?? false,
+                              "conn": self.relay?.isConnected ?? false])
+                return
+            }
+            // ② 查状态（手表定时 ping，用来显示绿灯/橙灯）
+            if message["ping"] != nil {
+                if let p = self.pairing, self.relay?.isConnected != true {
+                    self.relay?.connect(room: p.room, relayBase: p.relayBase)
+                }
+                replyHandler(["ok": true,
+                              "deck": self.relay?.deckPresent ?? false,
+                              "conn": self.relay?.isConnected ?? false])
+                return
+            }
+            // ③ 要配对信息
+            replyHandler(self.pairingPayload())
+        }
+    }
+    func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {}
 }

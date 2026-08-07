@@ -119,6 +119,10 @@
 
   // —— 第二屏：出二维码 + 等待/已配对 ——
   function startPairing(wsBaseHttp, phoneBase, label) {
+    // 先关掉上一次的连接：否则每点一次「手机遥控」就多一条 WebSocket，
+    // 同一条指令会被每条连接各执行一次 → 一次点击翻好几页。
+    closePc();
+    if (ws) { try { ws.onmessage = null; ws.onerror = null; ws.close(); } catch (e) {} ws = null; }
     var room = roomId();
     var phoneUrl = phoneBase + '/r/' + room;
     overlay.style.display = 'flex';

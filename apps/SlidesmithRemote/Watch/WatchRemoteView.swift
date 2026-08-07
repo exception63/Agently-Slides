@@ -33,38 +33,62 @@ struct WatchRemoteView: View {
 
     // MARK: - 状态条
 
+    /// 放映端是否在线：经手机那条路由手机回报，直连那条路看自己的连接
+    private var deckOnline: Bool {
+        link.transport == .phone ? link.phoneDeckPresent : relay.deckPresent
+    }
+
     private var statusBar: some View {
         HStack(spacing: 5) {
             Circle()
-                .fill(dotColor)
+                .fill(deckOnline ? Color.green : (link.transport == .none ? Color.gray : Color.orange))
                 .frame(width: 7, height: 7)
-            Text(relay.statusText)
+            Text(statusLine)
                 .font(.system(size: 12, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Spacer(minLength: 0)
         }
-        .foregroundStyle(relay.deckPresent ? Color.green : Color.orange)
+        .foregroundStyle(deckOnline ? Color.green : Color.orange)
     }
 
-    private var dotColor: Color {
-        if relay.deckPresent { return .green }
-        return relay.isConnected ? .orange : .gray
+    /// 同时告诉用户「通不通」和「走的哪条路」——排障时一眼看清
+    private var statusLine: String {
+        switch link.transport {
+        case .phone:  return deckOnline ? "已连接 · 经 iPhone" : "等待放映端 · 经 iPhone"
+        case .direct: return relay.deckPresent ? "已连接 · 直连" : relay.statusText + " · 直连"
+        case .none:   return relay.isConnected ? relay.statusText : "等待 iPhone 或网络…"
+        }
     }
 
     private var unpairedHint: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "qrcode.viewfinder")
-                .font(.system(size: 26))
-                .foregroundStyle(.orange)
-            Text("还没配对")
-                .font(.system(size: 15, weight: .semibold))
-            Text("用 iPhone 上的 Slidesmith 遥控扫一次电脑上的二维码即可")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
+        ScrollView {
+            VStack(spacing: 8) {
+                Image(systemName: "qrcode.viewfinder")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.orange)
+                Text("还没配对")
+                    .font(.system(size: 15, weight: .semibold))
+                // 诊断：明确告诉用户卡在哪一步，而不是干瘪的「未配对」
+                Text(link.diagnostic)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                Button {
+                    WKInterfaceDevice.current().play(.click)
+                    link.requestFromPhone()
+                } label: {
+                    Label("重试", systemImage: "arrow.clockwise")
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .tint(.orange)
+                Text("提示：先在 iPhone 上打开遥控 App 并完成扫码，再点重试")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.vertical, 4)
         }
-        .frame(maxHeight: .infinity)
     }
 
     // MARK: - 翻页区
@@ -88,13 +112,13 @@ struct WatchRemoteView: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(tint.opacity(flash == action ? 0.55 : 0.22))
         )
-        .foregroundStyle(relay.deckPresent ? Color.white : Color.white.opacity(0.45))
+        .foregroundStyle(deckOnline ? Color.white : Color.white.opacity(0.45))
         .animation(.easeOut(duration: 0.12), value: flash)
     }
 
     /// 发指令 + 触觉反馈。发不出去（没连上/放映端不在）给 failure 震动，避免「按了以为翻了」。
     private func fire(_ action: RemoteAction) {
-        let ok = relay.send(action)
+        let ok = link.send(action)
         WKInterfaceDevice.current().play(ok ? .click : .failure)
         guard ok else { return }
         flash = action

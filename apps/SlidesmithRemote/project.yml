@@ -10,10 +10,28 @@ settings:
   base:
     SWIFT_VERSION: "5.0"
     CODE_SIGN_STYLE: Automatic
-    MARKETING_VERSION: "0.1"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.2"
+    CURRENT_PROJECT_VERSION: "2"
     GENERATE_INFOPLIST_FILE: YES
     ENABLE_USER_SCRIPT_SANDBOXING: NO
+    # 两个 target 的 bundle id 从这一个变量派生，避免手改其一导致
+    # 手表的 WKCompanionAppBundleIdentifier 与手机对不上（对不上＝系统不认伴侣关系＝永远「未配对」）
+    SM_APP_ID: com.zlyscu.slidesmithremote
+
+# 显式声明 scheme（否则重新 generate 后只剩 Xcode 自动补的用户级 scheme，命令行会找不到）
+schemes:
+  SlidesmithRemote:
+    build:
+      targets:
+        SlidesmithRemote: all
+    run: { config: Debug }
+    archive: { config: Release }
+  SlidesmithRemoteWatch:
+    build:
+      targets:
+        SlidesmithRemoteWatch: all
+    run: { config: Debug }
+    archive: { config: Release }
 
 targets:
   # ---- iPhone：扫码配对 + 把 room 同步给手表 + 自己也能当遥控 ----
@@ -25,7 +43,7 @@ targets:
       - path: Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.zlyscu.slidesmithremote
+        PRODUCT_BUNDLE_IDENTIFIER: $(SM_APP_ID)
         INFOPLIST_KEY_CFBundleDisplayName: Slidesmith 遥控
         INFOPLIST_KEY_NSCameraUsageDescription: 扫描电脑上 slides 的配对二维码
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
@@ -37,7 +55,10 @@ targets:
         embed: true
         copy:
           destination: productsDirectory
-          subpath: Watch
+          # 必须是 $(CONTENTS_FOLDER_PATH)/Watch —— 这才是「Embed Watch Content」的真实目标，
+          # 手表 App 要被拷进 iPhone App 包内部。只写 "Watch" 会拷到产物目录旁边，
+          # 系统就不认伴侣关系，WatchConnectivity 报 "Companion app is not installed"。
+          subpath: $(CONTENTS_FOLDER_PATH)/Watch
 
   # ---- Apple Watch：真正的遥控器（分区翻页 + 捏合双击 = 下一页）----
   SlidesmithRemoteWatch:
@@ -48,9 +69,9 @@ targets:
       - path: Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.zlyscu.slidesmithremote.watchkitapp
+        PRODUCT_BUNDLE_IDENTIFIER: $(SM_APP_ID).watchkitapp
         INFOPLIST_KEY_CFBundleDisplayName: Slidesmith
         INFOPLIST_KEY_WKApplication: YES
-        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: com.zlyscu.slidesmithremote
+        INFOPLIST_KEY_WKCompanionAppBundleIdentifier: $(SM_APP_ID)
         INFOPLIST_KEY_WKRunsIndependentlyOfCompanionApp: YES
         TARGETED_DEVICE_FAMILY: "4"
