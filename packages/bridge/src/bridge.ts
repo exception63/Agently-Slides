@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { EventEmitter } from 'node:events';
 import { spawn } from 'node:child_process';
 import { WebSocketServer, type WebSocket } from 'ws';
+import { outlineOf, type OutlineEntry } from './outline.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, '..', '..', '..');
@@ -174,6 +175,7 @@ async function fetchImageDataUrl(rawUrl: string): Promise<{ dataUrl: string; byt
 // ---- wire protocol (JSON over WebSocket) ----
 //   bridge → Studio : { type:'hello', hasDeck, owner, port } | { type:'import', name, html } | { type:'patch', text, preview }
 //   Studio → bridge : { type:'ready' } | { type:'requests', request, images? } | { type:'exported', name, html }
+//   bridge → Studio : { type:'hello' } | { type:'import' } | { type:'patch' } | { type:'sync-request' }
 //
 // An image-layout request carries images:[{id,name,dataUrl}]. The bridge writes each
 // to a temp dir and substitutes the __TRAY_DIR__ token in the request text with that
@@ -234,6 +236,16 @@ export interface BridgeHandle extends EventEmitter {
    *  preview=true marks it as a *proposal* so the Studio shows it behind a 保留/还原
    *  banner instead of committing silently (the 改前先问我 permission mode). */
   applyPatch(text: string, opts?: { preview?: boolean }): { clients: number; queued: boolean };
+  /** ask the connected Studio to push its *current* deck up, and resolve once it
+   *  lands (or after timeoutMs). Resolves immediately when no Studio is connected.
+   *  See the comment on the implementation for why a read must do this first. */
+  syncFromStudio(timeoutMs?: number): Promise<boolean>;
+  /** the loaded deck's pages: index · data-id · title. Computed with the exact
+   *  same id rule the Studio uses on import, so the ids are the ones apply_patch
+   *  will match. Pass ids (or 1-based page numbers) in `withHtml` to get whole
+   *  `<section>`s back — that's what lets a free-form chat rewrite a page without
+   *  reading (and mis-guessing) the file on disk. */
+  outline(withHtml?: string[]): OutlineEntry[];
   status(): BridgeStatus;
   /** bind a Claude Code session label to this bridge (the handshake). Re-broadcasts
    *  hello so every connected Studio shows which session it's talking to. */
@@ -400,11 +412,21 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     }
     // POST /api/open  body: a contract HTML deck → load it (used by the offline Studio's
     // "连接 Claude" hand-off, so the connected version opens with the same deck)
+    //
+    // ?path=<abs> is optional and only meaningful when the caller loaded the deck
+    // from disk (the client-mode MCP does — see remote.ts). Without it the deck is
+    // "in-memory" and PDF/HTML export falls back to ~/.slidesmith instead of landing
+    // beside the deck; with it, an out-of-process caller gets the same behaviour a
+    // local handle.open() would.
     if (url === '/api/open' && req.method === 'POST') {
       readBody(req).then((body) => {
         const name = decodeURIComponent((/[?&]name=([^&]+)/.exec(req.url || '') || [])[1] || 'deck.html');
-        if (body.trim()) handle.openHtml(name, body);
-        sendJson(res, { ok: !!body.trim(), name });
+        const path = decodeURIComponent((/[?&]path=([^&]+)/.exec(req.url || '') || [])[1] || '');
+        if (body.trim()) {
+          handle.openHtml(name, body);
+          if (path) deckAbsPath = resolve(path); // openHtml just cleared it — re-set after
+        }
+        sendJson(res, { ok: !!body.trim(), name, path: deckAbsPath });
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
@@ -414,6 +436,17 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       const drain = !/[?&]drain=0\b/.test(req.url || '');
       const reqs = handle.getRequests(drain);
       sendJson(res, { ok: true, count: reqs.length, requests: reqs });
+      return;
+    }
+    // GET /api/outline[?html=id1,id2|3] → the loaded deck's pages (index · id · title).
+    // `html=` names the pages whose full <section> to include (by data-id or page number).
+    if (url === '/api/outline' && (req.method === 'GET' || req.method === 'POST')) {
+      const raw = decodeURIComponent((/[?&]html=([^&]*)/.exec(req.url || '') || [])[1] || '');
+      const want = raw.split(',').map((s) => s.trim()).filter(Boolean);
+      handle.syncFromStudio().then((synced) => {
+        const pages = handle.outline(want);
+        sendJson(res, { ok: true, deckName: deck ? deck.name : null, count: pages.length, pages, synced });
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 500));
       return;
     }
     // POST /api/patch  body: raw <section data-id> html (or {"sections":"…","preview":bool}) → applied to Studio.
@@ -713,6 +746,30 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     return owner;
   };
   handle.owner = () => owner;
+  // **读之前先要一次最新的。**
+  //
+  // 桥里这份 `deck.html` 只在三个时刻被刷新：导入、AI 补丁之后（Studio 自己
+  // `syncExportToBridge`）、用户按保存/导出。**用户在 Studio 里手打的字不在其列。**
+  //
+  // 于是有一条会静默毁掉工作的路径：用户改了两页字 → 转头在面板里说「第 5 页再短点」
+  // → Claude 读到的是手改之前的那份 → 它在旧内容上重写 → apply_patch 回写 →
+  // **那两页手改被无声地抹掉了**。用户既不会收到任何提示，也无从知道是哪一步吃掉的。
+  //
+  // 所以读之前先向 Studio 要一次。它不在线（没人连着）就没有更新的版本可要，直接返回。
+  handle.syncFromStudio = (timeoutMs = 1500) =>
+    new Promise<boolean>((res) => {
+      const live = [...sockets].filter((s) => s.readyState === s.OPEN);
+      if (!live.length) return res(false);
+      let done = false;
+      const settle = (ok: boolean) => { if (done) return; done = true; emitter.off('exported', onExported); res(ok); };
+      const onExported = () => settle(true);
+      emitter.once('exported', onExported);
+      setTimeout(() => settle(false), timeoutMs);
+      broadcast({ type: 'sync-request' });
+    });
+
+  handle.outline = (withHtml = []) =>
+    deck ? outlineOf(deck.html, new Set(withHtml)) : [];
   handle.status = statusObj;
   handle.openBrowser = () => launchBrowser(handle.url);
   handle.waitForStudio = (timeoutMs = 15000) =>

@@ -1,0 +1,42 @@
+name: SlidesmithStudio
+options:
+  bundleIdPrefix: com.zlyscu
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "26.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    GENERATE_INFOPLIST_FILE: NO
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+
+# 显式声明 scheme——xcodegen 重新 generate 之后只剩 Xcode 自动补的用户级 scheme，
+# 命令行 `xcodebuild -scheme` 会找不到（SlidesmithRemote 上栽过一次）。
+schemes:
+  SlidesmithStudio:
+    build:
+      targets:
+        SlidesmithStudio: all
+    run: { config: Debug }
+    archive: { config: Release }
+
+targets:
+  SlidesmithStudio:
+    type: application
+    platform: macOS
+    sources:
+      - path: macOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.zlyscu.slidesmithstudio
+        PRODUCT_NAME: Slidesmith Studio
+        INFOPLIST_FILE: Support/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Support/SlidesmithStudio.entitlements
+        # **仓库路径烘进 Info.plist**，app 靠它找 `packages/cli` 和 `bridge/`。
+        # 用户可以在 app 里另选一个目录（存 UserDefaults，优先级更高）；这一条只是
+        # 开发机上的默认值，换机器就靠那个选择器。见 RepoLocator。
+        SM_REPO_ROOT: $(SRCROOT)/../..

@@ -290,11 +290,12 @@ program
 
 program
   .command('mcp')
-  .description('run the bridge as an MCP server (stdio) for Claude Code: tools slidesmith_open / get_requests / apply_patch / status. stdout is the MCP stream — do not run interactively.')
+  .description('run the bridge as an MCP server (stdio) for Claude Code: tools slidesmith_open / get_requests / apply_patch / status. Attaches to an already-running bridge on the port if it finds one (Slidesmith Studio.app owns one), otherwise starts its own. stdout is the MCP stream — do not run interactively.')
   .option('-p, --port <n>', 'bridge http/ws port', String(DEFAULT_PORT))
-  .action(async (opts: { port: string }) => {
+  .option('--attach-only', 'fail instead of starting a bridge when none is running (use when the app owns it)')
+  .action(async (opts: { port: string; attachOnly?: boolean }) => {
     try {
-      await startMcp({ port: parseInt(opts.port, 10) || DEFAULT_PORT });
+      await startMcp({ port: parseInt(opts.port, 10) || DEFAULT_PORT, attachOnly: opts.attachOnly });
     } catch (e) {
       console.error(`✗ ${(e as Error).message}`);
       process.exit(1);

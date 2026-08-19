@@ -10,3 +10,7 @@ coverage/
 apps/**/*.xcodeproj/xcuserdata/
 apps/**/*.xcworkspace/xcuserdata/
 DerivedData/
+
+# app 的 Claude 桥运行时写的端口记录
+apps/SlidesmithStudio/bridge/.port
+apps/SlidesmithStudio/bridge/__pycache__/

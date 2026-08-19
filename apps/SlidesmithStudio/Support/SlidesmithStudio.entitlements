@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- **沙盒必须关。** 这个 app 要拉起 node 和 python3、要在仓库目录里读写 deck、
+	     它背后那个 claude 还要跑 git/rg/playwright。沙盒里这些一条都不成立，
+	     而失败的表现全都是"它没反应"——不是报错。OmniSecretary 走过同样的路。
+	     代价是它不能上 App Store，本来也没打算上。 -->
+	<key>com.apple.security.app-sandbox</key>
+	<false/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
+</dict>
+</plist>

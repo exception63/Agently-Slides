@@ -2404,6 +2404,9 @@ function connectBridge(): void {
     // after applying a patch, sync the updated full deck back so the bridge's
     // in-memory copy stays current (late-joiners / reconnects see the change)
     else if (m.type === 'patch' && typeof m.text === 'string') { applyAiPatch(m.text, !!m.preview); setTimeout(syncExportToBridge, 500); }
+    // 桥要一份最新的 deck（AI 读页之前会问一次）。**手打的编辑只有这条路能传上去**——
+    // 保存/导出/AI 补丁之外，桥手里那份一直是旧的，AI 照旧内容重写就会盖掉手改。
+    else if (m.type === 'sync-request') syncExportToBridge();
   });
   ws.addEventListener('close', () => {
     bridge.connected = false; bridge.ws = null; updateBridgeBadge();
