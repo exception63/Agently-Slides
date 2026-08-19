@@ -156,9 +156,21 @@
   var frame = document.getElementById('scriptFrame'), emptyHint = document.getElementById('scriptEmpty');
   var curTitle = document.getElementById('curTitle'), nextTitle = document.getElementById('nextTitle');
   var pageNo = document.getElementById('pageNo'), timerEl = document.getElementById('timer');
-  var scriptLoaded = false, askedInfo = false, cueOn = false, lastAnchor = null, pendingState = null;
+  var scriptLoaded = false, cueOn = false, lastAnchor = null, pendingState = null;
 
-  function askInfo() { if (askedInfo) return; askedInfo = true; sendRaw({ type: 'need-info' }); }
+  // 要讲稿要要到手为止。原来只问一次，那一次丢了（半开的直连、握手竞态、切后台）
+  // 讲稿就永远空着——现场没法等「过一会儿自己好」。改成每 2 秒重问，拿到即停。
+  var askTimer = null;
+  function askInfo() {
+    if (scriptLoaded) return;
+    sendRaw({ type: 'need-info' });
+    if (askTimer) return;
+    var tries = 0;
+    askTimer = setInterval(function () {
+      if (scriptLoaded || ++tries > 15) { clearInterval(askTimer); askTimer = null; return; }
+      if (deckPresent) sendRaw({ type: 'need-info' });
+    }, 2000);
+  }
   // 放映端发来的东西：两条路（中转 ws / 直连 dc）进来的都走这里
   function onDeckMsg(m) {
     if (!m) return;
@@ -207,13 +219,13 @@
   function connect() {
     setState('', '连接中…');
     ws = new WebSocket(wsUrl());
-    ws.onopen = function () { setState('', '等待放映端'); askedInfo = false; };
+    ws.onopen = function () { setState('', '等待放映端'); };
     ws.onmessage = function (e) { var m; try { m = JSON.parse(e.data); } catch (x) { return; }
       if (m.type === 'joined' || m.type === 'peer') reflectPeers(m.peers);
       else if (m.type === 'signal') { if (m.kind === 'offer') onOffer(m.data); else if (m.kind === 'ice') onIce(m.data); }
       else onDeckMsg(m);
     };
-    ws.onclose = function () { setState('bad', '连接断开，重连中…'); askedInfo = false; setTimeout(connect, 1500); };
+    ws.onclose = function () { setState('bad', '连接断开，重连中…'); setTimeout(connect, 1500); };
     ws.onerror = function () { try { ws.close(); } catch (x) {} };
   }
   connect();

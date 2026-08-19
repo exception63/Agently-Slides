@@ -89,9 +89,13 @@
   // 出站一律「直连优先、中转兜底」。这条对讲稿尤其要紧：讲稿是你还没讲出口的话
   // （未发表的研究、内部数据都可能在里面），能不过第三方就不过。手机和电脑同一
   // Wi-Fi 时 P2P 会自动建起来，那时整份讲稿根本不出局域网；连不上才回落中转。
+  // 直连**只在验证过之后**才用。WebRTC 会半开：deck 这边 readyState 已经是 'open'，
+  // 手机那边其实没连上——往里发等于扔进黑洞，而且不报错。判据取「收到过对端的消息」，
+  // 因为手机的 dc 一开就会往这边发东西，收到即证明双向通。没验过就老实走中转。
+  var dcProven = false;
   function relaySend(o) {
     var msg = JSON.stringify(o);
-    if (dc && dc.readyState === 'open') { try { dc.send(msg); return; } catch (e) {} }
+    if (dcProven && dc && dc.readyState === 'open') { try { dc.send(msg); return; } catch (e) {} }
     if (ws && ws.readyState === 1) { try { ws.send(msg); } catch (e) {} }
   }
 
@@ -133,12 +137,13 @@
     // （need-info）就石沉大海，重连一次讲稿屏就空了。
     dc.onmessage = function (e) {
       var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      dcProven = true;                      // 收到就说明这条道真的双向通了
       if (m.type === 'cmd' && m.action) handle(m.action);
       else if (m.type === 'need-info') sendDeckInfo();
       else if (m.type === 'jump' && typeof m.slideIdx === 'number') presenterJump(m.slideIdx);
     };
     dc.onopen = function () { setTransport(true); sendDeckInfo(); };
-    dc.onclose = function () { setTransport(false); };
+    dc.onclose = function () { dcProven = false; setTransport(false); };
     pc.createOffer().then(function (off) { return pc.setLocalDescription(off).then(function () { sig({ kind: 'offer', data: off }); }); }).catch(function () {});
   }
   function onAnswer(sdp) { if (!pc) return; pc.setRemoteDescription(new RTCSessionDescription(sdp)).then(function () { pendingIce.forEach(function (c) { try { pc.addIceCandidate(c); } catch (e) {} }); pendingIce = []; }).catch(function () {}); }
