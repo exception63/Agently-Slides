@@ -7,7 +7,7 @@ SLIDES-INJECTION · 主屏 slides 注入代码片段 · v0.3
 v0.3 新增（vs v0.2）：
 - broadcastPresenter payload 加 `source:'slides'` 字段（防回声）
 - 新增 handleReverseJump · 接收演讲者模式反向广播的 jump-to-slide
-- BroadcastChannel.onmessage 包装 + localStorage 'fuquan-slide-jump' 双通道接收
+- BroadcastChannel.onmessage 包装 + localStorage '{{CHANNEL}}-slide-jump' 双通道接收
 - 现在 slides 既会发也会收 · 实现双向联动
 ============================================================
 */
@@ -66,7 +66,7 @@ const SEG_NAMES = {{SEG_NAMES}}; // 例：['开场','prompt 深讲','agents 深�
 
 // BroadcastChannel + localStorage 双通道
 let presenterChannel = null;
-try { presenterChannel = new BroadcastChannel('fuquan-presenter-sync'); }
+try { presenterChannel = new BroadcastChannel('{{CHANNEL}}-presenter-sync'); }
 catch(e) { console.warn('BroadcastChannel 不可用 · 仅用 localStorage'); }
 let presenterWindow = null;
 
@@ -105,7 +105,7 @@ if (presenterChannel) {
 }
 // localStorage 兜底通道
 window.addEventListener('storage', e => {
-  if (e.key !== 'fuquan-slide-jump' || !e.newValue) return;
+  if (e.key !== '{{CHANNEL}}-slide-jump' || !e.newValue) return;
   try { handleReverseJump(JSON.parse(e.newValue)); } catch(err) {}
 });
 

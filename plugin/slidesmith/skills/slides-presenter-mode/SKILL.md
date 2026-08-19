@@ -229,11 +229,19 @@ cp 讲稿.html 讲稿.html.bak-${TS}
 
 ### Step 6 · 复制副屏 HTML（presenter-view）
 
-`templates/presenter-view.html.template` 是完整可用的副屏 HTML——替换 3 个占位：
+`templates/presenter-view.html.template` 是完整可用的副屏 HTML——替换 4 个占位：
 
 - `{{SCRIPT_BASE}}` —— 讲稿 HTML 的相对路径
 - `{{SLIDE_MAP_LOCAL}}` —— 上一步建的 SLIDE_MAP
 - `{{SEG_NAMES}}` —— 段名数组
+- `{{CHANNEL}}` —— **这份 deck 专属的频道前缀**，用项目名，如 `dyq-defense-2026`
+
+> ⚠️ `{{CHANNEL}}` 每份 deck 必须不同，别图省事沿用别人的。BroadcastChannel 是
+> **按同源 + 频道名**广播的：两份 deck 用了同一个名字、又恰好在同一浏览器里开着
+> （都从 file:// 打开，或都由同一个本地服务器提供），A 的翻页广播会被 B 收到，
+> 于是 B 的副屏/手机讲稿屏跟着 A 跳——这就是模板早期写死 `fuquan-presenter-sync`
+> 留下的坑，现已改成占位符。同一个名字也会让 localStorage 的 `-state` / `-jump`
+> 键互相覆盖。
 
 副屏 HTML 自带：BroadcastChannel + localStorage 双通道接收 · iframe 加载讲稿 · 深色 header（slide #/标题/上下张预览/计时器/锁定/缩放）· **anchor 比较代替 slideIdx 比较**（鲁棒）。
 

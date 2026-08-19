@@ -326,7 +326,7 @@
   // 双通道接收：BroadcastChannel + localStorage event
   // ============================================================
   let bc = null;
-  try { bc = new BroadcastChannel('fuquan-presenter-sync'); bc.onmessage = e => applyState(e.data); }
+  try { bc = new BroadcastChannel('{{CHANNEL}}-presenter-sync'); bc.onmessage = e => applyState(e.data); }
   catch (e) { console.warn('BroadcastChannel 不可用', e); }
 
   window.addEventListener('storage', e => {
@@ -392,7 +392,7 @@
   function broadcastSlideJump(slideIdx) {
     const payload = { type: 'jump-to-slide', slideIdx, ts: Date.now(), source: 'presenter' };
     if (bc) { try { bc.postMessage(payload); } catch(e){} }
-    try { localStorage.setItem('fuquan-slide-jump', JSON.stringify(payload)); } catch(e){}
+    try { localStorage.setItem('{{CHANNEL}}-slide-jump', JSON.stringify(payload)); } catch(e){}
   }
   function reverseNav(dir) {
     if (lastIdx < 0) { toast('尚未收到主屏状态 · 请先在主屏翻一页'); return; }
