@@ -38,9 +38,18 @@
     chan: null,       // BroadcastChannel 实例
     name: null,       // 频道名
     last: null,       // 最近一次状态（新设备中途接入时补发）
+    lastBcAt: 0,      // 最近一次收到广播的时刻（DOM 兜底据此让路）
+    domWatch: false,  // DOM 观察兜底是否已启动
+    started: false,
   };
   // 频道名：优先用显式配置；否则从 localStorage 嗅探——broadcastPresenter 每次
   // 都会写一条 `<channel>-state`，键名反推得到频道名，免配置。
+  // 频道名的三个来源，按「可信度」排，不是按方便程度排：
+  //   ① 引擎自己声明的 —— 权威
+  //   ② 从 localStorage 的 `<频道>-state` 反推 —— 权威（那是广播真的写下的）
+  //   ③ __SM_DECK_ID__ + '-sync' —— **只是猜**，仅对遵守新约定的引擎成立
+  // 早先把 ③ 排在 ② 前面是错的：老引擎广播在自己烘死的名字上（如 'editorial-demo'），
+  // 猜出来的名字根本收不到，而且因为「猜到了名字」还不会退回 DOM 兜底，等于全哑。
   function presenterChannelName() {
     if (typeof window.__SM_PRESENTER_CHANNEL__ === 'string' && window.__SM_PRESENTER_CHANNEL__) return window.__SM_PRESENTER_CHANNEL__;
     try {
@@ -51,13 +60,147 @@
         if (v && typeof v.slideIdx === 'number') return k.slice(0, -6);
       }
     } catch (e) { /* 隐私模式下 localStorage 会抛，忽略 */ }
+    if (typeof window.__SM_DECK_ID__ === 'string' && window.__SM_DECK_ID__) return window.__SM_DECK_ID__ + '-sync';
     return null;
   }
+
+  // ——————————————————————————————————————————————————————————————
+  // 没有广播时自己算状态。
+  // 老引擎导出的 deck、以及别家做的 deck 都不会广播——但它们的 DOM 里明摆着当前是
+  // 第几页。editorial 引擎还额外暴露了 window.deckAPI（idx/total/SLIDE_MAP/SLIDE_TITLES），
+  // 有就直接用，没有就从 DOM 认「带 active 类的那一页」。
+  // ——————————————————————————————————————————————————————————————
+  function deckSlides() {
+    var d = document.querySelector('#deck') || document.querySelector('.deck');
+    if (!d) return [];
+    var direct = d.querySelectorAll(':scope > .slide');
+    return [].slice.call(direct.length ? direct : d.querySelectorAll('.slide'));
+  }
+  function activeIdxFromDom(list) {
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i].className || '';
+      if (/(^|\s)(active|is-active|slide--active|sm-active)(\s|$)/.test(c)) return i;
+    }
+    return -1;
+  }
+  function titleOf(el) {
+    if (!el) return '';
+    if (el.dataset && el.dataset.title) return el.dataset.title;
+    var t = el.querySelector('.cover__title,.secdiv__title,.manifesto__title,.insight__statement,.bigq__t,.head__title,.title,h1,h2,h3');
+    return t ? (t.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40) : '';
+  }
+  function stateFromDom() {
+    var api = window.deckAPI;
+    var list = deckSlides();
+    var total = (api && api.total) || list.length;
+    if (!total) return null;
+    var i = (api && typeof api.idx === 'number') ? api.idx : activeIdxFromDom(list);
+    if (i < 0) i = 0;
+    var titles = (api && api.SLIDE_TITLES) || list.map(titleOf);
+    var map = (api && api.SLIDE_MAP) || null;
+    return {
+      slideIdx: i, total: total,
+      anchor: (map && map[i]) || ('sm-note-' + i),
+      title: titles[i] || '', prevTitle: i > 0 ? (titles[i - 1] || '') : '',
+      nextTitle: i < total - 1 ? (titles[i + 1] || '') : '', source: 'slides'
+    };
+  }
+  // deck 一旦有自己的广播就用广播（更准，带 segment / 作者定义的锚点）；
+  // 没有才启动这个观察器。翻页在 DOM 上一定表现为 class 变化，所以 MutationObserver
+  // 够用；再加一个 500ms 的兜底轮询，防某些引擎用别的方式换页。
+  function startDomWatch() {
+    if (PFEED.domWatch) return;
+    PFEED.domWatch = true;
+    var lastKey = '';
+    function tick() {
+      if (PFEED.lastBcAt && Date.now() - PFEED.lastBcAt < 3000) return;   // 广播在干活，让路
+      var st = stateFromDom(); if (!st) return;
+      var key = st.slideIdx + '/' + st.total;
+      if (key === lastKey) return;
+      lastKey = key; PFEED.last = st;
+      relaySend({ type: 'state', state: st });
+    }
+    var d = document.querySelector('#deck') || document.querySelector('.deck') || document.body;
+    try { new MutationObserver(tick).observe(d, { attributes: true, subtree: true, attributeFilter: ['class'] }); } catch (e) {}
+    setInterval(tick, 500);
+    tick();
+  }
+
+  // ——————————————————————————————————————————————————————————————
+  // 没有内嵌讲稿时，从 slide 里的 <aside class="notes"> 现造一份。
+  // 这样「Studio 里随手做的 deck + 每页写几句备注」也能当演讲者视图用，不必走
+  // 一体版那套流程。造出来的讲稿自带 fuquan-scroll / fuquan-cue 监听，所以手机端
+  // 一行都不用改——它分不出这份讲稿是作者写的还是这里现拼的。
+  // ——————————————————————————————————————————————————————————————
+  function collectNotes() {
+    var list = deckSlides(); if (!list.length) return null;
+    var api = window.deckAPI;
+    var map = (api && api.SLIDE_MAP) || null;
+    var titles = (api && api.SLIDE_TITLES) || list.map(titleOf);
+    var items = [], found = 0;
+    for (var i = 0; i < list.length; i++) {
+      var n = list[i].querySelector('aside.notes, .notes, [data-notes]');
+      var html = '';
+      if (n) html = n.getAttribute('data-notes') ? escapeHtml(n.getAttribute('data-notes')) : n.innerHTML;
+      else if (list[i].getAttribute('data-notes')) html = escapeHtml(list[i].getAttribute('data-notes'));
+      if (html && html.replace(/<[^>]*>/g, '').trim()) found++;
+      items.push({ anchor: (map && map[i]) || ('sm-note-' + i), idx: i, title: titles[i] || '', html: html });
+    }
+    return found ? items : null;      // 一条备注都没有 → 别造空讲稿，让手机端显示提示
+  }
+  function escapeHtml(t) {
+    return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function buildTranscript(items) {
+    var body = items.map(function (it) {
+      return '<section class="seg" id="' + it.anchor + '">'
+        + '<h2><span class="no">' + (it.idx + 1) + '</span>' + escapeHtml(it.title) + '</h2>'
+        + '<div class="body">' + (it.html || '<p class="empty">（本页没有备注）</p>') + '</div>'
+        + '</section>';
+    }).join('\n');
+    return '<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1">'
+      + '<style>'
+      + 'html,body{margin:0;background:#FAF6EE;color:#1f1d1a;'
+      + 'font:19px/1.85 -apple-system,system-ui,"PingFang SC","Songti SC",serif;-webkit-text-size-adjust:100%}'
+      + '.seg{padding:22px 24px 6px;scroll-margin-top:12px}'
+      + '.seg h2{margin:0 0 12px;font-size:19px;font-weight:700;color:#8a2b1a;display:flex;align-items:baseline;gap:10px}'
+      + '.seg h2 .no{font:700 12px/1 "SF Mono",Menlo,monospace;background:#8a2b1a;color:#FAF6EE;'
+      + 'padding:4px 7px;border-radius:4px;letter-spacing:.5px}'
+      + '.body p{margin:0 0 14px}.body strong{color:#8a2b1a}.body em{color:#2b5f8a;font-style:normal}'
+      + '.body .empty{color:#9a948a}'
+      + '.seg.cur{background:#fff5e0}'                       // 当前页整块浅色高亮
+      + 'body.cue-on .seg.cur strong{background:#ffe08a;border-radius:3px;padding:0 3px}'  // ✦ 提词
+      + '</style></head><body>' + body
+      + '<script>(function(){'
+      + 'function scrollToAnchor(a){var el=document.getElementById(a);if(!el)return;'
+      + 'var all=document.querySelectorAll(".seg");for(var i=0;i<all.length;i++)all[i].classList.remove("cur");'
+      + 'el.classList.add("cur");el.scrollIntoView({block:"start",behavior:"smooth"});}'
+      + 'window.addEventListener("message",function(e){if(!e||!e.data)return;'
+      + 'if(e.data.type==="fuquan-scroll"&&e.data.anchor)scrollToAnchor(e.data.anchor);'
+      + 'else if(e.data.type==="fuquan-cue")document.body.classList.toggle("cue-on",!!e.data.on);});'
+      + '})();</scr' + 'ipt></body></html>';
+  }
+  function b64(str) {
+    try { return btoa(unescape(encodeURIComponent(str))); }
+    catch (e) { return null; }
+  }
+  // 讲稿来源，按优先级：作者缝进来的一体版 > 从 slide 备注现造
+  function transcriptB64() {
+    if (typeof window.__TXB64__ === 'string' && window.__TXB64__) return window.__TXB64__;
+    var items = collectNotes(); if (!items) return null;
+    return b64(buildTranscript(items));
+  }
   function startPresenterFeed() {
-    if (PFEED.chan || !window.BroadcastChannel) return;
-    PFEED.name = presenterChannelName();
-    if (!PFEED.name) return;                       // 这份 deck 没有演讲者广播 → 只当遥控用
-    try { PFEED.chan = new BroadcastChannel(PFEED.name); } catch (e) { return; }
+    if (PFEED.started) return;
+    PFEED.started = true;
+    PFEED.name = window.BroadcastChannel ? presenterChannelName() : null;
+    if (PFEED.name) { try { PFEED.chan = new BroadcastChannel(PFEED.name); } catch (e) { PFEED.chan = null; } }
+    // DOM 兜底**常驻**，不管有没有猜到频道名。理由：猜中频道名 ≠ 真能收到广播
+    // （老引擎用自己烘死的名字）。两条路并行，广播一到就以广播为准——它带 segment
+    // 和作者定义的锚点，更准；DOM 那条在广播活跃时自动让路。
+    if (!PFEED.last) PFEED.last = stateFromDom();
+    startDomWatch();
     // 同一页面里另建一个同名 channel 是能收到本页 postMessage 的（规范只排除发送者
     // 自己那个对象），所以不用碰 deck 的代码就能旁听。
     PFEED.chan.onmessage = function (e) {
@@ -65,6 +208,7 @@
       if (!d || typeof d.slideIdx !== 'number') return;
       if (d.type === 'jump-to-slide') return;       // 那是反向指令，不是状态
       PFEED.last = d;
+      PFEED.lastBcAt = Date.now();      // 让 DOM 兜底知道「广播还活着，别插嘴」
       relaySend({ type: 'state', state: d });
     };
     // 让 deck 立刻补广播一次当前页：它监听 'presenter-ready'（副窗打开时用的同一条路）
@@ -76,7 +220,7 @@
     startPresenterFeed();
     relaySend({
       type: 'deck-info',
-      txb64: (typeof window.__TXB64__ === 'string' ? window.__TXB64__ : null),
+      txb64: transcriptB64(),
       title: document.title || '',
       state: PFEED.last || null
     });

@@ -763,13 +763,17 @@ function assembleDeck(forEdit = false): string {
   const editAttr = forEdit ? ' data-smfx-edit="1"' : '';
   const skin = skinInject();
   const keyGuard = forEdit ? EDIT_KEYGUARD_JS : '';
-  let doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${keyGuard}${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
+  let doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${keyGuard}${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${NOTES_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
   // 手机遥控：先剥离任何旧注入（幂等，防 re-import 累积），再按需（仅导出、勾选时）烘进。
   // 注意：注入内容含 `$`（qr 库/客户端里有），必须用「函数替换」——字符串替换会把 $'/$&/$1 当特殊
   // 记号解释，导致注入的 JS 被腐蚀（曾致「二维码生成失败」）。
   doc = doc.replace(/<!--sm-phone-remote-start-->[\s\S]*?<!--sm-phone-remote-end-->/g, '');
   if (!forEdit && embedPhoneRemote) {
-    const inject = PHONE_REMOTE_JS.replace('__SM_ROOMVAL__', smRoomId()); // 固定房间号 → 二维码不变
+    // 房间号 = 配对凭证（烘死 → 二维码永久不变）；deck id = 广播频道名，保证同一台
+    // 电脑上同时开着的两份 deck 不会串台（BroadcastChannel 按同源+频道名广播）。
+    const inject = PHONE_REMOTE_JS
+      .replace('__SM_ROOMVAL__', smRoomId())
+      .replace('__SM_DECKIDVAL__', 'sm-' + smRoomId().slice(0, 12));
     doc = doc.replace('</body>', () => inject + '\n</body>');
   }
   // 编辑预览：把外链 Google Fonts 改成「非阻塞」加载，否则没翻墙时浏览器会卡在 fonts.googleapis.com
@@ -810,6 +814,11 @@ const TYPO_CSS = '<style id="sm-typo">'
 // vs click-to-play. Respect prefers-reduced-motion.
 //  - auto  (default): a slide gets .sm-play when it becomes active → entrance plays once, motion loops.
 //  - manual: a slide gets .sm-armed (entrance hidden, motion paused) until the viewer clicks → .sm-play.
+// 演讲者备注：写在 slide 里的 <aside class="notes">，**永远不给观众看**。
+// 预览和导出件都注入这条——漏出去就是事故（观众看到你的提词）。手机遥控客户端
+// 会把这些备注收集起来现造一份讲稿推到 iPad/手机，那才是它们该出现的地方。
+const NOTES_CSS = '<style id="sm-notes">#deck .slide aside.notes,#deck .slide .notes,'
+  + '#deck .slide [data-notes]{display:none!important}</style>';
 const FX_CSS = '<style id="sm-fx">'
   // continuous MOTION — assigned always; auto runs immediately, manual stays paused until played
   + '#deck .slide [data-motion]{will-change:transform,opacity,filter}'
@@ -990,7 +999,8 @@ const FX_CANVAS_JS = '<script id="sm-fx-canvas">' + fxCanvasJs + '</scr' + 'ipt>
 // __SM_ROOM__ 占位符在导出时被替换成一个固定房间号（每份导出各一个），使这份 HTML 的配对二维码永久不变。
 const PHONE_REMOTE_JS =
   '<!--sm-phone-remote-start-->\n'
-  + '<script>window.__SM_CLOUD_RELAY__=' + JSON.stringify(PR_CLOUD) + ';window.__SM_ROOM__="__SM_ROOMVAL__";</scr' + 'ipt>\n'
+  + '<script>window.__SM_CLOUD_RELAY__=' + JSON.stringify(PR_CLOUD) + ';window.__SM_ROOM__="__SM_ROOMVAL__";'
+  + 'window.__SM_DECK_ID__="__SM_DECKIDVAL__";</scr' + 'ipt>\n'
   + '<script>' + qrLibJs + '</scr' + 'ipt>\n'
   + '<script>' + pairClientJs + '</scr' + 'ipt>\n'
   + '<!--sm-phone-remote-end-->';

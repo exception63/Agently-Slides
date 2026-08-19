@@ -8,7 +8,19 @@
    ════════════════════════════════════════════════════════════════════ */
 (function () {
   /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
-  const CONFIG = { channel: '{{CHANNEL}}', presenterFile: '演讲者模式.html' };
+  // 频道名必须**每份 deck 唯一**：BroadcastChannel 按「同源 + 频道名」广播，重名的两份
+  // deck 只要同时开着就会互相串台（A 翻页，B 的副屏/手机讲稿跟着跳）。
+  // 解析顺序：生成时填进来的 {{CHANNEL}} > Studio 导出写入的 deck id > 本次加载的随机值。
+  // 最后那条是兜底：占位符没被替换时，宁可退化成「本页面私有」，也不能让所有 deck 共用
+  // 字面量 '{{CHANNEL}}' 这一个频道。
+  const DECK_CHANNEL = (function () {
+    const baked = '{{CHANNEL}}';
+    if (baked && baked.indexOf('{{') !== 0) return baked;
+    if (typeof window.__SM_DECK_ID__ === 'string' && window.__SM_DECK_ID__) return window.__SM_DECK_ID__ + '-sync';
+    return 'sm-anon-' + Math.random().toString(36).slice(2, 10);
+  })();
+  const CONFIG = { channel: DECK_CHANNEL, presenterFile: '演讲者模式.html' };
+  window.__SM_PRESENTER_CHANNEL__ = DECK_CHANNEL;   // 告诉手机遥控客户端该听哪个频道
 
   const deck = document.getElementById('deck');
   const slides = Array.from(deck.querySelectorAll(':scope > .slide'));
