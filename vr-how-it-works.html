@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VR 是怎么工作的 · 交互动画样本</title>
+<style>
+  :root{
+    --bg:#0b1020; --surface:#141a2e; --surface2:#1c2440; --line:#2a3458;
+    --ink:#eaf0fb; --muted:#9aa5c0;
+    --accent:#22d3ee;   /* 左眼 / 主色 */
+    --accent2:#f472b6;  /* 右眼 */
+    --good:#34d399; --warn:#fbbf24;
+    --font:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",Segoe UI,Roboto,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:var(--font)}
+  body{display:grid;place-items:center;padding:24px}
+
+  /* 一张 16:9 的 slide 画布 */
+  .slide{
+    width:min(100%,1180px);aspect-ratio:16/9;background:var(--bg);
+    border:1px solid var(--line);border-radius:18px;padding:34px 40px;
+    display:flex;flex-direction:column;gap:14px;overflow:hidden;position:relative;
+  }
+  .eyebrow{font-size:13px;letter-spacing:.18em;color:var(--accent);text-transform:uppercase;font-weight:600}
+  h1{margin:2px 0 0;font-size:clamp(24px,3.2vw,40px);font-weight:700;letter-spacing:-.01em}
+  .sub{margin:0;color:var(--muted);font-size:clamp(13px,1.4vw,16px)}
+
+  .stage{flex:1;display:flex;gap:18px;min-height:0}
+  /* 头显 */
+  .goggles{
+    flex:1;background:var(--surface);border:1px solid var(--line);border-radius:20px;
+    padding:14px;display:flex;flex-direction:column;gap:10px;min-width:0;
+  }
+  .views{flex:1;display:flex;gap:10px;min-height:0}
+  .view{flex:1;border-radius:14px;overflow:hidden;background:#070b16;position:relative;min-width:0;
+        border:2px solid transparent}
+  .view.solo{flex:1}
+  .view.eyeL{border-color:color-mix(in srgb,var(--accent) 70%,transparent)}
+  .view.eyeR{border-color:color-mix(in srgb,var(--accent2) 70%,transparent)}
+  .view svg{width:100%;height:100%;display:block}
+  .eyetag{position:absolute;top:6px;left:8px;font-size:11px;font-weight:600;
+          padding:2px 7px;border-radius:999px;background:#0009;color:#fff;letter-spacing:.04em}
+  .eyeL .eyetag{color:var(--accent)} .eyeR .eyetag{color:var(--accent2)}
+  .lensrow{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:12px}
+  .lensrow b{color:var(--ink);font-weight:600}
+  .lens{width:30px;height:14px;border-radius:50%;border:2px solid var(--accent);opacity:.8}
+
+  /* 右侧仪表 */
+  .panel{width:300px;display:flex;flex-direction:column;gap:12px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px 16px}
+  .card h3{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.04em}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:7px 0}
+  .row .k{color:var(--muted);font-size:13px}
+  .row .v{font-variant-numeric:tabular-nums;font-weight:700;font-size:15px}
+  .big{font-size:26px;font-weight:800;letter-spacing:-.01em}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--good);margin-right:6px}
+  .dot.live{background:var(--warn);animation:blink .5s steps(2,jump-none) infinite}
+  .pill{font-size:12px;font-weight:700;padding:3px 9px;border-radius:999px}
+  .pill.on{background:color-mix(in srgb,var(--good) 22%,transparent);color:var(--good)}
+  .pill.off{background:color-mix(in srgb,var(--muted) 22%,transparent);color:var(--muted)}
+
+  /* 控件 */
+  .controls{display:flex;flex-direction:column;gap:12px}
+  .ctl label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  input[type=range]{width:100%;accent-color:var(--accent);height:22px}
+  .switch{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;font-size:14px}
+  .switch input{width:42px;height:24px;accent-color:var(--accent);cursor:pointer}
+
+  .pillars{display:flex;gap:10px}
+  .pillar{flex:1;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:9px 11px}
+  .pillar .t{font-size:12.5px;font-weight:700} .pillar .d{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+  .hint{position:absolute;right:18px;bottom:16px;font-size:12px;color:var(--muted);opacity:.85}
+  @keyframes blink{50%{opacity:.25}}
+  @keyframes pulse{0%,100%{opacity:.55}50%{opacity:1}}
+  .sun{transform-origin:center;animation:pulse 3.4s ease-in-out infinite}
+  @media (prefers-reduced-motion:reduce){.sun,.dot.live{animation:none}}
+  @media (max-width:760px){.panel{width:240px}.stage{flex-direction:column}.panel{width:auto}}
+</style>
+</head>
+<body>
+
+<!-- 隐藏的世界图源：远景层(慢) + 近景层(快) → 转头时产生视差 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <g id="farSrc">
+    <circle class="sun" cx="240" cy="70" r="34" fill="#fcd34d"/>
+    <circle cx="120" cy="50" r="2" fill="#cbd5e1"/><circle cx="520" cy="40" r="2" fill="#cbd5e1"/>
+    <circle cx="900" cy="60" r="2" fill="#cbd5e1"/><circle cx="1300" cy="44" r="2" fill="#cbd5e1"/>
+    <polygon points="-50,300 250,150 560,300" fill="#26314f"/>
+    <polygon points="430,300 760,120 1080,300" fill="#2e3a5e"/>
+    <polygon points="980,300 1280,170 1620,300" fill="#26314f"/>
+  </g>
+  <g id="nearSrc">
+    <rect x="0" y="266" width="1600" height="40" fill="#10331f"/>
+    <!-- 小屋(左) -->
+    <g transform="translate(150,200)"><rect width="80" height="66" fill="#7c3aed"/><polygon points="-8,0 40,-30 88,0" fill="#a78bfa"/><rect x="30" y="34" width="20" height="32" fill="#241246"/></g>
+    <!-- 红方块 -->
+    <rect x="420" y="206" width="60" height="60" rx="6" fill="#f87171"/>
+    <!-- 树(中) -->
+    <g transform="translate(700,176)"><rect x="22" y="58" width="14" height="32" fill="#7c5230"/><polygon points="29,0 -8,64 66,64" fill="#34d399"/></g>
+    <!-- 旗(右) -->
+    <g transform="translate(1040,170)"><rect width="6" height="96" fill="#cbd5e1"/><polygon points="6,4 64,20 6,36" fill="#22d3ee"/></g>
+  </g>
+</defs></svg>
+
+<section class="slide" role="group" aria-label="VR 工作原理交互动画">
+  <header>
+    <div class="eyebrow">交互动画样本 · 内联直出</div>
+    <h1>VR 是怎么工作的</h1>
+    <p class="sub">拖动「转头」滑块看头部追踪与视差，开关「双眼 3D」看立体视觉——这就是它骗过大脑的三招。</p>
+  </header>
+
+  <div class="stage">
+    <div class="goggles" aria-label="头显内部画面">
+      <div class="views" id="views">
+        <div class="view solo" id="vSolo"><span class="eyetag">单眼画面</span>
+          <svg viewBox="0 0 600 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="单眼看到的平面画面">
+            <rect width="600" height="300" fill="#0a1326"/><g class="far"></g><g class="near"></g>
+          </svg></div>
+        <div class="view eyeL" id="vL" hidden><span class="eyetag">左眼</span>
+          <svg viewBox="0 0 320 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="左眼画面">
+            <rect width="320" height="300" fill="#0a1326"/><g class="far"></g><g class="near"></g>
+          </svg></div>
+        <div class="view eyeR" id="vR" hidden><span class="eyetag">右眼</span>
+          <svg viewBox="0 0 320 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="右眼画面">
+            <rect width="320" height="300" fill="#0a1326"/><g class="far"></g><g class="near"></g>
+          </svg></div>
+      </div>
+      <div class="lensrow"><span class="lens"></span><span><b>透镜</b>：把贴在眼前的小屏幕，放大成眼前一大片远景（撑大视野 FOV）</span><span class="lens"></span></div>
+    </div>
+
+    <div class="panel">
+      <div class="card controls">
+        <div class="ctl">
+          <label for="yaw">① 转动头部（头部追踪 / IMU）</label>
+          <input id="yaw" type="range" min="-40" max="40" value="0" step="1" aria-label="转头角度">
+        </div>
+        <label class="switch"><input id="stereo" type="checkbox" checked> ② 双眼 3D 立体视觉</label>
+      </div>
+      <div class="card">
+        <h3>实时状态</h3>
+        <div class="row"><span class="k">陀螺仪检测</span><span class="v" id="ang">正前方 0°</span></div>
+        <div class="row"><span class="k">画面渲染</span><span class="v"><span class="dot" id="rdot"></span><span id="rtxt">90Hz 待命</span></span></div>
+        <div class="row"><span class="k">立体深度</span><span class="pill on" id="depth">开 · 有 3D 纵深</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="pillars">
+    <div class="pillar"><div class="t">双眼立体</div><div class="d">左右眼画面有微小差异 → 大脑合成出深度</div></div>
+    <div class="pillar"><div class="t">透镜放大</div><div class="d">放大近屏 + 撑满视野，让你“身临其境”</div></div>
+    <div class="pillar"><div class="t">头部追踪</div><div class="d">转头即重渲染，低延迟才不晕</div></div>
+  </div>
+
+  <div class="hint">提示：用鼠标拖动上面的滑块试试 →</div>
+</section>
+
+<script>
+(function(){
+  const base=300, kFar=0.5, kNear=1.5, dFar=3, dNear=13;
+  const yaw=document.getElementById('yaw'), stereo=document.getElementById('stereo');
+  const vSolo=document.getElementById('vSolo'), vL=document.getElementById('vL'), vR=document.getElementById('vR');
+  const ang=document.getElementById('ang'), rdot=document.getElementById('rdot'), rtxt=document.getElementById('rtxt'), depth=document.getElementById('depth');
+
+  // 把世界图源 use 进每个视口
+  document.querySelectorAll('.view svg').forEach(svg=>{
+    const f=svg.querySelector('.far'), n=svg.querySelector('.near');
+    f.innerHTML='<use href="#farSrc"/>'; n.innerHTML='<use href="#nearSrc"/>';
+  });
+  function setT(svg, scroll, eyeOff){
+    svg.querySelector('.far').setAttribute('transform','translate('+(-(base+scroll*kFar)+eyeOff*dFar)+',0)');
+    svg.querySelector('.near').setAttribute('transform','translate('+(-(base+scroll*kNear)+eyeOff*dNear)+',0)');
+  }
+  let flashT=null;
+  function render(flash){
+    const a=+yaw.value, on=stereo.checked;
+    vSolo.hidden=on; vL.hidden=!on; vR.hidden=!on;
+    setT(vSolo.querySelector('svg'), a, 0);
+    setT(vL.querySelector('svg'), a, +1);   // 左眼：物体略偏右
+    setT(vR.querySelector('svg'), a, -1);   // 右眼：物体略偏左
+    ang.textContent = a===0 ? '正前方 0°' : (a>0?'向右看 +'+a+'°':'向左看 '+a+'°');
+    depth.textContent = on?'开 · 有 3D 纵深':'关 · 平面无纵深';
+    depth.className = 'pill '+(on?'on':'off');
+    if(flash){ rdot.classList.add('live'); rtxt.textContent='重新渲染中…';
+      clearTimeout(flashT); flashT=setTimeout(()=>{rdot.classList.remove('live'); rtxt.textContent='90Hz 已稳定';},420); }
+  }
+  yaw.addEventListener('input',()=>{stop();render(true);});
+  stereo.addEventListener('change',()=>render(true));
+
+  // 入场自动小幅扫一下，暗示“可以拖”；用户一上手就停
+  let auto=true; const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+  function stop(){auto=false;}
+  ['pointerdown','keydown'].forEach(e=>document.addEventListener(e,stop,{once:true}));
+  render(false);
+  if(!reduce){
+    const seq=[10,18,10,0,-10,-18,-10,0]; let i=0;
+    const tick=()=>{ if(!auto)return; yaw.value=seq[i%seq.length]; i++; render(true);
+      if(i<=seq.length) setTimeout(tick,520); };
+    setTimeout(tick,700);
+  }
+})();
+</script>
+</body>
+</html>

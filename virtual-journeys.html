@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Virtual Journeys, Shared Meaning</title>
+<!-- 在线时加载该皮肤的字体；离线时自动回退到系统字体（字体栈已含 fallback） -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* skin: academic · 由 build.py 装配（core + skin + engine）· 改样式请改 assets/ 下的源，勿改本成品 */
+/* ════════════════════════════════════════════════════════════════════
+   _core.css · 与风格无关的骨架 + 引擎界面（topbar / 段导航 / 进度条 / 投屏态）
+   所有皮肤共用。它只用令牌，不定义令牌——令牌由各皮肤的 :root 提供：
+     必需：--paper --ink --accent --accent-2 --accent-soft --rule
+          --pad-x --pad-y --font-sans --font-display --font-mono --fit-scale
+   引擎周边的工具 UI（顶栏/侧栏）固定深色，只有强调色（进度条/当前态/缩略框）
+   跟随皮肤的 --accent，使工具一致、内容随皮变化。
+   ════════════════════════════════════════════════════════════════════ */
+
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:#2a2a2a;font-family:var(--font-sans);color:var(--ink);-webkit-font-smoothing:antialiased;}
+body{padding-left:0;padding-top:60px;transition:padding 0.2s;}
+.deck{display:flex;flex-direction:column;gap:32px;padding:32px 24px 60px 320px;align-items:center;}
+.slide-wrap{width:calc(1920px * var(--fit-scale));height:calc(1080px * var(--fit-scale));position:relative;flex-shrink:0;}
+.slide{width:1920px;height:1080px;background:var(--paper);color:var(--ink);padding:var(--pad-y) var(--pad-x);position:absolute;top:0;left:0;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 4px 24px rgba(0,0,0,0.4);transform:scale(var(--fit-scale));transform-origin:top left;}
+
+/* ============================ 顶部控制条 ============================ */
+.topbar{position:fixed;top:0;left:0;right:0;height:60px;background:rgba(20,23,31,0.96);color:#F2EDE2;display:flex;align-items:center;gap:16px;padding:0 24px;z-index:1000;backdrop-filter:blur(8px);border-bottom:1px solid rgba(255,255,255,0.08);}
+.topbar__brand{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:0.02em;color:#F2EDE2;}
+.topbar__sub{font-family:var(--font-mono);font-size:11px;letter-spacing:0.16em;color:rgba(242,237,226,0.5);text-transform:uppercase;}
+.topbar__spacer{flex:1;}
+.topbar__btn{background:transparent;color:#F2EDE2;border:1px solid rgba(242,237,226,0.3);padding:7px 16px;border-radius:4px;font-family:var(--font-mono);font-size:12px;letter-spacing:0.12em;text-transform:uppercase;cursor:pointer;font-weight:500;}
+.topbar__btn:hover{background:rgba(242,237,226,0.1);border-color:rgba(242,237,226,0.6);}
+.topbar__btn--primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+.topbar__btn--primary:hover{background:var(--accent-2);border-color:var(--accent-2);}
+.topbar__btn--presenter{background:#2A2A2A;border-color:#2A2A2A;color:#F5E3B0;}
+.topbar__btn--presenter:hover{background:#3a3a3a;border-color:#B58530;color:#F5E3B0;}
+.topbar__btn--presenter.active{background:#B58530;border-color:#B58530;color:#fff;box-shadow:0 0 0 2px rgba(181,133,48,0.3);}
+.topbar__info{font-family:var(--font-mono);font-size:12px;color:rgba(242,237,226,0.7);letter-spacing:0.08em;}
+.topbar__info strong{color:#F2EDE2;font-weight:600;}
+
+/* ============================ 折叠式段导航 + 缩略图 ============================ */
+.segnav{position:fixed;left:0;top:60px;bottom:0;width:300px;background:rgba(20,23,31,0.94);border-right:1px solid rgba(255,255,255,0.08);z-index:999;overflow-y:auto;backdrop-filter:blur(8px);}
+.segnav::-webkit-scrollbar{width:6px;}
+.segnav::-webkit-scrollbar-track{background:rgba(0,0,0,0.2);}
+.segnav::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.15);border-radius:3px;}
+.segnav__seg{border-bottom:1px solid rgba(255,255,255,0.06);}
+.segnav__head{display:flex;align-items:center;gap:10px;padding:14px 18px;background:transparent;border:0;color:rgba(242,237,226,0.78);width:100%;cursor:pointer;text-align:left;font-family:var(--font-sans);transition:background 0.15s;}
+.segnav__head:hover{background:rgba(255,255,255,0.04);color:#F2EDE2;}
+.segnav__seg--current > .segnav__head{background:var(--accent-soft);color:#F2EDE2;}
+.segnav__head-id{font-family:var(--font-mono);font-size:11px;letter-spacing:0.14em;color:var(--accent-ui,#C2A06B);text-transform:uppercase;font-weight:600;width:42px;flex-shrink:0;}
+.segnav__head-name{flex:1;font-size:13px;font-weight:500;line-height:1.3;}
+.segnav__head-meta{font-family:var(--font-mono);font-size:10px;color:rgba(242,237,226,0.4);letter-spacing:0.1em;}
+.segnav__head-arrow{font-size:10px;color:rgba(242,237,226,0.4);transition:transform 0.2s;flex-shrink:0;width:12px;text-align:center;}
+.segnav__seg--expanded .segnav__head-arrow{transform:rotate(90deg);}
+.segnav__thumbs{display:none;padding:8px 12px 14px;grid-template-columns:1fr 1fr;gap:8px;}
+.segnav__seg--expanded .segnav__thumbs{display:grid;}
+.thumb{width:126px;height:71px;background:var(--paper);cursor:pointer;border:2px solid transparent;position:relative;overflow:hidden;transition:border-color 0.15s;flex-shrink:0;}
+.thumb:hover{border-color:var(--accent);}
+.thumb--active{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft);}
+.thumb__inner{width:1920px !important;height:1080px !important;transform:scale(0.0656) !important;transform-origin:top left !important;position:absolute !important;top:0 !important;left:0 !important;box-shadow:none !important;pointer-events:none !important;}
+/* 编号徽标固定深字 + 白底——所有皮通用（深色皮的 --ink 是浅色，不能用 var(--ink)，否则白底白字看不清）*/
+.thumb__num{position:absolute;top:2px;left:4px;font-family:var(--font-mono);font-size:9px;color:#16181E;background:rgba(255,255,255,0.85);padding:1px 5px;border-radius:2px;z-index:2;font-weight:600;}
+
+/* —— 进度条 / 提示 —— */
+.progress{position:fixed;top:60px;left:300px;right:0;height:3px;background:rgba(255,255,255,0.08);z-index:998;}
+.progress__bar{height:100%;background:var(--accent);transition:width 0.2s;}
+.hint{position:fixed;bottom:16px;right:20px;font-family:var(--font-mono);font-size:11px;color:#888;pointer-events:none;z-index:1000;letter-spacing:0.1em;}
+body.present .hint,body:fullscreen .hint{color:rgba(255,255,255,0.3);}
+
+/* ============================ 投屏 / 全屏模式 ============================ */
+body.present{background:#000;padding:0;}
+body.present .topbar,body.present .segnav,body.present .progress{display:none;}
+body.present .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+body.present .slide-wrap{width:auto;height:auto;position:static;flex-shrink:0;}
+body.present .slide{display:none;position:static;transform:scale(var(--sc,1));transform-origin:center center;box-shadow:none;}
+body.present .slide.active{display:flex;}
+body.fullscreen{background:#000;}
+:fullscreen{background:#000;}
+:fullscreen .topbar,:fullscreen .segnav,:fullscreen .progress{display:none;}
+:fullscreen .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
+:fullscreen .slide{box-shadow:none;}
+
+
+/* —— 皮肤 academic —— */
+/* FONTS https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,500&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Source+Sans+3:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap */
+/* ════════════════════════════════════════════════════════════════════
+   skin: academic · 学术汇报风（社科 / 人文 · 舒展）
+   规范来源：会议汇报惯例 + ui-ux-pro-max（typography #14 News Editorial /
+   #8 Wellness Calm；colors #40 Legal「权威藏青 + 信任金」暖化）。
+   气质：克制单主色（深靛青）· 易读无衬线正文 + 宋体/衬线标题 · 图表优先 +
+   编号图注 · 规范参考文献 · 大留白 · 引用密集也不挤。
+   换主色 → 只改 :root 的 --accent / --accent-2 / --accent-soft。
+   想要「全宋体期刊感」→ 见 references/skins/academic.md 的开关说明。
+   ════════════════════════════════════════════════════════════════════ */
+:root {
+  /* —— 配色（暖白纸 + 深靛青主色 + 赭金稀用 · 改主题只改这一组）—— */
+  --paper:#F8F6F1;--paper-soft:#F1EEE6;--paper-warm:#ECE7DB;
+  --rule:#DCD6C9;--rule-soft:#E7E2D6;--rule-strong:#C7C0B0;
+  --ink:#1C2024;--ink-2:#3A4047;--ink-3:#5E6670;--ink-4:#969CA6;
+  --accent:#27406B;--accent-2:#1B2E4D;--accent-soft:rgba(39,64,107,0.09);--accent-ui:#9FB3D1;
+  --gold:#9A6E2E;--gold-soft:#B89357;        /* 第二色，稀用 */
+  --good:#3F6E55;--warn:#9A6E2E;--bad:#A24632; /* 语义色，克制 */
+  --night:#1A2230;--night-2:#222C3D;--night-paper:#EDEAE2;
+  /* —— 字号阶梯（比杂志风更小更密 · 承载更多文字）—— */
+  --t-display:120px;--t-h1:80px;--t-h2:56px;--t-h3:40px;--t-h4:32px;
+  --t-lead:30px;--t-body:28px;--t-small:23px;--t-eyebrow:19px;
+  --pad-x:120px;--pad-y:84px;
+  /* 字体栈 · 标题衬线（Newsreader/Lora + 思源宋体）· 正文无衬线（Source Sans + 思源黑体）*/
+  --font-serif:"Newsreader","Lora","Source Han Serif SC","Noto Serif SC","Songti SC","STSong",serif;
+  --font-display:"Newsreader","Lora","Source Han Serif SC","Noto Serif SC","Songti SC",serif;
+  --font-sans:"Source Sans 3","Inter","Source Han Sans SC","Noto Sans SC","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  --font-mono:"IBM Plex Mono","SF Mono",Menlo,monospace;
+  --fit-scale:0.55;
+}
+
+/* —— 页脚 chrome：细发丝线 + 段名 / 作者 · 页码（会议汇报坐标感）—— */
+.chrome{position:absolute;left:var(--pad-x);right:var(--pad-x);bottom:40px;display:flex;justify-content:space-between;align-items:baseline;font-family:var(--font-sans);font-size:17px;letter-spacing:0.02em;color:var(--ink-4);padding-top:14px;border-top:1px solid var(--rule);}
+.chrome__l{display:flex;gap:24px;align-items:baseline;white-space:nowrap;}
+.chrome__seg{color:var(--ink-3);font-weight:500;}
+.chrome__r{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;white-space:nowrap;letter-spacing:0.06em;}
+/* —— runner：可选顶部页眉条（讲题 / 机构）—— */
+.runner{position:absolute;top:54px;left:var(--pad-x);right:var(--pad-x);display:flex;justify-content:space-between;align-items:center;font-family:var(--font-sans);font-size:18px;color:var(--ink-3);padding-bottom:14px;border-bottom:1px solid var(--rule);}
+.runner__r{font-family:var(--font-mono);font-size:15px;letter-spacing:0.1em;color:var(--ink-4);text-transform:uppercase;}
+
+/* —— 通用排版原子 —— */
+.eyebrow{font-family:var(--font-mono);font-size:var(--t-eyebrow);letter-spacing:0.18em;color:var(--accent);text-transform:uppercase;font-weight:600;}
+.title{font-family:var(--font-display);font-weight:600;font-size:var(--t-h2);line-height:1.18;letter-spacing:0;color:var(--ink);margin:0;}
+.title--xl{font-size:104px;}.title--lg{font-size:80px;}.title--md{font-size:48px;}.title--sm{font-size:38px;}
+.lead{font-family:var(--font-sans);font-size:var(--t-lead);line-height:1.6;color:var(--ink-2);max-width:1480px;margin:0;font-weight:400;}
+.body{font-size:var(--t-body);line-height:1.7;color:var(--ink-2);}
+.small{font-size:var(--t-small);line-height:1.65;color:var(--ink-3);}
+.num{font-family:var(--font-mono);font-feature-settings:"tnum";font-variant-numeric:tabular-nums;}
+.mark-v{color:var(--accent);}.mark-n{color:var(--accent);}.mark-g{color:var(--gold);}
+.key{color:var(--accent);font-weight:600;font-style:normal;}
+strong{font-weight:600;color:var(--accent);}
+em{font-style:italic;color:var(--ink);font-family:var(--font-serif);}     /* 学术：斜体 = 术语 / 强调，不抢色 */
+.cite{font-family:var(--font-sans);font-size:0.7em;color:var(--ink-3);letter-spacing:0.01em;white-space:nowrap;font-style:normal;font-weight:400;}
+.head{margin-top:6px;margin-bottom:30px;padding-bottom:20px;border-bottom:1px solid var(--rule);}  /* 学术：标题下加发丝线 = 页眉感 */
+.head__eyebrow{margin-bottom:14px;}.head__title{margin:0 0 8px;}
+.head__sub{font-family:var(--font-sans);font-size:24px;color:var(--ink-3);margin:0;font-weight:400;line-height:1.5;}
+.fill{flex:1;min-height:0;}
+.center{align-items:center;justify-content:center;text-align:center;}
+.center .lead{margin-left:auto;margin-right:auto;}
+.center .head{border-bottom:0;}
+
+/* —— cover 封面 —— */
+.cover{background:var(--paper);justify-content:space-between;}
+.cover__top{display:flex;justify-content:space-between;align-items:flex-start;}
+.cover__brand{font-family:var(--font-sans);font-size:22px;letter-spacing:0.02em;color:var(--ink-3);font-weight:500;}
+.cover__seal{font-family:var(--font-mono);font-size:16px;letter-spacing:0.14em;color:var(--accent);text-transform:uppercase;border:1px solid var(--accent);padding:8px 16px;border-radius:2px;}
+.cover__main{display:flex;flex-direction:column;gap:30px;border-left:3px solid var(--accent);padding-left:44px;}
+.cover__eyebrow{font-family:var(--font-mono);font-size:21px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;font-weight:600;}
+.cover__title{font-family:var(--font-display);font-weight:600;font-size:100px;line-height:1.08;letter-spacing:0;color:var(--ink);margin:0;}
+.cover__title em{color:var(--accent);font-style:italic;}
+.cover__sub{font-family:var(--font-sans);font-size:33px;color:var(--ink-2);max-width:1500px;font-weight:400;line-height:1.5;}
+.cover__meta{display:flex;gap:64px;font-family:var(--font-sans);color:var(--ink-3);padding-top:30px;border-top:1px solid var(--rule);flex-wrap:wrap;}
+.cover__meta-item{display:flex;flex-direction:column;gap:7px;}
+.cover__meta-k{font-family:var(--font-mono);color:var(--ink-4);font-size:14px;letter-spacing:0.12em;text-transform:uppercase;}
+.cover__meta-v{color:var(--ink);font-size:21px;font-weight:500;}
+
+/* —— section divider 段分隔（克制 · 无巨型幽灵数字）—— */
+.secdiv{background:var(--paper);justify-content:center;}
+.secdiv--dark{background:var(--night);color:var(--night-paper);}
+.secdiv--accent{background:var(--accent);color:var(--paper);}
+.secdiv__num{font-family:var(--font-mono);font-size:24px;font-weight:600;letter-spacing:0.18em;color:var(--accent);text-transform:uppercase;margin-bottom:22px;}
+.secdiv--dark .secdiv__num,.secdiv--accent .secdiv__num{color:var(--gold-soft);}
+.secdiv__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--ink-3);text-transform:uppercase;margin-bottom:30px;font-weight:500;}
+.secdiv--dark .secdiv__eyebrow,.secdiv--accent .secdiv__eyebrow{color:rgba(237,234,226,0.7);}
+.secdiv__title{font-family:var(--font-display);font-weight:600;font-size:88px;line-height:1.12;letter-spacing:0;color:var(--ink);margin:0 0 32px;max-width:1500px;padding-top:30px;border-top:2px solid var(--accent);}
+.secdiv__title em{color:var(--accent);font-style:italic;}
+.secdiv--dark .secdiv__title{color:var(--night-paper);border-top-color:var(--gold-soft);}
+.secdiv--accent .secdiv__title{color:var(--paper);border-top-color:var(--paper);}
+.secdiv__lead{font-family:var(--font-sans);font-size:30px;line-height:1.6;color:var(--ink-2);max-width:1400px;margin:0;font-weight:400;}
+.secdiv--dark .secdiv__lead{color:rgba(237,234,226,0.78);}
+.secdiv--accent .secdiv__lead{color:rgba(248,246,241,0.9);}
+.secdiv__meta{font-family:var(--font-mono);font-size:17px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;padding-top:26px;margin-top:30px;border-top:1px solid var(--rule);display:flex;gap:36px;}
+
+/* —— manifesto / insight 中心论断（学术：稳重衬线，不喊口号）—— */
+.manifesto,.insight{align-items:center;justify-content:center;text-align:center;background:var(--paper);padding:var(--pad-y) 140px;}
+.manifesto__eyebrow,.insight__eyebrow{font-family:var(--font-mono);font-size:19px;letter-spacing:0.22em;color:var(--accent);text-transform:uppercase;margin-bottom:46px;font-weight:600;}
+.manifesto__title,.insight__statement{font-family:var(--font-display);font-weight:500;font-size:80px;line-height:1.22;letter-spacing:0;color:var(--ink);margin:0;max-width:1640px;}
+.manifesto__title em,.insight__statement em{color:var(--accent);font-style:italic;}
+.manifesto__sub,.insight__sub{font-family:var(--font-sans);font-size:30px;color:var(--ink-3);margin:42px auto 0;max-width:1400px;line-height:1.6;font-weight:400;}
+.manifesto--dark{background:var(--night);color:var(--night-paper);}
+.manifesto--dark .manifesto__title{color:var(--night-paper);}
+.manifesto--dark .manifesto__sub{color:rgba(237,234,226,0.78);}
+
+/* —— bullets 论点清单（学术主力版式 · ≤6 条 · 舒展）—— */
+.bullets{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:26px;}
+.bullets > li{font-family:var(--font-sans);font-size:30px;line-height:1.6;color:var(--ink-2);padding-left:46px;position:relative;}
+.bullets > li::before{content:"";position:absolute;left:4px;top:18px;width:18px;height:2px;background:var(--accent);}
+.bullets li b,.bullets li strong{color:var(--accent);font-weight:600;}
+.bullets ul{list-style:none;margin:14px 0 0;padding:0;display:flex;flex-direction:column;gap:13px;}
+.bullets ul li{font-size:25px;color:var(--ink-3);padding-left:40px;position:relative;line-height:1.55;}
+.bullets ul li::before{content:"";position:absolute;left:8px;top:15px;width:9px;height:9px;border:1.5px solid var(--ink-4);border-radius:50%;}
+.bullets--lead > li{font-size:33px;}
+
+/* —— figure 图（社科主力：模型图 / 图表 + 编号图注）—— */
+.figure{display:flex;flex-direction:column;gap:18px;height:100%;}
+.figure__frame{flex:1;min-height:0;background:#FFFFFF;border:1px solid var(--rule);border-radius:3px;display:flex;align-items:center;justify-content:center;overflow:hidden;padding:24px;}
+.figure__frame img,.figure__frame svg{max-width:100%;max-height:100%;display:block;}
+.figure__cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);line-height:1.55;}
+.figure__cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--accent);font-weight:600;margin-right:12px;text-transform:uppercase;}
+.figure__src{font-family:var(--font-sans);font-size:16px;color:var(--ink-4);}
+.figure--row{flex-direction:row;gap:36px;align-items:stretch;}
+
+/* —— 概念模型小零件（X→M→Y / 调节）· 给 figure 内联 SVG 用作参照 —— */
+.node{fill:#FFFFFF;stroke:var(--accent);stroke-width:2;}
+.node-accent{fill:var(--accent);}
+.path-arrow{stroke:var(--accent);stroke-width:2;fill:none;}
+.path-dash{stroke:var(--gold);stroke-width:2;stroke-dasharray:7 5;fill:none;}
+
+/* —— cards 卡片组（研究问题 / 贡献 · 克制）—— */
+.cards{display:grid;gap:26px;grid-template-columns:repeat(3,1fr);}
+.cards--2{grid-template-columns:repeat(2,1fr);}
+.cards--4{grid-template-columns:repeat(4,1fr);}
+.cards--5{grid-template-columns:repeat(5,1fr);}
+.cards--6{grid-template-columns:repeat(6,1fr);gap:18px;}
+.card{background:#FFFFFF;padding:30px 28px;display:flex;flex-direction:column;gap:13px;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;}
+.card--v{border-top-color:var(--accent);}.card--n{border-top-color:var(--gold);}.card--g{border-top-color:var(--good);}
+.card--plain{background:transparent;border:0;border-top:1px solid var(--rule);border-radius:0;padding:24px 0;}
+.card__eyebrow{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--accent);font-weight:600;}
+.card__level{font-family:var(--font-display);font-size:54px;font-weight:600;line-height:0.95;color:var(--accent);}
+.card__title{font-family:var(--font-display);font-weight:600;font-size:31px;color:var(--ink);line-height:1.3;margin-top:6px;}
+.card__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.6;}
+.card__meta{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;margin-top:auto;padding-top:12px;border-top:1px solid var(--rule);}
+
+/* —— numlist 编号清单（证据 / 步骤）—— */
+.numlist{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--rule);}
+.numitem{display:grid;grid-template-columns:64px 1fr auto;align-items:baseline;gap:30px;padding:18px 0;border-bottom:1px solid var(--rule);}
+.numitem--tight{padding:12px 0;}
+.numitem__n{font-family:var(--font-display);font-size:32px;font-weight:600;color:var(--accent);line-height:1;}
+.numitem__main{display:flex;flex-direction:column;gap:6px;}
+.numitem__title{font-family:var(--font-display);font-weight:600;font-size:29px;color:var(--ink);line-height:1.3;}
+.numitem__desc{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.6;}
+.numitem__tag{font-family:var(--font-sans);font-size:18px;color:var(--ink-4);padding-top:8px;}
+.numitem--accent .numitem__n,.numitem--accent .numitem__title{color:var(--accent);}
+.numlist--lg .numitem{padding:13px 0;gap:22px;grid-template-columns:60px 1fr auto;}
+.numlist--lg .numitem__n{font-size:30px;}.numlist--lg .numitem__title{font-size:24px;}
+.numlist--lg .numitem__desc{font-size:18px;line-height:1.5;}.numlist--lg .numitem__tag{font-size:15px;}
+
+/* —— terminal 终端 / prompt（HCI / AI 演示）—— */
+.terminal{background:var(--night);color:#DDE2E8;padding:28px 36px;font-family:var(--font-mono);font-size:19px;line-height:1.55;position:relative;border-radius:4px;}
+.terminal__tag{font-family:var(--font-mono);font-size:14px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(221,226,232,0.5);margin-bottom:22px;display:flex;justify-content:space-between;}
+.terminal__tag span:first-child::before{content:"● ";color:var(--gold-soft);}
+.terminal__user{color:#9FB3D1;}.terminal__system{color:#9ECbB0;}.terminal__hint{color:#C9A86A;}.terminal__dim{color:rgba(221,226,232,0.45);}
+.terminal__cmd{white-space:pre-wrap;margin:0;font-family:inherit;font-size:inherit;line-height:inherit;}
+
+/* —— compare 两栏对比 —— */
+.compare{display:grid;grid-template-columns:1fr 1fr;gap:0;border-top:2px solid var(--accent);border-bottom:1px solid var(--rule);}
+.compare__col{padding:38px 40px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:16px;}
+.compare__col:last-child{border-right:0;}
+.compare__col--bad,.compare__col--bad .compare__title{color:var(--ink-3);}
+.compare__col--good .compare__title{color:var(--accent);}
+.compare__label{font-family:var(--font-mono);font-size:17px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-4);}
+.compare__title{font-family:var(--font-display);font-weight:600;font-size:40px;color:var(--ink);line-height:1.2;margin-bottom:10px;}
+.compare__list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:15px;}
+.compare__list li{font-family:var(--font-sans);font-size:22px;line-height:1.6;color:var(--ink-2);padding-left:26px;position:relative;}
+.compare__list li::before{content:"–";position:absolute;left:0;color:var(--ink-4);}
+.compare__col--good .compare__list li::before{color:var(--accent);}
+
+/* —— steps 流程 —— */
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border-top:2px solid var(--accent);border-bottom:1px solid var(--rule);}
+.steps--5{grid-template-columns:repeat(5,1fr);}.steps--4{grid-template-columns:repeat(4,1fr);}
+.step{padding:34px 28px;border-right:1px solid var(--rule);display:flex;flex-direction:column;gap:12px;}
+.step:last-child{border-right:0;}
+.step__n{font-family:var(--font-mono);font-size:18px;font-weight:600;letter-spacing:0.1em;color:var(--accent);text-transform:uppercase;}
+.step__title{font-family:var(--font-display);font-weight:600;font-size:29px;color:var(--ink);line-height:1.25;}
+.step__desc{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.6;}
+
+/* —— table 表格（booktabs：上下粗线、无竖线）—— */
+.table-cap{font-family:var(--font-sans);font-size:21px;color:var(--ink-2);margin-bottom:14px;}
+.table-cap b{font-family:var(--font-mono);font-size:16px;letter-spacing:0.08em;color:var(--accent);font-weight:600;margin-right:12px;text-transform:uppercase;}
+.table{width:100%;border-collapse:collapse;font-family:var(--font-sans);font-size:22px;border-top:2px solid var(--ink);border-bottom:2px solid var(--ink);}
+.table th,.table td{padding:15px 18px;text-align:left;vertical-align:top;line-height:1.5;}
+.table thead th{font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--rule-strong);font-weight:600;}
+.table tbody tr{border-bottom:1px solid var(--rule);}
+.table tbody tr:last-child{border-bottom:0;}
+.table td.num{font-variant-numeric:tabular-nums;}
+.table td.bad{color:var(--ink-4);}.table td.good{color:var(--accent);font-weight:600;}
+.table tr.hl td{background:var(--accent-soft);}
+
+/* —— formula5 编号公式行 —— */
+.formula5{display:grid;grid-template-columns:80px 1fr 1.2fr;gap:0;border-top:2px solid var(--accent);}
+.formula5__row{display:contents;}
+.formula5__row > div{padding:22px 24px;border-bottom:1px solid var(--rule);}
+.formula5__n{font-family:var(--font-display);font-size:38px;font-weight:600;color:var(--accent);line-height:1;}
+.formula5__k{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--ink);}
+.formula5__v{font-family:var(--font-sans);font-size:22px;color:var(--ink-2);line-height:1.6;}
+
+/* —— arch 分层堆栈 —— */
+.arch{display:flex;flex-direction:column;gap:6px;}
+.arch__layer{display:grid;grid-template-columns:60px 240px 1fr;gap:24px;align-items:center;padding:14px 24px;background:#FFFFFF;border:1px solid var(--rule);border-left:4px solid var(--accent);border-radius:2px;}
+.arch__layer--5{border-left-color:var(--accent);}
+.arch__layer--4{border-left-color:var(--gold);}
+.arch__layer--3{border-left-color:var(--good);}
+.arch__layer--2{border-left-color:var(--ink-3);}
+.arch__layer--1{border-left-color:var(--ink);}
+.arch__n{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--accent);line-height:1;}
+.arch__name{font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--ink);}
+.arch__name small{display:block;font-family:var(--font-mono);font-size:12px;color:var(--ink-4);letter-spacing:0.1em;margin-top:3px;font-weight:400;text-transform:uppercase;}
+.arch__desc{font-family:var(--font-sans);font-size:18px;color:var(--ink-2);line-height:1.5;}
+.arch__tag{font-family:var(--font-mono);font-size:13px;letter-spacing:0.08em;color:var(--ink-4);text-transform:uppercase;text-align:right;}
+
+/* —— three-circle 三区 —— */
+.three-circle{display:flex;gap:30px;align-items:stretch;}
+.zone{flex:1;padding:34px 32px;background:#FFFFFF;border:1px solid var(--rule);border-top:5px solid;border-radius:3px;display:flex;flex-direction:column;gap:15px;}
+.zone--g{border-top-color:var(--good);}
+.zone--y{border-top-color:var(--gold);}
+.zone--r{border-top-color:var(--bad);}
+.zone__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600;}
+.zone__title{font-family:var(--font-display);font-size:38px;font-weight:600;color:var(--ink);}
+.zone--g .zone__title{color:var(--good);}.zone--y .zone__title{color:var(--gold);}.zone--r .zone__title{color:var(--bad);}
+.zone__test{font-family:var(--font-serif);font-size:22px;color:var(--ink-2);font-style:italic;}
+.zone__eg{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.6;}
+.zone__action{margin-top:auto;padding-top:15px;border-top:1px solid var(--rule);font-family:var(--font-sans);font-size:21px;font-weight:600;color:var(--accent);}
+
+/* —— bigq 装框大引用 —— */
+.bigq{background:var(--paper-soft);padding:40px 56px;border-left:4px solid var(--accent);border-radius:3px;text-align:left;}
+.bigq__t{font-family:var(--font-serif);font-size:48px;font-weight:500;font-style:italic;line-height:1.35;color:var(--ink);margin:0;}
+.bigq__t em{color:var(--accent);}
+.bigq__sub{font-family:var(--font-sans);font-size:21px;color:var(--ink-3);margin-top:18px;font-style:normal;}
+
+/* —— matrix 矩阵 —— */
+.matrix{display:grid;grid-template-columns:260px repeat(3,1fr);border-top:2px solid var(--accent);border-left:1px solid var(--rule);}
+.matrix__h{padding:18px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-mono);font-size:15px;letter-spacing:0.08em;text-transform:uppercase;color:var(--accent);background:var(--paper-soft);text-align:center;font-weight:600;}
+.matrix__h.row-h{text-align:left;font-family:var(--font-display);font-size:22px;font-weight:600;color:var(--ink);text-transform:none;letter-spacing:0;}
+.matrix__cell{padding:20px 18px;border-right:1px solid var(--rule);border-bottom:1px solid var(--rule);font-family:var(--font-sans);font-size:18px;line-height:1.5;color:var(--ink-2);min-height:84px;}
+.matrix__cell strong{color:var(--accent);}
+
+/* —— bignum 关键数字（学术：克制 · 衬线深靛青）—— */
+.bignum{display:flex;flex-direction:column;gap:8px;padding:30px 30px;background:#FFFFFF;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;}
+.bignum__v{font-family:var(--font-display);font-size:84px;font-weight:600;line-height:0.98;color:var(--accent);letter-spacing:-0.01em;}
+.bignum__u{font-family:var(--font-sans);font-size:25px;color:var(--ink-2);font-weight:500;line-height:1.4;}
+.bignum__k{font-family:var(--font-sans);font-size:17px;color:var(--ink-4);margin-top:12px;}
+
+/* —— summary 总结三栏 —— */
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;}
+.sum-card{padding:34px 32px;background:#FFFFFF;border:1px solid var(--rule);border-top:3px solid var(--accent);border-radius:3px;display:flex;flex-direction:column;gap:14px;}
+.sum-card--v{border-top-color:var(--accent);}.sum-card--n{border-top-color:var(--gold);}.sum-card--g{border-top-color:var(--good);}
+.sum-card__k{font-family:var(--font-mono);font-size:16px;letter-spacing:0.1em;color:var(--ink-3);text-transform:uppercase;font-weight:600;}
+.sum-card__v{font-family:var(--font-display);font-weight:600;font-size:42px;color:var(--accent);line-height:1.15;}
+.sum-card--n .sum-card__v{color:var(--gold);}.sum-card--g .sum-card__v{color:var(--good);}
+.sum-card__hint{font-family:var(--font-sans);font-size:20px;color:var(--ink-2);line-height:1.6;}
+
+/* —— refs 参考文献（编号 + 悬挂缩进 + 刊名斜体 · 两列）—— */
+.refs{display:grid;grid-template-columns:1fr 1fr;gap:14px 56px;counter-reset:ref;list-style:none;margin:0;padding:0;}
+.refs--1col{grid-template-columns:1fr;}
+.refs li{font-family:var(--font-sans);font-size:19px;line-height:1.5;color:var(--ink-2);padding-left:38px;position:relative;break-inside:avoid;}
+.refs li::before{counter-increment:ref;content:"["counter(ref)"]";position:absolute;left:0;top:0;font-family:var(--font-mono);font-size:16px;color:var(--accent);font-weight:600;}
+.refs li em,.refs li .jrnl{font-style:italic;color:var(--ink);}
+.refs--plain li::before{content:"";}
+.refs--plain li{padding-left:30px;text-indent:-30px;}
+.refs--dim li{color:var(--ink-4);}
+
+/* —— helpers —— */
+.callout{border-left:3px solid var(--accent);padding:18px 26px;background:var(--accent-soft);font-family:var(--font-sans);font-size:22px;line-height:1.6;color:var(--ink-2);border-radius:0 3px 3px 0;}
+.note-box{margin-top:24px;padding:20px 28px;background:var(--paper-soft);border-left:3px solid var(--gold);font-family:var(--font-sans);font-size:22px;line-height:1.6;color:var(--ink-2);border-radius:0 3px 3px 0;}
+.row{display:flex;gap:32px;}.col{display:flex;flex-direction:column;gap:24px;}
+.mt-s{margin-top:18px;}.mt-m{margin-top:34px;}.mt-l{margin-top:54px;}
+
+</style>
+<style id="vj-studio-fallback">
+/* Studio edit-preview compatibility: if the deck's own JS engine doesn't boot (Slidesmith
+   Studio reassembles the deck and its engine may not run), slides remain direct children of
+   #deck and are position:absolute -> they collapse to a black stage. In THAT case only,
+   lay slides out as a scaled, flowing scroll-stack. When the engine DOES run it wraps each
+   slide in .slide-wrap, so slides are no longer direct children of #deck and these rules
+   never match -> standalone rendering is completely unaffected. */
+#deck:has(> .slide.slide){background:#2a2a2a;display:flex!important;flex-direction:column;align-items:center;gap:26px;padding:30px 24px!important;}
+#deck > .slide{position:relative!important;top:auto!important;left:auto!important;transform:none!important;zoom:.60;margin:0!important;box-shadow:0 6px 28px rgba(0,0,0,.22)!important;flex:0 0 auto;}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__brand">Journal of Business Research · 2026</div>
+  <div class="topbar__sub">共享式 VR 旅游如何提升行动受限老年人的生活满意度</div>
+  <div class="topbar__spacer"></div>
+  <span class="topbar__info">当前 <strong id="curSeg">段 0</strong> · <strong id="curIdx">1</strong> / <strong id="totalIdx">0</strong></span>
+  <button class="topbar__btn" id="prevBtn" title="上一页 ←">←</button>
+  <button class="topbar__btn" id="nextBtn" title="下一页 →">→</button>
+  <button class="topbar__btn topbar__btn--primary" id="playBtn" title="全屏播放（F 或 Enter）">▶ 全屏播放</button>
+  <button class="topbar__btn topbar__btn--presenter" id="presenterBtn" title="演讲者模式 · 副屏同步讲稿">🖥 演讲者</button>
+</header>
+
+<nav class="segnav" id="segnav"></nav>
+<div class="progress"><div class="progress__bar" id="progressBar" style="width:0%"></div></div>
+<div class="hint">F 全屏播放 · S 演讲者模式 · ← → 翻页 · ESC 退出 · 1-9 跳段</div>
+
+<div class="deck" id="deck">
+<section data-seg="0" data-segname="段 0 · 开场" class="slide cover">
+  <div class="cover__top"><div class="cover__brand">Journal of Business Research · 206 (2026) 115975</div><div class="cover__seal">VR</div></div>
+  <div class="cover__main">
+    <div class="cover__eyebrow">Immersive Technologies · 实证研究</div>
+    <h1 class="cover__title" data-anim="tracking-in">Virtual Journeys,<br><em>Shared Meaning</em></h1>
+    <p class="cover__sub">共享式 VR 旅游如何提升行动受限老年人的生活满意度<br><span style="font-size:.8em;color:var(--ink-3)">Enhancing consumer well-being of mobility-limited older adults through VR tourism</span></p>
+  </div>
+  <div class="cover__meta">
+    <div class="cover__meta-item"><span class="cover__meta-k">Authors</span><span class="cover__meta-v">Zhou L., Niu L., Wang V.L., Wu B.</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">Journal</span><span class="cover__meta-v">J. of Business Research</span></div>
+    <div class="cover__meta-item"><span class="cover__meta-k">DOI</span><span class="cover__meta-v">10.1016/j.jbusres.2026.115975</span></div>
+  </div>
+</section>
+
+<section data-seg="0" data-segname="段 0 · 开场" class="slide manifesto" data-title="开场钩子">
+  <h2 class="manifesto__title" data-anim="rise">当身体走不远，<br>世界能否<em>被一起看见</em>？</h2>
+  <p class="manifesto__sub">全球老龄化叠加行动受限，社交孤立侵蚀着老年人的心理健康。<br>VR 旅游带来沉浸式远行——但<em>一个人看</em>，还是<em>一起看</em>，结果大不相同。</p>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 背景与缺口" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part I</div>
+  <div class="secdiv__eyebrow">Background &amp; Gap</div>
+  <h2 class="secdiv__title">背景<br>与<em>研究缺口</em></h2>
+  <p class="secdiv__lead">为什么是老年人？为什么是「共享」？</p>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 背景与缺口" class="slide ">
+  <div class="head"><div class="eyebrow head__eyebrow">§1 · Why older adults</div><h2 class="title head__title">一个被忽视的<em>消费者群体</em></h2></div>
+  <div class="fill">
+    <ul class="bullets" data-anim="rise">
+      <li>全球老龄化加剧，行动受限老年人面临<b>社交孤立、心理健康下降、活动受限</b>。<span class="cite">(Cornwell &amp; Waite, 2009)</span></li>
+      <li>既有 VR 研究集中在<b>生产力、培训与年轻群体</b>，少有关注老年人福祉。<span class="cite">(de Regt et al., 2021)</span></li>
+      <li>社交丰富、情感有意义的体验能改善老年人健康——<b>VR 或可搭起这座桥</b>。<span class="cite">(Lu et al., 2016)</span></li>
+      <li>缺口：技术中介的福祉机制，尤其是<b>「共享 vs. 单人」</b>的差异，尚未厘清。</li>
+    </ul>
+  </div>
+</section>
+
+<section data-seg="1" data-segname="段 1 · 背景与缺口" class="slide insight" data-title="研究问题">
+  <div class="insight__eyebrow">Research Question</div>
+  <h2 class="insight__statement" data-anim="focus-in">与人<em>共享</em>一次 VR 旅程，<br>能否、又如何、在何时<br>提升老年人的<em>生活满意度</em>？</h2>
+  <p class="insight__sub">三个实验 · 124 名+ 行动受限老年人 · 养老机构实地</p>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 理论与假设" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part II</div>
+  <div class="secdiv__eyebrow">Theory &amp; Hypotheses</div>
+  <h2 class="secdiv__title">理论框架<br>与<em>假设</em></h2>
+  <p class="secdiv__lead">三个理论，回答 Why / How / What。</p>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 理论与假设" class="slide ">
+  <div class="head"><div class="eyebrow head__eyebrow">§2 · Theoretical lens</div><h2 class="title head__title">三个理论<em>层层递进</em></h2></div>
+  <div class="fill">
+    <div class="cards cards--3" data-anim="rise">
+      <div class="card card--v"><div class="card__eyebrow">WHY · 为什么</div><div class="card__title">社会情绪选择理论</div><div class="card__desc">时间有限，老年人更看重<b>情感有意义</b>的社会互动。<span class="cite">(Carstensen, 2006)</span></div></div>
+      <div class="card card--n"><div class="card__eyebrow">HOW · 怎么实现</div><div class="card__title">社会临场感理论</div><div class="card__desc">VR 让「他人在场」可被感知，<b>模拟面对面</b>的陪伴与温度。<span class="cite">(Biocca et al., 2003)</span></div></div>
+      <div class="card card--g"><div class="card__eyebrow">WHAT · 结果是</div><div class="card__title">自我决定理论</div><div class="card__desc">满足<b>关联需求</b>→ 提升意义感 → 改善福祉。<span class="cite">(Ryan, 2009)</span></div></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 理论与假设" class="slide " data-title="概念模型">
+  <div class="head"><div class="eyebrow head__eyebrow">§2.1 · Conceptual Model</div><h2 class="title head__title">一条<em>中介</em>，两个<em>边界</em></h2></div>
+  <div class="fill">
+    <div class="figure" data-anim="fade">
+      <div class="figure__frame"><svg viewBox="0 0 1400 560" xmlns="http://www.w3.org/2000/svg" font-family="'Source Sans 3','Noto Sans SC',sans-serif"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#27406B"/></marker><marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9A6E2E"/></marker></defs><rect class="node" x="60" y="232" width="330" height="120" rx="4"/><text x="225" y="282" text-anchor="middle" fill="#1C2024" font-size="33" font-weight="600">共享 VR 体验</text><text x="225" y="318" text-anchor="middle" fill="#5E6670" font-size="21">Shared VR (vs. Solo) · X</text><rect class="node" x="535" y="60" width="330" height="120" rx="4"/><text x="700" y="110" text-anchor="middle" fill="#1C2024" font-size="33" font-weight="600">意义感</text><text x="700" y="146" text-anchor="middle" fill="#5E6670" font-size="21">Sense of Meaning · M</text><rect class="node" x="1010" y="232" width="330" height="120" rx="4"/><text x="1175" y="282" text-anchor="middle" fill="#1C2024" font-size="33" font-weight="600">生活满意度</text><text x="1175" y="318" text-anchor="middle" fill="#5E6670" font-size="21">Life Satisfaction · Y</text><rect x="500" y="430" width="300" height="96" rx="4" fill="#F1EEE6" stroke="#9A6E2E" stroke-width="2"/><text x="650" y="470" text-anchor="middle" fill="#1C2024" font-size="25" font-weight="600">外部投入</text><text x="650" y="500" text-anchor="middle" fill="#5E6670" font-size="19">External Engagement · H3</text><rect x="980" y="430" width="320" height="96" rx="4" fill="#F1EEE6" stroke="#9A6E2E" stroke-width="2"/><text x="1140" y="470" text-anchor="middle" fill="#1C2024" font-size="25" font-weight="600">既有社交孤立</text><text x="1140" y="500" text-anchor="middle" fill="#5E6670" font-size="19">Prior Social Isolation · H4</text><path class="path-arrow" d="M300,236 C400,150 460,135 535,128" marker-end="url(#arr)"/><text x="392" y="150" fill="#27406B" font-size="24" font-style="italic">a (H2)</text><path class="path-arrow" d="M865,128 C945,135 1010,150 1095,234" marker-end="url(#arr)"/><text x="980" y="150" fill="#27406B" font-size="24" font-style="italic">b (H2)</text><path class="path-dash" d="M390,300 L1010,300" marker-end="url(#arr)"/><text x="700" y="290" text-anchor="middle" fill="#5E6670" font-size="21" font-style="italic">c&#8242; 直接效应 (H1)</text><path class="path-dash" d="M620,430 L520,310" marker-end="url(#arrG)"/><path class="path-dash" d="M1140,430 L1140,304" marker-end="url(#arrG)"/></svg></div>
+      <div class="figure__cap"><b>图 1</b>共享 VR 体验经由<em>意义感</em>提升生活满意度的有调节中介模型。实线为中介路径 a、b 与直接效应 c&#8242;；金色虚线为调节：外部投入调节 a 路径，既有社交孤立调节直接效应。</div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 理论与假设" class="slide " data-title="假设 H1–H4">
+  <div class="head"><div class="eyebrow head__eyebrow">§2.2 · Hypotheses</div><h2 class="title head__title">四个<em>假设</em></h2></div>
+  <div class="fill">
+    <div class="numlist numlist--lg" data-anim="rise">
+      <div class="numitem numitem--accent"><div class="numitem__n">H1</div><div class="numitem__main"><div class="numitem__title">共享 &gt; 单人</div><div class="numitem__desc">共享 VR 体验对生活满意度的正向作用强于单人体验。</div></div><div class="numitem__tag">主效应</div></div>
+      <div class="numitem"><div class="numitem__n">H2</div><div class="numitem__main"><div class="numitem__title">意义感中介</div><div class="numitem__desc">意义感中介共享 VR 体验 → 生活满意度。</div></div><div class="numitem__tag">中介</div></div>
+      <div class="numitem"><div class="numitem__n">H3</div><div class="numitem__main"><div class="numitem__title">外部投入调节</div><div class="numitem__desc">外部投入越高，共享效应越强。</div></div><div class="numitem__tag">调节</div></div>
+      <div class="numitem"><div class="numitem__n">H4</div><div class="numitem__main"><div class="numitem__title">既有孤立调节</div><div class="numitem__desc">既有社交孤立越高，共享效应越强。</div></div><div class="numitem__tag">调节</div></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="2" data-segname="段 2 · 理论与假设" class="slide " data-title="三实验一览">
+  <div class="head"><div class="eyebrow head__eyebrow">§2.3 · Research Overview</div><h2 class="title head__title">三个实验<em>一览</em></h2></div>
+  <div class="fill">
+    <div class="table-cap"><b>表 1</b>三个实验的设计、样本与检验的假设。</div>
+    <table class="table" data-anim="fade">
+      <thead><tr><th>实验</th><th>设计</th><th class="num">样本</th><th>操纵</th><th>检验</th></tr></thead>
+      <tbody>
+        <tr><td><b>研究 1</b></td><td>单因素组间（共享 vs. 单人）</td><td class="num">120</td><td>实时共享 VR 旅游</td><td>H1 · H2 · H4</td></tr>
+        <tr><td><b>研究 2</b></td><td>2 (共享/单人) × 2 (外部投入 高/低)</td><td class="num">120</td><td>实时共享 + 引导表达</td><td>H3 · H2</td></tr>
+        <tr class="hl"><td><b>研究 3</b></td><td>单因素组间（事后共享 vs. 单人）</td><td class="num">60</td><td>VR 结束后小组分享</td><td>H1 · H2</td></tr>
+      </tbody>
+    </table>
+    <div class="figure__src" style="margin-top:14px;">情境：均为 Arches National Park · Meta Quest 3 · Brink Traveler · 养老机构行动受限老年人（≥60 岁）。</div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 实证结果" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part III</div>
+  <div class="secdiv__eyebrow">Empirical Findings</div>
+  <h2 class="secdiv__title">三个实验<br><em>结果</em></h2>
+  <p class="secdiv__lead">数据怎么说。</p>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 实证结果" class="slide " data-title="研究1 主效应">
+  <div class="head"><div class="eyebrow head__eyebrow">Study 1 · Main effect (H1)</div><h2 class="title head__title">共享让满意度<em>更高</em></h2></div>
+  <div class="fill row" style="gap:40px;align-items:center;">
+    <div class="figure" style="flex:1.4;" data-anim="fade">
+      <div class="figure__frame"><svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" font-family="'Source Sans 3','Noto Sans SC',sans-serif" aria-label="bar chart"><line x1="104" y1="374.0" x2="792" y2="374.0" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="380.0" text-anchor="end" font-size="20" fill="#5E6670">4</text><line x1="104" y1="308.4" x2="792" y2="308.4" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="314.4" text-anchor="end" font-size="20" fill="#5E6670">4.5</text><line x1="104" y1="242.8" x2="792" y2="242.8" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="248.8" text-anchor="end" font-size="20" fill="#5E6670">5</text><line x1="104" y1="177.2" x2="792" y2="177.2" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="183.2" text-anchor="end" font-size="20" fill="#5E6670">5.5</text><line x1="104" y1="111.6" x2="792" y2="111.6" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="117.6" text-anchor="end" font-size="20" fill="#5E6670">6</text><line x1="104" y1="46.0" x2="792" y2="46.0" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="52.0" text-anchor="end" font-size="20" fill="#5E6670">6.5</text><line x1="104" y1="46" x2="104" y2="374" stroke="#1C2024" stroke-width="1.6"/><line x1="104" y1="374" x2="792" y2="374" stroke="#1C2024" stroke-width="1.6"/><text x="34" y="210" text-anchor="middle" font-size="21" fill="#1C2024" transform="rotate(-90 34 210)">生活满意度 (1–7)</text><rect x="228.0" y="295.3" width="96.0" height="78.7" fill="#AEB7C4" rx="2"/><text x="276.0" y="283.3" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">4.60</text><line x1="276.0" y1="172.0" x2="276.0" y2="418.6" stroke="#5E6670" stroke-width="1.5"/><line x1="267.0" y1="172.0" x2="285.0" y2="172.0" stroke="#5E6670" stroke-width="1.5"/><line x1="267.0" y1="418.6" x2="285.0" y2="418.6" stroke="#5E6670" stroke-width="1.5"/><text x="276.0" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">Solo 单人</text><rect x="572.0" y="192.9" width="96.0" height="181.1" fill="#27406B" rx="2"/><text x="620.0" y="180.9" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">5.38</text><line x1="620.0" y1="86.7" x2="620.0" y2="299.2" stroke="#5E6670" stroke-width="1.5"/><line x1="611.0" y1="86.7" x2="629.0" y2="86.7" stroke="#5E6670" stroke-width="1.5"/><line x1="611.0" y1="299.2" x2="629.0" y2="299.2" stroke="#5E6670" stroke-width="1.5"/><text x="620.0" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">Shared 共享</text><line x1="276.0" y1="72" x2="276.0" y2="82" stroke="#1C2024" stroke-width="1.3"/><line x1="620.0" y1="72" x2="620.0" y2="82" stroke="#1C2024" stroke-width="1.3"/><line x1="276.0" y1="72" x2="620.0" y2="72" stroke="#1C2024" stroke-width="1.3"/><text x="448.0" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#27406B">*** t(118)=4.87, p<.001</text></svg></div>
+      <div class="figure__cap"><b>图 2</b>研究 1 两组生活满意度（误差棒为 ±1 SD）。</div>
+    </div>
+    <div class="col" style="flex:1;gap:18px;">
+      <div class="bignum"><div class="bignum__v" data-anim="num-pop">+0.78</div><div class="bignum__u">满意度差（共享 − 单人）</div><div class="bignum__k">5.38 vs. 4.60 · t(118)=4.87, p&lt;.001</div></div>
+      <div class="note-box">操纵检验：共享组社会临场感 <b>5.92</b> vs. 单人 <b>3.10</b>（p&lt;.001）。<b>H1 成立。</b></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 实证结果" class="slide " data-title="研究1 中介与调节">
+  <div class="head"><div class="eyebrow head__eyebrow">Study 1 · Mediation (H2) &amp; Moderation (H4)</div><h2 class="title head__title">为何有效，<em>对谁</em>更有效</h2></div>
+  <div class="fill row" style="gap:40px;align-items:center;">
+    <div class="col" style="flex:1;gap:16px;">
+      <div class="bignum"><div class="bignum__v" data-anim="num-pop">0.39</div><div class="bignum__u">意义感的中介间接效应</div><div class="bignum__k">95% CI [0.20, 0.63] · PROCESS Model 4 · H2 成立</div></div>
+      <div class="note-box">机制：共享 → <b>意义感</b> → 生活满意度。意义感是关键心理通道。</div>
+    </div>
+    <div class="figure" style="flex:1.3;" data-anim="fade">
+      <div class="figure__frame"><svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" font-family="'Source Sans 3','Noto Sans SC',sans-serif" aria-label="bar chart"><line x1="104" y1="374.0" x2="792" y2="374.0" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="380.0" text-anchor="end" font-size="20" fill="#5E6670">0</text><line x1="104" y1="264.7" x2="792" y2="264.7" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="270.7" text-anchor="end" font-size="20" fill="#5E6670">0.5</text><line x1="104" y1="155.3" x2="792" y2="155.3" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="161.3" text-anchor="end" font-size="20" fill="#5E6670">1</text><line x1="104" y1="46.0" x2="792" y2="46.0" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="52.0" text-anchor="end" font-size="20" fill="#5E6670">1.5</text><line x1="104" y1="46" x2="104" y2="374" stroke="#1C2024" stroke-width="1.6"/><line x1="104" y1="374" x2="792" y2="374" stroke="#1C2024" stroke-width="1.6"/><text x="34" y="210" text-anchor="middle" font-size="21" fill="#1C2024" transform="rotate(-90 34 210)">共享 VR 的效应 (b)</text><rect x="228.0" y="304.0" width="96.0" height="70.0" fill="#AEB7C4" rx="2"/><text x="276.0" y="292.0" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">0.32</text><text x="276.0" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">低孤立 −1SD</text><rect x="572.0" y="109.4" width="96.0" height="264.6" fill="#27406B" rx="2"/><text x="620.0" y="97.4" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">1.21</text><text x="620.0" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">高孤立 +1SD</text><line x1="276.0" y1="72" x2="276.0" y2="82" stroke="#1C2024" stroke-width="1.3"/><line x1="620.0" y1="72" x2="620.0" y2="82" stroke="#1C2024" stroke-width="1.3"/><line x1="276.0" y1="72" x2="620.0" y2="72" stroke="#1C2024" stroke-width="1.3"/><text x="448.0" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#27406B">交互 b=0.45, p=.003</text></svg></div>
+      <div class="figure__cap"><b>图 3</b>既有社交孤立的调节：共享 VR 的效应在<em>高孤立</em>者中更强（简单斜率 b=1.21, p&lt;.001 vs. 低孤立 b=0.32, ns）。<b>H4 成立。</b></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 实证结果" class="slide " data-title="研究2 交互">
+  <div class="head"><div class="eyebrow head__eyebrow">Study 2 · Interaction (H3)</div><h2 class="title head__title">投入越多，<em>共享越值</em></h2></div>
+  <div class="fill row" style="gap:40px;align-items:center;">
+    <div class="figure" style="flex:1.4;" data-anim="fade">
+      <div class="figure__frame"><svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" font-family="'Source Sans 3','Noto Sans SC',sans-serif" aria-label="interaction plot"><line x1="110" y1="382.0" x2="670" y2="382.0" stroke="#E7E1D3" stroke-width="1"/><text x="98" y="388.0" text-anchor="end" font-size="20" fill="#5E6670">4</text><line x1="110" y1="314.8" x2="670" y2="314.8" stroke="#E7E1D3" stroke-width="1"/><text x="98" y="320.8" text-anchor="end" font-size="20" fill="#5E6670">4.5</text><line x1="110" y1="247.6" x2="670" y2="247.6" stroke="#E7E1D3" stroke-width="1"/><text x="98" y="253.6" text-anchor="end" font-size="20" fill="#5E6670">5</text><line x1="110" y1="180.4" x2="670" y2="180.4" stroke="#E7E1D3" stroke-width="1"/><text x="98" y="186.4" text-anchor="end" font-size="20" fill="#5E6670">5.5</text><line x1="110" y1="113.2" x2="670" y2="113.2" stroke="#E7E1D3" stroke-width="1"/><text x="98" y="119.2" text-anchor="end" font-size="20" fill="#5E6670">6</text><line x1="110" y1="46.0" x2="670" y2="46.0" stroke="#E7E1D3" stroke-width="1"/><text x="98" y="52.0" text-anchor="end" font-size="20" fill="#5E6670">6.5</text><line x1="110" y1="46" x2="110" y2="382" stroke="#1C2024" stroke-width="1.6"/><line x1="110" y1="382" x2="670" y2="382" stroke="#1C2024" stroke-width="1.6"/><text x="34" y="214" text-anchor="middle" font-size="21" fill="#1C2024" transform="rotate(-90 34 214)">生活满意度 (1–7)</text><text x="110.0" y="414.0" text-anchor="middle" font-size="22" fill="#1C2024">低 Low</text><text x="670.0" y="414.0" text-anchor="middle" font-size="22" fill="#1C2024">高 High</text><text x="390" y="444" text-anchor="middle" font-size="20" fill="#5E6670">外部投入 External engagement</text><polyline points="110.0,246.3 670.0,148.1" fill="none" stroke="#27406B" stroke-width="3" /><circle cx="110.0" cy="246.3" r="5" fill="#27406B"/><text x="110.0" y="232.3" text-anchor="middle" font-size="20" font-weight="700" fill="#1C2024">5.01</text><circle cx="670.0" cy="148.1" r="5" fill="#27406B"/><text x="670.0" y="134.1" text-anchor="middle" font-size="20" font-weight="700" fill="#1C2024">5.74</text><text x="682" y="154.1" font-size="20" font-weight="700" fill="#27406B">Shared 共享</text><polyline points="110.0,285.2 670.0,281.2" fill="none" stroke="#9A6E2E" stroke-width="3" stroke-dasharray="8 5" /><circle cx="110.0" cy="285.2" r="5" fill="#9A6E2E"/><text x="110.0" y="271.2" text-anchor="middle" font-size="20" font-weight="700" fill="#1C2024">4.72</text><circle cx="670.0" cy="281.2" r="5" fill="#9A6E2E"/><text x="670.0" y="267.2" text-anchor="middle" font-size="20" font-weight="700" fill="#1C2024">4.75</text><text x="682" y="287.2" font-size="20" font-weight="700" fill="#9A6E2E">Solo 单人</text><text x="120" y="70" font-size="19" font-style="italic" fill="#27406B">交互 F(1,116)=9.78, p=.002, η²=.08</text></svg></div>
+      <div class="figure__cap"><b>图 4</b>外部投入 × VR 体验对生活满意度的交互（2×2，每格 N=30）。</div>
+    </div>
+    <div class="col" style="flex:1;gap:16px;">
+      <div class="bignum"><div class="bignum__v" data-anim="num-pop">+0.99</div><div class="bignum__u">高投入下的共享优势</div><div class="bignum__k">5.74 vs. 4.75（高投入）｜低投入仅 5.01 vs. 4.72 (ns)</div></div>
+      <div class="note-box">有调节的中介：高投入下经意义感的间接效应更强（Index=0.23, 95% CI [0.09, 0.41]）。<b>H3 成立。</b></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 实证结果" class="slide " data-title="研究3 事后分享">
+  <div class="head"><div class="eyebrow head__eyebrow">Study 3 · Post-VR sharing (H1, H2)</div><h2 class="title head__title">连<em>事后</em>分享也有效</h2></div>
+  <div class="fill row" style="gap:40px;align-items:center;">
+    <div class="figure" style="flex:1.4;" data-anim="fade">
+      <div class="figure__frame"><svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" font-family="'Source Sans 3','Noto Sans SC',sans-serif" aria-label="bar chart"><line x1="104" y1="374.0" x2="792" y2="374.0" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="380.0" text-anchor="end" font-size="20" fill="#5E6670">4</text><line x1="104" y1="308.4" x2="792" y2="308.4" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="314.4" text-anchor="end" font-size="20" fill="#5E6670">4.5</text><line x1="104" y1="242.8" x2="792" y2="242.8" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="248.8" text-anchor="end" font-size="20" fill="#5E6670">5</text><line x1="104" y1="177.2" x2="792" y2="177.2" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="183.2" text-anchor="end" font-size="20" fill="#5E6670">5.5</text><line x1="104" y1="111.6" x2="792" y2="111.6" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="117.6" text-anchor="end" font-size="20" fill="#5E6670">6</text><line x1="104" y1="46.0" x2="792" y2="46.0" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="52.0" text-anchor="end" font-size="20" fill="#5E6670">6.5</text><line x1="104" y1="46" x2="104" y2="374" stroke="#1C2024" stroke-width="1.6"/><line x1="104" y1="374" x2="792" y2="374" stroke="#1C2024" stroke-width="1.6"/><text x="34" y="210" text-anchor="middle" font-size="21" fill="#1C2024" transform="rotate(-90 34 210)">生活满意度 (1–7)</text><rect x="228.0" y="288.7" width="96.0" height="85.3" fill="#AEB7C4" rx="2"/><text x="276.0" y="276.7" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">4.65</text><line x1="276.0" y1="182.4" x2="276.0" y2="395.0" stroke="#5E6670" stroke-width="1.5"/><line x1="267.0" y1="182.4" x2="285.0" y2="182.4" stroke="#5E6670" stroke-width="1.5"/><line x1="267.0" y1="395.0" x2="285.0" y2="395.0" stroke="#5E6670" stroke-width="1.5"/><text x="276.0" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">Solo 单人</text><rect x="572.0" y="195.6" width="96.0" height="178.4" fill="#27406B" rx="2"/><text x="620.0" y="183.6" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">5.36</text><line x1="620.0" y1="99.8" x2="620.0" y2="291.3" stroke="#5E6670" stroke-width="1.5"/><line x1="611.0" y1="99.8" x2="629.0" y2="99.8" stroke="#5E6670" stroke-width="1.5"/><line x1="611.0" y1="291.3" x2="629.0" y2="291.3" stroke="#5E6670" stroke-width="1.5"/><text x="620.0" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">Shared 共享</text><line x1="276.0" y1="72" x2="276.0" y2="82" stroke="#1C2024" stroke-width="1.3"/><line x1="620.0" y1="72" x2="620.0" y2="82" stroke="#1C2024" stroke-width="1.3"/><line x1="276.0" y1="72" x2="620.0" y2="72" stroke="#1C2024" stroke-width="1.3"/><text x="448.0" y="66" text-anchor="middle" font-size="22" font-weight="700" fill="#27406B">*** t(58)=3.57, p<.001</text></svg></div>
+      <div class="figure__cap"><b>图 5</b>研究 3：VR 结束后的小组分享 vs. 单人（误差棒 ±1 SD）。</div>
+    </div>
+    <div class="col" style="flex:1;gap:16px;">
+      <div class="bignum"><div class="bignum__v" data-anim="num-pop">+0.71</div><div class="bignum__u">事后共享的满意度优势</div><div class="bignum__k">5.36 vs. 4.65 · t(58)=3.57, p&lt;.001</div></div>
+      <div class="note-box">部分中介：间接 b=0.35 [0.19, 0.54]，直接 b=0.29 (p&lt;.05)。<b>H1、H2 再次成立。</b></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="3" data-segname="段 3 · 实证结果" class="slide " data-title="跨研究汇总">
+  <div class="head"><div class="eyebrow head__eyebrow">Across three studies</div><h2 class="title head__title">一个稳健的<em>模式</em></h2></div>
+  <div class="fill">
+    <div class="figure" data-anim="fade">
+      <div class="figure__frame"><svg viewBox="0 0 820 460" xmlns="http://www.w3.org/2000/svg" font-family="'Source Sans 3','Noto Sans SC',sans-serif" aria-label="bar chart"><line x1="104" y1="374.0" x2="792" y2="374.0" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="380.0" text-anchor="end" font-size="20" fill="#5E6670">4</text><line x1="104" y1="308.4" x2="792" y2="308.4" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="314.4" text-anchor="end" font-size="20" fill="#5E6670">4.5</text><line x1="104" y1="242.8" x2="792" y2="242.8" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="248.8" text-anchor="end" font-size="20" fill="#5E6670">5</text><line x1="104" y1="177.2" x2="792" y2="177.2" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="183.2" text-anchor="end" font-size="20" fill="#5E6670">5.5</text><line x1="104" y1="111.6" x2="792" y2="111.6" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="117.6" text-anchor="end" font-size="20" fill="#5E6670">6</text><line x1="104" y1="46.0" x2="792" y2="46.0" stroke="#E7E1D3" stroke-width="1"/><text x="92" y="52.0" text-anchor="end" font-size="20" fill="#5E6670">6.5</text><line x1="104" y1="46" x2="104" y2="374" stroke="#1C2024" stroke-width="1.6"/><line x1="104" y1="374" x2="792" y2="374" stroke="#1C2024" stroke-width="1.6"/><text x="34" y="210" text-anchor="middle" font-size="21" fill="#1C2024" transform="rotate(-90 34 210)">生活满意度 (1–7)</text><rect x="140.6" y="192.9" width="71.1" height="181.1" fill="#27406B" rx="2"/><text x="176.1" y="180.9" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">5.38</text><rect x="225.7" y="295.3" width="71.1" height="78.7" fill="#AEB7C4" rx="2"/><text x="261.2" y="283.3" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">4.60</text><text x="218.7" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">研究 1
+(实时共享)</text><rect x="369.9" y="145.7" width="71.1" height="228.3" fill="#27406B" rx="2"/><text x="405.5" y="133.7" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">5.74</text><rect x="455.0" y="275.6" width="71.1" height="98.4" fill="#AEB7C4" rx="2"/><text x="490.5" y="263.6" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">4.75</text><text x="448.0" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">研究 2
+(高投入)</text><rect x="599.2" y="195.6" width="71.1" height="178.4" fill="#27406B" rx="2"/><text x="634.8" y="183.6" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">5.36</text><rect x="684.3" y="288.7" width="71.1" height="85.3" fill="#AEB7C4" rx="2"/><text x="719.9" y="276.7" text-anchor="middle" font-size="23" font-weight="700" fill="#1C2024">4.65</text><text x="677.3" y="406.0" text-anchor="middle" font-size="22" fill="#1C2024">研究 3
+(事后共享)</text><rect x="112" y="417" width="15" height="15" fill="#27406B" rx="2"/><text x="134" y="430" font-size="20" fill="#1C2024">Shared 共享</text><rect x="287" y="417" width="15" height="15" fill="#AEB7C4" rx="2"/><text x="309" y="430" font-size="20" fill="#1C2024">Solo 单人</text></svg></div>
+      <div class="figure__cap"><b>图 6</b>三个实验中，共享体验的生活满意度始终高于单人——无论共享发生在 VR <em>过程中</em>还是<em>结束后</em>。</div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 讨论与启示" class="slide secdiv secdiv--accent">
+  <div class="secdiv__num">Part IV</div>
+  <div class="secdiv__eyebrow">Discussion &amp; Implications</div>
+  <h2 class="secdiv__title">贡献<br>与<em>启示</em></h2>
+  <p class="secdiv__lead">理论上说明了什么，实践上能做什么。</p>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 讨论与启示" class="slide " data-title="理论贡献">
+  <div class="head"><div class="eyebrow head__eyebrow">§4.1 · Theoretical contributions</div><h2 class="title head__title">理论<em>贡献</em></h2></div>
+  <div class="fill">
+    <ul class="bullets" data-anim="rise">
+      <li>整合三理论解释<b>技术中介的老年福祉</b>：社会情绪选择（why）+ 社会临场感（how）+ 自我决定（what）。</li>
+      <li>把社会情绪选择理论延伸到<b>沉浸式技术</b>——情感连接可在无物理接触时发生。</li>
+      <li>确立<b>感知社会临场感</b>在数字环境中提升满意度的关键作用。</li>
+      <li>揭示<b>意义感</b>是共享 VR → 生活满意度的核心心理机制，并刻画两个边界条件。</li>
+    </ul>
+  </div>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 讨论与启示" class="slide " data-title="管理启示">
+  <div class="head"><div class="eyebrow head__eyebrow">§4.2 · Managerial implications</div><h2 class="title head__title">给三类人的<em>行动建议</em></h2></div>
+  <div class="fill">
+    <div class="cards cards--3" data-anim="rise">
+      <div class="card card--n"><div class="card__eyebrow">VR 开发者</div><div class="card__title">把「多人共享」做成默认</div><div class="card__desc">多用户、虚拟陪伴、实时互动；支持<b>家人远程共同参与</b>。</div></div>
+      <div class="card card--v"><div class="card__eyebrow">照护者</div><div class="card__title">用引导式对话促投入</div><div class="card__desc">少用「请大声说」，多用开放式提问与<b>记忆唤起</b>，组织事后分享。</div></div>
+      <div class="card card--g"><div class="card__eyebrow">政策制定者</div><div class="card__title">把社交分享当核心模块</div><div class="card__desc">在养老与社区健康项目中试点共享 VR，<b>优先服务高孤立人群</b>。</div></div>
+    </div>
+  </div>
+</section>
+
+<section data-seg="4" data-segname="段 4 · 讨论与启示" class="slide " data-title="局限与未来">
+  <div class="head"><div class="eyebrow head__eyebrow">§4.3 · Limitations &amp; future</div><h2 class="title head__title">局限与<em>未来方向</em></h2></div>
+  <div class="fill">
+    <ul class="bullets" data-anim="rise">
+      <li>仅测<b>即时</b>反应——未来用<b>纵向设计</b>追踪长期效应。</li>
+      <li>由受训照护者/研究者促成分享，<b>真实多人 VR</b>更具生态效度。</li>
+      <li>样本来自养老机构（便利抽样），需在<b>更多元人群</b>中复制。</li>
+      <li>外部投入靠口头指令操纵，可能引入需求特征；可用<b>更自然的线索</b>。</li>
+    </ul>
+  </div>
+</section>
+
+<section data-seg="5" data-segname="段 5 · 结语" class="slide insight" data-title="结语">
+  <div class="insight__eyebrow">Takeaway</div>
+  <h2 class="insight__statement" data-anim="focus-in">把 VR 旅程<em>变成共享的旅程</em>，<br>就把像素变成了<em>意义</em>——<br>尤其对最孤独的人。</h2>
+  <p class="insight__sub">Shared VR experiences create meaningful, socially grounded value for mobility-limited older adults.</p>
+</section>
+
+<section data-seg="5" data-segname="段 5 · 结语" class="slide " data-title="参考文献">
+  <div class="head"><div class="eyebrow head__eyebrow">References · 节选（全部真实可溯，DOI 见原文）</div><h2 class="title head__title" style="font-size:52px;">参考文献</h2></div>
+  <div class="fill"><ol class="refs">
+    <li>Biocca, F., Harms, C., &amp; Burgoon, J. K. (2003). Toward a more robust theory and measure of social presence. <em>Presence: Teleoperators &amp; Virtual Environments</em>, 12(5), 456–480.</li>
+    <li>Carstensen, L. L. (2006). The influence of a sense of time on human development. <em>Science</em>, 312(5782), 1913–1915.</li>
+    <li>Cornwell, E. Y., &amp; Waite, L. J. (2009). Social disconnectedness, perceived isolation, and health among older adults. <em>Journal of Health and Social Behavior</em>, 50(1), 31–48.</li>
+    <li>Dermody, G., Whitehead, L., Wilson, G., &amp; Glass, C. (2020). The role of virtual reality in improving health outcomes for community-dwelling older adults. <em>Journal of Medical Internet Research</em>, 22(6), e17331.</li>
+    <li>Flavián, C., Ibáñez-Sánchez, S., &amp; Orús, C. (2019). The impact of virtual, augmented and mixed reality technologies on the customer experience. <em>Journal of Business Research</em>, 100, 547–560.</li>
+    <li>Hayes, A. F. (2017). <em>Introduction to mediation, moderation, and conditional process analysis</em>. Guilford.</li>
+    <li>Ryan, R. M., &amp; Deci, E. L. (2000). Self-determination theory and the facilitation of intrinsic motivation. <em>American Psychologist</em>, 55(1), 68–78.</li>
+    <li>Steger, M. F., Frazier, P., Oishi, S., &amp; Kaler, M. (2006). The meaning in life questionnaire. <em>Journal of Counseling Psychology</em>, 53(1), 80–93.</li>
+    <li style="color:var(--ink-4);">Zhou, Niu, Wang &amp; Wu (2026). Virtual Journeys, shared meaning. <em>Journal of Business Research</em>, 206, 115975.（本研究）</li>
+  </ol></div>
+</section>
+</div>
+
+<script>window.SLIDE_MAP=["vj-1", "vj-2", "vj-3", "vj-4", "vj-5", "vj-6", "vj-7", "vj-8", "vj-9", "vj-10", "vj-11", "vj-12", "vj-13", "vj-14", "vj-15", "vj-16", "vj-17", "vj-18", "vj-19", "vj-20", "vj-21", "vj-22"];</script>
+
+<script>
+/* ════════════════════════════════════════════════════════════════════
+   自配置引擎 · 与风格无关 · 所有皮肤共用 · 不用改这里
+   它会：① 从各 slide 的 data-seg 自动建段导航 + 缩略图 + 计数
+        ② 自动注入页脚 chrome（段名 + 页码）
+        ③ 自动取每张标题给副屏用
+        ④ 翻页广播给"演讲者模式.html"（配 slides-presenter-mode skill）
+   皮肤只通过 CSS（:root 令牌 + 组件样式）改外观，引擎逻辑不变。
+   ════════════════════════════════════════════════════════════════════ */
+(function () {
+  /* —— 每套 slides 改这里：广播频道名要唯一（避免多份 slides 串台）+ 副屏文件名 —— */
+  const CONFIG = { channel: 'vj-2026-sync', presenterFile: '演讲者模式.html' };
+
+  const deck = document.getElementById('deck');
+  const slides = Array.from(deck.querySelectorAll(':scope > .slide'));
+  const total = slides.length;
+  const body = document.body;
+  const segOf = s => parseInt(s.dataset.seg || '0', 10);
+
+  // —— 段名 / 计数 / 起始索引（全自动）——
+  const segName = [], segCount = [];
+  slides.forEach(s => {
+    const g = segOf(s);
+    if (segName[g] === undefined) segName[g] = s.dataset.segname || ('段 ' + g);
+    segCount[g] = (segCount[g] || 0) + 1;
+  });
+  const segShort = segName.map((n, g) => (n || ('段 ' + g)).replace(/^段\s*\d+\s*·?\s*/, '') || ('段 ' + g));
+  const segStarts = []; let _acc = 0; segCount.forEach((c, i) => { segStarts[i] = _acc; _acc += (c || 0); });
+
+  // —— 包 wrap + 注入 chrome 页脚 ——
+  slides.forEach((s, i) => {
+    s.dataset.globalIdx = i;
+    const wrap = document.createElement('div'); wrap.className = 'slide-wrap';
+    s.parentNode.insertBefore(wrap, s); wrap.appendChild(s);
+    if (!s.querySelector('.chrome')) {
+      const g = segOf(s);
+      const div = document.createElement('div'); div.className = 'chrome';
+      div.innerHTML = `<div class="chrome__l"><span class="chrome__seg">${s.dataset.segname || segName[g]}</span></div>`
+        + `<div class="chrome__r">${String(i + 1).padStart(3, '0')} / ${String(total).padStart(3, '0')}</div>`;
+      s.appendChild(div);
+    }
+  });
+
+  // —— 自动建段导航 ——
+  const segnav = document.getElementById('segnav');
+  segCount.forEach((c, g) => {
+    const seg = document.createElement('div'); seg.className = 'segnav__seg'; seg.dataset.seg = g;
+    seg.innerHTML = `<button class="segnav__head" type="button">`
+      + `<span class="segnav__head-id">段 ${g}</span>`
+      + `<span class="segnav__head-name">${segShort[g]}</span>`
+      + `<span class="segnav__head-meta">${c} 张</span>`
+      + `<span class="segnav__head-arrow">▸</span></button>`
+      + `<div class="segnav__thumbs" data-seg-thumbs="${g}"></div>`;
+    segnav.appendChild(seg);
+  });
+
+  // —— 缩略图（克隆 slide）——
+  slides.forEach((s, i) => {
+    const container = document.querySelector(`[data-seg-thumbs="${segOf(s)}"]`);
+    if (!container) return;
+    const thumb = document.createElement('div'); thumb.className = 'thumb'; thumb.dataset.idx = i;
+    const inner = s.cloneNode(true); inner.classList.add('thumb__inner'); inner.classList.remove('active');
+    const ch = inner.querySelector('.chrome'); if (ch) ch.remove();
+    thumb.appendChild(inner);
+    const num = document.createElement('div'); num.className = 'thumb__num'; num.textContent = (i + 1);
+    thumb.appendChild(num);
+    thumb.addEventListener('click', e => { e.stopPropagation(); setActive(i); });
+    container.appendChild(thumb);
+  });
+
+  // —— 段导航折叠 ——
+  document.querySelectorAll('.segnav__head').forEach(btn =>
+    btn.addEventListener('click', () => btn.closest('.segnav__seg').classList.toggle('segnav__seg--expanded')));
+  const firstSeg = document.querySelector('.segnav__seg'); if (firstSeg) firstSeg.classList.add('segnav__seg--expanded');
+
+  // —— 副屏标题（自动取标题文本，可被 data-title 覆盖）——
+  function deriveTitle(s) {
+    if (s.dataset.title) return s.dataset.title;
+    const el = s.querySelector('.cover__title,.secdiv__title,.manifesto__title,.insight__statement,.bigq__t,.head__title,.title,h1,h2,h3');
+    return el ? el.textContent.replace(/\s+/g, ' ').trim().slice(0, 40) : ('slide ' + (slides.indexOf(s) + 1));
+  }
+  const SLIDE_TITLES = slides.map(deriveTitle);
+  // 副屏锚点：优先用全局 window.SLIDE_MAP（slides-presenter-mode 注入），否则自动 s{seg}-{段内序号}
+  const segRun = [];
+  const SLIDE_MAP = (window.SLIDE_MAP && window.SLIDE_MAP.length === total) ? window.SLIDE_MAP
+    : slides.map(s => { const g = segOf(s); segRun[g] = (segRun[g] || 0) + 1; return `s${g}-${segRun[g]}`; });
+
+  // —— 状态 + UI ——
+  const curSegEl = document.getElementById('curSeg'), curIdxEl = document.getElementById('curIdx'),
+        totalIdxEl = document.getElementById('totalIdx'), progressBar = document.getElementById('progressBar');
+  totalIdxEl.textContent = total;
+  let idx = 0, present = false;
+
+  // —— 演讲者模式广播（BroadcastChannel + localStorage 双通道）——
+  let channel = null; try { channel = new BroadcastChannel(CONFIG.channel); } catch (e) {}
+  let presenterWindow = null;
+  function broadcastPresenter(i) {
+    const p = { slideIdx: i, total, segment: segOf(slides[i]), anchor: SLIDE_MAP[i] || ('s0-1'),
+      title: SLIDE_TITLES[i] || '', prevTitle: i > 0 ? SLIDE_TITLES[i - 1] : '',
+      nextTitle: i < total - 1 ? SLIDE_TITLES[i + 1] : '', ts: Date.now(), source: 'slides' };
+    if (channel) { try { channel.postMessage(p); } catch (e) {} }
+    try { localStorage.setItem(CONFIG.channel + '-state', JSON.stringify(p)); } catch (e) {}
+  }
+  function handleReverseJump(p) {
+    if (!p || p.type !== 'jump-to-slide' || p.source !== 'presenter' || typeof p.slideIdx !== 'number') return;
+    const t = Math.max(0, Math.min(total - 1, p.slideIdx)); if (t !== idx) setActive(t);
+  }
+  if (channel) { channel.onmessage = e => { if (e && e.data && e.data.type === 'jump-to-slide') handleReverseJump(e.data); }; }
+  window.addEventListener('storage', e => { if (e.key === CONFIG.channel + '-jump' && e.newValue) { try { handleReverseJump(JSON.parse(e.newValue)); } catch (x) {} } });
+  function openPresenter() {
+    if (presenterWindow && !presenterWindow.closed) { presenterWindow.focus(); broadcastPresenter(idx); return; }
+    presenterWindow = window.open(CONFIG.presenterFile, 'presenter', 'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no');
+    if (!presenterWindow) { alert('副屏窗口被阻止 · 请允许弹窗后再试。\n（演讲者模式需先用 slides-presenter-mode skill 生成 ' + CONFIG.presenterFile + '）'); return; }
+    document.getElementById('presenterBtn').classList.add('active');
+    setTimeout(() => broadcastPresenter(idx), 400); setTimeout(() => broadcastPresenter(idx), 1200);
+    const t = setInterval(() => { if (!presenterWindow || presenterWindow.closed) { clearInterval(t); document.getElementById('presenterBtn').classList.remove('active'); presenterWindow = null; } }, 1000);
+  }
+
+  // —— 核心导航 ——
+  function setActive(n) {
+    idx = Math.max(0, Math.min(total - 1, n));
+    slides.forEach((s, i) => s.classList.toggle('active', i === idx));
+    if (present) {
+      const sc = Math.min(window.innerWidth / 1920, window.innerHeight / 1080) * 0.98;
+      slides[idx].style.setProperty('--sc', sc);
+    } else {
+      const wrap = slides[idx].parentNode; if (wrap) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    updateUI(); broadcastPresenter(idx);
+  }
+  function updateUI() {
+    const g = segOf(slides[idx]);
+    curSegEl.textContent = '段 ' + g; curIdxEl.textContent = idx + 1;
+    progressBar.style.width = ((idx + 1) / total * 100).toFixed(2) + '%';
+    document.querySelectorAll('.segnav__seg').forEach(segEl => {
+      const cur = +segEl.dataset.seg === g;
+      segEl.classList.toggle('segnav__seg--current', cur); if (cur) segEl.classList.add('segnav__seg--expanded');
+    });
+    document.querySelectorAll('.thumb').forEach(t => t.classList.toggle('thumb--active', +t.dataset.idx === idx));
+    const at = document.querySelector('.thumb--active');
+    if (at) { const nr = segnav.getBoundingClientRect(), tr = at.getBoundingClientRect();
+      if (tr.top < nr.top + 60 || tr.bottom > nr.bottom - 20) at.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
+  }
+  function next() { setActive(idx + 1); } function prev() { setActive(idx - 1); }
+  function goSeg(n) { setActive(segStarts[n] || 0); }
+
+  function togglePresent() {
+    present = !present; body.classList.toggle('present', present);
+    if (present) setActive(idx);
+    else { slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+      setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); }
+  }
+  function enterFullscreen() {
+    const el = document.documentElement, req = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+    if (req) req.call(el).then(() => { if (!present) togglePresent(); body.classList.add('fullscreen'); }).catch(() => { if (!present) togglePresent(); });
+    else if (!present) togglePresent();
+  }
+  function exitFullscreen() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      const ex = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen; if (ex) ex.call(document);
+    }
+    body.classList.remove('fullscreen'); if (present) togglePresent();
+  }
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement) { body.classList.remove('fullscreen');
+      if (present) { present = false; body.classList.remove('present');
+        slides.forEach(s => { s.classList.remove('active'); s.style.removeProperty('--sc'); });
+        setTimeout(() => { const w = slides[idx].parentNode; if (w) w.scrollIntoView({ behavior: 'instant', block: 'center' }); }, 50); } }
+  });
+
+  // —— 键盘 ——
+  // 正在打字就不能翻页。Studio 编辑模式把每个文本块都设成 contenteditable，
+  // 而下面的快捷键几乎占满了打字要用的键：空格 / 方向键 / Enter / f o p s / 1-9。
+  // 不挡住的话，敲空格跳下一页、敲 f 进投屏，字根本改不了。
+  function isTyping(e) {
+    const a = document.activeElement;
+    if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return true;
+    const t = e && e.target;
+    return !!(t && (t.isContentEditable || (t.matches && t.matches('input, textarea, select'))));
+  }
+  document.addEventListener('keydown', e => {
+    if (isTyping(e)) {
+      // Esc = 退出这个文本块；焦点一走，翻页快捷键立刻恢复（打字时唯一仍响应的键）
+      if (e.key === 'Escape') { try { document.activeElement.blur(); } catch (x) {} e.preventDefault(); }
+      return;
+    }
+    const k = e.key;
+    if (k === 'f' || k === 'F' || k === 'Enter') { (document.fullscreenElement || body.classList.contains('present')) ? exitFullscreen() : enterFullscreen(); e.preventDefault(); return; }
+    if (k === 'p' || k === 'P') { togglePresent(); e.preventDefault(); return; }
+    if (k === 's' || k === 'S') { if (!e.ctrlKey && !e.metaKey) { openPresenter(); e.preventDefault(); } return; }
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown') { next(); e.preventDefault(); return; }
+    if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp') { prev(); e.preventDefault(); return; }
+    if (k === 'Escape') { if (document.fullscreenElement || body.classList.contains('present')) { exitFullscreen(); e.preventDefault(); } return; }
+    if (k === 'Home') { setActive(0); e.preventDefault(); return; }
+    if (k === 'End') { setActive(total - 1); e.preventDefault(); return; }
+    if (k >= '1' && k <= '9') { const n = +k - 1; if (n < segCount.length) { goSeg(n); e.preventDefault(); } return; }
+  });
+  // —— 投屏态点击翻页 ——
+  document.addEventListener('click', e => {
+    if (!present) return; if (e.target.closest('a, button, input, select, .topbar, .segnav')) return;
+    (e.clientX > window.innerWidth * 0.6) ? next() : (e.clientX < window.innerWidth * 0.4 ? prev() : 0);
+  });
+  document.getElementById('prevBtn').addEventListener('click', prev);
+  document.getElementById('nextBtn').addEventListener('click', next);
+  document.getElementById('playBtn').addEventListener('click', enterFullscreen);
+  document.getElementById('presenterBtn').addEventListener('click', openPresenter);
+
+  // —— 编辑态自适应缩放 + 滚动跟随 ——
+  function updateFitScale() {
+    const availW = window.innerWidth - 300 - 60, availH = window.innerHeight - 100;
+    const scale = Math.max(0.25, Math.min(0.7, availW / 1920, availH / 1080));
+    document.documentElement.style.setProperty('--fit-scale', scale.toFixed(4));
+  }
+  updateFitScale();
+  window.addEventListener('resize', () => { updateFitScale(); if (present) setActive(idx); });
+  let st = null;
+  window.addEventListener('scroll', () => {
+    if (present) return; if (st) clearTimeout(st);
+    st = setTimeout(() => {
+      const vc = window.scrollY + window.innerHeight / 2; let best = 0, bd = Infinity;
+      slides.forEach((s, i) => { const w = s.parentNode; if (!w) return; const r = w.getBoundingClientRect();
+        const c = r.top + window.scrollY + r.height / 2, d = Math.abs(c - vc); if (d < bd) { bd = d; best = i; } });
+      if (best !== idx) { idx = best; updateUI(); }
+    }, 100);
+  });
+
+  updateUI();
+  // 暴露给 slides-presenter-mode / 控制台调试
+  window.deckAPI = { setActive, next, prev, goSeg, openPresenter, get idx() { return idx; }, total, SLIDE_MAP, SLIDE_TITLES };
+})();
+
+</script>
+</body>
+</html>
