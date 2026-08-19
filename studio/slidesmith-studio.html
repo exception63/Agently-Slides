@@ -5073,6 +5073,23 @@ var qrcode = function() {
   // \u4E00\u4F53\u7248\u90A3\u5957\u6D41\u7A0B\u3002\u9020\u51FA\u6765\u7684\u8BB2\u7A3F\u81EA\u5E26 fuquan-scroll / fuquan-cue \u76D1\u542C\uFF0C\u6240\u4EE5\u624B\u673A\u7AEF
   // \u4E00\u884C\u90FD\u4E0D\u7528\u6539\u2014\u2014\u5B83\u5206\u4E0D\u51FA\u8FD9\u4EFD\u8BB2\u7A3F\u662F\u4F5C\u8005\u5199\u7684\u8FD8\u662F\u8FD9\u91CC\u73B0\u62FC\u7684\u3002
   // \u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014\u2014
+  // presenter-mode \u5355\u6587\u4EF6\u7248\u628A\u8BB2\u7A3F\u653E\u5728 window.SM_NOTES\uFF08\u6BCF\u9875\u4E00\u6BB5 HTML\uFF09\uFF0C
+  // \u526F\u5C4F\u6A21\u677F\u653E\u5728 window.SM_PRESENTER_HTML\u3002\u8FD9\u91CC\u53EA\u8981\u524D\u8005\u3002
+  function collectSmNotes() {
+    var arr = window.SM_NOTES;
+    if (!arr || !arr.length) return null;
+    var list = deckSlides();
+    var api = window.deckAPI;
+    var map = (api && api.SLIDE_MAP) || null;
+    var titles = (api && api.SLIDE_TITLES) || list.map(titleOf);
+    var items = [], found = 0;
+    for (var i = 0; i < arr.length; i++) {
+      var html = typeof arr[i] === 'string' ? arr[i] : '';
+      if (html.replace(/<[^>]*>/g, '').trim()) found++;
+      items.push({ anchor: (map && map[i]) || ('sm-note-' + i), idx: i, title: titles[i] || '', html: html });
+    }
+    return found ? items : null;
+  }
   function collectNotes() {
     var list = deckSlides(); if (!list.length) return null;
     var api = window.deckAPI;
@@ -5109,6 +5126,11 @@ var qrcode = function() {
       + '.seg h2 .no{font:700 12px/1 "SF Mono",Menlo,monospace;background:#8a2b1a;color:#FAF6EE;'
       + 'padding:4px 7px;border-radius:4px;letter-spacing:.5px}'
       + '.body p{margin:0 0 14px}.body strong{color:#8a2b1a}.body em{color:#2b5f8a;font-style:normal}'
+      // presenter-mode \u7684\u4E24\u79CD\u8BB2\u5E08\u6807\u8BB0\uFF1A\u91D1\u53E5\uFF08\u8981\u5FF5\u51FA\u6765\u7684\uFF09\xB7 \u8BB2\u6CD5\uFF08\u600E\u4E48\u8BB2\u7684\u63D0\u793A\uFF09
+      + '.body h4{margin:0 0 10px;font-size:15px;color:#8a2b1a;letter-spacing:.04em}'
+      + '.body .golden{display:inline;background:#ffeec2;box-shadow:0 0 0 3px #ffeec2;border-radius:2px;font-weight:700}'
+      + '.body .cue{display:block;margin:12px 0 0;padding:9px 12px;border-left:3px solid #c2a15a;'
+      + 'background:#f3ecdd;color:#6b5a36;font-size:15.5px;line-height:1.7}'
       + '.body .empty{color:#9a948a}'
       + '.seg.cur{background:#fff5e0}'                       // \u5F53\u524D\u9875\u6574\u5757\u6D45\u8272\u9AD8\u4EAE
       + 'body.cue-on .seg.cur strong{background:#ffe08a;border-radius:3px;padding:0 3px}'  // \u2726 \u63D0\u8BCD
@@ -5127,9 +5149,15 @@ var qrcode = function() {
     catch (e) { return null; }
   }
   // \u8BB2\u7A3F\u6765\u6E90\uFF0C\u6309\u4F18\u5148\u7EA7\uFF1A\u4F5C\u8005\u7F1D\u8FDB\u6765\u7684\u4E00\u4F53\u7248 > \u4ECE slide \u5907\u6CE8\u73B0\u9020
+  // \u8BB2\u7A3F\u6765\u6E90\uFF0C\u6309\u4F18\u5148\u7EA7\u3002\u56DB\u79CD\u8F7D\u4F53\u90FD\u8BA4\uFF0C\u56E0\u4E3A\u5B83\u4EEC\u662F\u4E0D\u540C skill / \u4E0D\u540C\u5E74\u4EE3\u7684\u4EA7\u7269\uFF1A
+  //   \u2460 __TXB64__        \u4E00\u4F53\u7248\uFF08presenter-mode \u628A\u6574\u4EFD\u8BB2\u7A3F HTML base64 \u5D4C\u8FDB\u6765\uFF09
+  //   \u2461 SM_NOTES         presenter-mode \u5355\u6587\u4EF6\u7248\uFF08\u6BCF\u9875\u4E00\u6BB5 HTML \u7684\u6570\u7EC4\uFF09
+  //   \u2462 <aside class="notes">  html-ppt \u90A3\u79CD\u5199\u6CD5\uFF0C\u4E5F\u662F Studio \u91CC\u968F\u624B\u52A0\u5907\u6CE8\u7684\u5199\u6CD5
+  //   \u2463 \u90FD\u6CA1\u6709 \u2192 null\uFF0C\u624B\u673A\u7AEF\u663E\u793A\u300C\u8FD9\u4EFD slides \u6CA1\u6709\u5D4C\u8BB2\u7A3F\u300D
   function transcriptB64() {
     if (typeof window.__TXB64__ === 'string' && window.__TXB64__) return window.__TXB64__;
-    var items = collectNotes(); if (!items) return null;
+    var items = collectSmNotes() || collectNotes();
+    if (!items) return null;
     return b64(buildTranscript(items));
   }
   function startPresenterFeed() {

@@ -132,6 +132,23 @@
   // 一体版那套流程。造出来的讲稿自带 fuquan-scroll / fuquan-cue 监听，所以手机端
   // 一行都不用改——它分不出这份讲稿是作者写的还是这里现拼的。
   // ——————————————————————————————————————————————————————————————
+  // presenter-mode 单文件版把讲稿放在 window.SM_NOTES（每页一段 HTML），
+  // 副屏模板放在 window.SM_PRESENTER_HTML。这里只要前者。
+  function collectSmNotes() {
+    var arr = window.SM_NOTES;
+    if (!arr || !arr.length) return null;
+    var list = deckSlides();
+    var api = window.deckAPI;
+    var map = (api && api.SLIDE_MAP) || null;
+    var titles = (api && api.SLIDE_TITLES) || list.map(titleOf);
+    var items = [], found = 0;
+    for (var i = 0; i < arr.length; i++) {
+      var html = typeof arr[i] === 'string' ? arr[i] : '';
+      if (html.replace(/<[^>]*>/g, '').trim()) found++;
+      items.push({ anchor: (map && map[i]) || ('sm-note-' + i), idx: i, title: titles[i] || '', html: html });
+    }
+    return found ? items : null;
+  }
   function collectNotes() {
     var list = deckSlides(); if (!list.length) return null;
     var api = window.deckAPI;
@@ -168,6 +185,11 @@
       + '.seg h2 .no{font:700 12px/1 "SF Mono",Menlo,monospace;background:#8a2b1a;color:#FAF6EE;'
       + 'padding:4px 7px;border-radius:4px;letter-spacing:.5px}'
       + '.body p{margin:0 0 14px}.body strong{color:#8a2b1a}.body em{color:#2b5f8a;font-style:normal}'
+      // presenter-mode 的两种讲师标记：金句（要念出来的）· 讲法（怎么讲的提示）
+      + '.body h4{margin:0 0 10px;font-size:15px;color:#8a2b1a;letter-spacing:.04em}'
+      + '.body .golden{display:inline;background:#ffeec2;box-shadow:0 0 0 3px #ffeec2;border-radius:2px;font-weight:700}'
+      + '.body .cue{display:block;margin:12px 0 0;padding:9px 12px;border-left:3px solid #c2a15a;'
+      + 'background:#f3ecdd;color:#6b5a36;font-size:15.5px;line-height:1.7}'
       + '.body .empty{color:#9a948a}'
       + '.seg.cur{background:#fff5e0}'                       // 当前页整块浅色高亮
       + 'body.cue-on .seg.cur strong{background:#ffe08a;border-radius:3px;padding:0 3px}'  // ✦ 提词
@@ -186,9 +208,15 @@
     catch (e) { return null; }
   }
   // 讲稿来源，按优先级：作者缝进来的一体版 > 从 slide 备注现造
+  // 讲稿来源，按优先级。四种载体都认，因为它们是不同 skill / 不同年代的产物：
+  //   ① __TXB64__        一体版（presenter-mode 把整份讲稿 HTML base64 嵌进来）
+  //   ② SM_NOTES         presenter-mode 单文件版（每页一段 HTML 的数组）
+  //   ③ <aside class="notes">  html-ppt 那种写法，也是 Studio 里随手加备注的写法
+  //   ④ 都没有 → null，手机端显示「这份 slides 没有嵌讲稿」
   function transcriptB64() {
     if (typeof window.__TXB64__ === 'string' && window.__TXB64__) return window.__TXB64__;
-    var items = collectNotes(); if (!items) return null;
+    var items = collectSmNotes() || collectNotes();
+    if (!items) return null;
     return b64(buildTranscript(items));
   }
   function startPresenterFeed() {
