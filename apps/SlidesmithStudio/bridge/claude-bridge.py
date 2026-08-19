@@ -69,6 +69,7 @@ IDLE_MINUTES = float(os.environ.get("SLIDESMITH_BRIDGE_IDLE_MINUTES", "10"))
 HARD_TURN_LIMIT = float(os.environ.get("SLIDESMITH_BRIDGE_TURN_LIMIT_SECONDS", "1800"))
 MAX_SESSIONS = int(os.environ.get("SLIDESMITH_BRIDGE_MAX_SESSIONS", "4"))
 
+APP_NAME = "SlidesmithStudio"     # /health 里的身份，客户端与接管逻辑都靠它
 INSTANCE_ID = str(uuid.uuid4())[:8]
 
 VALID_EFFORTS = ("low", "medium", "high", "xhigh", "max")
@@ -469,7 +470,7 @@ class Handler(BaseHTTPRequestHandler):
                 # **身份必须报出来。** 客户端探端口时不能只看"有个健康的东西答了"——
                 # 桥被占会顺延，顺延到邻居的段里就会连上**别的项目**的桥，
                 # 那个 claude 的工作目录是另一个仓库，表现是"它答得头头是道但全错"。
-                "app": "SlidesmithStudio",
+                "app": APP_NAME,
                 "instance": INSTANCE_ID,
                 "claude": CLAUDE,
                 "cwd": PROJECT_ROOT,
@@ -651,6 +652,36 @@ class Handler(BaseHTTPRequestHandler):
         self._bridge_event("done", took=round(time.time() - began, 3))
 
 
+def _takeover_own_stray() -> None:
+    """默认端口上若蹲着**本 app 自己**的旧实例，请它退位；别人家的一律不碰。"""
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{PORT}/health", timeout=2) as resp:
+            who = json.loads(resp.read(64 * 1024) or b"{}").get("app")
+    except Exception:                                              # noqa: BLE001
+        return          # 没人在跑，或者占口的不说人话 → 照常绑定/顺延
+    if who != APP_NAME:
+        print(f"· {PORT} 被「{who or '不认识的服务'}」占着，不动它，本实例往后顺延", flush=True)
+        return
+    try:
+        request = urllib.request.Request(f"http://127.0.0.1:{PORT}/quit", method="POST")
+        with urllib.request.urlopen(request, timeout=2) as resp:
+            resp.read(256)
+    except Exception:                                              # noqa: BLE001
+        return
+    print(f"· {PORT} 上原来有个自己的桥接，已请它退位，本实例接管", flush=True)
+    # 等它把端口真的放开——`shutdown()` 是另起线程做的，不是立刻完成。
+    for _ in range(20):
+        time.sleep(0.25)
+        probe = socket.socket()
+        try:
+            probe.settimeout(0.2)
+            probe.connect(("127.0.0.1", PORT))
+        except OSError:
+            break               # 连不上了 = 它退干净了
+        finally:
+            probe.close()
+
+
 def main():
     if not os.path.exists(CLAUDE):
         print(f"✗ 找不到 claude 可执行文件：{CLAUDE}", file=sys.stderr)
@@ -660,27 +691,16 @@ def main():
               file=sys.stderr)
         sys.exit(1)
 
-    # 分裂脑防线：默认口上已经有实例时，**请它退位、自己接管**（不是自己退出让位）。
-    # 理由见 OmniSecretary 的同名段落：一个 HTTP 还应答、但内部已经坏掉的旧实例
+    # 分裂脑防线：默认口上已经有实例时，**先问它是谁，确认是自己人才请它退位**。
+    #
+    # 请它退位（而不是自己退出让位）的理由：一个 HTTP 还应答、但内部已经坏掉的旧实例
     # 会被永久钉在端口上，用户重启 app 都没用。改了脚本本来也就是要让新代码生效。
-    try:
-        request = urllib.request.Request(f"http://127.0.0.1:{PORT}/quit", method="POST")
-        with urllib.request.urlopen(request, timeout=2) as resp:
-            resp.read(256)
-        print(f"· {PORT} 上原来有个桥接，已请它退位，本实例接管", flush=True)
-        # 等它把端口真的放开——`shutdown()` 是另起线程做的，不是立刻完成。
-        for _ in range(20):
-            time.sleep(0.25)
-            probe = socket.socket()
-            try:
-                probe.settimeout(0.2)
-                probe.connect(("127.0.0.1", PORT))
-            except OSError:
-                break               # 连不上了 = 它退干净了
-            finally:
-                probe.close()
-    except Exception:                                              # noqa: BLE001
-        pass    # 没人在跑，或者占着这个口的不是我们的桥接 → 照常绑定/顺延
+    #
+    # **但必须先验身份。** 原来这里是无条件 POST /quit——万一那个口上蹲着的是
+    # 另一个 app 的 Claude 桥（各项目基号靠得近时顺延就会撞过去），我们一启动就把
+    # 隔壁那个关掉了，而两边都不报错：用户看到的是"我一开这个 app，那个 app 的
+    # AI 面板就断了"。不是自己人就一个字别碰，让下面的绑定循环顺延过去。
+    _takeover_own_stray()
 
     # **只听回环。** 和 OmniSecretary 不同，这里没有头显/手机要连——只有本机 app
     # 用它，而它背后是一个能在仓库目录里跑任意命令的 Claude。不开就是最好的鉴权。

@@ -32,6 +32,10 @@
   - **【我自己引入的缺陷·已修】Claude 桥端口 8932 落在 OmniSecretary 顺延段（8931–8942）里**，客户端扫 8932–8943 还可能连上**别的项目**的桥（那个 claude 的 cwd 是别的仓库＝"答得头头是道但全错"）。改为 **8991–9002**，并在 `/health` 加 `"app":"SlidesmithStudio"`、Swift `health()` 校验它，不是自己人就当没看见继续扫。规则：**各项目基号至少隔 20**（顺延 12 + 余量）。
   - **两个用户级 skill 已写**：`~/.claude/skills/connect-to-claude/`（app 接本机 Claude：桥模板 `reference/bridge-template.py`【已在空项目实跑验证】+ `ClaudeBridge.swift` + `ports.md` 端口登记表 + `ui-three-knobs.md`）与 `~/.claude/skills/connect-to-mac-claude/`（设备经 Mac 接入：`reference/discovery.md` Bonjour/双栈/Tailscale/12 条真机坑 + `device-tools.md` DeviceHub 反向驱动）。**以后要给新 app 接 Claude 直接调 skill，别再让 AI 去读现有项目。**
   - **多 app 并存实测**：8931 OmniSecretary / 8961 PaperStory / 8991 Slidesmith **同时在线互不干扰**。真正的成本不是端口而是内存——**一个常驻会话＝17 进程 / 2175 MB**（claude 本体只占 456 MB，其余全是用户级 MCP 的副本）；`--strict-mcp-config` 只带 1 个 MCP 时＝**3 进程 / 647 MB**。缓解：默认 onDemand（10 分钟自退）＋ 需要时给吃紧的那个配 MCP 白名单（模板里的 `APP_BRIDGE_MCP_CONFIG`，默认不开）。配额是唯一真正共享的东西。
+  - **【2026-08-19 二修·退出与端口】**用户问「退出 app 是不是全释放」「新 app 会不会避开占用的端口」，实测后发现并修了两处：
+    ① **桥必须归 app 所有**。原来是"探到活的就直接用"，于是 app 崩过一次后桥就变成 ppid=1 的孤儿，之后每次启动只是"又接上它"，退出时 `shutdown()` 又碰不到（只 terminate 自己 spawn 的 Process）。**真机实证：用户机器上 OmniSecretary 的桥是 8 月 14 日留下的孤儿，活了 5 天、`always` 档挂着 4 个闲置一小时的会话共 1.47 GB，当天的 app 实例只是接上去用，退出一个字节都不释放。** 修法＝`evictStrayBridges()`：启动时扫整个端口段，把**自家**的桥全请退位，再起一条自己的（代价一两秒）。已实测：造一个 ppid=1 孤儿 → 启动 app → 孤儿被收掉、新桥 ppid=app。
+    ② **`/quit` 接管前必须验身份**。原来无条件 POST /quit 到基号，撞上别的 app 的桥就会把它关掉（两边都不报错）。修法＝先 GET /health 看 `app` 字段，不是自己人就一个字不碰、往后顺延并打日志。已实测三态：空口直接用 / 同名接管 / 异名绕开（`· 8991 被「MyApp」占着，不动它，本实例往后顺延` → 绑 8992）。
+    **Slidesmith 自身退出实测：8765+8991 全释放、零孤儿 claude。** 三个 app 的桥（8931/8961/8991）全程互不干扰。两条修复都已回灌 `connect-to-claude` skill 的模板与文档。
 - **未做/待办**：面板里的 `/` 命令与 `@` 文件补全（OmniSecretary 有，这边没搬）；外部（curl）驱动的轮次不会显示在面板里（各自 session，正常）；改 `claude-bridge.py` 后要用菜单「重启桥接」。effort 选择器已功能验证（会话池记到 `effort=low`），**菜单展开的样子没有截图验证过**（需要真人点一下）。
 
 ## ✅ 当前状态（已完成，详见 history.md）

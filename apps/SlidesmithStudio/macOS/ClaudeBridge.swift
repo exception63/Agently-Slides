@@ -162,11 +162,24 @@ final class ClaudeBridge {
     }
 
     private func reallyStart() async {
-        if await discover() { return }          // 已经有一条在跑（上次没退干净）
         guard let root = RepoLocator.shared.root else {
             note = RepoLocator.shared.problem ?? "找不到仓库"
             return
         }
+        // **先把游荡在外的自家桥收掉，再起一条自己的。**
+        //
+        // 原来是"探到活的就直接用"。看着省事，代价是**这条桥永远不归 app 所有**：
+        // `shutdown()` 只 terminate 自己 spawn 的那个 Process，接来的那条它碰不到。
+        // 于是 app 一旦崩过 / 被强制退出，桥就变成 ppid=1 的孤儿活下去，之后每次
+        // 启动都只是"又接上了它"，退出时又收不掉——而它名下挂着常驻会话，
+        // **一个会话就 2 GB**。
+        //
+        // 真机实证（2026-08-19，用户机器上的另一个 app）：一条 8 月 14 日留下的
+        // 孤儿桥活了五天，挂着 4 个闲置了一小时的会话共 1.47 GB，当天的 app 实例
+        // 只是接上去用，退出它一个字节都不会释放。
+        //
+        // 接管的代价只有一两秒，换来的是**"退出 app＝全部释放"这句话真的成立**。
+        await evictStrayBridges()
         guard spawn(root: root) else { return }
         for _ in 0..<60 {
             if await discover() { return }
@@ -198,6 +211,23 @@ final class ClaudeBridge {
             note = "拉不起 Claude 桥：\(error.localizedDescription)"
             return false
         }
+    }
+
+    /// 把端口段里所有**自家**的桥请退位（别人家的一个字不碰）。
+    ///
+    /// 扫整段而不是只看基号：孤儿也可能是当初顺延上去的。
+    private func evictStrayBridges() async {
+        for port in Self.portRange {
+            let candidate = URL(string: "http://127.0.0.1:\(port)/")!
+            guard await health(at: candidate) != nil else { continue }   // health 里已校验 app 身份
+            var request = URLRequest(url: candidate.appendingPathComponent("quit"))
+            request.httpMethod = "POST"
+            request.timeoutInterval = 3
+            _ = try? await URLSession.shared.data(for: request)
+            note = "收掉了一条游荡在 \(port) 的旧桥接（上次没退干净），正在起新的"
+        }
+        // 等端口真的放开——桥那边的 shutdown() 是另起线程做的，不是立刻完成。
+        try? await Task.sleep(for: .milliseconds(700))
     }
 
     /// app 退出时调。桥是我们拉起来的，就得由我们收——**连它带常驻会话一起**。
