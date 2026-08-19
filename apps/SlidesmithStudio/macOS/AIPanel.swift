@@ -72,6 +72,18 @@ struct AIPanel: View {
                     }
                     .pickerStyle(.inline)
                 }
+                Section("推理力度（换档＝换进程，下一轮生效）") {
+                    Picker("力度", selection: Binding(get: { claude.effort },
+                                                     set: { claude.effort = $0 })) {
+                        // 「默认」＝不传 `--effort`，用 CLI 自己的默认值。
+                        // 这一项必须有：没有它，用户一旦选过就再也回不到"不指定"。
+                        Text("默认（跟 CLI）").tag(ClaudeBridge.Effort?.none)
+                        ForEach(ClaudeBridge.Effort.allCases) { level in
+                            Text(level.label).tag(ClaudeBridge.Effort?.some(level))
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
                 Section("放权档位（换档＝换进程，下一轮生效）") {
                     Picker("放权", selection: Binding(get: { claude.autonomy },
                                                      set: { claude.autonomy = $0 })) {

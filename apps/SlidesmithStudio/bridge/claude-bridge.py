@@ -20,7 +20,7 @@
 |---|---|---|
 | 监听 | `::` 双栈 + 口令 + Bonjour（头显/手机要连） | **只听回环**——只有本机 app 用它 |
 | 设备通道 | DeviceHub / vision_* / phone_* 工具 | 没有。Slidesmith 的"设备"是 WebView，走 node 那条桥 |
-| 端口 | 8931 | **8932**（8765 是 node deck 桥、8787 是遥控 relay、8931 是 OmniSecretary） |
+| 端口 | 8931 | **8991**（见 skill `connect-to-claude` 的 reference/ports.md） |
 | 事实注入 | 时间锚点 + 哪块屏幕 | 时间锚点 + **现在 Studio 里开着哪个 deck** |
 
 常驻/预热/会话池那些是原样搬过来的，包括几条真机上栽出来的坑（正忙时不算闲、
@@ -54,7 +54,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 # 脚本在 <repo>/apps/SlidesmithStudio/bridge/ 下，往上三级才是仓库根。
 BRIDGE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BRIDGE_DIR, "..", "..", ".."))
-PORT = int(os.environ.get("SLIDESMITH_BRIDGE_PORT", "8932"))
+PORT = int(os.environ.get("SLIDESMITH_BRIDGE_PORT", "8991"))
 PORT_FILE = os.path.join(BRIDGE_DIR, ".port")
 
 # node 那条桥（deck / Studio）的地址。只用来问"现在开着哪个 deck"，问不到就不贴。
@@ -83,6 +83,7 @@ def _clean_effort(raw) -> str | None:
 
 
 MODELS = [
+    {"id": "fable", "label": "Fable · 叙事、创意向"},
     {"id": "opus", "label": "Opus · 最强，复杂改版/写内容"},
     {"id": "sonnet", "label": "Sonnet · 均衡，日常够用"},
     {"id": "haiku", "label": "Haiku · 最快，批量小活"},
@@ -465,6 +466,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/health":
             self._json({
                 "ok": os.path.exists(CLAUDE),
+                # **身份必须报出来。** 客户端探端口时不能只看"有个健康的东西答了"——
+                # 桥被占会顺延，顺延到邻居的段里就会连上**别的项目**的桥，
+                # 那个 claude 的工作目录是另一个仓库，表现是"它答得头头是道但全错"。
+                "app": "SlidesmithStudio",
                 "instance": INSTANCE_ID,
                 "claude": CLAUDE,
                 "cwd": PROJECT_ROOT,

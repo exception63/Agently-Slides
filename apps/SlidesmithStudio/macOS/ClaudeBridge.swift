@@ -23,7 +23,13 @@ final class ClaudeBridge {
 
     static let logName = "SlidesmithStudio-claude-bridge"
     /// 桥自己会在被占时往后顺延，所以客户端也得扫这一段。
-    private static let portRange = 8932...8943
+    /// 基号见 skill `connect-to-claude` 的 reference/ports.md（各项目至少隔 20，
+    /// 否则顺延会撞进邻居的段里）。
+    private static let portRange = 8991...9002
+    /// 桥在 `/health` 里报的身份。**必须校验**——只认"有个健康的东西答了"的话，
+    /// 扫到邻居项目的桥也会当成自己的，而那个 claude 的工作目录是别的仓库：
+    /// 表现是"它答得头头是道但全错"，最难查的一类。
+    private static let appIdentity = "SlidesmithStudio"
 
     struct Model: Identifiable, Hashable {
         var id: String
@@ -51,6 +57,29 @@ final class ClaudeBridge {
         /// 粗略的"满没满"。Claude Code 到阈值会自动压缩，不会真的爆，
         /// 但你有权提前知道它快压了。
         var fill: Double { min(1, Double(contextTokens) / 180_000) }
+    }
+
+    /// 推理力度 = CLI 的 `--effort`。**和 model / permission-mode 是同一类东西：
+    /// 进程的启动参数，不是每轮参数**——CLI 没有"这一轮临时换力度"这回事，
+    /// 换了桥就得换进程（`SessionPool.get` 会据此判断）。
+    ///
+    /// `nil` = 不传这个 flag，用 CLI 自己的默认值。**默认就该是 nil**：
+    /// 写死一个档位等于替用户做了一个他没要求的选择，而且 CLI 以后改默认值时
+    /// 这里会悄悄跟不上。
+    enum Effort: String, CaseIterable, Identifiable, Sendable {
+        case low, medium, high, xhigh, max
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .low:    "低 · 最快"
+            case .medium: "中"
+            case .high:   "高"
+            case .xhigh:  "更高"
+            case .max:    "最高 · 最慢"
+            }
+        }
     }
 
     /// 放权档位 = CLI 的 `--permission-mode`，就是终端里 Shift+Tab 切的那个。
@@ -96,6 +125,10 @@ final class ClaudeBridge {
     private(set) var lastError: String?
 
     var model = "sonnet"
+    var effort: Effort? {
+        didSet { guard oldValue != effort else { return }
+                 notice("推理力度已切到「\(effort?.label ?? "默认")」——下一轮生效（换进程）。") }
+    }
     var autonomy: Autonomy = .full {
         // 权限档是**进程的启动参数**，改了下一轮桥会换进程。这里只要记住就行。
         didSet { guard oldValue != autonomy else { return }
@@ -226,6 +259,8 @@ final class ClaudeBridge {
               (response as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
+        // 别人家的桥（或者别的什么恰好也叫 /health 的服务）→ 当没看见，继续扫。
+        guard json["app"] as? String == Self.appIdentity else { return nil }
         return json
     }
 
@@ -306,6 +341,7 @@ final class ClaudeBridge {
             "permission_mode": autonomy.rawValue,
         ]
         if let sessionID { payload["session_id"] = sessionID }
+        if let effort { payload["effort"] = effort.rawValue }
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
 
         do {
@@ -355,8 +391,12 @@ final class ClaudeBridge {
         var request = URLRequest(url: endpoint.appendingPathComponent("warmup"))
         request.httpMethod = "POST"
         request.timeoutInterval = 120
+        // **预热的参数必须和真问那一轮完全一致。** 差一个 effort，`SessionPool.get`
+        // 就判定"换进程"，刚热好的那个当场被丢掉——白等，而且看不出来。
         var payload: [String: Any] = ["model": model, "permission_mode": autonomy.rawValue]
+        if let effort { payload["effort"] = effort.rawValue }
         if let sessionID { payload["session_id"] = sessionID }
+        if let effort { payload["effort"] = effort.rawValue }
         request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
         guard let (data, _) = try? await URLSession.shared.data(for: request),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -392,7 +432,7 @@ final class ClaudeBridge {
         var lines = ["**桥接诊断**"]
         lines.append("· 端点：\(endpoint?.absoluteString ?? "（没连上）")")
         lines.append("· 会话：\(sessionID ?? "（还没有）")")
-        lines.append("· 模型：\(model) · 放权：\(autonomy.label)")
+        lines.append("· 模型：\(model) · 力度：\(effort?.label ?? "默认") · 放权：\(autonomy.label)")
         if let endpoint, let json = await health(at: endpoint) {
             lines.append("· cwd：\(json["cwd"] as? String ?? "?")")
             lines.append("· claude：\(json["claude"] as? String ?? "?")")

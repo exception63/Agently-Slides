@@ -30,12 +30,15 @@ targets:
     platform: macOS
     sources:
       - path: macOS
+      - path: Resources/Assets.xcassets
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.zlyscu.slidesmithstudio
         PRODUCT_NAME: Slidesmith Studio
         INFOPLIST_FILE: Support/Info.plist
         CODE_SIGN_ENTITLEMENTS: Support/SlidesmithStudio.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # **仓库路径烘进 Info.plist**，app 靠它找 `packages/cli` 和 `bridge/`。
         # 用户可以在 app 里另选一个目录（存 UserDefaults，优先级更高）；这一条只是
         # 开发机上的默认值，换机器就靠那个选择器。见 RepoLocator。

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2E2BB48BD8FE01CE85EE41AE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = CDC8655B7FF6E6F9AF3C3BAB /* Assets.xcassets */; };
 		350C9F930ED11486968137BB /* ClaudeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C95AE27B2BB59498C5D21A3 /* ClaudeBridge.swift */; };
 		3A27E4340AA352B53F4DEB1B /* DeckBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6AA425D92B8777D960B2BBC4 /* DeckBridge.swift */; };
 		43C1B2CD88D39FA27DF886EE /* AIPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 377D6C59B2E6494BA7BFF12C /* AIPanel.swift */; };
@@ -22,6 +23,7 @@
 		377D6C59B2E6494BA7BFF12C /* AIPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIPanel.swift; sourceTree = "<group>"; };
 		6AA425D92B8777D960B2BBC4 /* DeckBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckBridge.swift; sourceTree = "<group>"; };
 		9ED2BC7BC91DE5690FDC259B /* SlidesmithStudioApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidesmithStudioApp.swift; sourceTree = "<group>"; };
+		CDC8655B7FF6E6F9AF3C3BAB /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		FFAF7834EAF1D2EE53EC6F00 /* SlidesmithStudio.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlidesmithStudio.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -39,6 +41,14 @@
 			path = macOS;
 			sourceTree = "<group>";
 		};
+		9A87D6C5098431F6FAF55CE3 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				CDC8655B7FF6E6F9AF3C3BAB /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		CC5862EC1632F85C3BBE3C26 /* Products */ = {
 			isa = PBXGroup;
 			children = (
@@ -51,6 +61,7 @@
 			isa = PBXGroup;
 			children = (
 				281ADECF7D7AB802D6C60C20 /* macOS */,
+				9A87D6C5098431F6FAF55CE3 /* Resources */,
 				CC5862EC1632F85C3BBE3C26 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,6 +74,7 @@
 			buildConfigurationList = 23B370789A1B8D6673C8DD4A /* Build configuration list for PBXNativeTarget "SlidesmithStudio" */;
 			buildPhases = (
 				C00A3492872B958DDE747AC8 /* Sources */,
+				85DC9A5F7630044763A7248F /* Resources */,
 			);
 			buildRules = (
 			);
@@ -107,6 +119,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		85DC9A5F7630044763A7248F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2E2BB48BD8FE01CE85EE41AE /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		C00A3492872B958DDE747AC8 /* Sources */ = {
