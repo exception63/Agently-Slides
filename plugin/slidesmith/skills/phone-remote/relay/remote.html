@@ -7,42 +7,100 @@
 <meta name="theme-color" content="#0a0a0c">
 <title>Slidesmith 遥控</title>
 <style>
-  :root { --bg:#0a0a0c; --panel:#16161c; --panel2:#1e1e26; --line:#2a2a34; --fg:#f4f4f6; --amber:#f5b73f; --green:#39d353; --red:#ff5a5a; }
+  :root { --bg:#0a0a0c; --panel:#16161c; --panel2:#1e1e26; --line:#2a2a34; --fg:#f4f4f6; --dim:#9a9aa6; --amber:#f5b73f; --green:#39d353; --red:#ff5a5a; }
   * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none; }
   html,body { margin:0; height:100%; background:var(--bg); color:var(--fg); font-family:-apple-system,system-ui,"PingFang SC",sans-serif; overflow:hidden; overscroll-behavior:none; }
   body { display:flex; flex-direction:column; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
-  header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; font-size:13px; }
-  #status { display:flex; align-items:center; gap:7px; font-weight:600; }
-  #dot { width:9px; height:9px; border-radius:50%; background:var(--amber); box-shadow:0 0 8px currentColor; color:var(--amber); }
+  header { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 14px; font-size:13px; }
+  #status { display:flex; align-items:center; gap:7px; font-weight:600; min-width:0; }
+  #statusText { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #dot { width:9px; height:9px; border-radius:50%; background:var(--amber); box-shadow:0 0 8px currentColor; color:var(--amber); flex:none; }
   #dot.ok { background:var(--green); color:var(--green); } #dot.bad { background:var(--red); color:var(--red); }
-  main { flex:1; display:flex; gap:10px; padding:6px 12px 12px; min-height:0; }
+  /* 模式切换：遥控 / 讲稿 —— 镜像投屏时用讲稿模式，这块屏就是你的演讲者视图 */
+  #modes { display:flex; gap:4px; background:var(--panel); border-radius:999px; padding:3px; flex:none; }
+  #modes button { border:none; background:none; color:var(--dim); font:600 13px/1 -apple-system,system-ui,"PingFang SC",sans-serif; padding:8px 15px; border-radius:999px; }
+  #modes button.on { background:var(--panel2); color:var(--amber); }
+  #warn { margin:0 12px 8px; padding:9px 12px; border-radius:12px; background:#3a2a12; color:var(--amber); font-size:12.5px; line-height:1.5; display:none; }
+  #warn.show { display:block; }
+  .pane { flex:1; display:none; flex-direction:column; min-height:0; }
+  .pane.on { display:flex; }
+
+  /* ——— 遥控模式 ——— */
+  #padPane main { flex:1; display:flex; gap:10px; padding:6px 12px 12px; min-height:0; }
   .page { flex:1; border:none; border-radius:22px; background:var(--panel); color:var(--fg); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; font-size:15px; letter-spacing:.06em; transition:transform .06s, background .15s; }
   .page:active { transform:scale(.97); background:var(--panel2); }
   .page .arrow { font-size:76px; line-height:1; font-weight:300; }
   .page.next { background:linear-gradient(160deg,#26262f,#191921); } .page.next:active { background:#2f2f3a; }
-  footer { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:0 12px calc(12px + env(safe-area-inset-bottom)); }
+  #padPane footer { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:0 12px calc(12px + env(safe-area-inset-bottom)); }
   .tool { border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--fg); padding:14px 4px; font-size:13px; display:flex; flex-direction:column; align-items:center; gap:5px; transition:transform .06s, background .15s; }
   .tool:active { transform:scale(.95); background:var(--panel2); } .tool .ic { font-size:22px; line-height:1; } .tool.on { border-color:var(--amber); color:var(--amber); }
-  #warn { margin:0 12px 8px; padding:9px 12px; border-radius:12px; background:#3a2a12; color:var(--amber); font-size:12.5px; line-height:1.5; display:none; }
-  #warn.show { display:block; }
+
+  /* ——— 讲稿模式（演讲者视图）——— */
+  #scriptBar { display:flex; align-items:stretch; gap:12px; margin:0 12px 8px; padding:10px 14px; background:var(--panel); border-radius:16px; }
+  #scriptBar .col { min-width:0; }
+  #scriptBar .col.grow { flex:1; }
+  .lbl { font-size:10.5px; letter-spacing:.12em; color:var(--dim); text-transform:uppercase; }
+  #curTitle { font-size:17px; font-weight:700; line-height:1.3; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #nextTitle { font-size:12.5px; color:var(--dim); margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #pageNo { font:700 22px/1 "SF Mono",Menlo,monospace; margin-top:3px; }
+  #timer { font:700 22px/1 "SF Mono",Menlo,monospace; color:var(--green); margin-top:3px; letter-spacing:1px; }
+  #timer.paused { color:var(--dim); }
+  .col.tap { border-left:1px solid var(--line); padding-left:12px; text-align:center; }
+  #scriptWrap { flex:1; margin:0 12px; border-radius:16px; overflow:hidden; background:#FAF6EE; min-height:0; position:relative; }
+  #scriptFrame { width:100%; height:100%; border:none; display:block; }
+  #scriptEmpty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; text-align:center; padding:28px; color:#6b6b73; font-size:14px; line-height:1.7; background:#FAF6EE; }
+  #scriptNav { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:10px 12px calc(12px + env(safe-area-inset-bottom)); }
+  #scriptNav button { border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--fg); padding:16px 4px; font-size:15px; font-weight:600; transition:transform .06s, background .15s; }
+  #scriptNav button:active { transform:scale(.96); background:var(--panel2); }
+  #scriptNav button.on { border-color:var(--amber); color:var(--amber); }
 </style>
 </head>
 <body>
   <header>
     <div id="status"><span id="dot"></span><span id="statusText">连接中…</span></div>
-    <div style="opacity:.5">Slidesmith 遥控</div>
+    <div id="modes">
+      <button id="mPad" class="on">遥控</button>
+      <button id="mScript">讲稿</button>
+    </div>
   </header>
   <div id="warn">已连上中转，但<b>放映端还没打开</b>。请在电脑上打开这份 slides 并点「手机遥控」。</div>
-  <main>
-    <button class="page prev" data-a="prev"><span class="arrow">‹</span><span>上一页</span></button>
-    <button class="page next" data-a="next"><span class="arrow">›</span><span>下一页</span></button>
-  </main>
-  <footer>
-    <button class="tool" data-a="first"><span class="ic">⤒</span><span>首页</span></button>
-    <button class="tool" data-a="last"><span class="ic">⤓</span><span>末页</span></button>
-    <button class="tool" id="blackBtn" data-a="black"><span class="ic">◼</span><span>黑屏</span></button>
-    <button class="tool" data-a="present"><span class="ic">▦</span><span>放映态</span></button>
-  </footer>
+
+  <!-- 遥控模式 -->
+  <div class="pane on" id="padPane">
+    <main>
+      <button class="page prev" data-a="prev"><span class="arrow">‹</span><span>上一页</span></button>
+      <button class="page next" data-a="next"><span class="arrow">›</span><span>下一页</span></button>
+    </main>
+    <footer>
+      <button class="tool" data-a="first"><span class="ic">⤒</span><span>首页</span></button>
+      <button class="tool" data-a="last"><span class="ic">⤓</span><span>末页</span></button>
+      <button class="tool" id="blackBtn" data-a="black"><span class="ic">◼</span><span>黑屏</span></button>
+      <button class="tool" data-a="present"><span class="ic">▦</span><span>放映态</span></button>
+    </footer>
+  </div>
+
+  <!-- 讲稿模式 = 这块屏就是演讲者视图（镜像投屏时的唯一落点）-->
+  <div class="pane" id="scriptPane">
+    <div id="scriptBar">
+      <div class="col grow">
+        <div class="lbl">当前</div>
+        <div id="curTitle">—</div>
+        <div id="nextTitle">› 下一张：—</div>
+      </div>
+      <div class="col tap"><div class="lbl">页</div><div id="pageNo">—</div></div>
+      <div class="col tap"><div class="lbl">计时</div><div id="timer">00:00</div></div>
+    </div>
+    <div id="scriptWrap">
+      <iframe id="scriptFrame" title="讲稿"></iframe>
+      <div id="scriptEmpty">等放映端把讲稿推过来…<br><span style="font-size:12.5px">若这份 slides 没有嵌讲稿，这里会一直空着——<br>讲稿模式需要「一体版」（讲稿已缝进同一个 HTML）。</span></div>
+    </div>
+    <div id="scriptNav">
+      <button data-a="prev">‹ 上一页</button>
+      <button id="cueBtn">✦ 提词</button>
+      <button data-a="next">下一页 ›</button>
+    </div>
+  </div>
+
 <script>
   var ROOM = __ROOM__;
   var dot = document.getElementById('dot'), stext = document.getElementById('statusText'), warn = document.getElementById('warn');
@@ -59,7 +117,7 @@
   function connLabel() { return deckPresent ? ('已连接放映端 · ' + (p2p ? '直连' : '云端')) : '等待放映端'; }
   function reflectPeers(peers) {
     deckPresent = peers && peers.deck > 0;
-    if (deckPresent) { setState('ok', connLabel()); warn.classList.remove('show'); }
+    if (deckPresent) { setState('ok', connLabel()); warn.classList.remove('show'); askInfo(); }
     else { setState('', '等待放映端'); warn.classList.add('show'); p2p = false; closePc(); }
   }
   function signal(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'signal', kind: obj.kind, data: obj.data })); }
@@ -85,25 +143,79 @@
     try { pc.addIceCandidate(cand); } catch (e) {}
   }
 
+  // ——————————————————————————————————————————————————————
+  // 讲稿模式：放映端把整份讲稿（base64）推过来一次，之后每翻一页只来一个状态对象。
+  // 讲稿本体就是 deck 里那份，用的也是同一套 postMessage 契约(fuquan-scroll/cue)，
+  // 所以这块屏跟电脑上弹出的副窗看到的是同一个东西——只是它长在另一台设备上，
+  // 于是镜像投屏也拆不散它。
+  // ——————————————————————————————————————————————————————
+  var frame = document.getElementById('scriptFrame'), emptyHint = document.getElementById('scriptEmpty');
+  var curTitle = document.getElementById('curTitle'), nextTitle = document.getElementById('nextTitle');
+  var pageNo = document.getElementById('pageNo'), timerEl = document.getElementById('timer');
+  var scriptLoaded = false, askedInfo = false, cueOn = false, lastAnchor = null, pendingState = null;
+
+  function askInfo() { if (askedInfo) return; askedInfo = true; sendRaw({ type: 'need-info' }); }
+  function toFrame(msg) { try { frame.contentWindow.postMessage(msg, '*'); } catch (e) {} }
+
+  function loadScript(txb64) {
+    if (scriptLoaded || !txb64) return;
+    var html;
+    try { html = new TextDecoder().decode(Uint8Array.from(atob(txb64), function (c) { return c.charCodeAt(0); })); }
+    catch (e) { return; }
+    frame.srcdoc = html;
+    scriptLoaded = true;
+    emptyHint.style.display = 'none';
+    // srcdoc 解析完才收得到 postMessage；补一次当前锚点
+    frame.addEventListener('load', function () {
+      if (cueOn) toFrame({ type: 'fuquan-cue', on: true });
+      if (lastAnchor) toFrame({ type: 'fuquan-scroll', anchor: lastAnchor });
+      else if (pendingState) applyState(pendingState);
+    });
+  }
+  function applyState(s) {
+    if (!s || typeof s.slideIdx !== 'number') return;
+    pendingState = s;
+    curTitle.textContent = s.title || '—';
+    nextTitle.textContent = '› 下一张：' + (s.nextTitle || '—');
+    pageNo.textContent = (s.slideIdx + 1) + (typeof s.total === 'number' ? ' / ' + s.total : '');
+    if (s.anchor) { lastAnchor = s.anchor; if (scriptLoaded) toFrame({ type: 'fuquan-scroll', anchor: s.anchor }); }
+  }
+
+  // 计时：第一次收到状态就开始跑（= 你真正开讲的时刻）
+  var t0 = null, timerTick = null;
+  function startTimer() {
+    if (timerTick) return;
+    t0 = Date.now();
+    timerTick = setInterval(function () {
+      var s = Math.floor((Date.now() - t0) / 1000);
+      var mm = Math.floor(s / 60), ss = s % 60;
+      timerEl.textContent = (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss;
+    }, 500);
+  }
+  timerEl.addEventListener('click', function () { t0 = Date.now(); });   // 点一下归零
+
   function connect() {
     setState('', '连接中…');
     ws = new WebSocket(wsUrl());
-    ws.onopen = function () { setState('', '等待放映端'); };
+    ws.onopen = function () { setState('', '等待放映端'); askedInfo = false; };
     ws.onmessage = function (e) { var m; try { m = JSON.parse(e.data); } catch (x) { return; }
       if (m.type === 'joined' || m.type === 'peer') reflectPeers(m.peers);
       else if (m.type === 'signal') { if (m.kind === 'offer') onOffer(m.data); else if (m.kind === 'ice') onIce(m.data); }
+      else if (m.type === 'deck-info') { loadScript(m.txb64); if (m.state) { applyState(m.state); startTimer(); } }
+      else if (m.type === 'state') { applyState(m.state); startTimer(); }
     };
-    ws.onclose = function () { setState('bad', '连接断开，重连中…'); setTimeout(connect, 1500); };
+    ws.onclose = function () { setState('bad', '连接断开，重连中…'); askedInfo = false; setTimeout(connect, 1500); };
     ws.onerror = function () { try { ws.close(); } catch (x) {} };
   }
   connect();
 
   function haptic() { try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
-  function cmd(action) {
-    var msg = JSON.stringify({ type: 'cmd', action: action });
+  function sendRaw(obj) {
+    var msg = JSON.stringify(obj);
     if (dc && dc.readyState === 'open') { try { dc.send(msg); return; } catch (e) {} }   // 直连优先
-    if (ws && ws.readyState === 1) ws.send(msg);                                            // 回落云中转
+    if (ws && ws.readyState === 1) ws.send(msg);                                          // 回落云中转
   }
+  function cmd(action) { sendRaw({ type: 'cmd', action: action }); }
 
   document.querySelectorAll('[data-a]').forEach(function (el) {
     el.addEventListener('click', function () {
@@ -112,6 +224,25 @@
       cmd(a);
     });
   });
+  document.getElementById('cueBtn').addEventListener('click', function () {
+    cueOn = !cueOn; haptic();
+    this.classList.toggle('on', cueOn);
+    toFrame({ type: 'fuquan-cue', on: cueOn });
+  });
+
+  // 模式切换
+  var mPad = document.getElementById('mPad'), mScript = document.getElementById('mScript');
+  var padPane = document.getElementById('padPane'), scriptPane = document.getElementById('scriptPane');
+  function setMode(script) {
+    mPad.classList.toggle('on', !script); mScript.classList.toggle('on', script);
+    padPane.classList.toggle('on', !script); scriptPane.classList.toggle('on', script);
+    try { localStorage.setItem('sm-remote-mode', script ? 'script' : 'pad'); } catch (e) {}
+    if (script) askInfo();
+  }
+  mPad.addEventListener('click', function () { setMode(false); });
+  mScript.addEventListener('click', function () { setMode(true); });
+  try { if (localStorage.getItem('sm-remote-mode') === 'script') setMode(true); } catch (e) {}
+
   document.addEventListener('touchmove', function (e) { if (e.scale !== 1) e.preventDefault(); }, { passive: false });
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); });
 </script>

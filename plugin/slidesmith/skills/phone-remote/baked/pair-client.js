@@ -23,6 +23,71 @@
     else if (action === 'present') fireKey('p');
     else if (action === 'black') toggleBlack();
   }
+  // ——————————————————————————————————————————————————————————————
+  // 演讲者讲稿推送（v0.2）—— 镜像投屏的解法
+  //
+  // 现场如果是**镜像**投屏，同一台机器上开第二个窗口毫无意义：镜像会把窗口
+  // 原样复制到投影上，观众跟你看到一模一样的东西。这是镜像的定义，PPT 也一样。
+  // 所以讲稿必须落到**另一个设备**（iPad / 手机）——本模块干的就是这件事。
+  //
+  // 关键是不重写演讲者模式：presenter-mode 的 deck 本来就在
+  // BroadcastChannel 上广播完整状态（slideIdx / total / anchor / title /
+  // prevTitle / nextTitle），讲稿也已经 base64 嵌在 window.__TXB64__ 里。
+  // 这里只把那份广播接到已有的中转管道上，中转一行都不用改（它是透明转发）。
+  var PFEED = {
+    chan: null,       // BroadcastChannel 实例
+    name: null,       // 频道名
+    last: null,       // 最近一次状态（新设备中途接入时补发）
+  };
+  // 频道名：优先用显式配置；否则从 localStorage 嗅探——broadcastPresenter 每次
+  // 都会写一条 `<channel>-state`，键名反推得到频道名，免配置。
+  function presenterChannelName() {
+    if (typeof window.__SM_PRESENTER_CHANNEL__ === 'string' && window.__SM_PRESENTER_CHANNEL__) return window.__SM_PRESENTER_CHANNEL__;
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || k.slice(-6) !== '-state') continue;
+        var v = JSON.parse(localStorage.getItem(k) || 'null');
+        if (v && typeof v.slideIdx === 'number') return k.slice(0, -6);
+      }
+    } catch (e) { /* 隐私模式下 localStorage 会抛，忽略 */ }
+    return null;
+  }
+  function startPresenterFeed() {
+    if (PFEED.chan || !window.BroadcastChannel) return;
+    PFEED.name = presenterChannelName();
+    if (!PFEED.name) return;                       // 这份 deck 没有演讲者广播 → 只当遥控用
+    try { PFEED.chan = new BroadcastChannel(PFEED.name); } catch (e) { return; }
+    // 同一页面里另建一个同名 channel 是能收到本页 postMessage 的（规范只排除发送者
+    // 自己那个对象），所以不用碰 deck 的代码就能旁听。
+    PFEED.chan.onmessage = function (e) {
+      var d = e && e.data;
+      if (!d || typeof d.slideIdx !== 'number') return;
+      if (d.type === 'jump-to-slide') return;       // 那是反向指令，不是状态
+      PFEED.last = d;
+      relaySend({ type: 'state', state: d });
+    };
+    // 让 deck 立刻补广播一次当前页：它监听 'presenter-ready'（副窗打开时用的同一条路）
+    try { window.postMessage({ type: 'presenter-ready' }, '*'); } catch (e) {}
+    try { if (!PFEED.last) { var raw = localStorage.getItem(PFEED.name + '-state'); if (raw) PFEED.last = JSON.parse(raw); } } catch (e) {}
+  }
+  // 讲稿全文 + 当前状态：第二设备一连上就推这一次（讲稿约 30-50 KB，之后每页只走几十字节状态）
+  function sendDeckInfo() {
+    startPresenterFeed();
+    relaySend({
+      type: 'deck-info',
+      txb64: (typeof window.__TXB64__ === 'string' ? window.__TXB64__ : null),
+      title: document.title || '',
+      state: PFEED.last || null
+    });
+  }
+  // 第二设备点「上一页/下一页」时也可以直接指定页码（讲稿模式下点目录跳转用）
+  function presenterJump(i) {
+    if (!PFEED.chan || typeof i !== 'number') return;
+    try { PFEED.chan.postMessage({ type: 'jump-to-slide', slideIdx: i, source: 'presenter' }); } catch (e) {}
+  }
+  function relaySend(o) { if (ws && ws.readyState === 1) { try { ws.send(JSON.stringify(o)); } catch (e) {} } }
+
   function randId() {
     var a = new Uint8Array(12); (window.crypto || crypto).getRandomValues(a);
     return Array.from(a).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
@@ -57,7 +122,14 @@
     pc = new RTCPeerConnection({ iceServers: ICE });
     pc.onicecandidate = function (e) { if (e.candidate) sig({ kind: 'ice', data: e.candidate }); };
     dc = pc.createDataChannel('ctrl');
-    dc.onmessage = function (e) { var m; try { m = JSON.parse(e.data); } catch (x) { return; } if (m.type === 'cmd' && m.action) handle(m.action); };
+    // 直连通道要认全部三种入站消息，不能只认 cmd —— 否则 iPad 升级到直连之后再要讲稿
+    // （need-info）就石沉大海，重连一次讲稿屏就空了。
+    dc.onmessage = function (e) {
+      var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if (m.type === 'cmd' && m.action) handle(m.action);
+      else if (m.type === 'need-info') sendDeckInfo();
+      else if (m.type === 'jump' && typeof m.slideIdx === 'number') presenterJump(m.slideIdx);
+    };
     dc.onopen = function () { setTransport(true); };
     dc.onclose = function () { setTransport(false); };
     pc.createOffer().then(function (off) { return pc.setLocalDescription(off).then(function () { sig({ kind: 'offer', data: off }); }); }).catch(function () {});
@@ -146,10 +218,13 @@
       else if (m.type === 'joined' && m.peers && m.peers.remote > 0) { markPaired(); startRtc(); }
       else if (m.type === 'signal') { if (m.kind === 'answer') onAnswer(m.data); else if (m.kind === 'ice') onIce(m.data); }
       else if (m.type === 'cmd' && m.action) handle(m.action);   // 云端回落路径
+      else if (m.type === 'need-info') sendDeckInfo();            // 第二设备要讲稿
+      else if (m.type === 'jump' && typeof m.slideIdx === 'number') presenterJump(m.slideIdx);
     };
     ws.onerror = function () { pairError(label === '云端' ? '连不上云中转，请确认电脑已联网。' : '连不上本机局域网服务。'); };
   }
   function markPaired() {
+    sendDeckInfo();                                  // 对端一上线就把讲稿 + 当前页推过去
     var msg = card.querySelector('#__sm_pairmsg');
     if (msg) { msg.textContent = '✅ 手机已连接，可以开始遥控（可关闭本窗）'; msg.style.color = '#1a9d4b'; }
   }
