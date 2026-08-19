@@ -244,7 +244,7 @@ const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySele
 
 // ---------------- rendering ----------------
 function previewHtml(): string {
-  return renderDeckHtml(deck).replace('</body>', `<script>${BRIDGE}</script></body>`);
+  return insertBeforeBodyEnd(renderDeckHtml(deck), `<script>${BRIDGE}</script>`);
 }
 function reloadPreview(): void {
   ($('#preview') as HTMLIFrameElement).srcdoc = previewHtml();
@@ -725,6 +725,26 @@ function nonBlockFonts(html: string): string {
     return tag.replace(/\s*\/?>\s*$/, ` media="print" onload="this.media='all'">`);
   });
 }
+// 在**文档真正的**结束标签前插入内容。
+//
+// 千万别用 String.replace('</body>', …)：那只换首次匹配。一体版 deck 会把整份副屏
+// HTML 当字符串存在 JS 里（`window.SM_PRESENTER_HTML = '<!doctype html>…</body></html>'`），
+// 那串里就有 </body>，首次匹配会命中**字符串内部**，把脚本拦腰截断。
+// 实测后果：dogfood deck 导出后整段脚本报 "Invalid or unexpected token"，
+// SM_NOTES / SM_PRESENTER_HTML 全变 undefined → 演讲者模式打开是空的。
+//
+// 结构决定判据：内嵌的 HTML 字符串一定在 body 里，所以
+//   · 文档真正的 </body> 是**最后**一个
+//   · 文档真正的 </head> 是 <body 之前的**最后**一个
+function insertBeforeBodyEnd(doc: string, s: string): string {
+  const i = doc.lastIndexOf('</body>');
+  return i < 0 ? doc + s : doc.slice(0, i) + s + doc.slice(i);
+}
+function insertBeforeHeadEnd(doc: string, s: string): string {
+  const bodyAt = doc.search(/<body\b/i);
+  const i = doc.lastIndexOf('</head>', bodyAt < 0 ? doc.length : bodyAt);
+  return i < 0 ? doc : doc.slice(0, i) + s + doc.slice(i);
+}
 // 编辑态按键闸门（只注入预览、不进导出件）。
 //
 // 为什么必须由 Studio 来挡：deck 自带的引擎把空格 / 方向键 / Enter / f o p s / 1-9
@@ -774,7 +794,7 @@ function assembleDeck(forEdit = false): string {
     const inject = PHONE_REMOTE_JS
       .replace('__SM_ROOMVAL__', smRoomId())
       .replace('__SM_DECKIDVAL__', 'sm-' + smRoomId().slice(0, 12));
-    doc = doc.replace('</body>', () => inject + '\n</body>');
+    doc = insertBeforeBodyEnd(doc, inject + '\n');
   }
   // 编辑预览：把外链 Google Fonts 改成「非阻塞」加载，否则没翻墙时浏览器会卡在 fonts.googleapis.com
   // 等渲染 →「加载特别慢 / 看不到 slides / 换肤黑屏」。文字先用系统字体即时显示，字体到了再升级。
@@ -1976,8 +1996,8 @@ async function embedFonts(html: string): Promise<string> {
   const out = html
     .replace(/<link[^>]+fonts\.(googleapis|gstatic)\.com[^>]*>\s*/g, '') // drop remote links/preconnects
     .replace(/@import\s+url\((['"]?)https:\/\/fonts\.googleapis\.com\/css2[^'")]+\1\)\s*;?/g, '') // and @imports
-    .replace('</head>', '<style id="sm-embedded-fonts">\n' + faces.join('\n') + '\n</style>\n</head>');
-  return out;
+    ;
+  return insertBeforeHeadEnd(out, '<style id="sm-embedded-fonts">\n' + faces.join('\n') + '\n</style>\n');
 }
 // the bytes we save/download: assembled deck, optionally with fonts inlined for offline use
 async function buildExportHtml(): Promise<string> {
@@ -2253,7 +2273,7 @@ function pdfPrintHtml(): string {
     + '.slide:last-child{page-break-after:auto;break-after:auto}'
     + '.slide [data-anim],.slide [data-anim] *,.slide [data-motion]{opacity:1!important;animation:none!important}}</style>';
   const full = mode === 'html' ? (harvestAll(), assembleDeck(false)) : renderDeckHtml(deck);
-  return full.replace('</head>', printCss + '</head>');
+  return insertBeforeHeadEnd(full, printCss);
 }
 // Fallback: the old browser-print path (for standalone file:// use, no bridge). The
 // user must pick 另存为 PDF + Margins:None — and even then Chrome leaves white margins

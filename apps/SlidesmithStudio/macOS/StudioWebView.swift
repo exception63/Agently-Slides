@@ -33,6 +33,16 @@ struct StudioWebView: NSViewRepresentable {
         // 持久化 store 就够，但显式写出来省得以后有人改成 nonPersistent 把草稿弄丢。
         config.websiteDataStore = .default()
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        // 弹窗（演讲者副屏、动画库、PDF 预览）必须放行。
+        // 默认 false 时 WKWebView 只在「有用户手势」的那一瞬放行 window.open，而
+        // Studio 的预览是 srcdoc iframe，deck 引擎又常在 setTimeout 里补开/补写
+        // 副屏——手势早过期了，表现就是「点了演讲者没反应，也不报错」。
+        config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        // file:// 在 WKWebView 里是**不透明源**：不开这两个，父页拿不到自己开出来的
+        // 子窗口的 document，`presenterWindow.document.write(模板)` 会被静默拒绝，
+        // 于是窗口开了也是白的。私有 key，但从 WebKit 早期沿用至今，Safari 自己也在用。
+        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        config.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.uiDelegate = context.coordinator
