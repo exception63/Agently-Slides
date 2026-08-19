@@ -248,6 +248,8 @@ body.cue-on .seg-cover strong{color:var(--ink,#1F1B16);background:transparent;}
   const NAV_KEYS  = new Set(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','PageUp','PageDown',' ']);
   const FUNC_KEYS = new Set(['l','j','s','d','k','o','h','r','=','+','-','_']);
   window.addEventListener('keydown', e => {
+    const _a = document.activeElement;
+    if (_a && (_a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(_a.tagName))) return;
     if (e.target.matches && e.target.matches('input, textarea, select')) return;
     const k = e.key;
     if (!NAV_KEYS.has(k) && !FUNC_KEYS.has(k.toLowerCase())) return;

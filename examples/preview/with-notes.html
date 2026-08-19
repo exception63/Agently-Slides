@@ -783,7 +783,21 @@ body.sm.anim .sm-deck > .slide [data-motion="shimmer"] { will-change: background
     if (act && act.scrollIntoView) act.scrollIntoView({ block: 'nearest' });
   }
 
+  // 正在打字（输入框 / contenteditable）时，这些键归光标和输入法，不归翻页。
+  // 否则在可编辑的 deck 里敲个空格就翻页、敲个 f 就进全屏。
+  function isTyping(e) {
+    var a = document.activeElement;
+    if (a && (a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) return true;
+    var t = e && e.target;
+    return !!(t && (t.isContentEditable || (t.matches && t.matches('input, textarea, select'))));
+  }
+
   function onKey(e) {
+    if (isTyping(e)) {
+      // Esc = 退出编辑，焦点一走快捷键立刻恢复
+      if (e.key === 'Escape') { try { document.activeElement.blur(); } catch (x) {} e.preventDefault(); }
+      return;
+    }
     var k = e.key;
     if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'PageDown' || k === 'Enter') {
       go(idx + 1); e.preventDefault();

@@ -1481,8 +1481,21 @@ strong{font-weight:700;color:var(--ink);}em{font-style:italic;color:var(--accent
   window.addEventListener('resize', () => { if (overviewEl && overviewEl.classList.contains('open')) fitOverview(); });
 
   // —— 键盘 ——
+  // 正在打字就不能翻页。Studio 编辑模式把每个文本块都设成 contenteditable，
+  // 而下面的快捷键几乎占满了打字要用的键：空格 / 方向键 / Enter / f o p s / 1-9。
+  // 不挡住的话，敲空格跳下一页、敲 f 进投屏，字根本改不了。
+  function isTyping(e) {
+    const a = document.activeElement;
+    if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))) return true;
+    const t = e && e.target;
+    return !!(t && (t.isContentEditable || (t.matches && t.matches('input, textarea, select'))));
+  }
   document.addEventListener('keydown', e => {
-    if (e.target.matches('input, textarea, select')) return;
+    if (isTyping(e)) {
+      // Esc = 退出这个文本块；焦点一走，翻页快捷键立刻恢复（打字时唯一仍响应的键）
+      if (e.key === 'Escape') { try { document.activeElement.blur(); } catch (x) {} e.preventDefault(); }
+      return;
+    }
     const k = e.key;
     if (k === 'o' || k === 'O') { toggleOverview(); e.preventDefault(); return; }
     if (k === 'Escape' && overviewEl && overviewEl.classList.contains('open')) { closeOverview(); e.preventDefault(); return; }

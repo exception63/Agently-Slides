@@ -725,6 +725,27 @@ function nonBlockFonts(html: string): string {
     return tag.replace(/\s*\/?>\s*$/, ` media="print" onload="this.media='all'">`);
   });
 }
+// 编辑态按键闸门（只注入预览、不进导出件）。
+//
+// 为什么必须由 Studio 来挡：deck 自带的引擎把空格 / 方向键 / Enter / f o p s / 1-9
+// 全占成了翻页与投屏快捷键，而编辑模式下每个文本块都是 contenteditable——用户一打字
+// 就翻页、敲个 f 就进全屏。引擎源码已经补了 isTyping 守卫，但**用户手上已经导出的
+// deck 还带着老引擎**，改不了那些文件；所以这里在预览里再兜一层。
+//
+// 手法：document 上的**捕获**监听。捕获永远早于同一节点上的冒泡监听（deck 引擎用的是
+// 冒泡），所以不管引擎何时注册都拦得住。只 stopImmediatePropagation、**不** preventDefault
+// ——按键照常输入字符、照常移动光标，只是引擎收不到。带 ⌘/Ctrl/Alt 的一律放行，
+// 否则会连 Studio 自己的 ⌘S / ⌘Z 一起掐掉。放在 <head> 最前，先于任何 deck 脚本执行。
+const EDIT_KEYGUARD_JS = '<script id="sm-edit-keyguard">(function(){'
+  + 'function typing(){var a=document.activeElement;'
+  + 'return !!(a&&(a.isContentEditable||a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT"));}'
+  + 'document.addEventListener("keydown",function(e){'
+  + 'if(e.metaKey||e.ctrlKey||e.altKey)return;'   // ⌘S/⌘Z 等留给 Studio
+  + 'if(!typing())return;'                        // 没在打字 → 翻页快捷键照常
+  + 'if(e.key==="Escape"){try{document.activeElement.blur();}catch(x){}e.preventDefault();e.stopImmediatePropagation();return;}'
+  + 'e.stopImmediatePropagation();'               // 不 preventDefault：字照打、光标照走
+  + '},true);'
+  + '})();</scr' + 'ipt>\n';
 function assembleDeck(forEdit = false): string {
   const editCss = forEdit
     ? '<style id="sm-edit-css">[contenteditable]{cursor:text}'
@@ -741,7 +762,8 @@ function assembleDeck(forEdit = false): string {
   // the editing surface so the FX driver skips exit-on-nav (keeps Studio nav instant).
   const editAttr = forEdit ? ' data-smfx-edit="1"' : '';
   const skin = skinInject();
-  let doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
+  const keyGuard = forEdit ? EDIT_KEYGUARD_JS : '';
+  let doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${keyGuard}${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
   // 手机遥控：先剥离任何旧注入（幂等，防 re-import 累积），再按需（仅导出、勾选时）烘进。
   // 注意：注入内容含 `$`（qr 库/客户端里有），必须用「函数替换」——字符串替换会把 $'/$&/$1 当特殊
   // 记号解释，导致注入的 JS 被腐蚀（曾致「二维码生成失败」）。
@@ -2838,7 +2860,7 @@ function buildUI(): void {
         <div class="hint" style="margin-top:6px">图片以内联方式写入 HTML，导出后离线可用。也可在预览中直接粘贴图片；若已选中元素，将插入其后。</div>
 
         <h3>选中元素</h3>
-        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑；选中后可调整字体、字号与颜色。</div>
+        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑；选中后可调整字体、字号与颜色。<br>打字时空格 / 方向键归输入，按 <b>Esc</b> 退出文本框即可继续用键盘翻页。</div>
         <div id="hSel" class="hselon" style="display:none">
           <div class="tag" id="hSelTag">—</div>
           <div class="field"><label>字体</label><select id="hFont"></select></div>
