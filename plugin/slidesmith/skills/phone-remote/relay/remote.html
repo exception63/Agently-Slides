@@ -131,6 +131,10 @@
       dc = e.channel;
       dc.onopen = function () { p2p = true; if (deckPresent) setState('ok', connLabel()); };
       dc.onclose = function () { p2p = false; if (deckPresent) setState('ok', connLabel()); };
+      // 直连是双向的：讲稿和翻页状态现在优先走这条道（不出局域网），
+      // 所以这边必须听。原来只有「手机 → deck」单向，忘了听就等于直连一建立
+      // 讲稿屏就再也不更新了。
+      dc.onmessage = function (ev) { var m; try { m = JSON.parse(ev.data); } catch (x) { return; } onDeckMsg(m); };
     };
     pc.setRemoteDescription(new RTCSessionDescription(sdp)).then(function () {
       pendingIce.forEach(function (c) { try { pc.addIceCandidate(c); } catch (e) {} }); pendingIce = [];
@@ -155,6 +159,12 @@
   var scriptLoaded = false, askedInfo = false, cueOn = false, lastAnchor = null, pendingState = null;
 
   function askInfo() { if (askedInfo) return; askedInfo = true; sendRaw({ type: 'need-info' }); }
+  // 放映端发来的东西：两条路（中转 ws / 直连 dc）进来的都走这里
+  function onDeckMsg(m) {
+    if (!m) return;
+    if (m.type === 'deck-info') { loadScript(m.txb64); if (m.state) { applyState(m.state); startTimer(); } }
+    else if (m.type === 'state') { applyState(m.state); startTimer(); }
+  }
   function toFrame(msg) { try { frame.contentWindow.postMessage(msg, '*'); } catch (e) {} }
 
   function loadScript(txb64) {
@@ -201,8 +211,7 @@
     ws.onmessage = function (e) { var m; try { m = JSON.parse(e.data); } catch (x) { return; }
       if (m.type === 'joined' || m.type === 'peer') reflectPeers(m.peers);
       else if (m.type === 'signal') { if (m.kind === 'offer') onOffer(m.data); else if (m.kind === 'ice') onIce(m.data); }
-      else if (m.type === 'deck-info') { loadScript(m.txb64); if (m.state) { applyState(m.state); startTimer(); } }
-      else if (m.type === 'state') { applyState(m.state); startTimer(); }
+      else onDeckMsg(m);
     };
     ws.onclose = function () { setState('bad', '连接断开，重连中…'); askedInfo = false; setTimeout(connect, 1500); };
     ws.onerror = function () { try { ws.close(); } catch (x) {} };
@@ -237,7 +246,15 @@
     mPad.classList.toggle('on', !script); mScript.classList.toggle('on', script);
     padPane.classList.toggle('on', !script); scriptPane.classList.toggle('on', script);
     try { localStorage.setItem('sm-remote-mode', script ? 'script' : 'pad'); } catch (e) {}
-    if (script) askInfo();
+    // 讲稿面板隐藏时 iframe 高度是 0，那期间收到的滚动指令等于打空枪。
+    // 所以每次切回讲稿都要按最后一次状态重新定位，否则你切过去看到的是上一次的位置。
+    if (script) {
+      askInfo();
+      setTimeout(function () {
+        if (lastAnchor) toFrame({ type: 'fuquan-scroll', anchor: lastAnchor });
+        if (cueOn) toFrame({ type: 'fuquan-cue', on: true });
+      }, 120);
+    }
   }
   mPad.addEventListener('click', function () { setMode(false); });
   mScript.addEventListener('click', function () { setMode(true); });

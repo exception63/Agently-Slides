@@ -86,7 +86,14 @@
     if (!PFEED.chan || typeof i !== 'number') return;
     try { PFEED.chan.postMessage({ type: 'jump-to-slide', slideIdx: i, source: 'presenter' }); } catch (e) {}
   }
-  function relaySend(o) { if (ws && ws.readyState === 1) { try { ws.send(JSON.stringify(o)); } catch (e) {} } }
+  // 出站一律「直连优先、中转兜底」。这条对讲稿尤其要紧：讲稿是你还没讲出口的话
+  // （未发表的研究、内部数据都可能在里面），能不过第三方就不过。手机和电脑同一
+  // Wi-Fi 时 P2P 会自动建起来，那时整份讲稿根本不出局域网；连不上才回落中转。
+  function relaySend(o) {
+    var msg = JSON.stringify(o);
+    if (dc && dc.readyState === 'open') { try { dc.send(msg); return; } catch (e) {} }
+    if (ws && ws.readyState === 1) { try { ws.send(msg); } catch (e) {} }
+  }
 
   function randId() {
     var a = new Uint8Array(12); (window.crypto || crypto).getRandomValues(a);
@@ -130,7 +137,7 @@
       else if (m.type === 'need-info') sendDeckInfo();
       else if (m.type === 'jump' && typeof m.slideIdx === 'number') presenterJump(m.slideIdx);
     };
-    dc.onopen = function () { setTransport(true); };
+    dc.onopen = function () { setTransport(true); sendDeckInfo(); };
     dc.onclose = function () { setTransport(false); };
     pc.createOffer().then(function (off) { return pc.setLocalDescription(off).then(function () { sig({ kind: 'offer', data: off }); }); }).catch(function () {});
   }
@@ -171,14 +178,35 @@
   }
 
   // —— 局域网：先问本机中转要 LAN IP ——
+  // 端口要挨个试：8787 常被别的开发服务占着（实测撞过一次），撞了就该往下找，
+  // 而不是甩用户一句「服务未开启」——服务明明开着，只是不在默认端口。
+  // 还要验响应形状：占着端口的那个服务也会应答 /whoami，只是答的不是我们要的东西。
+  function lanCandidates() {
+    var out = [];
+    if (window.__SM_LOCAL_RELAY__) out.push(String(window.__SM_LOCAL_RELAY__).replace(/\/$/, ''));
+    ['8787', '8788', '8799'].forEach(function (p) {
+      var u = 'http://localhost:' + p;
+      if (out.indexOf(u) < 0) out.push(u);
+    });
+    return out;
+  }
+  function probeLan(list, i, ok, fail) {
+    if (i >= list.length) { fail(); return; }
+    var base = list[i];
+    fetch(base + '/whoami', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (info) {
+        if (!info || !info.ips || !info.ips.length) throw new Error('not our relay');
+        ok(base, info);
+      })
+      .catch(function () { probeLan(list, i + 1, ok, fail); });
+  }
   function startLan() {
     card.innerHTML = '<div style="font-size:16px;font-weight:600;margin:20px 0">正在找本机局域网服务…</div>';
-    fetch(LOCAL + '/whoami', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (info) {
-      var ip = (info.ips && info.ips[0]) || null;
-      if (!ip) throw new Error('no ip');
-      var phoneBase = 'http://' + ip + ':' + (info.port || 8787);
-      startPairing(LOCAL, phoneBase, '局域网');
-    }).catch(function () {
+    probeLan(lanCandidates(), 0, function (base, info) {
+      var phoneBase = 'http://' + info.ips[0] + ':' + (info.port || 8787);
+      startPairing(base, phoneBase, '局域网');
+    }, function () {
       card.innerHTML =
         '<div style="font-size:17px;font-weight:700;margin-bottom:8px;color:#c0392b">本机局域网服务未开启</div>' +
         '<div style="font-size:13px;color:#555;line-height:1.7;text-align:left">局域网/离线模式需要先在<b>这台电脑</b>上启动 Slidesmith 的局域网中转：<br>' +
@@ -218,6 +246,10 @@
       else if (m.type === 'joined' && m.peers && m.peers.remote > 0) { markPaired(); startRtc(); }
       else if (m.type === 'signal') { if (m.kind === 'answer') onAnswer(m.data); else if (m.kind === 'ice') onIce(m.data); }
       else if (m.type === 'cmd' && m.action) handle(m.action);   // 云端回落路径
+      else if (m.type === 'evicted') {                            // 被同一份 slides 的另一个窗口顶掉了
+        closePc();
+        pairError('这份 slides 的另一个窗口/副本接管了遥控。要在本窗口讲，重新点一次「手机遥控」。');
+      }
       else if (m.type === 'need-info') sendDeckInfo();            // 第二设备要讲稿
       else if (m.type === 'jump' && typeof m.slideIdx === 'number') presenterJump(m.slideIdx);
     };

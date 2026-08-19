@@ -46,6 +46,16 @@ export class Room {
   async fetch(req) {
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('expected websocket', { status: 426 });
     const role = new URL(req.url).searchParams.get('role');
+    // 一个房间只留一个放映端，新的顶掉旧的。房间号是烘进 deck 文件的（保证二维码
+    // 永不变），代价是任何拷贝/备份都带同一个房间号；两份同开时，遥控端一次点击会
+    // 被转发给两份，讲稿屏还会被陈旧那份反复覆盖页码。判据取「新的赢」——你刚打开
+    // 的才是要讲的那份。
+    if (role === 'deck') {
+      for (const old of this.state.getWebSockets('deck')) {
+        try { old.send(JSON.stringify({ type: 'evicted', reason: 'another-deck' })); } catch (e) { /* noop */ }
+        try { old.close(1000, 'superseded'); } catch (e) { /* noop */ }
+      }
+    }
     const pair = new WebSocketPair();
     const client = pair[0], server = pair[1];
     this.state.acceptWebSocket(server, [role]);           // 带 tag=role，休眠也保留

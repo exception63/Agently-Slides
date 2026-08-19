@@ -94,6 +94,19 @@ http.on('upgrade', (req, socket, head) => {
 
 wss.on('connection', (ws, id, role) => {
   const r = room(id);
+  // 一个房间只留一个放映端，新的顶掉旧的。
+  //
+  // 房间号是**烘进 deck 文件**的（这样二维码永久不变、可截图复用），代价是：任何
+  // 一份拷贝/备份都带着同一个房间号。两份同时开着，遥控端一次点击会被中转转发给
+  // 两份，讲稿屏也会被那份陈旧的 deck 反复覆盖页码——实测过，deck=2。
+  // 判据取「新的赢」：你刚打开的那份才是要讲的那份，旧标签页多半是忘了关。
+  if (role === 'deck' && r.deck.size) {
+    for (const old of r.deck) {
+      send(old, { type: 'evicted', reason: 'another-deck' });
+      try { old.close(); } catch { /* noop */ }
+      r.deck.delete(old);
+    }
+  }
   r[role].add(ws);
   // 告诉本端当前对端数量；告诉对端「有人来了」
   send(ws, { type: 'joined', role, peers: counts(r) });
