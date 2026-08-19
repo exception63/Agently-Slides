@@ -36,6 +36,10 @@
     ① **桥必须归 app 所有**。原来是"探到活的就直接用"，于是 app 崩过一次后桥就变成 ppid=1 的孤儿，之后每次启动只是"又接上它"，退出时 `shutdown()` 又碰不到（只 terminate 自己 spawn 的 Process）。**真机实证：用户机器上 OmniSecretary 的桥是 8 月 14 日留下的孤儿，活了 5 天、`always` 档挂着 4 个闲置一小时的会话共 1.47 GB，当天的 app 实例只是接上去用，退出一个字节都不释放。** 修法＝`evictStrayBridges()`：启动时扫整个端口段，把**自家**的桥全请退位，再起一条自己的（代价一两秒）。已实测：造一个 ppid=1 孤儿 → 启动 app → 孤儿被收掉、新桥 ppid=app。
     ② **`/quit` 接管前必须验身份**。原来无条件 POST /quit 到基号，撞上别的 app 的桥就会把它关掉（两边都不报错）。修法＝先 GET /health 看 `app` 字段，不是自己人就一个字不碰、往后顺延并打日志。已实测三态：空口直接用 / 同名接管 / 异名绕开（`· 8991 被「MyApp」占着，不动它，本实例往后顺延` → 绑 8992）。
     **Slidesmith 自身退出实测：8765+8991 全释放、零孤儿 claude。** 三个 app 的桥（8931/8961/8991）全程互不干扰。两条修复都已回灌 `connect-to-claude` skill 的模板与文档。
+  - **【2026-08-19 三修·常驻档位 + 生命周期契约】**面板菜单从三段升到**四段**：模型 / 推理力度 / **常驻档位** / 放权档位。常驻档位是**桥自己的策略**（`POST /config`，立刻生效），不同于前三个（进程启动参数，下一轮生效）：`off` 每轮重开 / `onDemand` 默认（闲 10 分钟自退）/ `always` 一直常驻。**两条容易漏的**：① 档位要 `@AppStorage` 持久化，且**每次桥起来后 `applyStoredResident()` 重推一遍**——桥每次都从自己的默认值起，不推的话用户会发现「设了 always，重开又变回按需」（已实测：切 always → 退出 → 重开 → 档位仍是 always）；② 顶栏加了「常驻 N」小胶囊，**看得见的常驻不是负担，看不见的才是**。
+  - **生命周期契约（用户点名要的）已成立并实测**：开 app → 收自家孤儿桥 → 起桥 → 重推档位；退 app → 端口全空、零孤儿 claude。`connect-to-claude` skill 里加了「生命周期契约」一节（四条 + 一条验收命令），`ui-three-knobs.md` 改名 `ui-knobs.md` 并升级成四个旋钮。
+  - **给 OmniSecretary 的交接已写**：`~/同步空间/Claude Projects/OmniSecretary/docs/HANDOFF-2026-08-19-桥接生命周期审计.md`（含现场证据：它的桥是 8/14 的孤儿、always 档挂 1.47 GB；`/quit` 无身份校验的误杀风险；PaperStory 6 个孤儿 dns-sd 广播）。
+  - **答用户问：Studio 的「AI 修改」面板没消失** —— 它和「设计」同属 `#htmlpanel`，`display:none` 默认隐藏，**只在导入 HTML deck 之后才出现**（没 deck 时右栏是 deck 模式的 格式/动画效果/文稿）。它走的是 **deck 桥（8765）的 WebSocket `{type:'requests'}`**，然后由 app 长轮询 `/api/wait` 接住 → 转给原生面板 → **Claude 桥（8991）** → 同一个常驻会话。**两个入口、一个 Claude。**
 - **未做/待办**：面板里的 `/` 命令与 `@` 文件补全（OmniSecretary 有，这边没搬）；外部（curl）驱动的轮次不会显示在面板里（各自 session，正常）；改 `claude-bridge.py` 后要用菜单「重启桥接」。effort 选择器已功能验证（会话池记到 `effort=low`），**菜单展开的样子没有截图验证过**（需要真人点一下）。
 
 ## ✅ 当前状态（已完成，详见 history.md）

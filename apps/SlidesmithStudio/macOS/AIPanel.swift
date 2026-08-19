@@ -50,6 +50,18 @@ struct AIPanel: View {
             Text(claude.connected ? "Claude" : "未连接")
                 .font(.system(size: 12, weight: .medium))
 
+            if claude.liveSessions > 0 {
+                // **常驻要看得见。** 桥是 app 悄悄拉起来的，它的 stdout 没人看；
+                // 界面上一个字都不说的话，"现在有没有东西在后台占着内存"这件事
+                // 只能靠猜。
+                Text("常驻 \(claude.liveSessions)")
+                    .font(.system(size: 10.5))
+                    .padding(.horizontal, 5).padding(.vertical, 1)
+                    .background(.quinary, in: Capsule())
+                    .help("\(claude.liveSessions) 个常驻会话活着（档位：\(claude.resident.label)）。"
+                          + "每个连它那套 MCP 副本约 2 GB，退出 app 全部释放。")
+            }
+
             if claude.usage.contextTokens > 0 {
                 Text("上下文 \(claude.usage.contextTokens / 1000)k")
                     .font(.system(size: 11))
@@ -84,6 +96,15 @@ struct AIPanel: View {
                     }
                     .pickerStyle(.inline)
                 }
+                Section("常驻档位（桥的策略，立刻生效）") {
+                    Picker("常驻", selection: Binding(get: { claude.resident },
+                                                     set: { mode in Task { await claude.setResident(mode) } })) {
+                        ForEach(ClaudeBridge.Resident.allCases) { mode in
+                            Text(mode.label).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                }
                 Section("放权档位（换档＝换进程，下一轮生效）") {
                     Picker("放权", selection: Binding(get: { claude.autonomy },
                                                      set: { claude.autonomy = $0 })) {
@@ -102,7 +123,7 @@ struct AIPanel: View {
             }
             .menuStyle(.borderlessButton)
             .fixedSize()
-            .help("模型 · 放权档位 · 新对话")
+            .help("模型 · 推理力度 · 常驻档位 · 放权档位")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)

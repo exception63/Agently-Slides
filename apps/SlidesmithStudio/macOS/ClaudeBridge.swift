@@ -22,6 +22,7 @@ import Observation
 final class ClaudeBridge {
 
     static let logName = "SlidesmithStudio-claude-bridge"
+    private static let residentKey = "smClaudeResident"
     /// 桥自己会在被占时往后顺延，所以客户端也得扫这一段。
     /// 基号见 skill `connect-to-claude` 的 reference/ports.md（各项目至少隔 20，
     /// 否则顺延会撞进邻居的段里）。
@@ -57,6 +58,42 @@ final class ClaudeBridge {
         /// 粗略的"满没满"。Claude Code 到阈值会自动压缩，不会真的爆，
         /// 但你有权提前知道它快压了。
         var fill: Double { min(1, Double(contextTokens) / 180_000) }
+    }
+
+    /// 常驻档位 = 桥的 `mode`。**和另外三个旋钮不是一类东西**：模型/力度/放权是
+    /// `claude` 进程的启动参数，这个是**桥自己**的策略——它决定那个进程答完之后
+    /// 还留不留着。
+    ///
+    /// | 档 | 行为 | 常驻开销 |
+    /// |---|---|---|
+    /// | `off` | 每轮一个进程，答完就死 | 零 |
+    /// | `onDemand`（默认） | 第一次问才起，空闲 N 分钟自己退 | 只在你用的时候付 |
+    /// | `always` | 起来就不退（除非崩） | 一直付 |
+    ///
+    /// **默认必须是 onDemand。** 理由很具体：`always` 的服务在你忘了它之后还活着，
+    /// `onDemand` 的服务在你不用之后自己消失。**看不见的常驻才是负担。**
+    /// 而且**闲置回收是 onDemand 独有的**——切到 always 就等于自己认下这笔账
+    /// （一个会话连它那套 MCP 副本，实测约 2 GB）。
+    enum Resident: String, CaseIterable, Identifiable, Sendable {
+        case off, onDemand, always
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .off:      "不常驻 · 每次重开"
+            case .onDemand: "按需常驻（默认）"
+            case .always:   "一直常驻 · 最快"
+            }
+        }
+
+        var detail: String {
+            switch self {
+            case .off:      "答完就退，零后台开销。代价是每一句都要等十几秒冷启动。"
+            case .onDemand: "第一次问才起，闲够就自己退。用的时候才付钱。"
+            case .always:   "起来就不退，问什么都是秒回。**闲着也占着约 2 GB**，退出 app 才释放。"
+            }
+        }
     }
 
     /// 推理力度 = CLI 的 `--effort`。**和 model / permission-mode 是同一类东西：
@@ -121,6 +158,11 @@ final class ClaudeBridge {
     private(set) var usage = Usage()
     private(set) var models: [Model] = [Model(id: "sonnet", label: "Sonnet")]
     private(set) var sessions: [[String: Any]] = []
+    /// 池子里还活着几个常驻会话。**必须显示出来**——看得见的常驻不是负担，
+    /// 看不见的才是。桥是 app 悄悄拉起来的，它的 stdout 没人看。
+    var liveSessions: Int { sessions.filter { $0["alive"] as? Bool == true }.count }
+    private(set) var resident: Resident = .onDemand
+    private(set) var idleMinutes: Double = 10
     private(set) var note: String?
     private(set) var lastError: String?
 
@@ -182,7 +224,7 @@ final class ClaudeBridge {
         await evictStrayBridges()
         guard spawn(root: root) else { return }
         for _ in 0..<60 {
-            if await discover() { return }
+            if await discover() { await applyStoredResident(); return }
             try? await Task.sleep(for: .milliseconds(250))
         }
         note = "Claude 桥 15 秒还没起来。日志：\(RepoLocator.logURL(Self.logName).path)"
@@ -302,9 +344,43 @@ final class ClaudeBridge {
             }
         }
         sessions = (json["sessions"] as? [[String: Any]]) ?? []
+        if let mode = json["mode"] as? String, let parsed = Resident(rawValue: mode) { resident = parsed }
+        if let idle = json["idle_minutes"] as? Double { idleMinutes = idle }
         if json["ok"] as? Bool == false {
             note = "桥接找不到 claude 可执行文件（\(json["claude"] as? String ?? "?")）"
         }
+    }
+
+    /// 改常驻档位。`off` 会顺手把已经起来的都关掉（桥那边做的）。
+    func setResident(_ mode: Resident) async {
+        guard let endpoint else { return }
+        UserDefaults.standard.set(mode.rawValue, forKey: Self.residentKey)
+        var request = URLRequest(url: endpoint.appendingPathComponent("config"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["mode": mode.rawValue])
+        request.timeoutInterval = 5
+        _ = try? await URLSession.shared.data(for: request)
+        await refreshStatus()
+        notice("常驻档位已切到「\(mode.label)」。" + mode.detail)
+    }
+
+    /// **每次桥起来之后都要把用户选的档位推一遍。**
+    ///
+    /// 桥每次启动都用它自己的默认值（onDemand）——app 退出会把桥连同常驻会话
+    /// 一起收掉，所以"上次选的 always"这件事只活在 app 这边。不推的话，
+    /// 用户会发现「我明明设了一直常驻，重开 app 又变回按需了」。
+    private func applyStoredResident() async {
+        guard let saved = UserDefaults.standard.string(forKey: Self.residentKey),
+              let mode = Resident(rawValue: saved), mode != .onDemand else { return }
+        guard let endpoint else { return }
+        var request = URLRequest(url: endpoint.appendingPathComponent("config"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["mode": mode.rawValue])
+        request.timeoutInterval = 5
+        _ = try? await URLSession.shared.data(for: request)
+        await refreshStatus()
     }
 
     // MARK: - 提问
