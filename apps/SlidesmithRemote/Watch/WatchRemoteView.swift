@@ -12,6 +12,7 @@ struct WatchRemoteView: View {
     var body: some View {
         VStack(spacing: 6) {
             statusBar
+            nextLine
 
             if link.pairing == nil {
                 unpairedHint
@@ -37,6 +38,12 @@ struct WatchRemoteView: View {
         link.transport == .phone ? link.phoneDeckPresent : relay.deckPresent
     }
 
+    /// 页码从哪来：经手机那条路由手机回报，直连那条路直接看自己的连接。
+    /// 和 `deckOnline` 用同一个判据，免得出现「灯是绿的、页码是另一条路的」这种错位。
+    private var deckState: DeckState? {
+        link.transport == .phone ? link.phoneDeckState : relay.deckState
+    }
+
     private var statusBar: some View {
         HStack(spacing: 5) {
             Circle()
@@ -47,8 +54,32 @@ struct WatchRemoteView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
             Spacer(minLength: 0)
+            // 页码挤在状态条右端而不是单起一行 —— 表盘高度就那么点，
+            // 多一行「3 / 44」会把「下一页」的大靶区压小，那是盲按的命根子。
+            if let st = deckState {
+                Text("\(st.pageNo)/\(st.total)")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
         }
         .foregroundStyle(deckOnline ? Color.green : Color.orange)
+    }
+
+    /// 下一张讲什么。讲台上瞄一眼就能接上，比页码还有用。
+    /// 没配对 / 放映端没报过页时整行不出现，不占地方。
+    private var nextLine: some View {
+        Group {
+            if let st = deckState, !st.nextTitle.isEmpty {
+                Text("› " + st.nextTitle)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
     }
 
     /// 同时告诉用户「通不通」和「走的哪条路」——排障时一眼看清

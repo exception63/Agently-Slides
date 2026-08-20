@@ -84,6 +84,28 @@ final class PhoneLinkManager: NSObject, ObservableObject {
         if Thread.isMainThread { work() } else { DispatchQueue.main.async(execute: work) }
     }
 
+    /// 回给手表的状态包。
+    ///
+    /// **为什么走「手表来问、手机回答」而不是 updateApplicationContext 推**：
+    /// 手表本来就每 3 秒 ping 一次手机（`WatchLinkManager.startStatusPolling`），
+    /// 按键时的 reply 也顺路带回来。搭这条现成的车有两个好处：
+    ///  ① 不用做节流 —— 频率由手表定，翻页再快也不会把通道打爆；
+    ///  ② reply 永远是**当下**的状态，不像 applicationContext 那样会被系统合并/延迟。
+    ///
+    /// 只带三个字段。**别把 txb64 讲稿也塞进来** —— 手表屏幕根本塞不下，
+    /// 白白把 WCSession 的消息体挤爆。
+    private func statusPayload(ok: Bool) -> [String: Any] {
+        var p: [String: Any] = ["ok": ok,
+                                "deck": relay?.deckPresent ?? false,
+                                "conn": relay?.isConnected ?? false]
+        if let st = relay?.deckState {
+            p["idx"] = st.slideIdx      // 0 基，与协议一致；手表显示时再 +1
+            p["total"] = st.total
+            p["next"] = st.nextTitle
+        }
+        return p
+    }
+
     private func pairingPayload() -> [String: Any] {
         guard let p = pairing else { return [:] }
         return ["room": p.room, "relay": p.relayBase]
@@ -116,9 +138,7 @@ extension PhoneLinkManager: WCSessionDelegate {
                     self.relay?.connect(room: p.room, relayBase: p.relayBase)
                 }
                 let ok = self.relay?.send(action) ?? false
-                replyHandler(["ok": ok,
-                              "deck": self.relay?.deckPresent ?? false,
-                              "conn": self.relay?.isConnected ?? false])
+                replyHandler(self.statusPayload(ok: ok))
                 return
             }
             // ② 查状态（手表定时 ping，用来显示绿灯/橙灯）
@@ -126,9 +146,7 @@ extension PhoneLinkManager: WCSessionDelegate {
                 if let p = self.pairing, self.relay?.isConnected != true {
                     self.relay?.connect(room: p.room, relayBase: p.relayBase)
                 }
-                replyHandler(["ok": true,
-                              "deck": self.relay?.deckPresent ?? false,
-                              "conn": self.relay?.isConnected ?? false])
+                replyHandler(self.statusPayload(ok: true))
                 return
             }
             // ③ 要配对信息

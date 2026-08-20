@@ -17,6 +17,24 @@ enum RemoteAction: String, CaseIterable {
     }
 }
 
+/// 放映端每翻一页推来的状态。字段名与 deck 端 `pair-client.js` 的 `stateFromDom()` 一一对应。
+///
+/// **`slideIdx` 是 0 基的**——网页遥控端显示时统一 `+1`（`remote.html:202`）。
+/// 别在解析这一层偷偷改基数，否则和网页端、和 `jump` 指令的页码就对不上了。
+struct DeckState: Equatable {
+    var slideIdx = 0
+    var total = 0
+    var title = ""
+    var prevTitle = ""
+    var nextTitle = ""
+
+    /// 给人看的页码（1 基）
+    var pageNo: Int { slideIdx + 1 }
+    var pageLabel: String { total > 0 ? "\(pageNo) / \(total)" : "\(pageNo)" }
+    /// 还剩几张（手表上「还有多少」比「第几页」更有用）
+    var remaining: Int { max(0, total - pageNo) }
+}
+
 /// 连到 Slidesmith 中转（默认云端 Cloudflare Worker，也可指向本机 relay），
 /// 以 role=remote 接入某个 room，把指令转给同一 room 里正在放映的 deck。
 /// 手表和手机可以同时连同一个 room，互不冲突。
@@ -29,6 +47,12 @@ final class RelayClient: NSObject, ObservableObject {
     @Published private(set) var deckPresent = false
     @Published private(set) var statusText = "未配对"
     @Published private(set) var lastError: String?
+    /// 放映端当前页码 / 标题。手表靠它显示「3 / 44 · 下一张…」，iPhone 遥控页也显示。
+    @Published private(set) var deckState: DeckState?
+    /// deck 的文档标题（`deck-info` 里带来）
+    @Published private(set) var deckTitle = ""
+    /// 被中转判定「另一个窗口接管了这个房间」时的提示；正常情况下一直是 nil。
+    @Published private(set) var evictedNotice: String?
 
     private var task: URLSessionWebSocketTask?
     private var urlSession: URLSession!
@@ -39,6 +63,9 @@ final class RelayClient: NSObject, ObservableObject {
     private var pingTimer: Timer?
     /// 连接就绪前排队的指令（含入队时间，过期不补发）
     private var pendingCmds: [(RemoteAction, Date)] = []
+    /// 向放映端要一次当前状态（`need-info`）的重试定时器
+    private var infoTimer: Timer?
+    private var infoTries = 0
 
     override init() {
         super.init()
@@ -65,7 +92,10 @@ final class RelayClient: NSObject, ObservableObject {
     func disconnect() {
         wantsConnection = false
         closeSocket()
-        publish { self.isConnected = false; self.deckPresent = false; self.statusText = "已断开" }
+        publish {
+            self.isConnected = false; self.deckPresent = false; self.statusText = "已断开"
+            self.deckState = nil; self.evictedNotice = nil
+        }
     }
 
     private func openSocket() {
@@ -97,6 +127,7 @@ final class RelayClient: NSObject, ObservableObject {
 
     private func closeSocket() {
         pingTimer?.invalidate(); pingTimer = nil
+        stopInfoRequests()
         task?.cancel(with: .goingAway, reason: nil)
         task = nil
     }
@@ -147,8 +178,9 @@ final class RelayClient: NSObject, ObservableObject {
               let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let type = obj["type"] as? String else { return }
 
+        switch type {
         // 中转在 joined / peer 两种消息里都带 peers:{deck,remote}
-        if type == "joined" || type == "peer" {
+        case "joined", "peer":
             let peers = obj["peers"] as? [String: Any]
             let deck = (peers?["deck"] as? Int) ?? 0
             publish {
@@ -158,8 +190,94 @@ final class RelayClient: NSObject, ObservableObject {
                 self.statusText = deck > 0 ? "已连接放映端" : "等待放映端"
                 self.lastError = nil
                 self.flushPending()   // 补发唤醒期间排队的指令
+                if deck > 0 {
+                    self.evictedNotice = nil
+                    // 放映端在线但我们还不知道它翻到第几页 —— 去要一次。
+                    if self.deckState == nil { self.startInfoRequests() }
+                } else {
+                    // 放映端下线了，页码立刻作废：手表上留着「3 / 44」比空着更误导人。
+                    self.deckState = nil
+                    self.stopInfoRequests()
+                }
             }
+
+        // 每翻一页推一次，几十字节
+        case "state":
+            guard let st = Self.parseState(obj["state"]) else { return }
+            publish { self.deckState = st; self.stopInfoRequests() }
+
+        // 配对时推一次。**txb64（讲稿全文，30–60 KB）故意不解析**——原生这层用不上它，
+        // 讲稿是「讲稿」标签页里的 WebView 直接渲染网页端那一套。这里只要标题和随包
+        // 带来的 state：deck 只在**翻页时**才推 state，中途接进来不问就一直是空的。
+        case "deck-info":
+            let title = (obj["title"] as? String) ?? ""
+            let st = Self.parseState(obj["state"])
+            publish {
+                if !title.isEmpty { self.deckTitle = title }
+                if let st = st { self.deckState = st }
+                self.stopInfoRequests()
+            }
+
+        // 中转只把 evicted 发给**被顶掉的那个 deck**（relay.mjs:105 / worker.mjs:55），
+        // 遥控端正常收不到。留这个分支是防御性的：万一以后中转改成也通知遥控端，
+        // 界面不至于继续显示「已连接」还往空房间发指令。
+        case "evicted":
+            publish {
+                self.deckPresent = false
+                self.deckState = nil
+                self.evictedNotice = "这份 slides 的另一个窗口接管了遥控"
+                self.statusText = "放映端已被另一个窗口接管"
+                self.stopInfoRequests()
+            }
+
+        default:
+            break
         }
+    }
+
+    /// 把 `state` 对象解析成 DeckState。JSON 数字过来是 NSNumber，`as? Int` 能直接吃。
+    private static func parseState(_ any: Any?) -> DeckState? {
+        guard let d = any as? [String: Any], let idx = d["slideIdx"] as? Int else { return nil }
+        var st = DeckState()
+        st.slideIdx = max(0, idx)
+        st.total = (d["total"] as? Int) ?? 0
+        st.title = (d["title"] as? String) ?? ""
+        st.prevTitle = (d["prevTitle"] as? String) ?? ""
+        st.nextTitle = (d["nextTitle"] as? String) ?? ""
+        return st
+    }
+
+    // MARK: - 问一次「你现在第几页」
+
+    /// 协议里没有「只要状态」的请求，只有 `need-info`（会连讲稿一起推回来）。
+    /// 所以这里**一拿到状态就停**，并且封顶重试次数——网页端那种「每 2 秒问到手为止」
+    /// 是因为它真的要讲稿；原生只要几十字节的页码，不值得反复把 30–60 KB 拉回来。
+    private func startInfoRequests() {
+        guard infoTimer == nil, wantsConnection else { return }
+        infoTries = 0
+        requestInfo()
+        let t = Timer(timeInterval: 2, repeats: true) { [weak self] timer in
+            guard let self = self else { timer.invalidate(); return }
+            self.infoTries += 1
+            guard self.wantsConnection, self.deckState == nil, self.deckPresent, self.infoTries < 8 else {
+                timer.invalidate(); self.infoTimer = nil; return
+            }
+            self.requestInfo()
+        }
+        RunLoop.main.add(t, forMode: .common)
+        infoTimer = t
+    }
+
+    private func stopInfoRequests() {
+        infoTimer?.invalidate()
+        infoTimer = nil
+    }
+
+    private func requestInfo() {
+        guard let task = task, isConnected else { return }
+        guard let data = try? JSONSerialization.data(withJSONObject: ["type": "need-info"]),
+              let text = String(data: data, encoding: .utf8) else { return }
+        task.send(.string(text)) { _ in }
     }
 
     // MARK: - 发

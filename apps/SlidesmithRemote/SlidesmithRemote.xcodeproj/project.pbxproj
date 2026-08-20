@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		022C9E8CBFCE72DCDDBC955A /* WatchRemoteView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E53340568672513DB596FABE /* WatchRemoteView.swift */; };
 		038929B6D9A4A5315D924C5B /* PairingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC64B9D0970F97259EC56682 /* PairingStore.swift */; };
+		0DF1F924F9E6D64009941EDD /* TranscriptWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 243B350BD559EBA58DDBBA7B /* TranscriptWebView.swift */; };
 		19CC7E176566F07FC91856D5 /* RelayClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A265377A0BE3DC30B82E979E /* RelayClient.swift */; };
 		67362BEF9756E101CAA0EB20 /* SlidesmithRemoteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */; };
 		711A3EED8C80B311FF67F1E6 /* PairingStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC64B9D0970F97259EC56682 /* PairingStore.swift */; };
@@ -49,8 +50,9 @@
 
 /* Begin PBXFileReference section */
 		0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidesmithRemoteApp.swift; sourceTree = "<group>"; };
+		243B350BD559EBA58DDBBA7B /* TranscriptWebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptWebView.swift; sourceTree = "<group>"; };
 		3EC310BA3339FE23DA065BA4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlidesmithRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		4375EA85CBD8EB0B679D74CD /* SlidesmithRemote.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = SlidesmithRemote.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		65751D0E62E2083AE8F5C8E3 /* WatchLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchLinkManager.swift; sourceTree = "<group>"; };
 		6B60713DC0CDBEB9569634FB /* SlidesmithRemoteWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SlidesmithRemoteWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneLinkManager.swift; sourceTree = "<group>"; };
@@ -111,6 +113,7 @@
 				703803A63E197D77E5F65F5B /* PhoneLinkManager.swift */,
 				A8F81243D292E21CD80DE322 /* QRScannerView.swift */,
 				0CE1D3D8EABE66735C34E6FD /* SlidesmithRemoteApp.swift */,
+				243B350BD559EBA58DDBBA7B /* TranscriptWebView.swift */,
 			);
 			path = iOS;
 			sourceTree = "<group>";
@@ -235,6 +238,7 @@
 				B63226275E095DF52D005E19 /* QRScannerView.swift in Sources */,
 				91D9CE34561F0525C7DBE30B /* RelayClient.swift in Sources */,
 				67362BEF9756E101CAA0EB20 /* SlidesmithRemoteApp.swift in Sources */,
+				0DF1F924F9E6D64009941EDD /* TranscriptWebView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -323,7 +327,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = "Slidesmith 遥控";
 				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上 slides 的配对二维码";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -343,7 +346,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = Slidesmith;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(SM_APP_ID)";
@@ -422,7 +424,6 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
-				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = "Slidesmith 遥控";
 				INFOPLIST_KEY_NSCameraUsageDescription = "扫描电脑上 slides 的配对二维码";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -442,7 +443,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				DEVELOPMENT_TEAM = C5BH6BHB9Q;
 				INFOPLIST_KEY_CFBundleDisplayName = Slidesmith;
 				INFOPLIST_KEY_WKApplication = YES;
 				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = "$(SM_APP_ID)";

@@ -18,6 +18,9 @@ final class WatchLinkManager: NSObject, ObservableObject {
     @Published private(set) var transport: Transport = .none
     /// 经手机这条路时，放映端在不在线（由手机回报）
     @Published private(set) var phoneDeckPresent = false
+    /// 放映端当前页码 / 下一张标题。经手机那条路由手机回报，直连那条路直接看 relay。
+    /// 手表屏幕塞不下讲稿，但「讲到哪、还剩几张」是刚需 —— 低头一眼就知道。
+    @Published private(set) var phoneDeckState: DeckState?
     private var statusTimer: Timer?
     private var unreachableTicks = 0
 
@@ -131,6 +134,17 @@ final class WatchLinkManager: NSObject, ObservableObject {
             self.phoneDeckPresent = (reply["deck"] as? Bool) ?? false
             self.transport = .phone
             self.unreachableTicks = 0
+            // 页码：手机没带（放映端还没报过页）就清掉。留着上一次的「3 / 44」
+            // 比空着更误导人 —— 讲台上瞄一眼看到旧页码是会真的讲错的。
+            if let idx = reply["idx"] as? Int {
+                var st = DeckState()
+                st.slideIdx = max(0, idx)
+                st.total = (reply["total"] as? Int) ?? 0
+                st.nextTitle = (reply["next"] as? String) ?? ""
+                self.phoneDeckState = st
+            } else {
+                self.phoneDeckState = nil
+            }
         }
     }
 

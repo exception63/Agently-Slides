@@ -1,26 +1,50 @@
 import SwiftUI
 
+/// 遥控 / 讲稿 两个模式，和网页端 `/r/<room>` 的分段控件一一对应。
+enum RemoteTab: String, CaseIterable, Identifiable {
+    case remote = "遥控"
+    case transcript = "讲稿"
+    var id: String { rawValue }
+}
+
 struct ContentView: View {
     @EnvironmentObject private var relay: RelayClient
     @EnvironmentObject private var link: PhoneLinkManager
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var web = TranscriptWeb()
     @State private var scanning = false
+    @State private var tab: RemoteTab = .remote
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 18) {
-                statusCard
+            VStack(spacing: 14) {
+                // 讲稿页把顶部状态卡让出来：网页端自己就带一条状态栏，
+                // 再叠一张原生的既重复又白占掉小半屏讲稿。
+                if !(tab == .transcript && link.pairing != nil) { statusCard }
 
                 if link.pairing == nil {
                     Spacer()
                     pairPrompt
                     Spacer()
                 } else {
-                    remotePad
-                    Spacer()
-                    footer
+                    Picker("", selection: $tab) {
+                        ForEach(RemoteTab.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+
+                    switch tab {
+                    case .remote:
+                        deckStateBar
+                        remotePad
+                        Spacer()
+                        footer
+                    case .transcript:
+                        transcriptPane
+                    }
                 }
             }
-            .padding(20)
+            .padding(.horizontal, tab == .transcript && link.pairing != nil ? 0 : 20)
+            .padding(.vertical, 20)
             .navigationTitle("Slidesmith 遥控")
             .sheet(isPresented: $scanning) {
                 QRScannerView(
@@ -40,7 +64,18 @@ struct ContentView: View {
                 }
             }
         }
+        // 屏幕常亮：讲到一半手机自动锁屏是真实事故。只在「配上了 + App 在前台」时
+        // 关掉休眠，退到后台立刻恢复系统默认，免得把用户的电池白白烧穿。
+        .onChange(of: scenePhase) { _, _ in updateIdleTimer() }
+        .onChange(of: link.pairing) { _, _ in updateIdleTimer() }
+        .onAppear { updateIdleTimer() }
     }
+
+    private func updateIdleTimer() {
+        UIApplication.shared.isIdleTimerDisabled = (scenePhase == .active && link.pairing != nil)
+    }
+
+    // MARK: - 顶部状态
 
     private var statusCard: some View {
         HStack(spacing: 10) {
@@ -48,7 +83,7 @@ struct ContentView: View {
                 .fill(relay.deckPresent ? Color.green : (relay.isConnected ? Color.orange : Color.gray))
                 .frame(width: 10, height: 10)
             VStack(alignment: .leading, spacing: 2) {
-                Text(relay.statusText).font(.subheadline.weight(.semibold))
+                Text(relay.evictedNotice ?? relay.statusText).font(.subheadline.weight(.semibold))
                 Text(link.watchStatusText).font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -60,6 +95,45 @@ struct ContentView: View {
         }
         .padding(14)
         .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    /// 现在讲到第几页 · 下一张是什么。以前手机是个「瞎按的遥控器」，这一条是补的第一块。
+    private var deckStateBar: some View {
+        Group {
+            if let st = relay.deckState {
+                VStack(spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text("\(st.pageNo)")
+                            .font(.system(size: 34, weight: .bold, design: .rounded))
+                            .foregroundStyle(.orange)
+                        Text("/ \(st.total)")
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if st.remaining > 0 {
+                            Text("还剩 \(st.remaining) 张")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if !st.title.isEmpty {
+                        Text(st.title)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    if !st.nextTitle.isEmpty {
+                        Text("下一张：\(st.nextTitle)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(14)
+                .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 14))
+            }
+        }
     }
 
     private var pairPrompt: some View {
@@ -80,6 +154,21 @@ struct ContentView: View {
             .tint(.orange)
         }
     }
+
+    // MARK: - 讲稿
+
+    private var transcriptPane: some View {
+        TranscriptWebView(web: web)
+            .ignoresSafeArea(edges: .bottom)
+            .onAppear {
+                if let p = link.pairing, let u = URL(string: p.phoneURL) { web.load(u) }
+            }
+            .onChange(of: link.pairing) { _, p in
+                if let p = p, let u = URL(string: p.phoneURL) { web.load(u) }
+            }
+    }
+
+    // MARK: - 遥控
 
     private var remotePad: some View {
         VStack(spacing: 12) {
