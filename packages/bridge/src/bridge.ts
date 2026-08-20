@@ -177,7 +177,9 @@ async function fetchImageDataUrl(rawUrl: string): Promise<{ dataUrl: string; byt
 //   Studio → bridge : { type:'ready' } | { type:'requests', request, images? } | { type:'exported', name, html }
 //   bridge → Studio : { type:'hello' } | { type:'import' } | { type:'patch' } | { type:'sync-request' }
 //                     | { type:'cues-request' } | { type:'set-cues', cues, replace }
+//                     | { type:'notes-request', anchors } | { type:'set-notes', segments }
 //   Studio → bridge : … | { type:'cues', watchMode, pages, applied?, keptExisting?, unknownAnchors?, error? }
+//                     | { type:'notes', hasNotes, pages, applied?, appliedAnchors?, rejected?, error? }
 //
 // An image-layout request carries images:[{id,name,dataUrl}]. The bridge writes each
 // to a temp dir and substitutes the __TRAY_DIR__ token in the request text with that
@@ -211,6 +213,24 @@ export interface CueReport {
   applied?: number;
   keptExisting?: string[];
   unknownAnchors?: string[];
+  error?: string;
+}
+
+/** 一体版 deck 内嵌的讲稿（`window.__TXB64__`）现状，由 Studio 现场交出来。
+ *
+ * 和提词一样，讲稿落在 `#deck` 之外，`applyPatch` 够不着；而且它是 base64，
+ * 在桥这边解/编一遍只会多一个会漂的真相源。 */
+export interface NoteReport {
+  /** false = 这份 deck 里没有内嵌讲稿（三文件版，或压根没讲稿） */
+  hasNotes: boolean;
+  deckMode: string;
+  /** `html` 只在点名要的锚点上才有——整份讲稿一次倒出去在 45 页上就是几万 token */
+  pages: Array<{ index: number; anchor: string; title: string; chars: number;
+    annotations: Array<{ quote: string; note: string }>; html?: string }>;
+  applied?: number;
+  appliedAnchors?: string[];
+  /** 被 Studio 拒收的块（锚点丢了 / 重复 / 不在顶层…），带原因 */
+  rejected?: Array<{ anchor: string; why: string }>;
   error?: string;
 }
 
@@ -274,6 +294,11 @@ export interface BridgeHandle extends EventEmitter {
    *  have no cues yet — so re-running "一键加提词" never clobbers what the user已经手调过.
    *  Resolves with the Studio's fresh report (what landed, what was kept, bad anchors). */
   setCues(cues: Record<string, string[]>, opts?: { replace?: boolean; timeoutMs?: number }): Promise<CueReport | null>;
+  /** 讲稿现状。`anchors` 里点名的块才带 html 全文。 */
+  notes(anchors?: string[], timeoutMs?: number): Promise<NoteReport | null>;
+  /** 把改写好的讲稿块写回去：{ 锚点: '整块 HTML' }。**Studio 会验锚点还在不在**，
+   *  丢了就整块拒收并在 `rejected` 里说明原因。 */
+  setNotes(segments: Record<string, string>, opts?: { timeoutMs?: number }): Promise<NoteReport | null>;
   status(): BridgeStatus;
   /** bind a Claude Code session label to this bridge (the handshake). Re-broadcasts
    *  hello so every connected Studio shows which session it's talking to. */
@@ -497,6 +522,28 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
+    // GET /api/notes[?anchors=a,b] → the deck's embedded transcript, block by anchor.
+    // POST /api/notes  body: {"segments":{anchor:"<h3 id=…>…"}} → write the rewritten blocks back.
+    if (url === '/api/notes' && req.method === 'GET') {
+      const raw = decodeURIComponent((/[?&]anchors=([^&]*)/.exec(req.url || '') || [])[1] || '');
+      const want = raw.split(',').map((x) => x.trim()).filter(Boolean);
+      handle.notes(want).then((r) => {
+        if (!r) return sendJson(res, { ok: false, error: 'Studio 没连上（或没回话），讲稿读不到' }, 409);
+        sendJson(res, { ok: true, ...r });
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 500));
+      return;
+    }
+    if (url === '/api/notes' && req.method === 'POST') {
+      readBody(req).then(async (body) => {
+        let j: { segments?: Record<string, string> };
+        try { j = JSON.parse(body); } catch { return sendJson(res, { ok: false, error: 'body 不是 JSON' }, 400); }
+        if (!j || !j.segments || typeof j.segments !== 'object') return sendJson(res, { ok: false, error: '缺 segments 字段' }, 400);
+        const r = await handle.setNotes(j.segments);
+        if (!r) return sendJson(res, { ok: false, error: 'Studio 没连上（或没回话），讲稿没写进去' }, 409);
+        sendJson(res, { ok: true, ...r });
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
+      return;
+    }
     // POST /api/patch  body: raw <section data-id> html (or {"sections":"…","preview":bool}) → applied to Studio.
     // ?preview=1 (or JSON preview:true) marks it a proposal → Studio stages it behind 保留/还原.
     if (url === '/api/patch' && req.method === 'POST') {
@@ -705,7 +752,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     emitter.emit('studio-connected');
 
     ws.on('message', (data) => {
-      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; images?: { id?: string; name?: string; dataUrl?: string }[]; name?: string; html?: string; watchMode?: boolean; pages?: unknown };
+      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; images?: { id?: string; name?: string; dataUrl?: string }[]; name?: string; html?: string; watchMode?: boolean; hasNotes?: boolean; pages?: unknown };
       try { m = JSON.parse(String(data)); } catch { return; }
       if (m.type === 'requests' && m.request && typeof m.request.content === 'string') {
         const id = 'req-' + (++reqSeq);
@@ -727,6 +774,9 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
         pending.push(r);
         emitter.emit('request', r);
         wakeWaiters(); // a long-poller blocked in /api/wait gets it instantly
+      } else if (m.type === 'notes' && typeof m.hasNotes === 'boolean') {
+        const { type: _tn, ...nreport } = m;
+        emitter.emit('notes', nreport as unknown as NoteReport);
       } else if (m.type === 'cues' && typeof m.watchMode === 'boolean') {
         const { type: _t, ...report } = m; // `type` 是线缆上的路由字段，别带进回给调用方的载荷
         emitter.emit('cues', report as unknown as CueReport);
@@ -837,6 +887,21 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   handle.cues = (timeoutMs = 3000) => askCues({ type: 'cues-request' }, timeoutMs);
   handle.setCues = (cues, opts = {}) =>
     askCues({ type: 'set-cues', cues, replace: !!opts.replace }, opts.timeoutMs || 5000);
+
+  function askNotes(msg: Record<string, unknown>, timeoutMs: number): Promise<NoteReport | null> {
+    return new Promise((res) => {
+      const live = [...sockets].filter((s) => s.readyState === s.OPEN);
+      if (!live.length) return res(null);
+      let done = false;
+      const settle = (r: NoteReport | null) => { if (done) return; done = true; emitter.off('notes', onNotes); res(r); };
+      const onNotes = (r: NoteReport) => settle(r);
+      emitter.once('notes', onNotes);
+      setTimeout(() => settle(null), timeoutMs);
+      broadcast(msg);
+    });
+  }
+  handle.notes = (anchors = [], timeoutMs = 4000) => askNotes({ type: 'notes-request', anchors }, timeoutMs);
+  handle.setNotes = (segments, opts = {}) => askNotes({ type: 'set-notes', segments }, opts.timeoutMs || 8000);
 
   handle.outline = (withHtml = []) =>
     deck ? outlineOf(deck.html, new Set(withHtml)) : [];

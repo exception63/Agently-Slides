@@ -552,6 +552,7 @@ async function saveHtmlInPlace(): Promise<void> {
 // route an imported file by type: contract HTML deck → html mode; json/md → IR mode
 function importFile(name: string, text: string): void {
   cueMap = null; cueLoaded = false;   // 换了 deck，提词缓存作废
+  notesDoc = null; notesLoaded = false; notesUndo = null; noteAnns = []; notePick = null;  // 讲稿同理
   fileHandle = null; // a new deck arrived → drop any stale writable handle; open-picker/drop re-set it after
   if (/\.html?$/i.test(name) || /^\s*<(!doctype|html|section|div|body)/i.test(text)) loadHtmlDeck(name, text);
   else loadDeck(name, text);
@@ -1072,6 +1073,11 @@ function previewWin(): (Window & { deckAPI?: { SLIDE_MAP?: string[] }; __SM_CUES
   try { return (($('#preview') as HTMLIFrameElement).contentWindow as never) || null; } catch { return null; }
 }
 
+/** 预览 iframe 里那份 deck 真的渲染出来了吗（`#deck` 在了就算） */
+function previewReady(): boolean {
+  try { return !!previewWin()?.document?.querySelector('#deck'); } catch { return false; }
+}
+
 /** 第 i 页对应的讲稿锚点。与 deck 端 stateFromDom() 的取法保持一致，否则手表对不上 */
 function slideAnchor(i: number): string {
   const w = previewWin();
@@ -1082,6 +1088,9 @@ function slideAnchor(i: number): string {
 /** 首次进面板时从预览里吃一份。返回 null = 这份 deck 没开 watch mode */
 function loadCues(): Record<string, string[]> | null {
   if (cueLoaded) return cueMap;
+  // **预览没起来就别缓存**：这时候读到的 undefined 不代表"这份 deck 没提词"，
+  // 缓存下去就变成永久的假答案（导入过程中 refreshTasks 就会撞上）。
+  if (!previewReady()) return null;
   cueLoaded = true;
   const raw = previewWin()?.__SM_CUES__;
   cueMap = (raw && typeof raw === 'object') ? JSON.parse(JSON.stringify(raw)) as Record<string, string[]> : null;
@@ -1315,6 +1324,372 @@ function nextCueTodo(map: Record<string, string[]>): number {
     if (cueIssues(map[slideAnchor(i)] || []).length) return i;
   }
   return -1;
+}
+
+// ---------------- 讲稿批注（notes） ----------------
+//
+// **讲稿不给直接编辑的入口，这是产品决策不是技术妥协**（2026-08-20 定）。
+// 讲稿带着锚点、`p.cue` 讲法块、`.golden` 金句块、`.data` 数据块——人手直接改必然
+// 弄漂这些结构，副屏同步和提词抽取会跟着一起坏。所以这里只做「读 + 划一段 + 加批注」，
+// 真正的改写交给 Claude；它回填的时候 **Studio 还要验一遍锚点在不在**
+// （见 applyNotesPatch）——把「别弄丢锚点」变成代码里的一道闸，而不是 prompt 里的一句嘱咐。
+//
+// 讲稿存在一体版 deck 的 `window.__TXB64__` 里（整份讲稿 HTML 的 base64）。和提词一样，
+// 它落在 `#deck` 之外，apply_patch 够不着 —— 所以又是一条独立通道。
+let notesDoc: Document | null = null;
+let notesLoaded = false;
+
+function loadNotes(): Document | null {
+  if (notesLoaded) return notesDoc;
+  if (!previewReady()) return null;   // 同 loadCues：没起来就别缓存"没有"
+  notesLoaded = true;
+  const b64 = (previewWin() as (Window & { __TXB64__?: string }) | null)?.__TXB64__;
+  if (!b64) return null;
+  let html = '';
+  try { html = decodeURIComponent(escape(atob(b64))); } catch { return null; }
+  try { notesDoc = new DOMParser().parseFromString(html, 'text/html'); } catch { notesDoc = null; }
+  return notesDoc;
+}
+
+/** 一个锚点块 = `h3#anchor` 本身 + 到下一个 h3 / 段封面之前的所有兄弟。
+ *  这就是「这一页的讲稿」，副屏整块高亮划的也是同一条线。 */
+function noteBlock(doc: Document, anchor: string): Element[] | null {
+  const h = doc.getElementById(anchor);
+  if (!h) return null;
+  const out: Element[] = [h];
+  let n = h.nextElementSibling;
+  while (n && !n.matches('h3, .seg-cover')) { out.push(n); n = n.nextElementSibling; }
+  return out;
+}
+function noteBlockHtml(doc: Document, anchor: string): string | null {
+  const els = noteBlock(doc, anchor);
+  return els ? els.map((e) => e.outerHTML).join('\n') : null;
+}
+
+/** 写回 deck 文本里的 `__TXB64__`。找不到那句赋值就返回 false —— **不静默失败** */
+function persistNotes(): boolean {
+  if (!notesDoc) return false;
+  const html = '<!DOCTYPE html>\n' + notesDoc.documentElement.outerHTML;
+  let b64 = '';
+  try { b64 = btoa(unescape(encodeURIComponent(html))); } catch { return false; }
+  const re = /(window\.__TXB64__\s*=\s*)(['"])[A-Za-z0-9+/=\s]*\2/;
+  let done = false;
+  for (const key of ['trailing', 'prelude'] as const) {
+    if (!done && re.test(H[key])) {
+      H[key] = H[key].replace(re, (_m, a: string, q: string) => a + q + b64 + q);
+      done = true;
+    }
+  }
+  if (done) markDirty();
+  return done;
+}
+
+function pageOfAnchor(a: string): number {
+  for (let i = 0; i < htmlSlides.length; i++) if (slideAnchor(i) === a) return i + 1;
+  return 0;
+}
+
+interface NoteAnn { id: string; anchor: string; page: number; quote: string; note: string }
+let noteAnns: NoteAnn[] = [];
+let noteAnnSeq = 0;
+/** 刚在讲稿里划中、还没写批注的那一段 */
+let notePick: { anchor: string; quote: string } | null = null;
+
+function notesFrame(): HTMLIFrameElement | null { return $('#notesFrame') as HTMLIFrameElement | null; }
+
+/** 讲稿原样进 iframe（它自带 CSS，换一套只会看着不像自己），另外注入选中 → 加批注的那点交互 */
+function notesFrameHtml(doc: Document): string {
+  const inject = '<style>'
+    + '.sm-ann{background:#ffe9a8;box-shadow:0 0 0 1px #e0c063;border-radius:2px}'
+    + '#sm-annbtn{position:absolute;z-index:99;font:600 12px/1 system-ui,-apple-system,sans-serif;padding:7px 11px;'
+    + 'border:0;border-radius:7px;background:#1c1c1f;color:#fff;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.32)}'
+    + '.sm-cur{outline:2px solid rgba(184,58,38,.35);outline-offset:6px;border-radius:3px}'
+    // 重新打开时黄色高亮是复原不了的（那是包在选区上的 <mark>，iframe 一重载就没了）。
+    // 所以至少让「这一段有批注」看得见——否则关掉再打开，批注像是凭空消失了。
+    + '.sm-annd{position:relative}'
+    + '.sm-annd::after{content:"批注";position:absolute;margin-left:.6em;font:600 10px/1.6 system-ui,sans-serif;'
+    + 'letter-spacing:.08em;color:#8a6a2a;background:#ffe9a8;border-radius:3px;padding:2px 6px;vertical-align:middle}'
+    + '</style>'
+    + '<script>' + NOTES_FRAME_JS + '<\/script>';
+  return '<!DOCTYPE html>\n' + doc.documentElement.outerHTML.replace(/<\/body>/i, inject + '</body>');
+}
+
+function openNotes(): void {
+  if (mode !== 'html') { toast('讲稿只对导入的 HTML deck 可用', true); return; }
+  const doc = loadNotes();
+  const m = $('#notesModal'); if (m) (m as HTMLElement).style.display = 'flex';
+  const frame = notesFrame();
+  const empty = $('#notesEmpty');
+  if (!doc) {
+    if (frame) (frame as HTMLElement).style.display = 'none';
+    if (empty) { (empty as HTMLElement).style.display = ''; }
+    renderNoteAnns();
+    return;
+  }
+  if (empty) (empty as HTMLElement).style.display = 'none';
+  const ub = $('#notesUndoBtn'); if (ub) (ub as HTMLElement).style.display = notesUndo ? '' : 'none';
+  if (frame) {
+    (frame as HTMLElement).style.display = '';
+    frame.onload = () => {
+      // 打开就停在当前页对应的那一段——45 页的讲稿里自己找是没人愿意做的事
+      const a = slideAnchor(cur);
+      try {
+        frame.contentWindow?.postMessage({ type: 'sm-note-goto', anchor: a }, '*');
+        pushAnnAnchors();
+      } catch { /* noop */ }
+    };
+    frame.srcdoc = notesFrameHtml(doc);
+  }
+  renderNoteAnns();
+}
+function closeNotes(): void { const m = $('#notesModal'); if (m) (m as HTMLElement).style.display = 'none'; }
+function pushAnnAnchors(): void {
+  const anchors = Array.from(new Set(noteAnns.map((a) => a.anchor).filter(Boolean)));
+  try { notesFrame()?.contentWindow?.postMessage({ type: 'sm-note-anchors', anchors }, '*'); } catch { /* noop */ }
+}
+
+/** 讲稿 iframe 里划中了一段 */
+function onNotePick(anchor: string, quote: string): void {
+  notePick = { anchor, quote };
+  const box = $('#notePickBox'); if (box) (box as HTMLElement).style.display = '';
+  const q = $('#notePickQuote'); if (q) q.textContent = quote.length > 90 ? quote.slice(0, 90) + '…' : quote;
+  const pg = $('#notePickWhere');
+  if (pg) {
+    const p = pageOfAnchor(anchor);
+    pg.textContent = anchor ? (p ? `第 ${p} 页 · ${anchor}` : `锚点 ${anchor}`) : '⚠ 这段不在任何锚点下，批注会挂在整份讲稿上';
+  }
+  const t = $('#noteText') as HTMLTextAreaElement | null;
+  if (t) { t.value = ''; t.focus(); }
+}
+
+function addNoteAnn(): void {
+  const t = $('#noteText') as HTMLTextAreaElement | null;
+  const txt = (t?.value || '').trim();
+  if (!notePick) { toast('先在讲稿里划中一段', true); return; }
+  if (!txt) { toast('写一句要改什么', true); return; }
+  const id = 'ann-' + (++noteAnnSeq);
+  noteAnns.push({ id, anchor: notePick.anchor, page: pageOfAnchor(notePick.anchor), quote: notePick.quote, note: txt });
+  // 让 iframe 把刚才那段标黄——批注挂在哪儿要看得见，否则划完就消失，等于没挂
+  try { notesFrame()?.contentWindow?.postMessage({ type: 'sm-note-mark', id }, '*'); } catch { /* noop */ }
+  notePick = null;
+  if (t) t.value = '';
+  const box = $('#notePickBox'); if (box) (box as HTMLElement).style.display = 'none';
+  renderNoteAnns(); refreshTasks(); pushAnnAnchors();
+  toast('已加批注 —— 在「AI 待办」里一键发送');
+}
+function removeNoteAnn(id: string): void {
+  noteAnns = noteAnns.filter((a) => a.id !== id);
+  renderNoteAnns(); refreshTasks(); pushAnnAnchors();
+}
+function renderNoteAnns(): void {
+  const box = $('#noteList'); if (!box) return;
+  const n = $('#noteCount'); if (n) n.textContent = noteAnns.length ? `${noteAnns.length} 条批注` : '还没有批注';
+  if (!noteAnns.length) {
+    box.innerHTML = '<div class="qempty">在左边讲稿里划一段文字，会浮出「加批注」。<br><br>'
+      + '批注挂在<b>锚点</b>上（跟着那一段走，不是行号），汇总进「AI 待办」，一键发给 Claude 改写。</div>';
+    return;
+  }
+  box.innerHTML = '';
+  noteAnns.forEach((a) => {
+    const row = document.createElement('div'); row.className = 'annrow';
+    row.innerHTML = `<div class="annhead"><span class="todochip note">${a.page ? '第 ' + a.page + ' 页' : '整份'}</span>`
+      + `<code>${esc(a.anchor || '—')}</code><button class="todo-del" title="删掉这条批注" aria-label="移除">✕</button></div>`
+      + `<div class="annquote">${esc(a.quote.length > 120 ? a.quote.slice(0, 120) + '…' : a.quote)}</div>`
+      + `<div class="annnote">${esc(a.note)}</div>`;
+    row.querySelector('.todo-del')!.addEventListener('click', () => removeNoteAnn(a.id));
+    row.querySelector('.annquote')!.addEventListener('click', () => {
+      try { notesFrame()?.contentWindow?.postMessage({ type: 'sm-note-goto', anchor: a.anchor }, '*'); } catch { /* noop */ }
+    });
+    box.appendChild(row);
+  });
+}
+
+/** 给 Claude 的那一段：批注 + 原文块 + 硬约束。**原文块必须带上**——不给原文，
+ *  它只能靠猜，锚点和讲法块十有八九活不下来。 */
+function aiNotesBlock(): string {
+  const doc = loadNotes();
+  const byAnchor: Record<string, NoteAnn[]> = {};
+  noteAnns.forEach((a) => { (byAnchor[a.anchor] = byAnchor[a.anchor] || []).push(a); });
+  const secs = Object.keys(byAnchor).map((anchor) => {
+    const anns = byAnchor[anchor];
+    const p = anns[0].page;
+    const src = (doc && anchor) ? noteBlockHtml(doc, anchor) : null;
+    return `### 锚点 \`${anchor || '（整份）'}\`${p ? ` · 第 ${p} 页` : ''}\n\n`
+      + anns.map((a) => `- 划中：「${a.quote}」\n  批注：${a.note}`).join('\n')
+      + (src ? `\n\n当前讲稿原文（这一整块，改写后原样替换它）：\n\n${FENCE}html\n${src}\n${FENCE}\n` : '\n');
+  }).join('\n');
+  return `## 讲稿批注（用 \`slidesmith_notes\` 回写，**不要用 apply_patch**）
+
+用户在讲稿上划了几段、各写了一条批注。请按批注改写对应的**整个锚点块**，
+然后用 \`slidesmith_notes\` 的 \`set\` 写回：\`{ "锚点": "改写后的整块 HTML" }\`。
+
+**改写时不许破的**：
+1. \`<h3 ... id="锚点">\` 必须原样留着（id 一个字都不能改，Studio 会验，丢了直接拒收）。
+2. 讲法块 \`<p class="cue">\` / 金句块 \`<div class="golden">\` / 数据块 \`<div class="data">\`
+   该在的还在——除非批注明确说要删。
+3. \`<strong>\` 是提词的种子（手表上会显示），别整段加粗、也别全去掉。
+4. 只动被批注的那几块，别顺手重写整份讲稿。
+
+${secs}
+---
+`;
+}
+
+// 注入讲稿 iframe 的那点交互：划一段 → 浮出「加批注」→ 告诉父窗口。
+// **按钮放在 iframe 里面**，不是父窗口——不然选区坐标要跨窗口换算，滚动一次就飘了。
+const NOTES_FRAME_JS = `(function(){
+  var btn = document.createElement('button');
+  btn.id = 'sm-annbtn'; btn.type = 'button'; btn.textContent = '加批注'; btn.style.display = 'none';
+  document.body.appendChild(btn);
+  var pending = null;
+  function anchorOf(node){
+    var el = node && node.nodeType === 1 ? node : (node && node.parentElement);
+    while (el && el !== document.body) {
+      var p = el;
+      while (p) { if (p.tagName === 'H3' && p.id) return p.id; p = p.previousElementSibling; }
+      el = el.parentElement;
+    }
+    return '';
+  }
+  document.addEventListener('mouseup', function(){
+    setTimeout(function(){
+      var sel = document.getSelection();
+      if (!sel || sel.isCollapsed) { btn.style.display = 'none'; pending = null; return; }
+      var txt = String(sel.toString()).replace(/\\s+/g, ' ').trim();
+      if (!txt) { btn.style.display = 'none'; pending = null; return; }
+      var r = sel.getRangeAt(0), box = r.getBoundingClientRect();
+      pending = { anchor: anchorOf(r.startContainer), quote: txt, range: r.cloneRange() };
+      btn.style.left = Math.max(4, box.left + window.scrollX) + 'px';
+      btn.style.top = (box.bottom + window.scrollY + 6) + 'px';
+      btn.style.display = '';
+    }, 0);
+  });
+  btn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+  btn.addEventListener('click', function(){
+    if (!pending) return;
+    try { parent.postMessage({ type: 'sm-note-pick', anchor: pending.anchor, quote: pending.quote }, '*'); } catch(e){}
+    btn.style.display = 'none';
+  });
+  window.addEventListener('message', function(e){
+    var d = e && e.data; if (!d) return;
+    if (d.type === 'sm-note-mark') {
+      if (!pending) return;
+      var m = document.createElement('mark'); m.className = 'sm-ann'; m.setAttribute('data-ann', d.id || '');
+      try { pending.range.surroundContents(m); }
+      catch (err) { try { m.appendChild(pending.range.extractContents()); pending.range.insertNode(m); } catch (e2) {} }
+      pending = null;
+      var s = document.getSelection(); if (s) s.removeAllRanges();
+    } else if (d.type === 'sm-note-anchors') {
+      var had = document.querySelectorAll('.sm-annd');
+      for (var j = 0; j < had.length; j++) had[j].classList.remove('sm-annd');
+      var list = d.anchors || [];
+      for (var k = 0; k < list.length; k++) {
+        var t = document.getElementById(list[k]); if (t) t.classList.add('sm-annd');
+      }
+    } else if (d.type === 'sm-note-goto' && d.anchor) {
+      var el = document.getElementById(d.anchor); if (!el) return;
+      var old = document.querySelectorAll('.sm-cur');
+      for (var i = 0; i < old.length; i++) old[i].classList.remove('sm-cur');
+      el.classList.add('sm-cur');
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+  });
+})();`;
+
+// ---------- 讲稿的对外接口：Claude ↔ 桥 ↔ 这里 ----------
+interface NotePageInfo { index: number; anchor: string; title: string; chars: number; annotations: { quote: string; note: string }[]; html?: string }
+/** Claude 上一次改写之前的整份讲稿 —— 撤销用 */
+let notesUndo: string | null = null;
+let notesAiCount = 0;
+
+function notesReport(wantHtml: string[] = [], extra: Record<string, unknown> = {}): Record<string, unknown> {
+  const doc = mode === 'html' ? loadNotes() : null;
+  const want = new Set(wantHtml);
+  const pages: NotePageInfo[] = [];
+  if (doc) {
+    htmlSlides.forEach((s, i) => {
+      const a = slideAnchor(i);
+      const els = noteBlock(doc, a);
+      const text = els ? els.map((e) => e.textContent || '').join(' ').replace(/\s+/g, ' ').trim() : '';
+      const info: NotePageInfo = {
+        index: i + 1, anchor: a, title: s.title, chars: text.length,
+        annotations: noteAnns.filter((x) => x.anchor === a).map((x) => ({ quote: x.quote, note: x.note })),
+      };
+      // 整份讲稿一次倒出去在 45 页上就是几万 token；点名要哪几块才给全文
+      if (want.has(a) || want.has(String(i + 1))) info.html = els ? els.map((e) => e.outerHTML).join('\n') : '';
+      pages.push(info);
+    });
+  }
+  return { hasNotes: !!doc, deckMode: mode, pages, ...extra };
+}
+function sendNotesReport(wantHtml: string[] = [], extra: Record<string, unknown> = {}): void {
+  if (!bridge.connected || !bridge.ws || bridge.ws.readyState !== WebSocket.OPEN) return;
+  try { bridge.ws.send(JSON.stringify({ type: 'notes', ...notesReport(wantHtml, extra) })); } catch { /* noop */ }
+}
+
+/**
+ * Claude 改写完的讲稿块回填。
+ *
+ * ⭐ **这里是那道闸**：锚点丢了 / 改了 / 变出第二个，一律拒收并原样报回去。
+ * 讲稿之所以不给人直接编辑，就是怕锚点被弄漂；换成 AI 来写，同一个风险还在——
+ * 所以把「锚点必须活着」写成代码，而不是 prompt 里的一句嘱咐。
+ */
+function applyNotesPatch(incoming: Record<string, string>): void {
+  if (mode !== 'html') { sendNotesReport([], { applied: 0, error: '当前不是 HTML deck' }); return; }
+  const doc = loadNotes();
+  if (!doc) {
+    sendNotesReport([], { applied: 0, error: '这份 deck 里没有内嵌讲稿（找不到 window.__TXB64__）。'
+      + '三文件联动版的讲稿在隔壁文件里，Studio 读不到——一体版才行。' });
+    return;
+  }
+  const before = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+  const rejected: { anchor: string; why: string }[] = [];
+  const okAnchors: string[] = [];
+  Object.keys(incoming).forEach((anchor) => {
+    const els = noteBlock(doc, anchor);
+    if (!els) { rejected.push({ anchor, why: '讲稿里没有这个锚点' }); return; }
+    let frag: Document;
+    try { frag = new DOMParser().parseFromString(String(incoming[anchor] || ''), 'text/html'); }
+    catch { rejected.push({ anchor, why: 'HTML 解析失败' }); return; }
+    const kids = Array.prototype.slice.call(frag.body.children) as Element[];
+    if (!kids.length) { rejected.push({ anchor, why: '改写后是空的' }); return; }
+    // 先问"锚点还在不在"，再问"在不在该在的位置"——顺序反了的话，被包进 <div> 的
+    // 锚点会收到"你把锚点弄丢了"这种指错方向的说法。
+    if (!frag.getElementById(anchor)) { rejected.push({ anchor, why: `改写后丢了 id="${anchor}" 的标题——锚点是副屏同步和手表提词的键，不能动` }); return; }
+    const heads = kids.filter((e) => e.id === anchor);
+    if (!heads.length) { rejected.push({ anchor, why: `id="${anchor}" 被嵌进了别的元素里，锚点必须留在这一块的顶层` }); return; }
+    if (heads.length > 1) { rejected.push({ anchor, why: `改写后出现 ${heads.length} 个 id="${anchor}"，锚点必须唯一` }); return; }
+    if (heads[0] !== kids[0]) { rejected.push({ anchor, why: '锚点标题必须是这一块的第一个元素' }); return; }
+    const parent = els[0].parentNode; if (!parent) { rejected.push({ anchor, why: '讲稿结构异常' }); return; }
+    const holder = doc.createDocumentFragment();
+    kids.forEach((k) => holder.appendChild(doc.importNode(k, true)));
+    parent.insertBefore(holder, els[0]);
+    els.forEach((e) => e.remove());
+    okAnchors.push(anchor);
+  });
+  if (okAnchors.length) {
+    if (!persistNotes()) {
+      // 写不回去就得把内存里那份也退回去，否则界面和文件从此各说各话
+      try { notesDoc = new DOMParser().parseFromString(before, 'text/html'); } catch { /* noop */ }
+      sendNotesReport([], { applied: 0, rejected, error: 'deck 里找不到 window.__TXB64__ = "…" 那句赋值，讲稿写不回去' });
+      return;
+    }
+    notesUndo = before; notesAiCount = okAnchors.length;
+    // 改过的那几块的批注算办完了，从待办里撤掉
+    noteAnns = noteAnns.filter((a) => okAnchors.indexOf(a.anchor) < 0);
+    refreshTasks();
+    if ($('#notesModal') && ($('#notesModal') as HTMLElement).style.display !== 'none') openNotes();
+    toast('Claude 改写了 ' + okAnchors.length + ' 段讲稿' + (rejected.length ? `，${rejected.length} 段被拒` : ''));
+    setTimeout(syncExportToBridge, 300);
+  }
+  sendNotesReport([], { applied: okAnchors.length, appliedAnchors: okAnchors, rejected });
+}
+
+function undoNotesPatch(): void {
+  if (!notesUndo) return;
+  try { notesDoc = new DOMParser().parseFromString(notesUndo, 'text/html'); } catch { return; }
+  notesUndo = null; notesAiCount = 0;
+  persistNotes(); openNotes(); toast('已还原到 Claude 改写之前');
 }
 
 function smRoomId(): string {
@@ -1729,7 +2104,8 @@ function buildAllRequest(): { name: string; count: number; content: string; imag
   const hasDeck = !!aiDeckInstruction.trim();
   const pages = htmlSlides.map((s, i) => ({ s, i })).filter(({ s }) =>
     (aiInstructions[s.id] && !aiApplied.has(s.id)) || genQueue[s.id] || trayImagesForSlide(s.id).length);
-  if (!pages.length && !hasDeck) return null;
+  const hasNoteAnns = noteAnns.length > 0;
+  if (!pages.length && !hasDeck && !hasNoteAnns) return null;
   const anyVec = Object.values(genQueue).some((g) => g.type === 'vector');
   const anyChart = Object.values(genQueue).some((g) => g.type === 'chart');
   const anyPhoto = Object.values(genQueue).some((g) => g.type === 'photo');
@@ -1739,12 +2115,13 @@ function buildAllRequest(): { name: string; count: number; content: string; imag
   if (anyChart) body += aiChartSpec();
   if (anyPhoto) body += aiImageGenSpec();
   if (trayImages.length) body += aiImagePreamble();
-  body += '\n## 需要处理的页\n' + pages.map(({ s, i }) => aiTaskBlock(s, i, {
+  if (hasNoteAnns) body += aiNotesBlock();
+  body += (pages.length ? '\n## 需要处理的页\n' : '') + pages.map(({ s, i }) => aiTaskBlock(s, i, {
     instr: (aiInstructions[s.id] && !aiApplied.has(s.id)) ? aiInstructions[s.id] : '',
     gen: genQueue[s.id],
     trayImgs: trayImagesForSlide(s.id),
-  })).join('\n') + aiOutputSpec();
-  return { name: `${fileBase}.ai-tasks.md`, count: pages.length + (hasDeck ? 1 : 0), content: body, images: trayPayload() };
+  })).join('\n') + (pages.length ? aiOutputSpec() : '');
+  return { name: `${fileBase}.ai-tasks.md`, count: pages.length + (hasDeck ? 1 : 0) + noteAnns.length, content: body, images: trayPayload() };
 }
 function submitAll(): void {
   const r = buildAllRequest();
@@ -1792,12 +2169,26 @@ function todoItems(): { label: string; desc: string; page: number; cls: string; 
     if (g) { const lab = g.type === 'vector' ? '配图 · 矢量' : g.type === 'chart' ? '配图 · 图表' : '配图 · 照片'; const cls = g.type === 'vector' ? 'vec' : g.type === 'chart' ? 'chart' : 'photo'; items.push({ label: lab, desc: g.hint || '（按内容自动）', page: i + 1, cls, remove: () => genUnmark(s.id) }); }
     trayImagesForSlide(s.id).forEach((t) => items.push({ label: t.placed ? '导入图 · 已放置' : '导入图', desc: t.name, page: i + 1, cls: 'tray', remove: () => removeTrayImage(t.id) }));
   });
+  // 讲稿批注也是待办的一种——同一个「一键发送」把它们一起交出去，
+  // 用户不该为了改讲稿再学一套流程。
+  noteAnns.forEach((a) => items.push({
+    label: '讲稿批注', desc: a.note, page: a.page, cls: 'note', remove: () => removeNoteAnn(a.id),
+  }));
   return items;
+}
+/** AI 面板里那行讲稿状态 */
+function refreshNotesStatus(): void {
+  const el = $('#notesStatus'); if (!el) return;
+  if (mode !== 'html') { el.textContent = '—'; return; }
+  const doc = loadNotes();
+  if (!doc) { el.textContent = '这份 deck 没有内嵌讲稿（一体版才有）'; return; }
+  const n = doc.querySelectorAll('h3[id]').length;
+  el.textContent = `内嵌讲稿 ${n} 段` + (noteAnns.length ? ` · ${noteAnns.length} 条批注待发送` : ' · 打开后划一段即可加批注');
 }
 function renderTodo(): void {
   const box = $('#aiTodo'); if (!box) return; box.innerHTML = '';
   const items = todoItems();
-  if (!items.length) box.innerHTML = '<div class="qempty">待办清单为空。写「本页修改意见」、在「本页 · 配图」加配图、或导入图片，都会出现在这里。</div>';
+  if (!items.length) box.innerHTML = '<div class="qempty">待办清单为空。写「本页修改意见」、在「本页 · 配图」加配图、导入图片、或在讲稿里加批注，都会出现在这里。</div>';
   items.forEach((it) => {
     const row = document.createElement('div'); row.className = 'todorow';
     row.innerHTML = `<span class="todochip ${it.cls}">${it.label}</span>` + (it.page ? `<span class="todopg">第 ${it.page} 页</span>` : '')
@@ -2337,7 +2728,7 @@ function refreshSentBanner(): void {
   else el.style.display = 'none';
 }
 // one call to re-sync everything that depends on comments/config/status
-function refreshTasks(): void { renderLeft(); renderTodo(); refreshSentBanner(); }
+function refreshTasks(): void { renderLeft(); renderTodo(); refreshSentBanner(); refreshNotesStatus(); }
 function updateAiTarget(): void {
   if (mode !== 'html') return;
   saveAiInstruction(); // persist the page we're leaving
@@ -2742,7 +3133,8 @@ function connectBridge(): void {
   });
   ws.addEventListener('message', (e: MessageEvent) => {
     let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; owner?: { label: string; since: number } | null; port?: number;
-      cues?: Record<string, string[]>; replace?: boolean };
+      cues?: Record<string, string[]>; replace?: boolean;
+      anchors?: string[]; segments?: Record<string, string> };
     try { m = JSON.parse(String(e.data)); } catch { return; }
     // hello carries the handshake: which session owns this bridge + its port. Re-sent
     // after a handshake, so the badge updates the moment Claude runs /slidesmith.
@@ -2758,6 +3150,9 @@ function connectBridge(): void {
     // __SM_CUES__，所以提词必须有自己的一条道。两条都用 {type:'cues'} 回话。
     else if (m.type === 'cues-request') sendCueReport();
     else if (m.type === 'set-cues' && m.cues && typeof m.cues === 'object') applyCuePatch(m.cues, !!m.replace);
+    // 讲稿。同理：__TXB64__ 也在 #deck 之外，apply_patch 够不着。
+    else if (m.type === 'notes-request') sendNotesReport(Array.isArray(m.anchors) ? m.anchors : []);
+    else if (m.type === 'set-notes' && m.segments && typeof m.segments === 'object') applyNotesPatch(m.segments);
   });
   ws.addEventListener('close', () => {
     bridge.connected = false; bridge.ws = null; updateBridgeBadge();
@@ -2884,6 +3279,29 @@ body.dark .genrow{background:#1b1e25;border-color:#2c323d}
 body.dark .genrow-h .qtt{color:#cfd2d8}
 body.dark .gen-hint{background:#12151b;border-color:#2c323d;color:#cfd2d8}
 .libmodal{position:fixed;inset:0;z-index:60;background:rgba(20,20,24,.55);display:none;align-items:center;justify-content:center}
+.notesbox{width:min(1180px,95vw);height:86vh}
+.noteswrap{flex:1;display:flex;min-height:0}
+.notesframe{flex:1;border:0;background:#fff;min-width:0}
+.notesempty{flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 40px;font-size:13px;line-height:1.9;color:#9a9a9e}
+.noteside{width:320px;flex:0 0 auto;border-left:1px solid #ececee;display:flex;flex-direction:column;min-height:0}
+.notepick{padding:12px 14px;border-bottom:1px solid #ececee;background:#fffdf5}
+.notepickwhere{font-size:11px;color:#9a9a9e;margin-bottom:5px}
+.notepickquote{font-size:12px;line-height:1.6;color:#4a4a4e;background:#ffe9a8;border-radius:4px;padding:6px 8px;margin-bottom:8px}
+.notelist{flex:1;overflow:auto;padding:10px 14px}
+.notelist .qempty{font-size:12px;color:#9a9a9e;line-height:1.7;padding:8px 2px}
+.annrow{border:1px solid #ececee;border-radius:8px;padding:9px 10px;margin-bottom:9px}
+.annhead{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.annhead code{font-size:10.5px;color:#9a9a9e}
+.annhead .todo-del{margin-left:auto}
+.annquote{font-size:11.5px;line-height:1.6;color:#6a6a6e;border-left:3px solid #e0c063;padding-left:7px;margin-bottom:5px;cursor:pointer}
+.annquote:hover{color:#B5402A}
+.annnote{font-size:12.5px;line-height:1.6;color:#1c1c1f}
+.todochip.note{background:#f3e6d2;color:#8a6a2a}
+.notes-status{font-size:11.5px;color:#9a9a9e;padding:2px 2px 6px}
+body.dark .noteside,body.dark .notepick{border-color:#2c323d}
+body.dark .notepick{background:#1d2027}
+body.dark .annrow{border-color:#2c323d}
+body.dark .annnote{color:#e8e8ea}
 .libbox{width:min(900px,92vw);max-height:86vh;display:flex;flex-direction:column;background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden}
 .libhead{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid #ececee}
 .libhead .ctitle{font-size:15px;font-weight:600;color:#3a3a3e}
@@ -3306,6 +3724,9 @@ function buildUI(): void {
         <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
         <div id="trayGrid" class="tray-grid"></div>
 
+        <div class="sechead">讲稿<button class="ihelp" type="button" data-help="讲稿不给直接编辑——它带着锚点和讲法/金句/数据块，手改必然弄漂，副屏同步和手表提词会一起坏。改法是：划一段、加一条批注，交给 Claude 在守住结构的前提下改写。">?</button><span class="grow"></span><button id="notesOpen" class="mini">打开讲稿</button></div>
+        <div class="notes-status" id="notesStatus">—</div>
+
         <div class="sechead">待办<button class="ihelp" type="button" data-help="上面的「改字 / 配图 / 导入图」都汇总在这里。点「一键发送给 AI」一次全部交给 Claude。">?</button><span class="grow"></span><span class="sendnote" id="aiSendNote" style="display:none">含照片·计费</span></div>
         <div id="aiTodo" class="aitodo"></div>
         <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
@@ -3369,6 +3790,28 @@ function buildUI(): void {
     <div class="ctitle">连接 Claude Code</div>
     <div id="cstate"></div>
     <button class="mini cclose" id="cclose">关闭</button>
+  </div>
+</div>
+<div class="libmodal" id="notesModal" style="display:none">
+  <div class="libbox notesbox">
+    <div class="libhead"><span class="ctitle">讲稿 · 批注</span><span id="noteCount" class="lib-count"></span><span class="grow"></span><button id="notesUndoBtn" class="mini" style="display:none">撤销 Claude 的改写</button><button id="notesClose" class="mini cclose">关闭</button></div>
+    <div class="noteswrap">
+      <iframe id="notesFrame" class="notesframe"></iframe>
+      <div id="notesEmpty" class="notesempty" style="display:none">
+        这份 deck 里没有内嵌讲稿。<br><br>
+        一体版（<code>slides-presenter-mode</code> 缝出来的单文件）会把整份讲稿 base64 嵌在
+        <code>window.__TXB64__</code> 里，Studio 才读得到；三文件联动版的讲稿在隔壁文件，这里看不见。
+      </div>
+      <div class="noteside">
+        <div class="notepick" id="notePickBox" style="display:none">
+          <div class="notepickwhere" id="notePickWhere"></div>
+          <div class="notepickquote" id="notePickQuote"></div>
+          <textarea id="noteText" rows="3" placeholder="这段要怎么改？例：太长了，砍一半；这里要更口语。"></textarea>
+          <div class="oprow"><button id="noteAdd" class="primary-mini">加批注</button><button id="noteCancel" class="mini">取消</button></div>
+        </div>
+        <div id="noteList" class="notelist"></div>
+      </div>
+    </div>
   </div>
 </div>
 <div class="libmodal" id="libModal" style="display:none">
@@ -3524,7 +3967,23 @@ function buildUI(): void {
     document.querySelectorAll('.htab').forEach((x) => x.classList.toggle('active', x === tb));
     document.querySelectorAll('.hpane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.hpane !== name));
     if (name === 'cue') renderCuePane();
+    else if (name === 'ai') refreshNotesStatus();
   }));
+  // 讲稿批注
+  $('#notesOpen').addEventListener('click', openNotes);
+  $('#notesClose').addEventListener('click', closeNotes);
+  $('#noteAdd').addEventListener('click', addNoteAnn);
+  $('#noteCancel').addEventListener('click', () => {
+    notePick = null;
+    const b = $('#notePickBox'); if (b) (b as HTMLElement).style.display = 'none';
+  });
+  $('#notesUndoBtn').addEventListener('click', undoNotesPatch);
+  // 讲稿 iframe 里点了「加批注」
+  window.addEventListener('message', (e: MessageEvent) => {
+    const d = e.data as { type?: string; anchor?: string; quote?: string } | null;
+    if (!d || d.type !== 'sm-note-pick' || typeof d.quote !== 'string') return;
+    onNotePick(d.anchor || '', d.quote);
+  });
   // 左栏多功能 tab：页面（缩略图导航）/ 换装（皮肤画廊，就地换肤）/ 插入（添加中枢）
   document.querySelectorAll('.ltab').forEach((tb) => tb.addEventListener('click', () => {
     const name = (tb as HTMLElement).dataset.ltab;

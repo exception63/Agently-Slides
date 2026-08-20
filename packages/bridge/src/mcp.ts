@@ -216,6 +216,56 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
   );
 
   server.registerTool(
+    'slidesmith_notes',
+    {
+      title: '读 / 写 deck 内嵌的讲稿（按锚点分块）',
+      description:
+        '一体版 deck 把整份讲稿 base64 嵌在 `window.__TXB64__` 里。不带 set 调用 = 读（每页：锚点 · 标题 · 字数 · 用户的批注；' +
+        '`anchors` 里点名的块才连整块 HTML 一起给）；带 set 调用 = 把改写好的块写回。\n\n' +
+        '**为什么不能用 slidesmith_apply_patch 写**：讲稿也在 `#deck` 之外，apply_patch 够不着。\n\n' +
+        '**改写时不许破的**（Studio 会验，破了整块拒收）：\n' +
+        '1. `<h3 … id="锚点">` 必须原样留着、唯一、且是这一块的**第一个顶层元素** —— 锚点是副屏同步和手表提词的键。\n' +
+        '2. 讲法块 `<p class="cue">` / 金句块 `<div class="golden">` / 数据块 `<div class="data">` 该在的还在，除非用户明说要删。\n' +
+        '3. `<strong>` 是手表提词的种子，别整段加粗、也别全去掉。\n' +
+        '4. 只动被批注的那几块，别顺手重写整份讲稿。\n\n' +
+        '典型用法：用户在 Studio 讲稿视图里划一段、写一条批注 → 批注随「AI 待办」发过来（含原文块）→ ' +
+        '你按批注改写整块 → 用本工具 set 写回 → 用户在 Studio 里看到结果，不满意可「撤销 Claude 的改写」。',
+      inputSchema: {
+        anchors: z.array(z.string()).optional()
+          .describe('要连整块 HTML 一起拿的锚点（或 1 开始的页号）。不传只要目录。'),
+        set: z.record(z.string()).optional()
+          .describe('要写回的块：{ "锚点": "<h3 class=\'sub\' id=\'锚点\'>…</h3><p>…</p>" }。整块替换，务必带上锚点标题本身。'),
+      },
+    },
+    async ({ anchors, set }) => {
+      const r = set ? await bridge.setNotes(set) : await bridge.notes(anchors || []);
+      if (!r) {
+        return text({ ok: false,
+          hint: 'Studio 没连上（或没回话）。讲稿的读写都要现场问 Studio 要——它手里那份才是解过码的真相。' });
+      }
+      if (!r.hasNotes) {
+        return text({ ok: false, hasNotes: false, error: r.error,
+          hint: '这份 deck 里没有内嵌讲稿（window.__TXB64__）。一体版（slides-presenter-mode 缝出来的单文件）才有；'
+            + '三文件联动版的讲稿在隔壁文件里，Studio 读不到。' });
+      }
+      const pending = r.pages.filter((p) => p.annotations.length)
+        .map((p) => ({ page: p.index, anchor: p.anchor, annotations: p.annotations }));
+      return text({
+        ok: true, hasNotes: true,
+        wrote: set ? (r.applied || 0) : undefined,
+        appliedAnchors: r.appliedAnchors,
+        rejected: r.rejected && r.rejected.length ? r.rejected : undefined,
+        total: r.pages.length,
+        pendingAnnotations: pending.length ? pending : undefined,
+        pages: set ? undefined : r.pages,
+        hint: (r.rejected && r.rejected.length)
+          ? '有块被拒收（见 rejected）——按原因改好再写一次，别绕过它。'
+          : (set ? '已写回。用户可以在 Studio 讲稿视图里看，并且随时「撤销 Claude 的改写」。' : undefined),
+      });
+    },
+  );
+
+  server.registerTool(
     'slidesmith_apply_patch',
     {
       title: '把改好的页回写到 Studio',
@@ -246,7 +296,7 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  log('MCP server ready on stdio. Tools: slidesmith_open, slidesmith_connect, slidesmith_wait, slidesmith_get_requests, slidesmith_outline, slidesmith_cues, slidesmith_apply_patch, slidesmith_status');
+  log('MCP server ready on stdio. Tools: slidesmith_open, slidesmith_connect, slidesmith_wait, slidesmith_get_requests, slidesmith_outline, slidesmith_cues, slidesmith_notes, slidesmith_apply_patch, slidesmith_status');
 
   // 客户端模式下 `close()` 是空操作——**桥不是我们起的，就不能由我们关**（app 还在用）。
   const shutdown = async () => { try { await bridge.close(); } catch { /* noop */ } process.exit(0); };
