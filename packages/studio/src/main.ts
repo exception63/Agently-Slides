@@ -1127,10 +1127,24 @@ function renderCuePane(): void {
     `<div class="field"><input class="cue-in" data-i="${i}" value="${esc(v)}" placeholder="${i === 0 ? '例：无缝嵌入' : '（可留空）'}" maxlength="24"></div>`
   ).join('');
 
-  box.innerHTML = `<div class="cfaint">第 ${cur + 1} 页 · 锚点 <code>${esc(anchor)}</code></div>`
+  // 全 deck 的账要摆在最上面：提词是「每页都得有」的东西，只盯着当前页
+  // 永远不知道自己还差 12 页没写。
+  const sum = cueDeckSummary(map);
+  const short = sum.total - sum.have;
+  const sumTxt = `全 deck ${sum.have}/${sum.total} 页有提词`
+    + (short ? ` · 缺 ${short} 页` : '')
+    + (sum.bad ? ` · ${sum.bad} 页不合规` : (short ? '' : ' · 全部合规'));
+
+  box.innerHTML = (cueUndo
+      ? `<div class="audit-row">Claude 刚写入 ${cueAiCount} 页 · <button id="cueUndo" class="mini">撤销</button></div>`
+      : '')
+    + `<div class="cfaint">${sumTxt}</div>`
+    + `<div class="cfaint">第 ${cur + 1} 页 · 锚点 <code>${esc(anchor)}</code></div>`
     + rows
     + '<div class="oprow"><button id="cueAdd" class="mini">＋ 加一条</button>'
-    + '<button id="cueFromNotes" class="mini">从讲稿抽一版</button></div>'
+    + '<button id="cueFromNotes" class="mini">从讲稿抽一版</button>'
+    + ((short || sum.bad) ? '<button id="cueNext" class="mini">跳到下一个待处理</button>' : '')
+    + '</div>'
     + '<div id="cueCheck"></div>';
 
   box.querySelectorAll('.cue-in').forEach((el) => {
@@ -1152,12 +1166,20 @@ function renderCuePane(): void {
   });
   const fromNotes = $('#cueFromNotes');
   if (fromNotes) fromNotes.addEventListener('click', () => cueDraftFromNotes(anchor));
+  const undoBtn = $('#cueUndo');
+  if (undoBtn) undoBtn.addEventListener('click', () => undoCuePatch());
+  const nextBtn = $('#cueNext');
+  if (nextBtn) nextBtn.addEventListener('click', () => {
+    const i = nextCueTodo(map);
+    if (i < 0) { toast('全部页都过关了'); return; }
+    selectHtmlSlide(i);
+  });
   checkCues(list.filter((t) => t.length > 0));
 }
 
-/** 就地体检 —— 讲台上才发现提词不合用就晚了 */
-function checkCues(vals: string[]): void {
-  const out = $('#cueCheck'); if (!out) return;
+/** 一页提词的毛病清单（空 = 合规）。**只此一处**——面板体检、全 deck 汇总、
+ *  交给 Claude 的回报，三处共用它，规则不会各写各的然后慢慢漂开。 */
+function cueIssues(vals: string[]): string[] {
   const bad: string[] = [];
   if (!vals.length) bad.push('这一页还没有提词');
   if (vals.length > CUE_MAX) bad.push(`条数 ${vals.length}，超过 ${CUE_MAX} 条手表要翻页`);
@@ -1165,6 +1187,13 @@ function checkCues(vals: string[]): void {
     if (v.length > CUE_LEN) bad.push(`「${v.slice(0, 8)}…」${v.length} 字，超上限 ${CUE_LEN}`);
     if (CUE_STRUCTURAL.test(v)) bad.push(`「${v}」像结构标签，手表上帮不上忙`);
   });
+  return bad;
+}
+
+/** 就地体检 —— 讲台上才发现提词不合用就晚了 */
+function checkCues(vals: string[]): void {
+  const out = $('#cueCheck'); if (!out) return;
+  const bad = cueIssues(vals);
   out.className = bad.length ? 'audit-row error' : 'audit-row';
   out.textContent = bad.length ? '⚠ ' + bad.join(' · ') : '✓ 合规';
 }
@@ -1191,6 +1220,101 @@ function cueDraftFromNotes(anchor: string): void {
   persistCues();
   renderCuePane();
   toast('抽了 ' + found.length + ' 条草稿 —— 请逐条过一遍再用');
+}
+
+// ---------- 提词的对外接口：Claude ↔ 桥 ↔ 这里（「一键加提词」走的就是这条） ----------
+//
+// **为什么非要另开一条通道**：`slidesmith_apply_patch` 只按 `data-id` 替换 `#deck` 里的
+// `<section>`，而提词表落在 `#deck` 之外的 prelude/trailing —— 补丁够不着它。
+//
+// **读也不让桥去正则解析那份字面量**（理由同 loadCues）：那是人和 skill 手写的 JS，
+// 带注释、可能有尾逗号。这里交出去的是浏览器已经求值过的那份；锚点也用 Studio 自己的
+// `slideAnchor()` 算，和提词面板、和手表查表用的键完全同源，不会各算各的。
+interface CuePageInfo { index: number; anchor: string; title: string; cues: string[]; issues: string[] }
+/** AI 上一次写入之前的整份提词表 —— 撤销用。null = 这一会话 AI 还没写过 */
+let cueUndo: Record<string, string[]> | null = null;
+let cueAiCount = 0;
+
+function cueReport(): { watchMode: boolean; deckMode: string; pages: CuePageInfo[] } {
+  const map = mode === 'html' ? loadCues() : null;
+  const pages: CuePageInfo[] = mode === 'html'
+    ? htmlSlides.map((s, i) => {
+      const a = slideAnchor(i);
+      const vals = (map && map[a]) ? map[a].slice() : [];
+      return { index: i + 1, anchor: a, title: s.title, cues: vals, issues: cueIssues(vals) };
+    })
+    : [];
+  return { watchMode: !!map, deckMode: mode, pages };
+}
+
+function sendCueReport(extra: Record<string, unknown> = {}): void {
+  if (!bridge.connected || !bridge.ws || bridge.ws.readyState !== WebSocket.OPEN) return;
+  try { bridge.ws.send(JSON.stringify({ type: 'cues', ...cueReport(), ...extra })); } catch { /* noop */ }
+}
+
+/**
+ * Claude 写来一份提词表。
+ *
+ * 默认 **merge**：只填还空着的页，**不动用户已经手调过的**。重跑「一键加提词」
+ * 因此是安全的——否则用户在面板里逐页过完一遍的成果，会被下一次生成整份抹掉。
+ * replace=true 才覆盖。
+ */
+function applyCuePatch(incoming: Record<string, string[]>, replace: boolean): void {
+  if (mode !== 'html') { sendCueReport({ applied: 0, error: '当前不是 HTML deck，提词写不进去' }); return; }
+  const map = loadCues();
+  if (!map) {
+    sendCueReport({ applied: 0, error: '这份 deck 没开 watch mode（找不到 window.__SM_CUES__）。'
+      + '先用 slides-presenter-mode skill 以 watch mode 重新缝一次，deck 里才有提词表可写。' });
+    return;
+  }
+  const valid = new Set(htmlSlides.map((_s, i) => slideAnchor(i)));
+  const snapshot = JSON.parse(JSON.stringify(map)) as Record<string, string[]>;
+  const unknown: string[] = []; const kept: string[] = [];
+  let applied = 0;
+  Object.keys(incoming).forEach((k) => {
+    // 不认识的锚点**不静默丢**——回报里带上，让写的人知道自己写歪了
+    if (!valid.has(k)) { unknown.push(k); return; }
+    const vals = (incoming[k] || []).map((v) => String(v).trim()).filter((v) => v.length > 0);
+    if (!vals.length) return;
+    if (!replace && map[k] && map[k].length) { kept.push(k); return; }
+    map[k] = vals; applied++;
+  });
+  if (applied) {
+    cueUndo = snapshot; cueAiCount = applied;
+    persistCues();
+    if (!($('[data-hpane="cue"]') as HTMLElement | null)?.hidden) renderCuePane();
+    toast('Claude 写入 ' + applied + ' 页提词 —— 请在「提词」面板逐页过一遍');
+    setTimeout(syncExportToBridge, 300);
+  }
+  sendCueReport({ applied, keptExisting: kept, unknownAnchors: unknown });
+}
+
+function undoCuePatch(): void {
+  if (!cueUndo) return;
+  cueMap = cueUndo; cueUndo = null; cueAiCount = 0;
+  persistCues(); renderCuePane(); toast('已还原到 Claude 写入之前');
+}
+
+/** 全 deck 一眼：几页有提词、几页不合规。**讲台上才发现缺页就晚了** */
+function cueDeckSummary(map: Record<string, string[]>): { have: number; total: number; bad: number } {
+  let have = 0; let bad = 0;
+  htmlSlides.forEach((_s, i) => {
+    const vals = map[slideAnchor(i)] || [];
+    if (!vals.length) return;
+    have++;
+    if (cueIssues(vals).length) bad++;
+  });
+  return { have, total: htmlSlides.length, bad };
+}
+
+/** 下一个还没提词 / 提词不合规的页（从当前页往后绕一圈）。-1 = 全都过关了 */
+function nextCueTodo(map: Record<string, string[]>): number {
+  const n = htmlSlides.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (cur + k) % n;
+    if (cueIssues(map[slideAnchor(i)] || []).length) return i;
+  }
+  return -1;
 }
 
 function smRoomId(): string {
@@ -2617,7 +2741,8 @@ function connectBridge(): void {
     updateBridgeBadge(); toast('已连接 Claude Code');
   });
   ws.addEventListener('message', (e: MessageEvent) => {
-    let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; owner?: { label: string; since: number } | null; port?: number };
+    let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; owner?: { label: string; since: number } | null; port?: number;
+      cues?: Record<string, string[]>; replace?: boolean };
     try { m = JSON.parse(String(e.data)); } catch { return; }
     // hello carries the handshake: which session owns this bridge + its port. Re-sent
     // after a handshake, so the badge updates the moment Claude runs /slidesmith.
@@ -2629,6 +2754,10 @@ function connectBridge(): void {
     // 桥要一份最新的 deck（AI 读页之前会问一次）。**手打的编辑只有这条路能传上去**——
     // 保存/导出/AI 补丁之外，桥手里那份一直是旧的，AI 照旧内容重写就会盖掉手改。
     else if (m.type === 'sync-request') syncExportToBridge();
+    // 手表提词。读走 cues-request，写走 set-cues —— apply_patch 够不着 #deck 之外的
+    // __SM_CUES__，所以提词必须有自己的一条道。两条都用 {type:'cues'} 回话。
+    else if (m.type === 'cues-request') sendCueReport();
+    else if (m.type === 'set-cues' && m.cues && typeof m.cues === 'object') applyCuePatch(m.cues, !!m.replace);
   });
   ws.addEventListener('close', () => {
     bridge.connected = false; bridge.ws = null; updateBridgeBadge();

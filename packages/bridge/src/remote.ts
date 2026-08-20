@@ -25,7 +25,7 @@
 // 一份，两边都不用将就。
 import { readFileSync } from 'node:fs';
 import { basename, resolve } from 'node:path';
-import type { BridgeHandle, BridgeOwner, BridgeRequest, BridgeStatus } from './bridge.js';
+import type { BridgeHandle, BridgeOwner, BridgeRequest, BridgeStatus, CueReport } from './bridge.js';
 import type { OutlineEntry } from './outline.js';
 
 /** MCP 层真正用到的那几件事。本地/远端两种实现，全异步。 */
@@ -41,6 +41,9 @@ export interface BridgeFacade {
   getRequests(drain: boolean): Promise<BridgeRequest[]>;
   applyPatch(sections: string, opts: { preview: boolean }): Promise<{ clients: number; queued: boolean }>;
   outline(withHtml: string[]): Promise<OutlineEntry[]>;
+  /** 手表提词表的读 / 写。null = Studio 没连上或没回话 */
+  cues(): Promise<CueReport | null>;
+  setCues(cues: Record<string, string[]>, opts: { replace: boolean }): Promise<CueReport | null>;
   status(): Promise<BridgeStatus>;
   close(): Promise<void>;
 }
@@ -57,6 +60,8 @@ export function localFacade(bridge: BridgeHandle): BridgeFacade {
     async getRequests(drain) { return bridge.getRequests(drain); },
     async applyPatch(sections, opts) { return bridge.applyPatch(sections, opts); },
     async outline(withHtml) { await bridge.syncFromStudio(); return bridge.outline(withHtml); },
+    cues: () => bridge.cues(),
+    setCues: (cues, opts) => bridge.setCues(cues, opts),
     async status() { return bridge.status(); },
     close: () => bridge.close(),
   };
@@ -157,6 +162,21 @@ export async function probeRemote(base: string, timeoutMs = 1200): Promise<Bridg
       const query = withHtml.length ? `?html=${encodeURIComponent(withHtml.join(','))}` : '';
       const r = await jsonFetch(`${root}/api/outline${query}`, { timeoutMs: 20000 });
       return (r['pages'] || []) as OutlineEntry[];
+    },
+
+    async cues() {
+      const r = await jsonFetch(`${root}/api/cues`, { timeoutMs: 15000 }).catch(() => null);
+      return (r && r['ok']) ? (r as unknown as CueReport) : null;
+    },
+
+    async setCues(cues, opts) {
+      const r = await jsonFetch(`${root}/api/cues`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ cues, replace: opts.replace }),
+        timeoutMs: 20000,
+      }).catch(() => null);
+      return (r && r['ok']) ? (r as unknown as CueReport) : null;
     },
 
     async status() {

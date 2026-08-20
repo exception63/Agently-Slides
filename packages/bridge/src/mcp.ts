@@ -163,6 +163,59 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
   );
 
   server.registerTool(
+    'slidesmith_cues',
+    {
+      title: '读 / 写手表提词（watch mode 的 __SM_CUES__）',
+      description:
+        '演讲时 Apple Watch 上显示的**每页提词**。不带 set 调用 = 读现状（每页：页号 · 锚点 · 标题 · 现有提词 · 体检结论）；' +
+        '带 set 调用 = 写进去。\n\n' +
+        '**为什么不能用 slidesmith_apply_patch 写**：提词表存在 `window.__SM_CUES__`，它落在 `#deck` 之外，' +
+        'apply_patch 只按 data-id 替换 `#deck` 里的 `<section>`，够不着它。\n\n' +
+        '**键必须是锚点**，就是本工具（和 slidesmith_outline）返回的那个 id / anchor，别自己造。\n\n' +
+        '**⭐ 硬约束（Apple Watch Ultra 3 / Series 11 实测得出，别放宽）**：\n' +
+        '· 每页 **1–5 条**（表盘放得下 5 行）\n' +
+        '· 每条 **≤10 个汉字**（英文 ≤16 字符）—— 超了就折行，整句话上去等于显示讲稿全文\n' +
+        '· 必须是**内容锚点**（「无缝嵌入」「感官剥夺」），不能是**结构标签**（「第一部分」「目录」）—— 后者占满一屏却帮不上忙\n' +
+        '· **不得与 slide 标题重复** —— 手表顶部已经在显示「5/45 · 标题」了\n' +
+        '· **每页都要有**，缺页比没这功能更让人慌\n\n' +
+        '默认 **只填空页、不覆盖已有的**（用户可能已经在 Studio 提词面板里手调过）；确实要重写就传 replace=true。' +
+        '写完 Studio 会弹提示让用户逐页过一遍，面板上还留着一个「撤销」。',
+      inputSchema: {
+        set: z.record(z.array(z.string())).optional()
+          .describe('要写入的提词表：{ "锚点": ["短语", …] }，如 {"s1-boom":["无缝嵌入"]}。不传 = 只读。'),
+        replace: z.boolean().optional()
+          .describe('true = 连已有提词的页也覆盖。默认 false（只填空页，重跑安全）。'),
+      },
+    },
+    async ({ set, replace }) => {
+      const r = set ? await bridge.setCues(set, { replace: !!replace }) : await bridge.cues();
+      if (!r) {
+        return text({ ok: false,
+          hint: 'Studio 没连上（或没回话）。提词的读写都要现场问 Studio 要——它手里那份才是浏览器求值过的真相。' });
+      }
+      if (!r.watchMode) {
+        return text({ ok: false, watchMode: false, error: r.error,
+          hint: '这份 deck 没开 watch mode，里面没有 window.__SM_CUES__ 可写。'
+            + '要先用 slides-presenter-mode skill 以 watch mode 重新缝一次（它会烘进提词表 + ✦提词 按钮）。' });
+      }
+      const missing = r.pages.filter((p) => !p.cues.length).map((p) => `${p.index} [${p.anchor}]`);
+      const bad = r.pages.filter((p) => p.cues.length && p.issues.length)
+        .map((p) => `${p.index} [${p.anchor}] ${p.issues.join(' · ')}`);
+      return text({
+        ok: true, watchMode: true, wrote: set ? (r.applied || 0) : undefined,
+        keptExisting: r.keptExisting, unknownAnchors: r.unknownAnchors,
+        total: r.pages.length, withCues: r.pages.length - missing.length,
+        missing, violations: bad,
+        // 读的时候才给整份表（拟提词要看标题和锚点）；写完只报账，不再倒一遍
+        pages: set ? undefined : r.pages,
+        hint: (missing.length || bad.length)
+          ? '还有页没过关（见 missing / violations），补齐再交差。'
+          : '每页都有提词且全部合规。',
+      });
+    },
+  );
+
+  server.registerTool(
     'slidesmith_apply_patch',
     {
       title: '把改好的页回写到 Studio',
@@ -193,7 +246,7 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  log('MCP server ready on stdio. Tools: slidesmith_open, slidesmith_connect, slidesmith_wait, slidesmith_get_requests, slidesmith_outline, slidesmith_apply_patch, slidesmith_status');
+  log('MCP server ready on stdio. Tools: slidesmith_open, slidesmith_connect, slidesmith_wait, slidesmith_get_requests, slidesmith_outline, slidesmith_cues, slidesmith_apply_patch, slidesmith_status');
 
   // 客户端模式下 `close()` 是空操作——**桥不是我们起的，就不能由我们关**（app 还在用）。
   const shutdown = async () => { try { await bridge.close(); } catch { /* noop */ } process.exit(0); };

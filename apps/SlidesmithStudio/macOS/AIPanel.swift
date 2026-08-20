@@ -23,6 +23,19 @@ struct AIPanel: View {
             ("统一视觉", "检查当前 deck 每一页的排版一致性：字号层级、留白、对齐、强调色用法。找出跑偏的页，逐页说清问题，再用 slidesmith_apply_patch 改回来。"),
             ("压缩文字", "当前 deck 里凡是正文超过三行的页，都改写得更短更有力——留观点去铺垫，别丢信息。改完用 slidesmith_apply_patch 回写。"),
             ("配张图", "看看当前 deck 哪一页最需要一张图（空得慌或者概念抽象），画一张贴合内容的内联 SVG 放进去。风格跟着这套皮肤的设计令牌走。"),
+            // 手表提词。**硬约束写在 slidesmith_cues 工具自己的说明里**，这里只讲流程——
+            // 规则同时抄一份在这里的话，两处迟早各改各的。
+            ("一键加提词", """
+                给当前 deck 生成 Apple Watch 上的每页提词。
+
+                1. 先 slidesmith_cues 读一遍现状：确认这份 deck 开了 watch mode，并看清哪些页已经有提词——**那些别动**。
+                2. slidesmith_outline 拿目录，再分批用 withHtml 取正文（一次 12–15 页，别一次拉整份，会把上下文撑爆）。
+                3. 逐页拟提词，键用返回的 anchor，别自己造。
+                4. 每批用 slidesmith_cues 的 set 写回。默认只填空页，**不要传 replace**——用户可能已经手调过。
+                5. 全部写完再读一次，确认 missing 和 violations 都空了。
+
+                硬约束在 slidesmith_cues 的工具说明里，一条都不能破。最后告诉我写了多少页、哪几页你拿不准，我在「提词」面板里逐页过。
+                """),
         ]
     }
 
@@ -238,6 +251,20 @@ struct AIPanel: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             HStack(alignment: .bottom, spacing: 8) {
+                // 预设也得**聊起来之后还够得着**：那几条链接只长在空状态里，
+                // 发过一句话就再也点不到了，而「一键加提词」恰恰是聊到一半才想起来的活。
+                Menu {
+                    ForEach(quickPrompts, id: \.0) { title, prompt in
+                        Button(title) { claude.send(prompt) }
+                    }
+                } label: {
+                    Image(systemName: "wand.and.stars").font(.system(size: 14))
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .frame(width: 20)
+                .help("预设：常用的几件活，点一下直接发给 Claude")
+
                 TextField("跟它说要改什么…", text: $input, axis: .vertical)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12.5))

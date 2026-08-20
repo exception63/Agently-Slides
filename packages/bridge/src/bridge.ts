@@ -176,6 +176,8 @@ async function fetchImageDataUrl(rawUrl: string): Promise<{ dataUrl: string; byt
 //   bridge → Studio : { type:'hello', hasDeck, owner, port } | { type:'import', name, html } | { type:'patch', text, preview }
 //   Studio → bridge : { type:'ready' } | { type:'requests', request, images? } | { type:'exported', name, html }
 //   bridge → Studio : { type:'hello' } | { type:'import' } | { type:'patch' } | { type:'sync-request' }
+//                     | { type:'cues-request' } | { type:'set-cues', cues, replace }
+//   Studio → bridge : … | { type:'cues', watchMode, pages, applied?, keptExisting?, unknownAnchors?, error? }
 //
 // An image-layout request carries images:[{id,name,dataUrl}]. The bridge writes each
 // to a temp dir and substitutes the __TRAY_DIR__ token in the request text with that
@@ -191,6 +193,25 @@ export interface BridgeRequest {
   count: number;
   /** user wants to review the AI's change before it's final (Studio's 改前先问我 switch) */
   confirm?: boolean;
+}
+
+/** 手表提词（watch mode）的现状，由 Studio 现场交出来。
+ *
+ * **为什么不在这里解析 deck 文本**：`window.__SM_CUES__` 是人和 skill 手写的 JS
+ * 字面量（带注释、可能有尾逗号），正则解析迟早翻车；而且提词表的键是 Studio
+ * 用 `deckAPI.SLIDE_MAP` 算出来的锚点，桥这边复算就是第二个真相源。所以读写
+ * 都问 Studio 要——它手里那份是浏览器已经求值过的。 */
+export interface CueReport {
+  /** deck 开没开 watch mode。false = 里面根本没有提词表，写不进去 */
+  watchMode: boolean;
+  deckMode: string;
+  /** `issues` 为空 = 这一页合规。规则由 Studio 那一处（cueIssues）算，桥不复算 */
+  pages: Array<{ index: number; anchor: string; title: string; cues: string[]; issues: string[] }>;
+  /** 只有写入之后才有：实际落了几页 · 因已有内容而保留的 · 认不出的锚点 */
+  applied?: number;
+  keptExisting?: string[];
+  unknownAnchors?: string[];
+  error?: string;
 }
 
 /** who owns this bridge — the Claude Code session that ran `/slidesmith`. The
@@ -246,6 +267,13 @@ export interface BridgeHandle extends EventEmitter {
    *  `<section>`s back — that's what lets a free-form chat rewrite a page without
    *  reading (and mis-guessing) the file on disk. */
   outline(withHtml?: string[]): OutlineEntry[];
+  /** ask the connected Studio for the deck's watch-mode cue table (anchor → phrases),
+   *  page by page. Resolves null when no Studio is connected / it doesn't answer. */
+  cues(timeoutMs?: number): Promise<CueReport | null>;
+  /** write a cue table into the deck. `replace=false` (default) only fills pages that
+   *  have no cues yet — so re-running "一键加提词" never clobbers what the user已经手调过.
+   *  Resolves with the Studio's fresh report (what landed, what was kept, bad anchors). */
+  setCues(cues: Record<string, string[]>, opts?: { replace?: boolean; timeoutMs?: number }): Promise<CueReport | null>;
   status(): BridgeStatus;
   /** bind a Claude Code session label to this bridge (the handshake). Re-broadcasts
    *  hello so every connected Studio shows which session it's talking to. */
@@ -447,6 +475,26 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
         const pages = handle.outline(want);
         sendJson(res, { ok: true, deckName: deck ? deck.name : null, count: pages.length, pages, synced });
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 500));
+      return;
+    }
+    // GET /api/cues → the deck's watch-mode cue table (anchor → phrases, page by page).
+    // POST /api/cues  body: {"cues":{anchor:[...]},"replace":bool} → write it into the deck.
+    if (url === '/api/cues' && req.method === 'GET') {
+      handle.cues().then((r) => {
+        if (!r) return sendJson(res, { ok: false, error: 'Studio 没连上（或没回话），提词读不到' }, 409);
+        sendJson(res, { ok: true, ...r });
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 500));
+      return;
+    }
+    if (url === '/api/cues' && req.method === 'POST') {
+      readBody(req).then(async (body) => {
+        let j: { cues?: Record<string, string[]>; replace?: boolean };
+        try { j = JSON.parse(body); } catch { return sendJson(res, { ok: false, error: 'body 不是 JSON' }, 400); }
+        if (!j || !j.cues || typeof j.cues !== 'object') return sendJson(res, { ok: false, error: '缺 cues 字段' }, 400);
+        const r = await handle.setCues(j.cues, { replace: !!j.replace });
+        if (!r) return sendJson(res, { ok: false, error: 'Studio 没连上（或没回话），提词没写进去' }, 409);
+        sendJson(res, { ok: true, ...r });
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
     // POST /api/patch  body: raw <section data-id> html (or {"sections":"…","preview":bool}) → applied to Studio.
@@ -657,7 +705,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     emitter.emit('studio-connected');
 
     ws.on('message', (data) => {
-      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; images?: { id?: string; name?: string; dataUrl?: string }[]; name?: string; html?: string };
+      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; images?: { id?: string; name?: string; dataUrl?: string }[]; name?: string; html?: string; watchMode?: boolean; pages?: unknown };
       try { m = JSON.parse(String(data)); } catch { return; }
       if (m.type === 'requests' && m.request && typeof m.request.content === 'string') {
         const id = 'req-' + (++reqSeq);
@@ -679,6 +727,9 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
         pending.push(r);
         emitter.emit('request', r);
         wakeWaiters(); // a long-poller blocked in /api/wait gets it instantly
+      } else if (m.type === 'cues' && typeof m.watchMode === 'boolean') {
+        const { type: _t, ...report } = m; // `type` 是线缆上的路由字段，别带进回给调用方的载荷
+        emitter.emit('cues', report as unknown as CueReport);
       } else if (m.type === 'exported' && typeof m.html === 'string') {
         // the Studio's current full deck html (e.g. after edits) — keep latest
         if (deck) deck.html = m.html;
@@ -767,6 +818,25 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       setTimeout(() => settle(false), timeoutMs);
       broadcast({ type: 'sync-request' });
     });
+
+  // 提词的读写都是「广播一条、等 Studio 回一条 `cues`」——和 syncFromStudio 同一个形状。
+  // 写完让 Studio 顺手把最新现状带回来，调用方一次就能看到「落了几页 / 还缺几页」，
+  // 不用再读一次。
+  function askCues(msg: Record<string, unknown>, timeoutMs: number): Promise<CueReport | null> {
+    return new Promise((res) => {
+      const live = [...sockets].filter((s) => s.readyState === s.OPEN);
+      if (!live.length) return res(null);
+      let done = false;
+      const settle = (r: CueReport | null) => { if (done) return; done = true; emitter.off('cues', onCues); res(r); };
+      const onCues = (r: CueReport) => settle(r);
+      emitter.once('cues', onCues);
+      setTimeout(() => settle(null), timeoutMs);
+      broadcast(msg);
+    });
+  }
+  handle.cues = (timeoutMs = 3000) => askCues({ type: 'cues-request' }, timeoutMs);
+  handle.setCues = (cues, opts = {}) =>
+    askCues({ type: 'set-cues', cues, replace: !!opts.replace }, opts.timeoutMs || 5000);
 
   handle.outline = (withHtml = []) =>
     deck ? outlineOf(deck.html, new Set(withHtml)) : [];
