@@ -23,6 +23,8 @@ final class WatchLinkManager: NSObject, ObservableObject {
     @Published private(set) var phoneDeckState: DeckState?
     /// 手机捎来的**当页讲稿正文**。手表没有 WebKit，只能拿纯文本。
     @Published private(set) var phoneNote = ""
+    /// 手机捎来的**当页提词**（讲稿里作者标的 <strong>）
+    @Published private(set) var phoneCue: [String] = []
     /// phoneNote 对应哪一页 —— ping 时报给手机，一样它就不重复发了
     private(set) var phoneNoteAnchor = ""
     private var statusTimer: Timer?
@@ -149,18 +151,24 @@ final class WatchLinkManager: NSObject, ObservableObject {
                 st.anchor = (reply["anchor"] as? String) ?? ""
                 self.phoneDeckState = st
 
-                if let note = reply["note"] as? String {
+                if let cue = reply["cue"] as? [String] {
+                    self.phoneCue = cue
+                    self.phoneNote = (reply["note"] as? String) ?? ""
+                    self.phoneNoteAnchor = st.anchor
+                } else if let note = reply["note"] as? String {
                     self.phoneNote = note
                     self.phoneNoteAnchor = st.anchor
                 } else if st.anchor != self.phoneNoteAnchor {
                     // 翻页了、手机却没捎讲稿（这一页它也没有）→ 别把上一页的讲稿留在屏幕上，
                     // 讲台上照着念错页比没得念糟糕得多。
                     self.phoneNote = ""
+                    self.phoneCue = []
                     self.phoneNoteAnchor = ""
                 }
             } else {
                 self.phoneDeckState = nil
                 self.phoneNote = ""
+                self.phoneCue = []
                 self.phoneNoteAnchor = ""
             }
         }

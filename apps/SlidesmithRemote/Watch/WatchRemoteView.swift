@@ -45,31 +45,37 @@ struct WatchRemoteView: View {
 
     // MARK: - 第二页：讲稿
 
-    /// 当页讲稿。经手机那条路由手机捎来，直连那条路自己从 txb64 里拆。
-    private var note: String {
-        if link.transport == .phone { return link.phoneNote }
-        if let a = deckState?.anchor { return relay.note(for: a) ?? "" }
-        return ""
+    /// 当页**提词**（讲稿里作者手打的 <strong>）。经手机那条路由手机捎来，
+    /// 直连那条路自己从 txb64 里拆。
+    private var cue: [String] {
+        if link.transport == .phone { return link.phoneCue }
+        if let a = deckState?.anchor { return relay.cue(for: a) }
+        return []
     }
 
     private var notePage: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 8) {
                 if let st = deckState {
                     Text("\(st.pageNo)/\(st.total)" + (st.title.isEmpty ? "" : " · " + st.title))
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(.orange)
                         .lineLimit(2)
                 }
-                if note.isEmpty {
+                if cue.isEmpty {
                     Text(noteHint)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 } else {
-                    // 转表冠滚动。字号给到 15：再小讲台上瞄一眼根本看不清。
-                    Text(note)
-                        .font(.system(size: 15))
-                        .lineSpacing(3)
+                    // 提词一条一行、字给到 19：手表是**一瞥**设备，
+                    // 要的是抬腕零点几秒抓住一个词，不是低头读段落。
+                    ForEach(Array(cue.enumerated()), id: \.offset) { _, k in
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text("✦").font(.system(size: 12)).foregroundStyle(.orange)
+                            Text(k).font(.system(size: 19, weight: .semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -81,7 +87,7 @@ struct WatchRemoteView: View {
     private var noteHint: String {
         if !deckOnline { return "等放映端上线后，讲稿会自动送过来。" }
         if deckState == nil { return "正在向放映端要当前页…" }
-        return "这一页没有讲稿。\n（deck 里要写 <aside class=\"notes\">，或用一体版/单文件版讲稿）"
+        return "这一页没标提词。\n（讲稿里用 <strong> 标出要点，副屏按 K 也是高亮它们）"
     }
 
     // MARK: - 状态条

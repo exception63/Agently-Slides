@@ -107,8 +107,9 @@ final class PhoneLinkManager: NSObject, ObservableObject {
             // 当页讲稿正文。**只在手表还没有这一页时才捎** —— 手表每 3 秒 ping 一次，
             // 一段讲稿几百到两千字，每次都塞进蓝牙这条管子是纯浪费。
             // 手表在 ping 里报自己手上是哪一页（have），一样就不发。
-            if haveAnchor != st.anchor, let note = relay?.note(for: st.anchor), !note.isEmpty {
-                p["note"] = note
+            if haveAnchor != st.anchor {
+                if let note = relay?.note(for: st.anchor), !note.isEmpty { p["note"] = note }
+                p["cue"] = relay?.cue(for: st.anchor) ?? []
             }
         }
         return p

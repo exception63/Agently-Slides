@@ -59,10 +59,19 @@ final class RelayClient: NSObject, ObservableObject {
     /// iPhone 的讲稿页是 WebView 装整页，不看这里。
     @Published private(set) var notes: [String: String] = [:]
 
+    /// 提词：锚点 → 作者在讲稿里手打的 <strong> 短语。手表主要看这个。
+    @Published private(set) var cues: [String: [String]] = [:]
+
     /// 取某一页的讲稿正文
     func note(for anchor: String) -> String? {
         guard !anchor.isEmpty else { return nil }
         return notes[anchor]
+    }
+
+    /// 取某一页的提词
+    func cue(for anchor: String) -> [String] {
+        guard !anchor.isEmpty else { return [] }
+        return cues[anchor] ?? []
     }
 
     private var task: URLSessionWebSocketTask?
@@ -237,10 +246,11 @@ final class RelayClient: NSObject, ObservableObject {
                 self.stopInfoRequestsIfDone()
             }
             // 30–60 KB 的 HTML 正则拆解，别放主线程 —— 手表上尤其明显。
-            guard !txb64.isEmpty else { publish { self.notes = [:] }; return }
+            guard !txb64.isEmpty else { publish { self.notes = [:]; self.cues = [:] }; return }
             Self.parseQueue.async { [weak self] in
                 let parsed = TranscriptNotes.parse(base64: txb64)
-                self?.publish { self?.notes = parsed }
+                let cued = TranscriptNotes.parseCues(base64: txb64)
+                self?.publish { self?.notes = parsed; self?.cues = cued }
             }
 
         // 中转只把 evicted 发给**被顶掉的那个 deck**（relay.mjs:105 / worker.mjs:55），
