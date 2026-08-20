@@ -63,6 +63,17 @@
 - **【关键 bug 已修】Studio 导出件「二维码生成失败」真因＝`String.replace('</body>', PHONE_REMOTE_JS)` 把注入内容里的 `$`（qr 库 `case '$'`→`$'` 是 replace 的"匹配后文本"特殊记号）解释掉了 → 注入的 qr 库 JS 被腐蚀 → `qrcode` 坏。手搓 desktop 文件用 slice 拼接没这问题，故只在 Studio 导出复现。修法：改「函数替换」`doc.replace('</body>', () => inject+'</body>')`（函数返回值不做 `$` 解释）。教训：拼接大段含 `$` 的代码进 HTML，别用字符串 `.replace`。**已 Playwright 验证 Studio 导出件 qr 正常渲染。**
 - **固定二维码（回应用户"为何每次生成"）**：房间号原来每次点击随机 → 二维码每次变。改成：Studio 导出时烘一个固定 `window.__SM_ROOM__`（`smRoomId()` 生成、`__SM_ROOMVAL__` 占位符替换——注意占位符不能叫 `__SM_ROOM__`否则先撞到变量名）；pair-client `roomId()` 优先用 `window.__SM_ROOM__`，没有则首次生成并缓存。→ 同一导出件二维码永久不变、可截图复用。已验证 qrUsesBakedRoom=true。
 
+## ✅ 遥控扩成「遥控 + 讲稿」双模式 —— 镜像投屏的解法（2026-08-20 · 网页端已上线，原生端未跟上）
+- **要解决的现场问题**：会场**镜像投屏**时，同机开第二个窗口毫无意义（镜像会把窗口复制到投影上，观众看到你的讲稿）。这是镜像的定义，PPT/Keynote 同样做不到。**讲稿只能落到另一个设备**（iPad / 手机）。
+- **做法：不重写演讲者模式，只换落点。** presenter-mode 的 deck 本来就在 BroadcastChannel 上广播完整状态、讲稿也已嵌在文件里；`pair-client.js` 只是**旁听那条广播**并接到已有的中转管道上（同页面另建同名 BroadcastChannel 收得到本页消息，规范只排除发送者自己那个对象）→ **deck 一行没碰、中转一行没改**。
+- **讲稿载体认四种**（优先级）：`__TXB64__` 一体版 > `SM_NOTES` 单文件版 > `<aside class="notes">`（html-ppt / Studio 随手备注）> 无。第三种让「Studio 里随手做的 deck + 每页写几句备注」也能当演讲者视图，客户端**现造**一份带 `fuquan-scroll`/`fuquan-cue` 监听的讲稿推过去，手机端一行没改。
+- **状态来源两条并行**：deck 有广播就用广播（带 segment 和作者锚点，更准）；没有就 **DOM 兜底常驻**（`window.deckAPI` 或 `.active` 类 + MutationObserver），广播活跃时自动让路 3 秒。频道名解析按可信度排：引擎自报 > localStorage 反推 > `__SM_DECK_ID__` 猜测。
+- **三条真机踩出来的规则**（别重蹈）：① **WebRTC 会半开** —— deck 侧 `readyState==='open'` 而对端没连上，往里发不报错、静默丢弃（30 KB 讲稿进黑洞）。故加 `dcProven` 门闩：收到过对端消息才认这条道。② **要讲稿要重试** —— 原来只问一次，丢了就永远空着（表现为「过了很久自己好了」＝ws 重连才复位）。改成每 2 秒重问、拿到即停。③ **一个房间只留一个放映端，新的顶掉旧的** —— 房间号烘死在文件里，任何拷贝都带同一个号，两份同开会互相打架；被顶掉方收 `evicted`。
+- **【会静默毁导出的洞·已修】`replace('</body>')` 只换首次匹配**：一体版把整份副屏 HTML 当字符串存在 JS 里，那串里也有 `</body>` 且在真正的之前 → 整块注入被塞进字符串字面量，JS 报 `Invalid or unexpected token`，`SM_NOTES`/`SM_PRESENTER_HTML` 双双 undefined，**演讲者模式打开是空的**。同类地雷四处（手机遥控注入/bridge 注入/字体内嵌/PDF 打印样式）已全改为 `insertBeforeBodyEnd`/`insertBeforeHeadEnd`——判据由文档结构给出：真正的 `</body>` 是**最后**一个，真正的 `</head>` 是 `<body` 之前的最后一个。
+- **Cloudflare 中转的定位要说清**：它是**管子不是仓库**，不存任何东西。同网走 P2P 直连（讲稿根本不出局域网），跨网才经中转转发一次，房间空了 DO 实例即销毁。**不同 deck 各自 96 位随机房间号，不会冲突**；唯一会冲突的是同一导出文件的多个副本（已由「新的顶掉旧的」兜住）。
+- **文件**：`plugin/slidesmith/skills/phone-remote/{baked/pair-client.js, relay/remote.html, relay/relay.mjs, relay/cloudflare/{worker.mjs,remote.html}}` + Studio 侧 `packages/studio/src/main.ts`（`__SM_DECK_ID__` 注入、`NOTES_CSS` 隐藏备注、两个 insert 辅助函数）。云端已部署 Version `21aaadd3`。
+- **⚠️ 原生 iOS/Watch 没跟上**（只认 `joined`/`peer`、只发 `cmd`）→ 见 `_memory/NEXT-SESSION.md`，那是下个迭代。
+
 ## ✅ Apple Watch 遥控 App（2026-08-07 · v0.1 已提交 16fc07d）
 - **`apps/SlidesmithRemote/`**（xcodegen · `project.yml` → `xcodegen generate`）：watchOS + iOS 双 target。手表以 `role=remote` 接入**现有云中转**，发的就是既有 `{"type":"cmd","action":"next"}` 协议 → **中转和 deck 端一行未改**，纯增量。
 - **手势（用户选定"分区"方案）**：下方大区=下一页、上方小区=上一页（零延迟、可盲按）；「下一页」同时 `.handGestureShortcut(.primaryAction)` → **捏合双击**翻页。触觉区分成功/失败。
