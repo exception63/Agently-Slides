@@ -241,6 +241,8 @@ extension WatchLinkManager: WCSessionDelegate {
     }
 
     func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        // 手机翻页后主动推来的状态（不等我们下一次 ping）——带 idx 就是它
+        if message["idx"] != nil { absorb(reply: message) }
         apply(context: message)
     }
 

@@ -14,6 +14,8 @@ struct ContentView: View {
     @StateObject private var web = TranscriptWeb()
     @State private var scanning = false
     @State private var tab: RemoteTab = .remote
+    /// 讲稿页折叠：连分段控件一起收走，整屏留给讲稿
+    @State private var collapsed = false
 
     var body: some View {
         NavigationStack {
@@ -27,10 +29,13 @@ struct ContentView: View {
                     pairPrompt
                     Spacer()
                 } else {
-                    Picker("", selection: $tab) {
-                        ForEach(RemoteTab.allCases) { Text($0.rawValue).tag($0) }
+                    if !(tab == .transcript && collapsed) {
+                        Picker("", selection: $tab) {
+                            ForEach(RemoteTab.allCases) { Text($0.rawValue).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal, tab == .transcript ? 20 : 0)
                     }
-                    .pickerStyle(.segmented)
 
                     switch tab {
                     case .remote:
@@ -46,6 +51,9 @@ struct ContentView: View {
             .padding(.horizontal, tab == .transcript && link.pairing != nil ? 0 : 20)
             .padding(.vertical, 20)
             .navigationTitle("Slidesmith 遥控")
+            // 讲稿页把导航栏整条藏掉。那条大标题在遥控页是招牌，在讲稿页纯粹是浪费——
+            // 它一个人就吃掉约四分之一屏，而讲稿恰恰是越多越好。
+            .toolbar(isTranscript ? .hidden : .visible, for: .navigationBar)
             .sheet(isPresented: $scanning) {
                 QRScannerView(
                     onFound: { found in
@@ -70,6 +78,9 @@ struct ContentView: View {
         .onChange(of: link.pairing) { _, _ in updateIdleTimer() }
         .onAppear { updateIdleTimer() }
     }
+
+    /// 现在是不是在「讲稿」页（且已配对）
+    private var isTranscript: Bool { tab == .transcript && link.pairing != nil }
 
     private func updateIdleTimer() {
         UIApplication.shared.isIdleTimerDisabled = (scenePhase == .active && link.pairing != nil)
@@ -160,6 +171,22 @@ struct ContentView: View {
     private var transcriptPane: some View {
         TranscriptWebView(web: web)
             .ignoresSafeArea(edges: .bottom)
+            // 折叠开关浮在讲稿右上角。收起后分段控件也一起没了，所以这个按钮是
+            // 回到「遥控」页的唯一入口 —— 半透明但不能真的看不见。
+            .overlay(alignment: .topTrailing) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { collapsed.toggle() }
+                } label: {
+                    Image(systemName: collapsed ? "chevron.down" : "chevron.up")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 34, height: 34)
+                        .background(Color.black.opacity(0.55), in: Circle())
+                        .overlay(Circle().stroke(Color.white.opacity(0.25), lineWidth: 1))
+                }
+                .padding(.trailing, 10)
+                .padding(.top, 8)
+            }
             .onAppear {
                 if let p = link.pairing, let u = URL(string: p.phoneURL) { web.load(u) }
             }

@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import WatchConnectivity
 
 /// 手机侧：保存配对信息，并把 room 同步给手表。
@@ -12,7 +13,33 @@ final class PhoneLinkManager: NSObject, ObservableObject {
 
     /// 手表把指令交给手机代发时要用到 —— 手表（尤其没蜂窝的）自己连长连接不可靠，
     /// 走「手表→蓝牙→iPhone→云中转」这条路才稳。
-    weak var relay: RelayClient?
+    weak var relay: RelayClient? {
+        didSet { observeDeckState() }
+    }
+    private var stateSub: AnyCancellable?
+    private var lastPushedAnchor = ""
+
+    /// 翻页了就**立刻**推给手表，别等手表下一次 ping。
+    ///
+    /// 原来只有「手表每 3 秒问一次」这一条路：手表自己按键时因为有 reply 所以是即时的，
+    /// 但**在 iPhone 上翻页**时手表最坏要等满 3 秒才更新 —— 真机上就是这点延迟。
+    /// 这里补一条「变化即推」。只在翻页时触发（人的手速），不是周期性刷屏，
+    /// 所以不需要节流；推的也只是页码 + 几条提词，几十到几百字节。
+    private func observeDeckState() {
+        stateSub = relay?.$deckState
+            .removeDuplicates()
+            .sink { [weak self] st in self?.pushState(st) }
+    }
+
+    private func pushState(_ st: DeckState?) {
+        guard let st = st, WCSession.isSupported() else { return }
+        let s = WCSession.default
+        guard s.activationState == .activated, s.isReachable else { return }
+        // 同一页别重复推（state 会因为标题等字段变化重发）
+        guard st.anchor != lastPushedAnchor || st.anchor.isEmpty else { return }
+        lastPushedAnchor = st.anchor
+        s.sendMessage(statusPayload(ok: true, includeNote: false), replyHandler: nil, errorHandler: { _ in })
+    }
 
     override init() {
         super.init()
@@ -94,7 +121,7 @@ final class PhoneLinkManager: NSObject, ObservableObject {
     ///
     /// 只带三个字段。**别把 txb64 讲稿也塞进来** —— 手表屏幕根本塞不下，
     /// 白白把 WCSession 的消息体挤爆。
-    private func statusPayload(ok: Bool, haveAnchor: String = "") -> [String: Any] {
+    private func statusPayload(ok: Bool, haveAnchor: String = "", includeNote: Bool = true) -> [String: Any] {
         var p: [String: Any] = ["ok": ok,
                                 "deck": relay?.deckPresent ?? false,
                                 "conn": relay?.isConnected ?? false]
@@ -108,8 +135,12 @@ final class PhoneLinkManager: NSObject, ObservableObject {
             // 一段讲稿几百到两千字，每次都塞进蓝牙这条管子是纯浪费。
             // 手表在 ping 里报自己手上是哪一页（have），一样就不发。
             if haveAnchor != st.anchor {
-                if let note = relay?.note(for: st.anchor), !note.isEmpty { p["note"] = note }
+                // 提词很小（几个短词），任何时候都带上；
+                // 讲稿全文动辄两千字，只在「拉」的那条路上带，主动推时不带。
                 p["cue"] = relay?.cue(for: st.anchor) ?? []
+                if includeNote, let note = relay?.note(for: st.anchor), !note.isEmpty {
+                    p["note"] = note
+                }
             }
         }
         return p
