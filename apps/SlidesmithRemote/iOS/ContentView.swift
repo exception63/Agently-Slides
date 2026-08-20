@@ -50,6 +50,11 @@ struct ContentView: View {
             }
             .padding(.horizontal, tab == .transcript && link.pairing != nil ? 0 : 20)
             .padding(.vertical, 20)
+            // 讲稿页整屏按暗色处理：网页讲稿本身是黑底，藏掉导航栏后状态栏那条
+            // 安全区会露出白底，黑页顶着白条很难看。背景铺到安全区外，
+            // 同时把配色切成 dark，状态栏文字才会变白、不至于黑字压黑底看不见。
+            .background { if isTranscript { Color.black.ignoresSafeArea() } }
+            .preferredColorScheme(isTranscript ? .dark : nil)
             .navigationTitle("Slidesmith 遥控")
             // 讲稿页把导航栏整条藏掉。那条大标题在遥控页是招牌，在讲稿页纯粹是浪费——
             // 它一个人就吃掉约四分之一屏，而讲稿恰恰是越多越好。
