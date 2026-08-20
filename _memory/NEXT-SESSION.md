@@ -22,7 +22,7 @@
 | MCP | `slidesmith_cues({set?, replace?})`，硬约束写在工具说明里，写完只报 `missing`/`violations` |
 | app | 预设加「一键加提词」；预设**同时收进输入框旁的菜单**（原来只长在空状态，发过一句话就点不到了） |
 
-### 任务 B · 讲稿批注 → AI 改写（commit 见下）
+### 任务 B · 讲稿批注 → AI 改写（commit `34119c5`）
 
 - **入口**：AI 面板「讲稿 → 打开讲稿」→ 全屏 modal，iframe 装整份讲稿（保留它自己的 CSS），
   打开即滚到当前页那一段
