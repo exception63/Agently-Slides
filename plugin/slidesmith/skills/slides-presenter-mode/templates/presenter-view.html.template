@@ -330,13 +330,13 @@
   catch (e) { console.warn('BroadcastChannel 不可用', e); }
 
   window.addEventListener('storage', e => {
-    if (e.key !== 'fuquan-presenter-state' || !e.newValue) return;
+    if (e.key !== '{{CHANNEL}}-presenter-state' || !e.newValue) return;
     try { applyState(JSON.parse(e.newValue)); } catch (err) {}
   });
 
   // 启动时读缓存
   try {
-    const cached = localStorage.getItem('fuquan-presenter-state');
+    const cached = localStorage.getItem('{{CHANNEL}}-presenter-state');
     if (cached) applyState(JSON.parse(cached));
   } catch (e) {}
 

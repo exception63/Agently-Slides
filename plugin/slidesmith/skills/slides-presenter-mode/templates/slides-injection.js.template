@@ -83,7 +83,7 @@ function broadcastPresenter(slideIdx) {
     source: 'slides'   // v0.3 · 防回声标识 · 演讲者模式据此忽略自己反向广播的回声
   };
   if (presenterChannel) { try { presenterChannel.postMessage(payload); } catch(e){} }
-  try { localStorage.setItem('fuquan-presenter-state', JSON.stringify(payload)); } catch(e){}
+  try { localStorage.setItem('{{CHANNEL}}-presenter-state', JSON.stringify(payload)); } catch(e){}
 }
 
 // v0.3 · 反向通道：接收演讲者模式的 {type:'jump-to-slide', source:'presenter'}

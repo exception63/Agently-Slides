@@ -1,0 +1,150 @@
+/* ============================================================================
+ * WATCH-CUES · 手表提词（slides-presenter-mode v0.4 · watch mode 专用）
+ * ----------------------------------------------------------------------------
+ * 注入到**主屏 slides**。开启 watch mode 时才烘进去，不开就完全不存在。
+ *
+ * 做三件事：
+ *   ① 存一份按锚点索引的提词表 window.__SM_CUES__
+ *   ② 加一个 `✦ 提词` 按钮
+ *   ③ 点开一个**排版与 Apple Watch 一致**的预览窗，跟着翻页走
+ *
+ * 手表那一端不用这段代码：它通过遥控协议拿 anchor，自己查同一张表。
+ * 这个预览窗的意义是——上台前在电脑上确认「待会儿手腕上会看到什么」，
+ * 而不是真的举着表一页页试。
+ *
+ * 占位符：{{CHANNEL}} 换成本 deck 专属频道名（**别写死**，两份 deck 同开会串台）
+ * ========================================================================== */
+
+/* ---------------------------------------------------------------------------
+ * ① 提词表 —— 键必须是 SLIDE_MAP 里出现过的锚点
+ *
+ * 硬约束（Ultra 3 = 211×257 点 / Series 11 46mm = 208×248 点 实测，19pt 半粗）：
+ *   · 每页必须有         —— 缺页即失败，手表上空白比没这功能更让人慌
+ *   · 每页 1–3 条        —— 5 条就顶满整屏
+ *   · 每条 ≤10 个汉字     —— 超过就折行；50 字直接铺满整屏
+ *   · 必须是内容锚点      —— 「第一部分」这种结构标签占地方又帮不上忙
+ *   · 不与 slide 标题重复 —— 手表顶部已经显示标题了
+ * ------------------------------------------------------------------------- */
+window.__SM_CUES__ = {
+  // "s0-cover": ["答辩开场"],
+  // "s1-boom":  ["无缝嵌入"],
+  // "s1-hook":  ["感官剥夺"],
+  // …由 skill 从讲稿 <strong> 种子化后**逐页校验**再写进来
+};
+
+(function () {
+  'use strict';
+  var CUES = window.__SM_CUES__ || {};
+
+  /* -------------------------------------------------------------------------
+   * ② 按钮 —— 放在演讲者按钮旁边；找不到工具栏就浮在左下角
+   * ---------------------------------------------------------------------- */
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'smCueBtn';
+  btn.textContent = '✦ 提词';
+  btn.title = '预览手表上会看到的提词';
+
+  var bar = document.querySelector('.topbar, .sm-topbar, #topbar');
+  if (bar) {
+    bar.appendChild(btn);
+  } else {
+    btn.style.cssText = 'position:fixed;left:14px;bottom:60px;z-index:2147483646;border:none;' +
+      'border-radius:999px;padding:10px 16px;cursor:pointer;background:#1c1c1e;color:#f5b73f;' +
+      'font:600 14px/1 system-ui,-apple-system,"PingFang SC",sans-serif;box-shadow:0 3px 12px rgba(0,0,0,.3)';
+    document.body.appendChild(btn);
+  }
+
+  /* -------------------------------------------------------------------------
+   * ③ 预览窗 —— 刻意做成表盘比例、同样的字号层级，所见即腕上所见
+   * ---------------------------------------------------------------------- */
+  var win = null;
+
+  function cueDoc() {
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>提词预览</title><style>' +
+      'html,body{margin:0;height:100%;background:#000;color:#fff;' +
+      'font:400 15px/1.5 -apple-system,system-ui,"PingFang SC",sans-serif}' +
+      // 211×257 点 ≈ Ultra 3。给个同比例的框，别让人在大屏上误判「放得下」
+      '.watch{width:211px;height:257px;margin:18px auto;padding:10px 8px;box-sizing:border-box;' +
+      'border-radius:26px;border:1px solid #2a2a2c;overflow:hidden}' +
+      '.hd{color:#f5b73f;font:700 12px/1.25 system-ui;margin-bottom:8px}' +
+      '.cue{display:flex;gap:6px;align-items:baseline;margin:8px 0}' +
+      '.mk{color:#f5b73f;font-size:12px;flex:none}' +
+      '.tx{font:600 19px/1.25 system-ui,"PingFang SC",sans-serif}' +
+      '.empty{color:#8a8a8e;font-size:13px}' +
+      '.note{max-width:211px;margin:0 auto;color:#8a8a8e;font-size:11px;line-height:1.6;text-align:center}' +
+      '.bad{color:#ff6b6b}' +
+      '</style></head><body><div class="watch" id="w"></div>' +
+      '<div class="note" id="n">这就是手表上会看到的样子</div></body></html>';
+  }
+
+  function render(state) {
+    if (!win || win.closed) return;
+    var d = win.document, w = d.getElementById('w'), n = d.getElementById('n');
+    if (!w) return;
+    var list = (state && CUES[state.anchor]) || [];
+    var head = state ? ((state.slideIdx + 1) + '/' + state.total +
+      (state.title ? ' · ' + state.title : '')) : '';
+    var html = '<div class="hd">' + esc(head) + '</div>';
+    if (!list.length) {
+      html += '<div class="empty">这一页没有提词</div>';
+    } else {
+      for (var i = 0; i < list.length; i++) {
+        html += '<div class="cue"><span class="mk">✦</span><span class="tx">' + esc(list[i]) + '</span></div>';
+      }
+    }
+    w.innerHTML = html;
+
+    // 就地体检：把违规当场说出来，别等上了台才发现
+    if (n) {
+      var bad = [];
+      if (!list.length) bad.push('这一页没有提词');
+      if (list.length > 3) bad.push('条数 ' + list.length + ' 超上限 3');
+      for (var j = 0; j < list.length; j++) {
+        if (list[j].length > 10) bad.push('「' + list[j].slice(0, 8) + '…」' + list[j].length + ' 字，超上限 10');
+      }
+      n.className = bad.length ? 'note bad' : 'note';
+      n.textContent = bad.length ? '⚠ ' + bad.join(' · ') : '这就是手表上会看到的样子';
+    }
+  }
+
+  function esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  btn.addEventListener('click', function () {
+    if (win && !win.closed) { win.focus(); render(lastState); return; }
+    win = window.open('', 'sm-cue-preview', 'width=270,height=380,menubar=no,toolbar=no,location=no,status=no');
+    if (!win) { alert('提词预览窗被拦截了 · 请允许弹窗后再试。'); return; }
+    win.document.open(); win.document.write(cueDoc()); win.document.close();
+    setTimeout(function () { render(lastState); }, 60);
+  });
+
+  /* -------------------------------------------------------------------------
+   * 跟随翻页 —— 和副屏走同一条通道，不另起炉灶
+   * ---------------------------------------------------------------------- */
+  var lastState = null;
+
+  function absorb(s) {
+    if (!s || typeof s.slideIdx !== 'number') return;
+    lastState = s;
+    render(s);
+  }
+
+  try {
+    var bc = new BroadcastChannel('{{CHANNEL}}-presenter-sync');
+    bc.onmessage = function (e) { absorb(e.data); };
+  } catch (e) { /* 老浏览器没有 BroadcastChannel，靠下面的 localStorage 兜底 */ }
+
+  window.addEventListener('storage', function (e) {
+    if (e.key !== '{{CHANNEL}}-presenter-state' || !e.newValue) return;
+    try { absorb(JSON.parse(e.newValue)); } catch (x) { /* noop */ }
+  });
+
+  // 开窗时可能已经翻过几页了，先吃一口缓存的状态
+  try {
+    var cached = localStorage.getItem('{{CHANNEL}}-presenter-state');
+    if (cached) lastState = JSON.parse(cached);
+  } catch (e) { /* noop */ }
+})();
