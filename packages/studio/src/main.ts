@@ -766,6 +766,29 @@ const EDIT_KEYGUARD_JS = '<script id="sm-edit-keyguard">(function(){'
   + 'e.stopImmediatePropagation();'               // 不 preventDefault：字照打、光标照走
   + '},true);'
   + '})();</scr' + 'ipt>\n';
+// 一体版 deck 的「演讲者」按钮开副屏用的是 `location.href.split('#')[0] + '#presenter'`
+// ——**重开自己**、靠 hash 切成副屏视图。这在 Studio 里会坏掉：预览是 srcdoc iframe，
+// 里面的 `location.href` 是 `about:srcdoc`，于是开出来的是 `about:srcdoc#presenter`，
+// 一个真正空白的文档 → 症状是「窗口弹出来了，但里面什么都没有」。
+// 修法：在预览里包一层 window.open，认出这种自我重开，改成用父窗口给的干净 deck HTML
+// 做一个 blob URL 再开。只拦 `about:srcdoc` + 带 hash 这一种，别的（相对路径的
+// 三文件版副屏、`window.open('')` + document.write 的打印窗口）一律原样放行。
+const PRESENTER_OPEN_FIX_JS = '<script id="sm-presenter-open-fix">(function(){'
+  + 'var orig=window.open;'
+  + 'window.open=function(url,name,features){'
+  + 'var u=url==null?"":String(url);'
+  + 'var i=u.indexOf("#");'
+  + 'if(u.indexOf("about:srcdoc")===0&&i>=0){'
+  + 'var html=null;'
+  + 'try{html=window.parent.__SM_PRESENTER_HTML__&&window.parent.__SM_PRESENTER_HTML__();}catch(e){}'
+  + 'if(html){try{'
+  + 'var b=URL.createObjectURL(new Blob([html],{type:"text/html"}));'
+  + 'return orig.call(window,b+u.slice(i),name,features);'
+  + '}catch(e){}}'
+  + '}'
+  + 'return orig.call(window,url,name,features);'
+  + '};'
+  + '})();</scr' + 'ipt>\n';
 function assembleDeck(forEdit = false): string {
   const editCss = forEdit
     ? '<style id="sm-edit-css">[contenteditable]{cursor:text}'
@@ -782,7 +805,7 @@ function assembleDeck(forEdit = false): string {
   // the editing surface so the FX driver skips exit-on-nav (keeps Studio nav instant).
   const editAttr = forEdit ? ' data-smfx-edit="1"' : '';
   const skin = skinInject();
-  const keyGuard = forEdit ? EDIT_KEYGUARD_JS : '';
+  const keyGuard = forEdit ? EDIT_KEYGUARD_JS + PRESENTER_OPEN_FIX_JS : '';
   let doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${keyGuard}${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${NOTES_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
   // 手机遥控：先剥离任何旧注入（幂等，防 re-import 累积），再按需（仅导出、勾选时）烘进。
   // 注意：注入内容含 `$`（qr 库/客户端里有），必须用「函数替换」——字符串替换会把 $'/$&/$1 当特殊
@@ -3427,6 +3450,14 @@ function buildUI(): void {
   (window as unknown as { __SM_OPEN_LIBRARY__: () => Promise<void> }).__SM_OPEN_LIBRARY__ = openLibrary;
   (window as unknown as { __SM_AUDIT__: typeof auditImportedDeck }).__SM_AUDIT__ = auditImportedDeck;
   (window as unknown as { __SM_PDF_HTML__: typeof pdfPrintHtml }).__SM_PDF_HTML__ = pdfPrintHtml;
+  // 预览里的 window.open shim 回头找它要一份「副屏能直接跑」的 deck HTML。
+  // 用导出态（不带 contenteditable / 选中框 / keyguard 这些编辑脚手架），但**必须把手机遥控关掉**：
+  // 房间号烘死在 deck 里，副屏再连一次就是同一房间的第二个放映端，会把主窗口顶掉（evicted）。
+  (window as unknown as { __SM_PRESENTER_HTML__: () => string }).__SM_PRESENTER_HTML__ = () => {
+    const saved = embedPhoneRemote;
+    embedPhoneRemote = false;
+    try { return assembleDeck(false); } finally { embedPhoneRemote = saved; }
+  };
   // bridge hooks (for automation / headless verification)
   (window as unknown as { __SM_BRIDGE__: () => { connected: boolean; owner: { label: string; since: number } | null; port: number } }).__SM_BRIDGE__ = () => ({ connected: bridge.connected, owner: bridge.owner, port: bridge.port });
   // permission mode + proposal state (for verification)
