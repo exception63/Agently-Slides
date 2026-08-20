@@ -27,6 +27,8 @@ struct DeckState: Equatable {
     var title = ""
     var prevTitle = ""
     var nextTitle = ""
+    /// 这一页在讲稿里对应的锚点（作者自定义，如 `s1-boom`）。手表靠它取当页讲稿。
+    var anchor = ""
 
     /// 给人看的页码（1 基）
     var pageNo: Int { slideIdx + 1 }
@@ -53,6 +55,15 @@ final class RelayClient: NSObject, ObservableObject {
     @Published private(set) var deckTitle = ""
     /// 被中转判定「另一个窗口接管了这个房间」时的提示；正常情况下一直是 nil。
     @Published private(set) var evictedNotice: String?
+    /// 讲稿：锚点 → 纯文本。**只有手表用**（watchOS 没 WebKit，渲染不了 HTML）；
+    /// iPhone 的讲稿页是 WebView 装整页，不看这里。
+    @Published private(set) var notes: [String: String] = [:]
+
+    /// 取某一页的讲稿正文
+    func note(for anchor: String) -> String? {
+        guard !anchor.isEmpty else { return nil }
+        return notes[anchor]
+    }
 
     private var task: URLSessionWebSocketTask?
     private var urlSession: URLSession!
@@ -66,6 +77,9 @@ final class RelayClient: NSObject, ObservableObject {
     /// 向放映端要一次当前状态（`need-info`）的重试定时器
     private var infoTimer: Timer?
     private var infoTries = 0
+    /// 放映端有没有回过 deck-info（回过就说明讲稿这事有结论了，哪怕它没带讲稿）
+    private var gotDeckInfo = false
+    private static let parseQueue = DispatchQueue(label: "sm.transcript.parse", qos: .utility)
 
     override init() {
         super.init()
@@ -193,18 +207,21 @@ final class RelayClient: NSObject, ObservableObject {
                 if deck > 0 {
                     self.evictedNotice = nil
                     // 放映端在线但我们还不知道它翻到第几页 —— 去要一次。
-                    if self.deckState == nil { self.startInfoRequests() }
+                    if self.deckState == nil || !self.gotDeckInfo { self.startInfoRequests() }
                 } else {
                     // 放映端下线了，页码立刻作废：手表上留着「3 / 44」比空着更误导人。
                     self.deckState = nil
                     self.stopInfoRequests()
+                    // 讲稿不清：同一份 deck 重连回来还是那份，留着能少拉一次 30–60 KB。
+                    // 但要把「问过了」的标记复位，换了 deck 才会重新去要。
+                    self.gotDeckInfo = false
                 }
             }
 
         // 每翻一页推一次，几十字节
         case "state":
             guard let st = Self.parseState(obj["state"]) else { return }
-            publish { self.deckState = st; self.stopInfoRequests() }
+            publish { self.deckState = st; self.stopInfoRequestsIfDone() }
 
         // 配对时推一次。**txb64（讲稿全文，30–60 KB）故意不解析**——原生这层用不上它，
         // 讲稿是「讲稿」标签页里的 WebView 直接渲染网页端那一套。这里只要标题和随包
@@ -212,10 +229,18 @@ final class RelayClient: NSObject, ObservableObject {
         case "deck-info":
             let title = (obj["title"] as? String) ?? ""
             let st = Self.parseState(obj["state"])
+            let txb64 = (obj["txb64"] as? String) ?? ""
             publish {
                 if !title.isEmpty { self.deckTitle = title }
                 if let st = st { self.deckState = st }
-                self.stopInfoRequests()
+                self.gotDeckInfo = true
+                self.stopInfoRequestsIfDone()
+            }
+            // 30–60 KB 的 HTML 正则拆解，别放主线程 —— 手表上尤其明显。
+            guard !txb64.isEmpty else { publish { self.notes = [:] }; return }
+            Self.parseQueue.async { [weak self] in
+                let parsed = TranscriptNotes.parse(base64: txb64)
+                self?.publish { self?.notes = parsed }
             }
 
         // 中转只把 evicted 发给**被顶掉的那个 deck**（relay.mjs:105 / worker.mjs:55），
@@ -244,6 +269,7 @@ final class RelayClient: NSObject, ObservableObject {
         st.title = (d["title"] as? String) ?? ""
         st.prevTitle = (d["prevTitle"] as? String) ?? ""
         st.nextTitle = (d["nextTitle"] as? String) ?? ""
+        st.anchor = (d["anchor"] as? String) ?? ""
         return st
     }
 
@@ -259,7 +285,8 @@ final class RelayClient: NSObject, ObservableObject {
         let t = Timer(timeInterval: 2, repeats: true) { [weak self] timer in
             guard let self = self else { timer.invalidate(); return }
             self.infoTries += 1
-            guard self.wantsConnection, self.deckState == nil, self.deckPresent, self.infoTries < 8 else {
+            let wantMore = (self.deckState == nil) || !self.gotDeckInfo
+            guard self.wantsConnection, wantMore, self.deckPresent, self.infoTries < 8 else {
                 timer.invalidate(); self.infoTimer = nil; return
             }
             self.requestInfo()
@@ -271,6 +298,12 @@ final class RelayClient: NSObject, ObservableObject {
     private func stopInfoRequests() {
         infoTimer?.invalidate()
         infoTimer = nil
+    }
+
+    /// 页码和讲稿两样都有结论了才停。
+    /// 手表要讲稿，所以不能像最初那样「拿到 state 就收工」——那样 txb64 永远等不到。
+    private func stopInfoRequestsIfDone() {
+        if deckState != nil, gotDeckInfo { stopInfoRequests() }
     }
 
     private func requestInfo() {

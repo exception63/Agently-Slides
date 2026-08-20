@@ -94,7 +94,7 @@ final class PhoneLinkManager: NSObject, ObservableObject {
     ///
     /// 只带三个字段。**别把 txb64 讲稿也塞进来** —— 手表屏幕根本塞不下，
     /// 白白把 WCSession 的消息体挤爆。
-    private func statusPayload(ok: Bool) -> [String: Any] {
+    private func statusPayload(ok: Bool, haveAnchor: String = "") -> [String: Any] {
         var p: [String: Any] = ["ok": ok,
                                 "deck": relay?.deckPresent ?? false,
                                 "conn": relay?.isConnected ?? false]
@@ -102,6 +102,14 @@ final class PhoneLinkManager: NSObject, ObservableObject {
             p["idx"] = st.slideIdx      // 0 基，与协议一致；手表显示时再 +1
             p["total"] = st.total
             p["next"] = st.nextTitle
+            p["title"] = st.title
+            p["anchor"] = st.anchor
+            // 当页讲稿正文。**只在手表还没有这一页时才捎** —— 手表每 3 秒 ping 一次，
+            // 一段讲稿几百到两千字，每次都塞进蓝牙这条管子是纯浪费。
+            // 手表在 ping 里报自己手上是哪一页（have），一样就不发。
+            if haveAnchor != st.anchor, let note = relay?.note(for: st.anchor), !note.isEmpty {
+                p["note"] = note
+            }
         }
         return p
     }
@@ -138,7 +146,7 @@ extension PhoneLinkManager: WCSessionDelegate {
                     self.relay?.connect(room: p.room, relayBase: p.relayBase)
                 }
                 let ok = self.relay?.send(action) ?? false
-                replyHandler(self.statusPayload(ok: ok))
+                replyHandler(self.statusPayload(ok: ok, haveAnchor: (message["have"] as? String) ?? ""))
                 return
             }
             // ② 查状态（手表定时 ping，用来显示绿灯/橙灯）
@@ -146,7 +154,7 @@ extension PhoneLinkManager: WCSessionDelegate {
                 if let p = self.pairing, self.relay?.isConnected != true {
                     self.relay?.connect(room: p.room, relayBase: p.relayBase)
                 }
-                replyHandler(self.statusPayload(ok: true))
+                replyHandler(self.statusPayload(ok: true, haveAnchor: (message["have"] as? String) ?? ""))
                 return
             }
             // ③ 要配对信息

@@ -8,27 +8,80 @@ import WatchKit
 struct WatchRemoteView: View {
     @EnvironmentObject private var relay: RelayClient
     @EnvironmentObject private var link: WatchLinkManager
+    @State private var page = 0
 
     var body: some View {
-        VStack(spacing: 6) {
-            statusBar
-            nextLine
-
+        Group {
             if link.pairing == nil {
-                unpairedHint
+                VStack(spacing: 6) { statusBar; unpairedHint }
+                    .padding(.horizontal, 6)
             } else {
-                // 上一页：小区
-                zoneButton(.prev, systemImage: "chevron.up", title: "上一页", minHeight: 44, tint: .gray)
-
-                // 下一页：大区 + 捏合双击主操作
-                zoneButton(.next, systemImage: "chevron.down", title: "下一页", minHeight: 96, tint: .orange)
-                    .handGestureShortcut(.primaryAction)
+                // 左右滑：翻页器 / 讲稿。分成两页而不是挤在一屏，是因为「下一页」的
+                // 大靶区不能被压小 —— 那是抬腕不看表也能盲按的前提。
+                TabView(selection: $page) {
+                    padPage.tag(0)
+                    notePage.tag(1)
+                }
+                .tabViewStyle(.page)
             }
         }
-        .padding(.horizontal, 6)
         .navigationTitle("Slidesmith")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { link.start(relay: relay) }
+    }
+
+    // MARK: - 第一页：翻页器
+
+    private var padPage: some View {
+        VStack(spacing: 6) {
+            statusBar
+            nextLine
+            zoneButton(.prev, systemImage: "chevron.up", title: "上一页", minHeight: 44, tint: .gray)
+            zoneButton(.next, systemImage: "chevron.down", title: "下一页", minHeight: 96, tint: .orange)
+                .handGestureShortcut(.primaryAction)
+        }
+        .padding(.horizontal, 6)
+    }
+
+    // MARK: - 第二页：讲稿
+
+    /// 当页讲稿。经手机那条路由手机捎来，直连那条路自己从 txb64 里拆。
+    private var note: String {
+        if link.transport == .phone { return link.phoneNote }
+        if let a = deckState?.anchor { return relay.note(for: a) ?? "" }
+        return ""
+    }
+
+    private var notePage: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 6) {
+                if let st = deckState {
+                    Text("\(st.pageNo)/\(st.total)" + (st.title.isEmpty ? "" : " · " + st.title))
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.orange)
+                        .lineLimit(2)
+                }
+                if note.isEmpty {
+                    Text(noteHint)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                } else {
+                    // 转表冠滚动。字号给到 15：再小讲台上瞄一眼根本看不清。
+                    Text(note)
+                        .font(.system(size: 15))
+                        .lineSpacing(3)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 6)
+        }
+    }
+
+    /// 讲稿为空时说清楚是**哪一环**没到，别只写「暂无讲稿」让人没法排查
+    private var noteHint: String {
+        if !deckOnline { return "等放映端上线后，讲稿会自动送过来。" }
+        if deckState == nil { return "正在向放映端要当前页…" }
+        return "这一页没有讲稿。\n（deck 里要写 <aside class=\"notes\">，或用一体版/单文件版讲稿）"
     }
 
     // MARK: - 状态条

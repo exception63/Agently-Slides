@@ -21,6 +21,10 @@ final class WatchLinkManager: NSObject, ObservableObject {
     /// 放映端当前页码 / 下一张标题。经手机那条路由手机回报，直连那条路直接看 relay。
     /// 手表屏幕塞不下讲稿，但「讲到哪、还剩几张」是刚需 —— 低头一眼就知道。
     @Published private(set) var phoneDeckState: DeckState?
+    /// 手机捎来的**当页讲稿正文**。手表没有 WebKit，只能拿纯文本。
+    @Published private(set) var phoneNote = ""
+    /// phoneNote 对应哪一页 —— ping 时报给手机，一样它就不重复发了
+    private(set) var phoneNoteAnchor = ""
     private var statusTimer: Timer?
     private var unreachableTicks = 0
 
@@ -112,7 +116,7 @@ final class WatchLinkManager: NSObject, ObservableObject {
     func send(_ action: RemoteAction) -> Bool {
         let s = WCSession.isSupported() ? WCSession.default : nil
         if let s = s, s.activationState == .activated, s.isReachable {
-            s.sendMessage(["cmd": action.rawValue], replyHandler: { [weak self] reply in
+            s.sendMessage(["cmd": action.rawValue, "have": phoneNoteAnchor], replyHandler: { [weak self] reply in
                 self?.absorb(reply: reply)
             }, errorHandler: { [weak self] _ in
                 // 手机这条路突然不行 → 立刻用手表自己的连接补发
@@ -141,9 +145,23 @@ final class WatchLinkManager: NSObject, ObservableObject {
                 st.slideIdx = max(0, idx)
                 st.total = (reply["total"] as? Int) ?? 0
                 st.nextTitle = (reply["next"] as? String) ?? ""
+                st.title = (reply["title"] as? String) ?? ""
+                st.anchor = (reply["anchor"] as? String) ?? ""
                 self.phoneDeckState = st
+
+                if let note = reply["note"] as? String {
+                    self.phoneNote = note
+                    self.phoneNoteAnchor = st.anchor
+                } else if st.anchor != self.phoneNoteAnchor {
+                    // 翻页了、手机却没捎讲稿（这一页它也没有）→ 别把上一页的讲稿留在屏幕上，
+                    // 讲台上照着念错页比没得念糟糕得多。
+                    self.phoneNote = ""
+                    self.phoneNoteAnchor = ""
+                }
             } else {
                 self.phoneDeckState = nil
+                self.phoneNote = ""
+                self.phoneNoteAnchor = ""
             }
         }
     }
@@ -167,7 +185,7 @@ final class WatchLinkManager: NSObject, ObservableObject {
                 return
             }
             DispatchQueue.main.async { self.unreachableTicks = 0 }
-            s.sendMessage(["ping": true], replyHandler: { [weak self] reply in
+            s.sendMessage(["ping": true, "have": self.phoneNoteAnchor], replyHandler: { [weak self] reply in
                 self?.absorb(reply: reply)
             }, errorHandler: { _ in })
         }
