@@ -239,18 +239,41 @@ final class RelayClient: NSObject, ObservableObject {
             let title = (obj["title"] as? String) ?? ""
             let st = Self.parseState(obj["state"])
             let txb64 = (obj["txb64"] as? String) ?? ""
+            // 作者定稿的提词表（presenter-mode 开了 watch mode 才有）。
+            // **有它就以它为准** —— 那是逐页校验过的；运行时从讲稿抠 <strong> 只是兜底，
+            // 因为 <strong> 在讲稿里同时担着「阅读强调」和「口播提词」两个角色，
+            // 实测一份 45 页真讲稿里抠出来的约三分之一不合规（太长 / 是结构标签）。
+            let authored: [String: [String]]? = (obj["cues"] as? [String: Any]).map { raw in
+                var out: [String: [String]] = [:]
+                for (k, v) in raw {
+                    guard let arr = v as? [Any] else { continue }
+                    let items = arr.compactMap { $0 as? String }
+                        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                        .filter { !$0.isEmpty }
+                    if !items.isEmpty { out[k] = items }
+                }
+                return out
+            }
             publish {
                 if !title.isEmpty { self.deckTitle = title }
                 if let st = st { self.deckState = st }
                 self.gotDeckInfo = true
+                if let a = authored, !a.isEmpty { self.cues = a }
                 self.stopInfoRequestsIfDone()
             }
             // 30–60 KB 的 HTML 正则拆解，别放主线程 —— 手表上尤其明显。
-            guard !txb64.isEmpty else { publish { self.notes = [:]; self.cues = [:] }; return }
+            guard !txb64.isEmpty else {
+                publish { self.notes = [:]; if authored == nil { self.cues = [:] } }
+                return
+            }
+            let needParseCues = (authored?.isEmpty ?? true)
             Self.parseQueue.async { [weak self] in
                 let parsed = TranscriptNotes.parse(base64: txb64)
-                let cued = TranscriptNotes.parseCues(base64: txb64)
-                self?.publish { self?.notes = parsed; self?.cues = cued }
+                let cued = needParseCues ? TranscriptNotes.parseCues(base64: txb64) : nil
+                self?.publish {
+                    self?.notes = parsed
+                    if let cued = cued { self?.cues = cued }
+                }
             }
 
         // 中转只把 evicted 发给**被顶掉的那个 deck**（relay.mjs:105 / worker.mjs:55），

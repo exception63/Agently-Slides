@@ -250,7 +250,11 @@
       type: 'deck-info',
       txb64: transcriptB64(),
       title: document.title || '',
-      state: PFEED.last || null
+      state: PFEED.last || null,
+      // 手表提词表（锚点 → 短语数组）。只有 presenter-mode 开了 watch mode 的 deck 才有。
+      // 没有时手表会回落到「运行时从讲稿里抠 <strong>」——能用，但质量不保证：
+      // <strong> 在讲稿里同时担着「阅读强调」和「口播提词」两个角色。
+      cues: (window.__SM_CUES__ && typeof window.__SM_CUES__ === 'object') ? window.__SM_CUES__ : null
     });
   }
   // 第二设备点「上一页/下一页」时也可以直接指定页码（讲稿模式下点目录跳转用）
