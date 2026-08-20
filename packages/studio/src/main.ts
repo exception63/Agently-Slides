@@ -551,6 +551,7 @@ async function saveHtmlInPlace(): Promise<void> {
 
 // route an imported file by type: contract HTML deck → html mode; json/md → IR mode
 function importFile(name: string, text: string): void {
+  cueMap = null; cueLoaded = false;   // 换了 deck，提词缓存作废
   fileHandle = null; // a new deck arrived → drop any stale writable handle; open-picker/drop re-set it after
   if (/\.html?$/i.test(name) || /^\s*<(!doctype|html|section|div|body)/i.test(text)) loadHtmlDeck(name, text);
   else loadDeck(name, text);
@@ -1048,6 +1049,137 @@ const PHONE_REMOTE_JS =
   + '<script>' + pairClientJs + '</scr' + 'ipt>\n'
   + '<!--sm-phone-remote-end-->';
 // 生成一个固定房间号（浏览器内），烘进导出件 → 二维码永久不变、可截图复用。
+// ---------------- 手表提词（watch mode） ----------------
+// 提词表按**锚点**索引（`{"s1-boom":["无缝嵌入"]}`），存在 deck 自己的
+// `window.__SM_CUES__` 里。这里做的是「读出来 → 编辑 → 写回去」。
+//
+// 读为什么走预览 iframe 而不是正则解析文本：那份字面量是**人和 skill 写的 JS**，
+// 带注释、可能有尾逗号，正则解析迟早翻车。iframe 里那份是浏览器**已经求值过**的，
+// 永远是对的。写回去时我们统一写成严格 JSON，下次谁解析都不难。
+let cueMap: Record<string, string[]> | null = null;
+let cueLoaded = false;
+
+/** 提词的硬约束 —— 与 slides-presenter-mode skill 里那张表一字不差 */
+const CUE_MAX = 3;
+const CUE_LEN = 10;
+const CUE_STRUCTURAL = /^(第[一二三四五六七八九十\d]+(部分|章|节|页)|part\s*\d+|目录|结构|概览|agenda)$/i;
+
+function previewWin(): (Window & { deckAPI?: { SLIDE_MAP?: string[] }; __SM_CUES__?: Record<string, string[]> }) | null {
+  try { return (($('#preview') as HTMLIFrameElement).contentWindow as never) || null; } catch { return null; }
+}
+
+/** 第 i 页对应的讲稿锚点。与 deck 端 stateFromDom() 的取法保持一致，否则手表对不上 */
+function slideAnchor(i: number): string {
+  const w = previewWin();
+  const m = w?.deckAPI?.SLIDE_MAP;
+  return (m && m[i]) || ('sm-note-' + i);
+}
+
+/** 首次进面板时从预览里吃一份。返回 null = 这份 deck 没开 watch mode */
+function loadCues(): Record<string, string[]> | null {
+  if (cueLoaded) return cueMap;
+  cueLoaded = true;
+  const raw = previewWin()?.__SM_CUES__;
+  cueMap = (raw && typeof raw === 'object') ? JSON.parse(JSON.stringify(raw)) as Record<string, string[]> : null;
+  return cueMap;
+}
+
+/** 写回 deck 文本。__SM_CUES__ 落在 #deck 之外，也就是 H.prelude / H.trailing 里 */
+function persistCues(): void {
+  if (!cueMap) return;
+  const json = JSON.stringify(cueMap, null, 2);
+  const re = /(window\.__SM_CUES__\s*=\s*)\{[\s\S]*?\}(\s*;)/;
+  let done = false;
+  for (const key of ['trailing', 'prelude'] as const) {
+    const src = H[key];
+    if (!done && re.test(src)) {
+      // 用函数替换：提词里可能含 $ 之类的字符，字符串替换会被当特殊记号解释
+      H[key] = src.replace(re, (_m, a: string, b: string) => a + json + b);
+      done = true;
+    }
+  }
+  // **只标脏，不重渲染预览**：提词不影响幻灯片外观，为敲一个字就重载整份 deck
+  // 会丢掉滚动位置和选中态。deck 里那个「✦ 提词」窗要等下次自然重渲染才跟上。
+  if (done) markDirty();
+}
+
+function renderCuePane(): void {
+  const box = $('#cueBody'); if (!box) return;
+  if (mode !== 'html') { box.innerHTML = '<div class="nosel">提词只对导入的 HTML deck 可用。</div>'; return; }
+  const map = loadCues();
+  if (!map) {
+    box.innerHTML = '<div class="nosel">这份 deck 没有开 <b>watch mode</b>。<br><br>'
+      + '用 <code>slides-presenter-mode</code> skill 开启后，deck 里会烘进提词表和「✦ 提词」按钮，'
+      + '这里就能逐页编辑了。</div>';
+    return;
+  }
+  const anchor = slideAnchor(cur);
+  const list = (map[anchor] || []).slice(0, CUE_MAX);
+  while (list.length < CUE_MAX) list.push('');
+
+  const rows = list.map((v, i) =>
+    `<div class="field"><input class="cue-in" data-i="${i}" value="${esc(v)}" placeholder="${i === 0 ? '例：无缝嵌入' : '（可留空）'}" maxlength="24"></div>`
+  ).join('');
+
+  box.innerHTML = `<div class="cfaint">第 ${cur + 1} 页 · 锚点 <code>${esc(anchor)}</code></div>`
+    + rows
+    + '<div class="oprow"><button id="cueFromNotes" class="mini">从讲稿抽一版</button></div>'
+    + '<div id="cueCheck"></div>';
+
+  box.querySelectorAll('.cue-in').forEach((el) => {
+    el.addEventListener('input', () => {
+      const vals = Array.from(box.querySelectorAll('.cue-in'))
+        .map((x) => (x as HTMLInputElement).value.trim())
+        .filter((t) => t.length > 0);
+      if (!cueMap) return;
+      if (vals.length) cueMap[anchor] = vals; else delete cueMap[anchor];
+      checkCues(vals);
+      persistCues();
+    });
+  });
+  const fromNotes = $('#cueFromNotes');
+  if (fromNotes) fromNotes.addEventListener('click', () => cueDraftFromNotes(anchor));
+  checkCues(list.filter((t) => t.length > 0));
+}
+
+/** 就地体检 —— 讲台上才发现提词不合用就晚了 */
+function checkCues(vals: string[]): void {
+  const out = $('#cueCheck'); if (!out) return;
+  const bad: string[] = [];
+  if (!vals.length) bad.push('这一页还没有提词');
+  if (vals.length > CUE_MAX) bad.push(`条数 ${vals.length} 超上限 ${CUE_MAX}`);
+  vals.forEach((v) => {
+    if (v.length > CUE_LEN) bad.push(`「${v.slice(0, 8)}…」${v.length} 字，超上限 ${CUE_LEN}`);
+    if (CUE_STRUCTURAL.test(v)) bad.push(`「${v}」像结构标签，手表上帮不上忙`);
+  });
+  out.className = bad.length ? 'audit-row error' : 'audit-row';
+  out.textContent = bad.length ? '⚠ ' + bad.join(' · ') : '✓ 合规';
+}
+
+/** 从讲稿里抽这一段的 <strong> 当草稿。**仍需人过一遍**——见 skill 里的红线 */
+function cueDraftFromNotes(anchor: string): void {
+  const w = previewWin() as (Window & { __TXB64__?: string }) | null;
+  const b64 = w?.__TXB64__;
+  if (!b64) { toast('这份 deck 没有内嵌讲稿，抽不出来', true); return; }
+  let html = '';
+  try { html = decodeURIComponent(escape(atob(b64))); } catch { toast('讲稿解码失败', true); return; }
+  const re = new RegExp('<h[1-6][^>]*\\bid="' + anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"[^>]*>([\\s\\S]*?)(?=<h[1-6][^>]*\\bid=|$)', 'i');
+  const seg = html.match(re);
+  if (!seg) { toast('讲稿里没找到锚点 ' + anchor, true); return; }
+  const found: string[] = [];
+  seg[1].replace(/<strong[^>]*>([\s\S]*?)<\/strong>/gi, (_m, t: string) => {
+    const clean = t.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    if (clean && found.indexOf(clean) < 0) found.push(clean);
+    return '';
+  });
+  if (!found.length) { toast('这一段讲稿里没有 <strong> 标记', true); return; }
+  if (!cueMap) return;
+  cueMap[anchor] = found.slice(0, CUE_MAX);
+  persistCues();
+  renderCuePane();
+  toast('抽了 ' + found.length + ' 条草稿 —— 请逐条过一遍再用');
+}
+
 function smRoomId(): string {
   const a = new Uint8Array(12); (window.crypto || crypto).getRandomValues(a);
   return Array.from(a).map((b) => ('0' + b.toString(16)).slice(-2)).join('');
@@ -1139,6 +1271,8 @@ function harvestAll(): void {
 }
 function selectHtmlSlide(i: number): void {
   cur = Math.max(0, Math.min(htmlSlides.length - 1, i));
+  // 提词是按页的，换页就得重画（面板没开着时这一步很廉价，直接 return）
+  if (!($('[data-hpane="cue"]') as HTMLElement | null)?.hidden) renderCuePane();
   lastSyncIdx = cur; // we are the source of truth now; keep the nav-poll in step
   if (htmlSelEl) deselectHtml(); // a selection on the old page no longer applies
   [].forEach.call(document.querySelectorAll('.srow'), (r: Element, idx: number) => r.classList.toggle('active', idx === cur));
@@ -2894,6 +3028,7 @@ function buildUI(): void {
         <button class="htab" data-htab="design">设计</button>
         <button class="htab" data-htab="anim">动画效果</button>
         <button class="htab" data-htab="ai">AI 修改</button>
+        <button class="htab" data-htab="cue">提词</button>
       </div>
 
       <!-- ===== 格式 ===== -->
@@ -3038,6 +3173,10 @@ function buildUI(): void {
         <div class="sechead">视觉自检<button class="ihelp" type="button" data-help="检查每页的内容溢出、文字对比度、坏图，点结果可跳到对应页。">?</button><span class="grow"></span><button id="auditRun" class="mini">检查</button></div>
         <div id="auditOut" class="auditout"></div>
       </div>
+    </div>
+    <div class="pane hpane" data-hpane="cue" hidden>
+      <div class="sechead">本页提词<button class="ihelp" type="button" data-help="Apple Watch 上会显示的提词。抬腕零点几秒要能读完，所以每页最多 3 条、每条不超过 10 个汉字，而且要是内容锚点（「无缝嵌入」）而不是结构标签（「第一部分」）。">?</button></div>
+      <div id="cueBody"></div>
     </div>
     <div class="tabs">
       <button class="tab active" data-tab="format">格式</button>
@@ -3242,6 +3381,7 @@ function buildUI(): void {
     const name = (tb as HTMLElement).dataset.htab;
     document.querySelectorAll('.htab').forEach((x) => x.classList.toggle('active', x === tb));
     document.querySelectorAll('.hpane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.hpane !== name));
+    if (name === 'cue') renderCuePane();
   }));
   // 左栏多功能 tab：页面（缩略图导航）/ 换装（皮肤画廊，就地换肤）/ 插入（添加中枢）
   document.querySelectorAll('.ltab').forEach((tb) => tb.addEventListener('click', () => {
