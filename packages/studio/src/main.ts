@@ -1058,9 +1058,13 @@ const PHONE_REMOTE_JS =
 // 永远是对的。写回去时我们统一写成严格 JSON，下次谁解析都不难。
 let cueMap: Record<string, string[]> | null = null;
 let cueLoaded = false;
+/** 用户手动点「＋ 加一条」超出 5 条时，额外多给几个空框（按锚点记） */
+const cueExtra: Record<string, number> = {};
 
 /** 提词的硬约束 —— 与 slides-presenter-mode skill 里那张表一字不差 */
-const CUE_MAX = 3;
+// 表盘放得下 5 行短提词。**这是 skill 出品的上限**；Studio 允许手动超过它
+// （手表上会变成要翻页，能用但不优雅），所以这里只告警、不拦。
+const CUE_MAX = 5;
 const CUE_LEN = 10;
 const CUE_STRUCTURAL = /^(第[一二三四五六七八九十\d]+(部分|章|节|页)|part\s*\d+|目录|结构|概览|agenda)$/i;
 
@@ -1114,8 +1118,10 @@ function renderCuePane(): void {
     return;
   }
   const anchor = slideAnchor(cur);
-  const list = (map[anchor] || []).slice(0, CUE_MAX);
+  // 已有的全都显示（可能超过 5——手动加的），不足 5 条补空框
+  const list = (map[anchor] || []).slice();
   while (list.length < CUE_MAX) list.push('');
+  if (cueExtra[anchor]) { for (let k = 0; k < cueExtra[anchor]; k++) list.push(''); }
 
   const rows = list.map((v, i) =>
     `<div class="field"><input class="cue-in" data-i="${i}" value="${esc(v)}" placeholder="${i === 0 ? '例：无缝嵌入' : '（可留空）'}" maxlength="24"></div>`
@@ -1123,7 +1129,8 @@ function renderCuePane(): void {
 
   box.innerHTML = `<div class="cfaint">第 ${cur + 1} 页 · 锚点 <code>${esc(anchor)}</code></div>`
     + rows
-    + '<div class="oprow"><button id="cueFromNotes" class="mini">从讲稿抽一版</button></div>'
+    + '<div class="oprow"><button id="cueAdd" class="mini">＋ 加一条</button>'
+    + '<button id="cueFromNotes" class="mini">从讲稿抽一版</button></div>'
     + '<div id="cueCheck"></div>';
 
   box.querySelectorAll('.cue-in').forEach((el) => {
@@ -1137,6 +1144,12 @@ function renderCuePane(): void {
       persistCues();
     });
   });
+  const addBtn = $('#cueAdd');
+  if (addBtn) addBtn.addEventListener('click', () => {
+    // 手动突破 5 条 —— 手表上会变成要翻页，体检会提醒，但不拦
+    cueExtra[anchor] = (cueExtra[anchor] || 0) + 1;
+    renderCuePane();
+  });
   const fromNotes = $('#cueFromNotes');
   if (fromNotes) fromNotes.addEventListener('click', () => cueDraftFromNotes(anchor));
   checkCues(list.filter((t) => t.length > 0));
@@ -1147,7 +1160,7 @@ function checkCues(vals: string[]): void {
   const out = $('#cueCheck'); if (!out) return;
   const bad: string[] = [];
   if (!vals.length) bad.push('这一页还没有提词');
-  if (vals.length > CUE_MAX) bad.push(`条数 ${vals.length} 超上限 ${CUE_MAX}`);
+  if (vals.length > CUE_MAX) bad.push(`条数 ${vals.length}，超过 ${CUE_MAX} 条手表要翻页`);
   vals.forEach((v) => {
     if (v.length > CUE_LEN) bad.push(`「${v.slice(0, 8)}…」${v.length} 字，超上限 ${CUE_LEN}`);
     if (CUE_STRUCTURAL.test(v)) bad.push(`「${v}」像结构标签，手表上帮不上忙`);
@@ -3175,7 +3188,7 @@ function buildUI(): void {
       </div>
     </div>
     <div class="pane hpane" data-hpane="cue" hidden>
-      <div class="sechead">本页提词<button class="ihelp" type="button" data-help="Apple Watch 上会显示的提词。抬腕零点几秒要能读完，所以每页最多 3 条、每条不超过 10 个汉字，而且要是内容锚点（「无缝嵌入」）而不是结构标签（「第一部分」）。">?</button></div>
+      <div class="sechead">本页提词<button class="ihelp" type="button" data-help="Apple Watch 上会显示的提词。抬腕零点几秒要能读完，所以每条不超过 10 个汉字，而且要是内容锚点（「无缝嵌入」）而不是结构标签（「第一部分」）。表盘放得下 5 行——skill 出品以 5 条为上限，这里可以再手动加，但手表上会变成要翻页。">?</button></div>
       <div id="cueBody"></div>
     </div>
     <div class="tabs">

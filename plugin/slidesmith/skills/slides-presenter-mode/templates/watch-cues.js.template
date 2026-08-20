@@ -20,7 +20,7 @@
  *
  * 硬约束（Ultra 3 = 211×257 点 / Series 11 46mm = 208×248 点 实测，19pt 半粗）：
  *   · 每页必须有         —— 缺页即失败，手表上空白比没这功能更让人慌
- *   · 每页 1–3 条        —— 5 条就顶满整屏
+ *   · 每页 1–5 条        —— 表盘放得下 5 行短的；skill 出品上限就是 5
  *   · 每条 ≤10 个汉字     —— 超过就折行；50 字直接铺满整屏
  *   · 必须是内容锚点      —— 「第一部分」这种结构标签占地方又帮不上忙
  *   · 不与 slide 标题重复 —— 手表顶部已经显示标题了
@@ -99,7 +99,7 @@ window.__SM_CUES__ = {
     if (n) {
       var bad = [];
       if (!list.length) bad.push('这一页没有提词');
-      if (list.length > 3) bad.push('条数 ' + list.length + ' 超上限 3');
+      if (list.length > 5) bad.push('条数 ' + list.length + '，超过 5 条手表要翻页');
       for (var j = 0; j < list.length; j++) {
         if (list[j].length > 10) bad.push('「' + list[j].slice(0, 8) + '…」' + list[j].length + ' 字，超上限 10');
       }
