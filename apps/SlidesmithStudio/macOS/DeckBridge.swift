@@ -44,6 +44,11 @@ final class DeckBridge {
     }
     private(set) var selection: Selection?
 
+    /// Studio 顶栏那个 ◐ 现在是深还是浅。**app 里其实有两个主题开关**：这个（管网页
+    /// 那半边）和系统外观（管原生的 Claude 面板）。用户点了 ◐ 之后左边黑了右边还白着，
+    /// 看着像坏了。拿到它之后 app 把整个窗口的外观跟着切，一个开关管两边。
+    private(set) var studioDark: Bool?
+
     /// 用户在 Studio 里提交的一条修改请求。`content` 是 Studio 自己组装好的
     /// 完整 prompt（指令 + 该页当前 HTML + 设计令牌 + 输出规范），**一个字都不要改**
     /// ——改写它等于在两个地方各维护一半的提示词。
@@ -185,6 +190,7 @@ final class DeckBridge {
         } else {
             selection = nil
         }
+        studioDark = json["studioDark"] as? Bool
         return json["port"] != nil
     }
 

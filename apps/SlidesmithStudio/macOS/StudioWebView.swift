@@ -50,7 +50,7 @@ struct StudioWebView: NSViewRepresentable {
         webView.allowsBackForwardNavigationGestures = false
         // Studio 自己管背景色（含深色模式）。给个中性底，免得加载那一瞬间闪白。
         webView.setValue(false, forKey: "drawsBackground")
-        webView.load(URLRequest(url: url))
+        webView.load(URLRequest(url: Self.hosted(url)))
         context.coordinator.webView = webView
         return webView
     }
@@ -58,8 +58,19 @@ struct StudioWebView: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {
         if context.coordinator.lastReloadToken != reloadToken {
             context.coordinator.lastReloadToken = reloadToken
-            webView.load(URLRequest(url: url))
+            webView.load(URLRequest(url: Self.hosted(url)))
         }
+    }
+
+    /// 带上 `?host=app`，让网页认出自己是在 app 壳里跑。
+    ///
+    /// **不是为了分叉成两套。** 同一份 HTML，只是有些东西在 app 里是重复的：
+    /// 品牌名（菜单栏已经写着）、deck 文件名（标题栏那颗药丸已经写着）。
+    /// 网页版单开时这两样是必要的，在 app 里就是同一个字符串占两行。
+    private static func hosted(_ url: URL) -> URL {
+        var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        comps?.queryItems = [URLQueryItem(name: "host", value: "app")]
+        return comps?.url ?? url
     }
 
     @MainActor

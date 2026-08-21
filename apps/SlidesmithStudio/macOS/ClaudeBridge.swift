@@ -416,7 +416,11 @@ final class ClaudeBridge {
 
     // MARK: - 提问
 
-    func send(_ prompt: String) {
+    /// - Parameters:
+    ///   - prompt: 真正发给 Claude 的整段（可能前面带了一行「你正看着第几页」的注解）
+    ///   - display: 气泡里显示什么。**必须和 prompt 分开**——给模型的注解糊在气泡里，
+    ///     用户看到的是自己没写过的一段话，那条注解本来是幕后的。
+    func send(_ prompt: String, display: String? = nil) {
         let text = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         if handleAppCommand(text) { return }
@@ -424,7 +428,8 @@ final class ClaudeBridge {
             notice("上一轮还在跑。等它答完，或者按「停」。")
             return
         }
-        turns.append(Turn(role: .user, text: text))
+        let shown = (display ?? text).trimmingCharacters(in: .whitespacesAndNewlines)
+        turns.append(Turn(role: .user, text: shown.isEmpty ? text : shown))
         beginStreaming()
         streamTask = Task { await self.stream(text) }
     }

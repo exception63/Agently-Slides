@@ -1869,6 +1869,11 @@ function wireFullDeckEditing(d: Document): void {
   d.querySelectorAll('#deck .slide').forEach((slide) => {
     slide.querySelectorAll('*').forEach((el) => { if (isTextLeaf(el)) (el as HTMLElement).setAttribute('contenteditable', 'true'); });
   });
+  // **deck 自己顶栏上的标题也要能改。** 它在 #deck 之外（属于 H.prelude），
+  // 所以既点不动、AI 也够不着——用户看着"贵州财经大学"却没有任何地方能改成
+  // "正大管理学院"。这里把那两行文字放开，harvestTopbar() 负责写回 prelude。
+  d.querySelectorAll('body > .topbar .topbar__brand, body > .topbar .topbar__sub')
+    .forEach((el) => (el as HTMLElement).setAttribute('contenteditable', 'true'));
   const deckEl = d.querySelector('#deck'); if (!deckEl) return;
   deckEl.addEventListener('click', (e) => {
     let t = e.target as Node | null; while (t && t.nodeType !== 1) t = (t as Node).parentNode;
@@ -1913,6 +1918,12 @@ function renderHtmlEdit(): void {
     // 等一拍再算一次，稳。
     try { d.addEventListener('fullscreenchange', () => setTimeout(() => refitPreview(), 60)); } catch { /* noop */ }
     applyDeckChrome();
+    // **不能赌谁先注册。** ready() 是在 deck DOM 一解析出来就跑的，那时候 deck 尾部
+    // 那段引擎脚本还没执行；它一执行就按自己的公式（减掉段导航的 300px）写一遍
+    // --fit-scale，把我们刚算好的覆盖掉——表现就是"首屏没铺满，⌘R 之后才对"。
+    // 隔几拍各补一次，再加一次 load 兜底，谁最后跑都不影响结果。
+    [60, 250, 700, 1500].forEach((ms) => setTimeout(() => refitPreview(), ms));
+    ifr.addEventListener('load', () => setTimeout(() => refitPreview(), 60), { once: true });
     // never-lose-work + history for text edits done straight in the deck DOM
     d.addEventListener('input', () => markDirty(), true);
     d.addEventListener('focusin', (e) => { if ((e.target as HTMLElement)?.isContentEditable) pushHistory('text'); }, true);
@@ -1953,6 +1964,30 @@ function harvestAll(): void {
   if (mode !== 'html') return;
   const d = ($('#preview') as HTMLIFrameElement).contentDocument; if (!d) return;
   d.querySelectorAll('#deck .slide').forEach((s, i) => { if (htmlSlides[i]) htmlSlides[i].html = cleanSectionHtml(s, htmlSlides[i].id); });
+  harvestTopbar(d);
+}
+/**
+ * 把 deck 顶栏上改过的标题写回 `H.prelude`。
+ *
+ * **只搬文字，不搬结构。** prelude 里还躺着 `__SM_CUES__` / 讲稿那些 script，
+ * 整块重新序列化风险太大；这里把 prelude 解析成一棵离线的 DOM，只替换那两个
+ * 元素的 textContent，再序列化回去——脚本原样保留。
+ */
+function harvestTopbar(d: Document): void {
+  const live = d.querySelector('body > .topbar');
+  if (!live || !H.prelude) return;
+  const holder = document.createElement('div');
+  holder.innerHTML = H.prelude;
+  const target = holder.querySelector('.topbar');
+  if (!target) return;
+  let changed = false;
+  ['.topbar__brand', '.topbar__sub'].forEach((sel) => {
+    const a = live.querySelector(sel), b = target.querySelector(sel);
+    if (!a || !b) return;
+    const next = a.textContent || '';
+    if ((b.textContent || '') !== next) { b.textContent = next; changed = true; }
+  });
+  if (changed) H.prelude = holder.innerHTML;
 }
 function selectHtmlSlide(i: number): void {
   cur = Math.max(0, Math.min(htmlSlides.length - 1, i));
@@ -2910,16 +2945,29 @@ function refreshTasks(): void { renderLeft(); renderTodo(); refreshSentBanner();
  * 发不出去就算了（没连桥 / 网页版直接开的），这只是个增强。
  */
 let lastSelectionKey = '';
+function tellBridge(payload: Record<string, unknown>): void {
+  const ws = bridge.ws;
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;   // 网页版直接开的没有桥
+  try { ws.send(JSON.stringify(payload)); } catch { /* 发不出去就算了，这只是增强 */ }
+}
 function reportSelection(index: number, slide: { id: string; title: string } | undefined): void {
   const key = index + '|' + (slide ? slide.id : '');
   if (key === lastSelectionKey) return;         // 同一页别反复发
   lastSelectionKey = key;
-  try {
-    bridge.ws.send(JSON.stringify({
-      type: 'selection', index: index + 1, total: htmlSlides.length,
-      id: slide ? slide.id : '', title: slide ? slide.title : '',
-    }));
-  } catch { /* 没连上桥就算了，这只是增强 */ }
+  tellBridge({
+    type: 'selection', index: index + 1, total: htmlSlides.length,
+    id: slide ? slide.id : '', title: slide ? slide.title : '',
+  });
+}
+/**
+ * 深浅色也报给桥。
+ *
+ * app 里其实有**两个**主题开关：Studio 顶栏这个 ◐（管网页那半边）和系统外观
+ * （管原生的 Claude 面板）。用户点了 ◐ 之后左边黑了右边还白着，看着像坏了。
+ * 报上去之后由 app 把整个窗口的外观跟着切，一个开关管两边。
+ */
+function reportTheme(): void {
+  tellBridge({ type: 'theme', dark: document.body.classList.contains('dark') });
 }
 function updateAiTarget(): void {
   if (mode !== 'html') return;
@@ -3255,6 +3303,20 @@ function applyStudioTheme(dark: boolean): void {
   document.body.classList.toggle('dark', dark);
   const b = $('#themeTog'); if (b) b.title = dark ? '切换为浅色界面' : '切换为深色界面';
 }
+/**
+ * 在 app 壳里跑的时候，把顶栏上重复的那两样收掉。
+ *
+ * app 的标题栏已经有一颗「● deck 文件名」的药丸，菜单栏上也写着 Slidesmith Studio；
+ * 顶栏再写一遍就是同一个字符串在屏幕上出现两次，白占地方。网页版单开时它们是
+ * 必要的（那时候没有别的地方写），所以只在 `?host=app` 时藏。
+ */
+function markAppHost(): void {
+  try {
+    if (new URLSearchParams(location.search).get('host') === 'app') {
+      document.body.classList.add('inapp');
+    }
+  } catch { /* noop */ }
+}
 function initStudioTheme(): void {
   let dark = false; try { dark = localStorage.getItem(THEME_KEY) === 'dark'; } catch { /* noop */ }
   applyStudioTheme(dark);
@@ -3263,6 +3325,7 @@ function toggleStudioTheme(): void {
   const dark = !document.body.classList.contains('dark');
   applyStudioTheme(dark);
   try { localStorage.setItem(THEME_KEY, dark ? 'dark' : 'light'); } catch { /* noop */ }
+  reportTheme();          // app 里的原生面板跟着切，一个开关管两边
 }
 
 // ======================= bridge: connected mode =======================
@@ -3367,7 +3430,10 @@ function connectBridge(): void {
     try { m = JSON.parse(String(e.data)); } catch { return; }
     // hello carries the handshake: which session owns this bridge + its port. Re-sent
     // after a handshake, so the badge updates the moment Claude runs /slidesmith.
-    if (m.type === 'hello') { bridge.owner = m.owner || null; bridge.port = m.port || 0; updateBridgeBadge(); }
+    if (m.type === 'hello') {
+      bridge.owner = m.owner || null; bridge.port = m.port || 0; updateBridgeBadge();
+      reportTheme();      // 刚连上就报一次，否则 app 启动时不知道该用深还是浅
+    }
     else if (m.type === 'import' && typeof m.html === 'string') { importedFromBridge = true; importFile(m.name || 'deck.html', m.html); importedFromBridge = false; }
     // after applying a patch, sync the updated full deck back so the bridge's
     // in-memory copy stays current (late-joiners / reconnects see the change)
@@ -3463,7 +3529,9 @@ body.dark{
 *{box-sizing:border-box}html,body{margin:0;height:100%}
 body{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;color:var(--sm-ink);display:flex;flex-direction:column;background:var(--sm-bg)}
 .ehead{height:50px;flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--sm-surface);color:var(--sm-ink);border-bottom:1px solid var(--sm-line-2);font-size:14px}
-.ehead .brand{font-weight:700}.ehead .dn{opacity:.6;font-size:13px}.ehead .grow{flex:1}
+.ehead .brand{font-weight:700}
+/* app 壳里这两样是重复的：品牌名菜单栏有，文件名标题栏那颗药丸有 */
+body.inapp .ehead .brand,body.inapp .ehead .dn{display:none}.ehead .dn{opacity:.6;font-size:13px}.ehead .grow{flex:1}
 .ehead button{background:var(--sm-bg);color:var(--sm-ink);border:1px solid var(--sm-line-2);border-radius:var(--sm-r-sm);padding:7px 13px;font-size:13px;cursor:pointer}
 .ehead button:hover{background:var(--sm-surface-4)}.ehead button.primary{background:var(--sm-accent-solid);border-color:var(--sm-accent);color:#fff}.ehead button.primary:hover{background:var(--sm-accent-deep)}
 .ehead .iconbtn{padding:6px 10px;font-size:15px;line-height:1}
@@ -4446,6 +4514,7 @@ function buildUI(): void {
   try { if (localStorage.getItem(RAIL_KEY) === '1') setRightCollapsed(true); } catch { /* noop */ }
   $('#themeTog').addEventListener('click', toggleStudioTheme);
   initStudioTheme();
+  markAppHost();
   $('#connectBtn').addEventListener('click', openConnectModal);
   $('#cclose').addEventListener('click', closeConnectModal);
   $('#connectModal').addEventListener('click', (e) => { if (e.target === $('#connectModal')) closeConnectModal(); });

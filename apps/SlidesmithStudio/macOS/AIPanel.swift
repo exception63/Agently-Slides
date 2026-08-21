@@ -303,7 +303,7 @@ struct AIPanel: View {
             // 原来是五条裸蓝链接，看着像调试页，而且不点一次不知道会发生什么。
             VStack(spacing: 6) {
                 ForEach(quickPrompts) { q in
-                    Button { claude.send(withContext(q.prompt)) } label: {
+                    Button { claude.send(withContext(q.prompt), display: q.title) } label: {
                         HStack(alignment: .top, spacing: 9) {
                             Image(systemName: q.icon)
                                 .font(.system(size: 13))
@@ -458,6 +458,9 @@ struct AIPanel: View {
                     HStack(spacing: 5) {
                         Image(systemName: attachSelection ? "checkmark.circle.fill" : "circle")
                             .font(.system(size: 10))
+                        // **药丸得自己说清自己是干什么的。** 只写「第 1 页 · 标题」的话，
+                        // 谁也看不出它是「发问时会把这一页带上」，只会以为是个状态显示。
+                        Text("带上").font(.system(size: 10.5, weight: .medium)).opacity(0.75)
                         Text(sel.label).font(.system(size: 11)).lineLimit(1)
                     }
                     .foregroundStyle(attachSelection ? SMPalette.accent(scheme) : Color.secondary)
@@ -487,7 +490,7 @@ struct AIPanel: View {
                 // 发过一句话就再也点不到了，而「一键加提词」恰恰是聊到一半才想起来的活。
                 Menu {
                     ForEach(quickPrompts) { q in
-                        Button(q.title) { claude.send(withContext(q.prompt)) }
+                        Button(q.title) { claude.send(withContext(q.prompt), display: q.title) }
                     }
                 } label: {
                     Image(systemName: "wand.and.stars").font(.system(size: 14))
@@ -544,7 +547,7 @@ struct AIPanel: View {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
         input = ""
-        claude.send(withContext(text))
+        claude.send(withContext(text), display: text)
     }
 
     /// 把「你正看着哪一页」贴在问题前面。

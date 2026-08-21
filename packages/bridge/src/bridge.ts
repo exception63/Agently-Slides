@@ -263,6 +263,9 @@ export interface BridgeStatus {
   /** 用户此刻在 Studio 里选中的那一页。app 的 Claude 面板拿它当上下文，
    *  省得每次打字说「第 12 页」。Studio 没连上时是 null。 */
   selection: { index: number; total: number; id: string; title: string } | null;
+  /** Studio 顶栏 ◐ 现在是深色还是浅色。app 拿它去切整个窗口的外观，
+   *  免得「网页那半边黑了、原生那半边还白着」。Studio 没连上时是 null。 */
+  studioDark: boolean | null;
 }
 
 export interface BridgeOptions {
@@ -432,6 +435,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   let deckAbsPath: string | null = null;
   /** Studio 报上来的「当前选中页」。只读不写盘——刷新一次就重报。 */
   let selection: BridgeStatus['selection'] = null;
+  let studioDark: boolean | null = null;
   let owner: BridgeOwner | null = null; // set by the handshake (which session owns this bridge)
   const pending: BridgeRequest[] = [];
   // long-poll waiters: callers blocked in waitForRequests / GET /api/wait. Resolved
@@ -774,7 +778,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     emitter.emit('studio-connected');
 
     ws.on('message', (data) => {
-      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; images?: { id?: string; name?: string; dataUrl?: string }[]; name?: string; html?: string; watchMode?: boolean; hasNotes?: boolean; pages?: unknown; index?: number; total?: number; id?: string; title?: string };
+      let m: { type?: string; request?: { name?: string; content?: string; count?: number; confirm?: boolean }; images?: { id?: string; name?: string; dataUrl?: string }[]; name?: string; html?: string; watchMode?: boolean; hasNotes?: boolean; pages?: unknown; index?: number; total?: number; id?: string; title?: string; dark?: boolean };
       try { m = JSON.parse(String(data)); } catch { return; }
       if (m.type === 'requests' && m.request && typeof m.request.content === 'string') {
         const id = 'req-' + (++reqSeq);
@@ -802,6 +806,8 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       } else if (m.type === 'cues' && typeof m.watchMode === 'boolean') {
         const { type: _t, ...report } = m; // `type` 是线缆上的路由字段，别带进回给调用方的载荷
         emitter.emit('cues', report as unknown as CueReport);
+      } else if (m.type === 'theme' && typeof m.dark === 'boolean') {
+        studioDark = m.dark;
       } else if (m.type === 'selection' && typeof m.index === 'number') {
         selection = { index: m.index, total: m.total || 0, id: m.id || '', title: m.title || '' };
       } else if (m.type === 'exported' && typeof m.html === 'string') {
@@ -830,6 +836,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       pendingRequests: pending.length,
       owner,
       selection,
+      studioDark,
     };
   }
 

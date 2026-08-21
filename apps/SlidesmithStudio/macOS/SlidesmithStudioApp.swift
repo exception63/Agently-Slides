@@ -107,6 +107,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor var deck: DeckBridge?
     @MainActor var claude: ClaudeBridge?
 
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // **关掉窗口标签栏。** 这个 app 一次只开一份 deck，标签栏纯粹是白占一行——
+        // 而且它显示的还是文件名，和 Studio 顶栏里那个是同一个字符串。
+        // 用户在系统设置里把「标签栏」设成「总是」时，不关这一条就会一直顶着一行。
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // **光设 allowsAutomaticWindowTabbing 不够。** 用户在系统设置里把「标签栏」
+        // 设成「总是」时，窗口还是会顶着一行只有一个标签的标签栏——上面写的就是
+        // 文件名，和 Studio 顶栏里那个是同一个字符串。得对着窗口本身关。
+        disallowTabbing()
+        // 窗口是 SwiftUI 建的，这一拍不一定已经在了，隔一拍再收一次尾。
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.disallowTabbing() }
+    }
+
+    private func disallowTabbing() {
+        for window in NSApp.windows {
+            window.tabbingMode = .disallowed
+        }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -114,6 +136,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             claude?.shutdown()
             deck?.shutdown()
         }
+    }
+}
+
+/// 抓到承载这个视图的 NSWindow，把窗口标签栏关掉。
+///
+/// **只在 AppDelegate 里设 `NSWindow.allowsAutomaticWindowTabbing` / `tabbingMode` 不管用**——
+/// SwiftUI 的窗口是它自己建的，建完会把 tabbingMode 重置回去。实测下来那一行标签栏
+/// 照样在，上面写的就是文件名，和 Studio 顶栏里那个是同一个字符串，纯粹白占一行。
+/// 等视图真的挂上去、拿到 window 再设，才按得住。
+private struct WindowChrome: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        DispatchQueue.main.async { apply(view.window) }
+        return view
+    }
+    func updateNSView(_ view: NSView, context: Context) { apply(view.window) }
+    private func apply(_ window: NSWindow?) {
+        guard let window else { return }
+        if window.tabbingMode != .disallowed { window.tabbingMode = .disallowed }
     }
 }
 
@@ -146,8 +187,15 @@ struct RootView: View {
                 }
             }
         }
+        .background(WindowChrome())
         .toolbar { toolbarContent }
-        .navigationTitle(deck.deckName ?? "Slidesmith Studio")
+        // **标题栏留空。** deck 名在 Studio 自己的顶栏里已经写着了，窗口标题再写一遍
+        // 就是同一个文件名在屏幕上出现三次（标签栏 + 窗口标题 + Studio 顶栏），
+        // 白占两行高度。
+        .navigationTitle("")
+        // Studio 顶栏那个 ◐ 一切，整个窗口跟着切——包括原生的 Claude 面板和标题栏。
+        // 不跟的话左边黑了右边还白着，看着像坏了。
+        .preferredColorScheme(deck.studioDark.map { $0 ? .dark : .light })
         .onReceive(NotificationCenter.default.publisher(for: .smReloadStudio)) { _ in
             reloadToken += 1
         }
