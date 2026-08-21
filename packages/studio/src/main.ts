@@ -536,7 +536,22 @@ async function saveHtmlInPlace(): Promise<void> {
         clearDraft(); syncExportToBridge();   // 桥里那份也换成新的，否则 ⌘R 会把改动"退回去"
         return;
       }
-      // 桥不知道这份 deck 在磁盘的哪儿（比如是拖进来的）→ 往下走浏览器那套
+      // 桥不知道这份 deck 在磁盘的哪儿（导入 HTML 进来的，网页拿不到路径）。
+      // **这时候绝不能悄悄往下走「下载副本」**——在 app 的 WebView 里那等于什么都
+      // 没发生，用户以为存好了，其实一个字节没写。退一步存成一份真文件，并且
+      // 明确告诉他存到哪了、这不是覆盖原文件。
+      if (j.error === 'no-path' && !(window as unknown as { showSaveFilePicker?: unknown }).showSaveFilePicker) {
+        const r2 = await fetch(
+          `${libBase()}/api/export-html?name=${encodeURIComponent(fileBase)}.html`,
+          { method: 'POST', headers: { 'content-type': 'text/html;charset=utf-8' }, body: html });
+        const j2 = await r2.json() as { ok: boolean; path?: string };
+        if (j2.ok && j2.path) {
+          clearDraft(); syncExportToBridge();
+          toast('⚠️ 没能覆盖原文件（这份 deck 是导入进来的，拿不到它的路径），'
+              + '已另存到：' + j2.path + ' —— 想一键覆盖，请用「打开」重新打开这份文件。', true);
+          return;
+        }
+      }
     } catch { /* 桥没应答 → 往下走浏览器那套 */ }
   }
   // 1) reuse a known handle → silent overwrite
@@ -568,7 +583,14 @@ async function saveHtmlInPlace(): Promise<void> {
       /* fall through to download */
     }
   }
-  // 3) browser without File System Access API → download a copy
+  // 3) 都不行了才下载副本。
+  // **在 app 的 WebView 里这条是死路**（没有下载能力，还会把页面导航去 blob URL，
+  // 表现是「左右栏突然没了」），所以宁可明说失败，也不要假装存好了。
+  if (location.protocol.startsWith('http')) {
+    toast('❌ 没能保存：桥不知道这份 deck 的文件位置，而这个环境也不支持「另存为」对话框。'
+        + '请用「打开」重新打开这份文件，再按保存。', true);
+    return;
+  }
   download(fileBase + '.html', html, 'text/html');
   toast('当前浏览器不支持原地覆盖，已下载副本', true);
 }

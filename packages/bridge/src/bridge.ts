@@ -492,6 +492,20 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     // "in-memory" and PDF/HTML export falls back to ~/.slidesmith instead of landing
     // beside the deck; with it, an out-of-process caller gets the same behaviour a
     // local handle.open() would.
+    // POST /api/deck-path?path=<abs> —— 只告诉桥「当前这份 deck 在磁盘的哪儿」，不重新加载。
+    //
+    // **为什么需要它**：用户在 Studio 里点「导入 HTML」时，网页只拿得到文件内容，
+    // 拿不到路径（浏览器安全限制）。于是桥虽然有 deck，却不知道它是哪个文件——
+    // 「保存」就没法覆盖回去。app 那边的 NSOpenPanel 是知道路径的，用这个接口补上。
+    if (url.startsWith('/api/deck-path') && req.method === 'POST') {
+      const p = decodeURIComponent((/[?&]path=([^&]+)/.exec(req.url || '') || [])[1] || '');
+      if (!p) { sendJson(res, { ok: false, error: 'no path' }, 400); return; }
+      const abs = resolve(p);
+      if (!existsSync(abs)) { sendJson(res, { ok: false, error: 'not found', path: abs }, 404); return; }
+      deckAbsPath = abs;
+      sendJson(res, { ok: true, path: abs });
+      return;
+    }
     if (url === '/api/open' && req.method === 'POST') {
       readBody(req).then((body) => {
         const name = decodeURIComponent((/[?&]name=([^&]+)/.exec(req.url || '') || [])[1] || 'deck.html');

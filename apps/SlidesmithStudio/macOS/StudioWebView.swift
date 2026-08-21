@@ -134,8 +134,30 @@ struct StudioWebView: NSViewRepresentable {
             panel.canChooseDirectories = parameters.allowsDirectories
             panel.canChooseFiles = true
             panel.begin { response in
-                completionHandler(response == .OK ? panel.urls : nil)
+                let urls = response == .OK ? panel.urls : nil
+                // **顺手把路径告诉桥。**
+                // 网页那边点「导入 HTML」只拿得到文件内容、拿不到路径（浏览器安全限制），
+                // 于是桥虽然有 deck 却不知道它是哪个文件，「保存」就覆盖不回去——
+                // 表现是「点了保存好像没反应，⌘R 之后改动全没了」。这里是全流程里
+                // 唯一知道真实路径的地方。
+                if let deckFile = urls?.first(where: { $0.pathExtension.lowercased() == "html"
+                                                    || $0.pathExtension.lowercased() == "htm" }) {
+                    Self.tellBridgeDeckPath(deckFile)
+                }
+                completionHandler(urls)
             }
+        }
+
+        /// 把「当前 deck 在磁盘的哪儿」告诉桥。失败不打扰用户——保存那一步会自己报。
+        private static func tellBridgeDeckPath(_ file: URL) {
+            let encoded = file.path.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? ""
+            guard !encoded.isEmpty,
+                  let url = URL(string: "http://127.0.0.1:\(DeckBridge.port)/api/deck-path?path=\(encoded)")
+            else { return }
+            var request = URLRequest(url: url)
+            request.httpMethod = "POST"
+            request.timeoutInterval = 5
+            URLSession.shared.dataTask(with: request).resume()
         }
 
         // MARK: - alert / confirm / prompt
