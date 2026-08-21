@@ -781,8 +781,14 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
         const { type: _t, ...report } = m; // `type` 是线缆上的路由字段，别带进回给调用方的载荷
         emitter.emit('cues', report as unknown as CueReport);
       } else if (m.type === 'exported' && typeof m.html === 'string') {
-        // the Studio's current full deck html (e.g. after edits) — keep latest
-        if (deck) deck.html = m.html;
+        // the Studio's current full deck html (e.g. after edits) — keep latest.
+        //
+        // **没有 deck 就收养它。** 桥的 `deck` 过去只有 `handle.open`（= `slidesmith_open`）
+        // 才会设。可是用户在 Studio 里点「导入 HTML」开的那份，桥一无所知 ——
+        // `hasDeck:false` / `outline` 空 / app 顶栏一直写着「未打开 deck」，
+        // 而屏幕上明明开着一份。AI 只好回一句「我不知道当前 deck 是哪份」。
+        if (deck) { deck.html = m.html; if (m.name) deck.name = m.name; }
+        else { deck = { name: m.name || 'deck.html', html: m.html }; deckAbsPath = null; }
         emitter.emit('exported', { name: m.name || (deck && deck.name), html: m.html });
       }
     });

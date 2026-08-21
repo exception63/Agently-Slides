@@ -550,6 +550,8 @@ async function saveHtmlInPlace(): Promise<void> {
 }
 
 // route an imported file by type: contract HTML deck → html mode; json/md → IR mode
+/** 这一次导入是桥推下来的吗（是的话就别再回声给桥） */
+let importedFromBridge = false;
 function importFile(name: string, text: string): void {
   cueMap = null; cueLoaded = false;   // 换了 deck，提词缓存作废
   notesDoc = null; notesLoaded = false; notesUndo = null; noteAnns = []; notePick = null;  // 讲稿同理
@@ -669,6 +671,10 @@ function loadHtmlDeck(name: string, html: string): void {
   const aiDeckBox = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (aiDeckBox) aiDeckBox.value = '';
   const fxSel = $('#hFxMode') as HTMLSelectElement | null; if (fxSel) fxSel.value = fxMode; // reflect imported deck's play mode
   renderLeft(); setHtmlMode(true); refreshHtmlInspector(); renderHtmlEdit(); renderTray(); renderTodo();
+  // **自己开的 deck 要主动报给桥**：否则桥的 `hasDeck` 一直是 false，
+  // AI 那边看到的是「Studio 里没打开任何 deck」，而屏幕上明明开着。
+  // 从桥推下来的那份不用回声（它本来就知道）。
+  if (!importedFromBridge) setTimeout(syncExportToBridge, 400);
   toast('已导入 HTML deck：' + fileBase + '（' + htmlSlides.length + ' 页 · ' + new Set(htmlSlides.map((s) => s.seg)).size + ' 段）');
 }
 
@@ -2993,6 +2999,29 @@ async function exportPdf(): Promise<void> {
   }
   exportPdfViaPrint();
 }
+const RAIL_KEY = 'slidesmith-rail-collapsed';
+/** 折叠 / 展开右栏。窄条上的 tab 名字按当前模式（HTML / Markdown）现建。 */
+function setRightCollapsed(on: boolean): void {
+  document.body.classList.toggle('panelcollapsed', on);
+  try { localStorage.setItem(RAIL_KEY, on ? '1' : '0'); } catch { /* noop */ }
+  if (on) renderRailStrip();
+}
+function renderRailStrip(): void {
+  const box = $('#railStripTabs'); if (!box) return;
+  // 哪条 tab 栏正开着就抄哪条 —— 两种模式的 tab 不一样，写死一份迟早对不上
+  const htmlOn = ($('#htmlpanel') as HTMLElement | null)?.style.display !== 'none';
+  const tabs = Array.from(document.querySelectorAll(htmlOn ? '.htab' : '.tab')) as HTMLElement[];
+  box.innerHTML = '';
+  tabs.forEach((t) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'striptab' + (t.classList.contains('active') ? ' active' : '');
+    b.textContent = t.textContent || '';
+    // 点窄条上的名字 = 展开 + 直接切到那一页，不用展开后再找一次
+    b.addEventListener('click', () => { setRightCollapsed(false); t.click(); });
+    box.appendChild(b);
+  });
+}
+
 function setHtmlMode(on: boolean): void {
   const p = $('#htmlpanel'); if (p) p.style.display = on ? '' : 'none';
   // hide only the IR tabs + IR panes (the inspector has its own .pane w/o data-pane)
@@ -3004,6 +3033,7 @@ function setHtmlMode(on: boolean): void {
   // keep the slide list visible in html mode too — it's now the task navigator
   // (per-slide comment badges live on it). The user can still collapse via ☰.
   if (!on) document.body.classList.remove('navcollapsed');
+  if (document.body.classList.contains('panelcollapsed')) renderRailStrip();
 }
 // offer to restore a draft saved before a refresh/crash (HTML mode only)
 function maybeOfferDraftRestore(): void {
@@ -3139,7 +3169,7 @@ function connectBridge(): void {
     // hello carries the handshake: which session owns this bridge + its port. Re-sent
     // after a handshake, so the badge updates the moment Claude runs /slidesmith.
     if (m.type === 'hello') { bridge.owner = m.owner || null; bridge.port = m.port || 0; updateBridgeBadge(); }
-    else if (m.type === 'import' && typeof m.html === 'string') importFile(m.name || 'deck.html', m.html);
+    else if (m.type === 'import' && typeof m.html === 'string') { importedFromBridge = true; importFile(m.name || 'deck.html', m.html); importedFromBridge = false; }
     // after applying a patch, sync the updated full deck back so the bridge's
     // in-memory copy stays current (late-joiners / reconnects see the change)
     else if (m.type === 'patch' && typeof m.text === 'string') { applyAiPatch(m.text, !!m.preview); setTimeout(syncExportToBridge, 500); }
@@ -3403,6 +3433,23 @@ body.dark .tododesc{color:#cfd2d8}
 .drop{position:absolute;inset:14px;border:2px dashed rgba(255,255,255,.25);border-radius:8px;display:none;align-items:center;justify-content:center;color:#bbb;font-size:15px;pointer-events:none}
 body.dragging .drop{display:flex;background:rgba(181,64,42,.12);border-color:#B5402A;color:#fff}
 .right{width:300px;flex:0 0 auto;background:#fff;border-left:1px solid #e2e2e4;display:flex;flex-direction:column}
+/* 折叠 —— **不是整块藏起来**：右栏缩成一条 34px 的窄条，上面还留着各 tab 的名字，
+   点哪个就展开到哪个。整块 display:none 的话，想找回来只能去猜哪个按钮能唤回它。 */
+.railtog{flex:0 0 22px;background:transparent;border:0;color:#9a9a9e;font-size:15px;cursor:pointer;font-family:inherit;padding:0}
+.railtog:hover{color:#B5402A}
+.railstrip{display:none;flex-direction:column;align-items:center;gap:6px;padding:10px 0;height:100%;overflow:hidden}
+.railstrip #railStripTabs{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:0;overflow:auto}
+.railstrip .railtog{flex:0 0 auto;font-size:16px;padding:2px 0}
+.railstrip button.striptab{writing-mode:vertical-rl;white-space:nowrap;background:transparent;border:0;padding:8px 3px;
+  font-size:12.5px;color:#6a6a6e;cursor:pointer;font-family:inherit;letter-spacing:.12em;border-radius:5px}
+.railstrip button.striptab:hover{background:#f6f6f7;color:#1c1c1f}
+.railstrip button.striptab.active{color:#B5402A;font-weight:600}
+body.panelcollapsed .right{width:34px}
+body.panelcollapsed .right>div{display:none!important}
+body.panelcollapsed .right>.railstrip{display:flex!important}
+body.dark .railstrip button.striptab{color:#9a9a9e}
+body.dark .railstrip button.striptab:hover{background:#242427;color:#f0f0f2}
+body.dark .railstrip button.striptab.active{color:#f0b34a}
 .tabs{display:flex;border-bottom:1px solid #e2e2e4;flex:0 0 auto}
 .tab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:12px 0;font-size:13px;color:#6a6a6e;cursor:pointer;font-family:inherit}
 .tab:hover{background:#f6f6f7}.tab.active{color:#B5402A;border-bottom-color:#B5402A;font-weight:600}
@@ -3582,6 +3629,10 @@ function buildUI(): void {
     <div class="drop">松开即可导入 HTML</div>
   </main>
   <aside class="right">
+    <div class="railstrip">
+      <button class="railtog" type="button" title="展开面板">‹</button>
+      <div id="railStripTabs"></div>
+    </div>
     <div id="htmlpanel" style="display:none">
       <div class="htabs">
         <button class="htab active" data-htab="fmt">格式</button>
@@ -3589,6 +3640,7 @@ function buildUI(): void {
         <button class="htab" data-htab="anim">动画效果</button>
         <button class="htab" data-htab="ai">AI 修改</button>
         <button class="htab" data-htab="cue">提词</button>
+        <button class="railtog" type="button" title="折叠面板，把地方让给预览">›</button>
       </div>
 
       <!-- ===== 格式 ===== -->
@@ -3745,6 +3797,7 @@ function buildUI(): void {
       <button class="tab active" data-tab="format">格式</button>
       <button class="tab" data-tab="anim">动画效果</button>
       <button class="tab" data-tab="doc">文稿</button>
+      <button class="railtog" type="button" title="折叠面板，把地方让给预览">›</button>
     </div>
     <div class="pane" data-pane="format">
       <h3>主题（配色）</h3><div class="field"><select id="theme"></select></div>
@@ -4071,6 +4124,8 @@ function buildUI(): void {
   $('#down').addEventListener('click', () => moveSlide(1));
 
   $('#navtog').addEventListener('click', () => document.body.classList.toggle('navcollapsed'));
+  document.querySelectorAll('.railtog').forEach((b) => b.addEventListener('click', () => setRightCollapsed(!document.body.classList.contains('panelcollapsed'))));
+  try { if (localStorage.getItem(RAIL_KEY) === '1') setRightCollapsed(true); } catch { /* noop */ }
   $('#themeTog').addEventListener('click', toggleStudioTheme);
   initStudioTheme();
   $('#connectBtn').addEventListener('click', openConnectModal);
