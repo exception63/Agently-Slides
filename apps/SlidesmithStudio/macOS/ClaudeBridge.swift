@@ -37,11 +37,28 @@ final class ClaudeBridge {
         var label: String
     }
 
+    /// 一次工具调用。
+    ///
+    /// 以前这里只留一个名字（`["apply_patch"]`），界面上就只能显示「它用了 apply_patch」——
+    /// 用户真正想知道的是**它动了哪一页、成没成**。所以 id（用来把结果对上号）、
+    /// 目标、状态三样都得留。
+    struct ToolCall: Identifiable, Equatable {
+        var id: String
+        var name: String
+        /// 「它动的是什么」：data-id / 文件路径 / 命令。整包参数可能是一整页 HTML，不留。
+        var target: String = ""
+        var status: Status = .running
+        /// 出错时的原因摘要。成功时留空——成功不需要解释。
+        var detail: String = ""
+
+        enum Status: Equatable { case running, ok, failed }
+    }
+
     struct Turn: Identifiable {
         let id = UUID()
         var role: Role
         var text: String
-        var tools: [String] = []
+        var tools: [ToolCall] = []
 
         /// `notice` 是面板自己说的话（`/clear` 的回执之类），不进 CLI 的对话历史，
         /// 也不花 token。
@@ -152,7 +169,7 @@ final class ClaudeBridge {
 
     private(set) var turns: [Turn] = []
     private(set) var streamingText = ""
-    private(set) var streamingTools: [String] = []
+    private(set) var streamingTools: [ToolCall] = []
     private(set) var running = false
     private(set) var connected = false
     private(set) var usage = Usage()
@@ -165,6 +182,20 @@ final class ClaudeBridge {
     private(set) var idleMinutes: Double = 10
     private(set) var note: String?
     private(set) var lastError: String?
+
+    /// 磁盘上的历史会话（桥的 /sessions 给的）。翻回去接着聊用。
+    struct HistorySession: Identifiable, Equatable {
+        var id: String          // session_id
+        var title: String
+        var updated: Date
+        var live: Bool          // 还有常驻进程
+    }
+    private(set) var history: [HistorySession] = []
+    private(set) var loadingHistory = false
+    /// 这一轮正在重试第几次（桥转发的 system/api_retry）。0 = 没在重试。
+    private(set) var retrying = 0
+    /// 已经按了「停这一轮」，正在等它收尾。界面靠它把按钮变成「正在停…」。
+    private(set) var interrupting = false
 
     var model = "sonnet"
     var effort: Effort? {
@@ -420,6 +451,84 @@ final class ClaudeBridge {
         streamTask = Task { await self.stream(prompt) }
     }
 
+    /// 叫停当前这一轮，**会话留着**。
+    ///
+    /// 桥那边走的是 stdin 的控制协议（不是信号）——进程活着、上下文在、
+    /// 下一句接着聊。界面上这颗按钮的意思因此是「这轮别跑了」，不是「关掉重来」。
+    func interrupt() {
+        guard running, !interrupting, let endpoint, let sid = sessionID else { return }
+        interrupting = true
+        Task {
+            var request = URLRequest(url: endpoint.appendingPathComponent("interrupt"))
+            request.httpMethod = "POST"
+            request.httpBody = try? JSONSerialization.data(withJSONObject: ["session_id": sid])
+            _ = try? await URLSession.shared.data(for: request)
+        }
+        // **故意不 cancel 本地的流。** 中断之后 CLI 会把这一轮正常收尾、照常吐
+        // `result`；这时候把 SSE 掐了，那些收尾输出就没人读——而这条连接一断，
+        // 桥会把进程丢掉，等于把「保住会话」这件事自己毁了。让它自然收完，
+        // 只多等一两秒，状态是对的。
+    }
+
+    /// 拉一遍磁盘上的历史会话。
+    func loadHistory() async {
+        guard let endpoint else { return }
+        loadingHistory = true
+        defer { loadingHistory = false }
+        var request = URLRequest(url: endpoint.appendingPathComponent("sessions"))
+        request.timeoutInterval = 20
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rows = json["sessions"] as? [[String: Any]] else { return }
+        history = rows.compactMap { row in
+            guard let id = row["session_id"] as? String else { return nil }
+            let raw = (row["title"] as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            return HistorySession(
+                id: id,
+                title: raw.isEmpty ? "（没有开场白）" : raw,
+                updated: Date(timeIntervalSince1970: row["updated"] as? Double ?? 0),
+                live: row["live"] as? Bool ?? false)
+        }
+    }
+
+    /// 翻回某一段历史会话：把它的轮次读进来，之后的对话接着那一段说。
+    ///
+    /// **不是只把文字贴出来**——`sessionID` 一并换过去，所以下一句是真的接在
+    /// 那段上下文后面，claude 那边走 `--resume`。
+    func resume(_ session: HistorySession) async {
+        guard let endpoint, !running else {
+            if running { notice("这一轮还在跑，等它答完再翻历史。") }
+            return
+        }
+        var comps = URLComponents(url: endpoint.appendingPathComponent("history"),
+                                  resolvingAgainstBaseURL: false)
+        comps?.queryItems = [URLQueryItem(name: "session", value: session.id)]
+        guard let url = comps?.url else { return }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 30
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let rows = json["turns"] as? [[String: Any]] else {
+            notice("这段会话读不出来。")
+            return
+        }
+        turns = rows.compactMap { row in
+            let role: Turn.Role = (row["role"] as? String == "user") ? .user : .assistant
+            let text = row["text"] as? String ?? ""
+            let tools = (row["tools"] as? [[String: Any]] ?? []).map { d in
+                ToolCall(id: UUID().uuidString,
+                         name: (d["name"] as? String ?? "").components(separatedBy: "__").last ?? "",
+                         target: d["input"] as? String ?? "",
+                         status: .ok)          // 历史里没有结果状态，一律当成跑完了
+            }
+            if text.isEmpty && tools.isEmpty { return nil }
+            return Turn(role: role, text: text, tools: tools)
+        }
+        sessionID = session.id
+        usage = Usage()
+        notice("已翻回这段会话（\(turns.count) 轮）。接着说就是续在它后面。")
+    }
+
     private func beginStreaming() {
         streamingText = ""
         streamingTools = []
@@ -427,6 +536,8 @@ final class ClaudeBridge {
         streamOpen = true
         running = true
         lastError = nil
+        retrying = 0
+        interrupting = false
     }
 
     /// POST /chat，把 SSE 逐行喂给 stream-json 解析。桥是原样转发的，
@@ -574,6 +685,21 @@ final class ClaudeBridge {
         switch type {
         case "system":
             if let sid = json["session_id"] as? String { sessionID = sid }
+            // 重试要说出来。不说的话表现是「它突然不动了」，而其实是 API 在退避重试。
+            if json["subtype"] as? String == "api_retry" {
+                retrying = json["attempt"] as? Int ?? 1
+            }
+
+        case "user":
+            // 工具**结果**回来的时候，角色是 user（一条 tool_result）。以前这一支
+            // 根本没接，所以界面上工具永远停在「正在跑」，成没成看不出来。
+            guard let message = json["message"] as? [String: Any],
+                  let content = message["content"] as? [[String: Any]] else { return }
+            for block in content where block["type"] as? String == "tool_result" {
+                closeToolCall(id: block["tool_use_id"] as? String ?? "",
+                              failed: block["is_error"] as? Bool == true,
+                              content: block["content"])
+            }
 
         case "stream_event":
             guard let event = json["event"] as? [String: Any],
@@ -588,7 +714,9 @@ final class ClaudeBridge {
             guard let message = json["message"] as? [String: Any],
                   let content = message["content"] as? [[String: Any]] else { return }
             for block in content where block["type"] as? String == "tool_use" {
-                if let name = block["name"] as? String { noteTool(name) }
+                guard let name = block["name"] as? String else { continue }
+                noteToolUse(id: block["id"] as? String ?? UUID().uuidString,
+                            name: name, input: block["input"] as? [String: Any])
             }
             // **正文兜底。** 平时文字是从 stream_event 的 text_delta 一片片来的；
             // 这里只当那一路没来时的备份：气泡还空着才填，否则会把已显示的再贴一遍。
@@ -672,12 +800,52 @@ final class ClaudeBridge {
         streamingText = text
     }
 
-    private func noteTool(_ name: String) {
+    private func noteToolUse(id: String, name: String, input: [String: Any]?) {
         guard streamOpen else { return }
         // MCP 工具名长得吓人（`mcp__plugin_slidesmith_slidesmith__slidesmith_apply_patch`），
         // 界面上只留最后一段。
         let short = name.components(separatedBy: "__").last ?? name
-        if streamingTools.last != short { streamingTools.append(short) }
+        guard !streamingTools.contains(where: { $0.id == id }) else { return }
+        streamingTools.append(ToolCall(id: id, name: short, target: Self.toolTarget(input)))
+        retrying = 0
+    }
+
+    /// 工具结果回来了，把对应那条从「正在跑」结掉。
+    private func closeToolCall(id: String, failed: Bool, content: Any?) {
+        guard let i = streamingTools.firstIndex(where: { $0.id == id }) else { return }
+        streamingTools[i].status = failed ? .failed : .ok
+        if failed { streamingTools[i].detail = Self.resultGist(content) }
+    }
+
+    /// 从工具参数里挑出「它动的是什么」。
+    ///
+    /// **不能把整包 input 摆出来**——apply_patch 的参数是一整页 HTML，几十 KB，
+    /// 糊在对话里既看不懂也把界面撑垮。挑一个有辨识度的字段就够了。
+    private static func toolTarget(_ input: [String: Any]?) -> String {
+        guard let input else { return "" }
+        for key in ["data_id", "dataId", "anchor", "file_path", "path",
+                    "command", "pattern", "query", "url", "deck", "prompt"] {
+            if let v = input[key] as? String, !v.trimmingCharacters(in: .whitespaces).isEmpty {
+                return String(v.trimmingCharacters(in: .whitespaces).prefix(90))
+            }
+        }
+        for key in ["sections", "cues", "notes", "edits", "todos"] {
+            if let arr = input[key] as? [Any] { return "\(arr.count) 项" }
+            if let dict = input[key] as? [String: Any] { return "\(dict.count) 项" }
+        }
+        return ""
+    }
+
+    /// 失败原因摘要。tool_result 的 content 可能是字符串，也可能是块数组。
+    private static func resultGist(_ content: Any?) -> String {
+        var text = ""
+        if let s = content as? String { text = s }
+        else if let blocks = content as? [[String: Any]] {
+            text = blocks.compactMap { $0["text"] as? String }.joined(separator: " ")
+        }
+        text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\n", with: " ")
+        return String(text.prefix(160))
     }
 
     /// 把流式中的那条提交进 `turns`。**只提交一次**——stop() 和被取消的 stream
@@ -685,6 +853,8 @@ final class ClaudeBridge {
     private func finishStreaming() {
         guard streamOpen else { return }
         streamOpen = false
+        interrupting = false
+        retrying = 0
         flushStreamNow()
         var text = streamingText
         let tools = streamingTools

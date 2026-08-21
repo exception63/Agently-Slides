@@ -33,6 +33,17 @@ final class DeckBridge {
     private(set) var pendingRequests = 0
     private(set) var note: String?
 
+    /// 用户此刻在 Studio 里选中的那一页。Claude 面板拿它当上下文，
+    /// 省得每次打字说「第 12 页」。Studio 没连上时是 nil。
+    struct Selection: Equatable {
+        var index: Int          // 1 起
+        var total: Int
+        var id: String          // section 的 data-id，给工具用
+        var title: String
+        var label: String { "第 \(index) 页 · \(title)" }
+    }
+    private(set) var selection: Selection?
+
     /// 用户在 Studio 里提交的一条修改请求。`content` 是 Studio 自己组装好的
     /// 完整 prompt（指令 + 该页当前 HTML + 设计令牌 + 输出规范），**一个字都不要改**
     /// ——改写它等于在两个地方各维护一半的提示词。
@@ -167,6 +178,13 @@ final class DeckBridge {
         studioConnected = (json["connected"] as? Int ?? 0) > 0
         deckName = json["deckName"] as? String
         pendingRequests = json["pendingRequests"] as? Int ?? 0
+        if let s = json["selection"] as? [String: Any], let i = s["index"] as? Int {
+            selection = Selection(index: i, total: s["total"] as? Int ?? 0,
+                                  id: s["id"] as? String ?? "",
+                                  title: s["title"] as? String ?? "")
+        } else {
+            selection = nil
+        }
         return json["port"] != nil
     }
 
