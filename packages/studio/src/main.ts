@@ -900,7 +900,7 @@ function assembleDeck(forEdit = false): string {
   const editAttr = forEdit ? ' data-smfx-edit="1" data-sm-deckchrome="' + (deckChromeOn ? 'on' : 'off') + '"' : '';
   const skin = skinInject();
   const keyGuard = forEdit ? EDIT_KEYGUARD_JS + PRESENTER_OPEN_FIX_JS : '';
-  let doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${keyGuard}${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${NOTES_CSS}${FX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
+  let doc = `<!DOCTYPE html>\n<html ${htmlOpenTag()} data-smfx="${fxMode}"${editAttr}>\n<head>\n${keyGuard}${H.head}${skin.font}${skin.style}${fontLinks}${TYPO_CSS}${NOTES_CSS}${FX_CSS}${PRESENT_FIX_CSS}${editCss}\n</head>\n<body class="${H.bodyClass}">\n${H.prelude}\n<div class="deck" id="deck">\n${deckInner}\n</div>\n${H.trailing}\n${FX_JS}\n${FX_CANVAS_JS}\n</body>\n</html>`;
   // 手机遥控：先剥离任何旧注入（幂等，防 re-import 累积），再按需（仅导出、勾选时）烘进。
   // 注意：注入内容含 `$`（qr 库/客户端里有），必须用「函数替换」——字符串替换会把 $'/$&/$1 当特殊
   // 记号解释，导致注入的 JS 被腐蚀（曾致「二维码生成失败」）。
@@ -951,6 +951,19 @@ function fontLinksFor(deckHtml: string): string {
 // headings so they don't drop a lonely word onto a second line, and prettify body text
 // so paragraphs/lists avoid orphan last-line words. Native CSS, degrades silently on old
 // browsers, no-op on single-line text. Targets generic tags + the Deck-Contract classes.
+// 播放（present）态的布局修复。**deck 模板里那条规则在所有笔记本上都是坏的**，
+// 而存量 deck 把它烤死在自己的 <style> 里了 —— 所以这份修复要注进每一次 assemble
+// （预览和导出都要），用户手上已有的 deck 一存 / 一导出就跟着修好。
+//
+// 坏在哪：`body.present .slide` 用 `transform:scale(var(--sc))` 缩放，**但 transform
+// 不改布局尺寸** —— 盒子在布局上仍是 1920×1080。屏幕只要比 1920×1080 小（＝所有笔记本），
+// `.deck` 就被撑出滚动条；而 flex 居中的溢出是两边对称的，右边能滚到、**左边那一截
+// 滚都滚不回来**。实测 1728×899：文档 1824×1080，横向溢出 96px、纵向 181px，幻灯片
+// 视觉顶端在 -82px。用户看到的就是「播放时一大片黑、画面偏出去、手动拉回来、翻下一页又偏」。
+// 修法：用负 margin 把布局盒子收回到视觉尺寸。
+const PRESENT_FIX_CSS = '<style id="sm-present-fix">'
+  + 'body.present .slide{margin:calc((1080px * var(--sc,1) - 1080px) / 2) calc((1920px * var(--sc,1) - 1920px) / 2)}'
+  + '</style>';
 const TYPO_CSS = '<style id="sm-typo">'
   + '#deck .slide h1,#deck .slide h2,#deck .slide h3,#deck .slide h4,#deck .slide .title,#deck .slide .cover__title,#deck .slide .secdiv__title,#deck .slide .manifesto__title,#deck .slide .insight__statement,#deck .slide .head__title,#deck .slide blockquote{text-wrap:balance}'
   + '#deck .slide p,#deck .slide li,#deck .slide .cover__sub,#deck .slide .card__desc,#deck .slide .sub{text-wrap:pretty}'
@@ -2003,6 +2016,10 @@ function cleanSectionHtml(s: Element, id?: string): string {
   c.removeAttribute('contenteditable'); c.removeAttribute('data-global-idx');
   if (id) c.setAttribute('data-id', id); // keep the stable addressing key
   (c as HTMLElement).style.removeProperty('--sm-fit');
+  // `--sc` 是 deck 引擎在播放态按**当时那块屏**算出来写进 style 的，纯运行时产物。
+  // 不剥的话它会被 outerHTML 原样烤进保存 / 导出的文件（实测用户那份 deck 里躺了 4 个
+  // `--sc: 0.4619`），换一块屏再播放，第一帧就是错的。
+  (c as HTMLElement).style.removeProperty('--sc');
   c.querySelectorAll('.chrome').forEach((e) => e.remove()); // engine-injected page footer
   c.querySelectorAll('[contenteditable]').forEach((e) => e.removeAttribute('contenteditable'));
   c.querySelectorAll('.sm-sel').forEach((e) => e.classList.remove('sm-sel'));

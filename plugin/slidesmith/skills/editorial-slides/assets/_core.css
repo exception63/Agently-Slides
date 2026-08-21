@@ -63,7 +63,12 @@ body.present{background:#000;padding:0;}
 body.present .topbar,body.present .segnav,body.present .progress{display:none;}
 body.present .deck{padding:0;gap:0;align-items:center;justify-content:center;min-height:100vh;}
 body.present .slide-wrap{width:auto;height:auto;position:static;flex-shrink:0;}
-body.present .slide{display:none;position:static;transform:scale(var(--sc,1));transform-origin:center center;box-shadow:none;}
+body.present .slide{display:none;position:static;transform:scale(var(--sc,1));transform-origin:center center;box-shadow:none;
+  /* transform 不改布局尺寸：这个盒子在布局上仍然是 1920×1080。屏幕只要比 1920×1080 小
+     （＝所有笔记本），.deck 就会被撑出滚动条，而 flex 居中的溢出是**两边对称**的——
+     右边能滚到，左边那一截滚都滚不回来。表现就是「播放时一大片黑/灰、画面偏出去、
+     手动拉回来翻下一页又偏」。用负 margin 把布局盒子收回到视觉尺寸即可。 */
+  margin:calc((1080px * var(--sc,1) - 1080px) / 2) calc((1920px * var(--sc,1) - 1920px) / 2);}
 body.present .slide.active{display:flex;}
 body.fullscreen{background:#000;}
 :fullscreen{background:#000;}
