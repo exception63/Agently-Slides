@@ -5,58 +5,26 @@
 
 ---
 
-## 一、下一件事：批注 → 一次性交给 AI（用户点名要做的）
+## 一、下一件事：等用户试用「批注 → 一次发给 AI」后的反馈
 
-用户的原话：「我多处批注之后，说是加到 AI 待办，那怎么发送给 AI 呢？**我还没找到发送的键**。按理说在打开的讲稿那个窗口里面就要有这个按键。」
-以及：「如果我要对 slides 的页面或者元素加 AI 修改批注，又该怎么做？」
+**上一轮点名的两件（1a 找不到发送键 / 1b slides 元素批注）都做完了**，见 `d948559`。
+用户还没亲手试过 —— 所以这一轮**先别急着往下加功能**，等他用一次再说。
 
-### 1a · 先修「找不到发送键」（半小时的活，但用户已经被卡住一次）
+### 已经做好的形状（试用时对照）
+- **AI tab 上有数字角标**：待办几项就显示几，tooltip 写明构成；折成窄条也跟着走。
+- **发送键有两颗、但发的是同一件事**：AI tab 里那颗，和讲稿弹窗底栏新加的那颗。
+  底栏那句话会写清「本次发送 N 项：改字 1 · 配图 1 · 讲稿批注 2」，
+  按完自动关弹窗 + 切回 AI tab，让人看见送走了什么。
+- **元素批注**：预览里点中元素 → 上方那排把手第二颗 **💬** → 写一句 → 加批注。
+  元素上留橙色序号角标（点开可看 / 可删），左栏那一页挂 ●，待办里是「批注 · 元素」。
+  一页可以同时有「整页修改意见」和多条元素批注。
 
-**现状（查证过，不是推测）**：发送键只有一颗，是右栏 **AI tab** 里的
-`#aiSendAll`「一键发送给 AI · N 项」。讲稿弹窗（`#notesModal`）里**没有任何发送入口** ——
-它只有「加批注 / 取消 / 撤销 Claude 的改写 / 关闭」。所以流程是：
-写完批注 → **关掉弹窗** → 切到 AI tab → 拉到「待办」→ 点发送。中间没有任何提示。
-
-**改法（建议）**：
-1. **AI tab 标签上挂数字角标**（待办 N 项）。这条最关键 —— 现在待办数只在 AI tab *里面*
-   看得到，人在别的 tab 就完全不知道有东西挂着。角标一挂，「有待办 / 去哪发」两件事同时解决。
-2. **讲稿弹窗底部加一条提示条**：「已加 N 条批注 · 它们和其余待办一起发送」+ 一颗发送按钮。
-   ⚠️ 这颗按钮**发的是整个待办**（改字 + 配图 + 导入图 + 讲稿批注），不是只发批注 ——
-   所以文案必须写清楚数量构成，别让人以为只发了讲稿那几条。
-   `todoItems()` 已经把四类混在一起（`main.ts` 2637 行），`aiRequestAll` 的 count 是
-   `pages.length + (hasDeck?1:0) + noteAnns.length`。
-3. **不要新开一条「只发讲稿批注」的通道**。整个设计就是「凑成一个待办、一次交出去」，
-   分裂成两条会让 AI 那边多一种请求类型，也让用户多学一套流程。
-
-### 1b · 再做「slides 上的元素批注」（主体活）
-
-**照抄讲稿那套已经跑通的形状**（它是对的）：讲稿批注存的是
-`{anchor, page, quote（划中的原文）, note}`，AI 收到的是「划中：「xxx」批注：yyy」——
-**给 AI 一段原文当锚点**，比给它坐标或选择器都靠谱。
-
-建议的数据结构：
-```ts
-interface SlideAnn { id: string; slideId: string; page: number;
-  sel?: { tag: string; nth: number; snippet: string };   // 没有 sel = 整页批注
-  note: string }
-```
-- `snippet` = 选中元素的前 ~40 字，**这是给 AI 认位置用的主锚点**；`tag`/`nth` 是兜底。
-- 交互：预览里选中元素（**已有**，`htmlSelEl`）→ gizmo 上加第三个把手「💬」
-  （`showGizmo()` 在 2809 行附近，现在是 `✥` 移动 + `◢` 缩放，加一个正好）→ 弹小输入框。
-- 已批注的元素在幻灯片上留个小角标（序号），点开可看/删。
-  ⚠️ **角标只在编辑态显示** —— 放映和导出都不能出现（和刚修的手机遥控按钮同一个道理，
-  见 commit `fc1a4da` 的做法：挂 `body.present / :fullscreen` 选择器，别用 JS 监听）。
-- 待办里多一类「批注 · 第 N 页 · 元素」，和现有四类并列，**走同一次发送**。
-- `.ai-tasks.md` 的每页块里多一段「元素批注」，**`AGENTS.md §4c` 要同步改**
-  （那节现在描述的是 改字/配图/图表/导入图 四种指令）。
-- AI 改完那一页后，该页的元素批注要跟着清掉（和 `aiApplied` 现在对「改字」的处理一致）。
-
-**别忘了的边界**：一页可以**同时**有「整页修改意见」和多条元素批注；用户批注后又手动改了
-那个元素的话 snippet 会对不上 —— 所以 snippet 和 tag/nth 都要给 AI，让它自己对。
-
-### 1c · 用户提过但还没做的
-「可以同时在多页加批注」——**现在其实已经可以**（每页各写各的，左栏出 ● 徽标）。
-用户之所以觉得不行，多半就是被 1a 那个"找不到发送键"挡住了。先修 1a 再看他还缺什么。
+### 他大概率会接着提的（想清楚再动手，别抢跑）
+1. **待办点一下跳过去**。现在待办行只能删、点不动。改字 / 配图 / 元素批注都该能
+   「点一下跳到那一页（元素批注再滚到那个元素并选中）」。这条最像下一个自然需求。
+2. **批注刷新就没了**。`autosaveDraft()` 只存 deck HTML，不存待办 —— 改字 / 配图 /
+   导入图 / 讲稿批注一直都是这样，元素批注只是跟着一致。要做就四类一起做，别只补一类。
+3. **左栏跟随滚动**（老问题，`五` 里那条）：还是要先问用户。
 
 ---
 
@@ -70,6 +38,7 @@ interface SlideAnn { id: string; slideId: string; page: number;
 | `b29c580` | **AI 面板秒回陈年回复**：CLI 会自己起「没有用户输入的轮次」（后台任务完成通知），桥读完就不读 stdout 了，下一句进来秒回旧答案、**此后永久错位一格**。改成 stdout 常驻读线程 + 喂新话前排干 |
 | `c745e2e` | **全屏播放画面偏出可视区**：`transform:scale()` 不改布局尺寸，1920×1080 的盒子在所有笔记本上都把容器撑出滚动条。负 margin 收回布局盒子；模板 + Studio 注入 + 33 份成品一起修 |
 | `fc1a4da` | 导出的 deck 放映时藏起「📱 手机遥控」按钮（配对二维码遮罩一起藏） |
+| `d948559` | **批注一次性发给 AI**：① AI tab 数字角标（折叠窄条也带）② 讲稿弹窗底栏＝发送键 + 「本次发送 N 项：…」的构成说明，发完关窗切回 AI tab ③ **slides 元素批注**：gizmo 第三把手 💬 → 小窗 → 元素上留序号角标、左栏挂 ●、待办里「批注 · 元素」，和改字/配图/导入图/讲稿批注**同一次发送**；AI 改完那页自动清。锚点＝**原文前 40 字**为主、tag/nth/class 兜底。角标**放映整层藏、导出零残留**。新增 `verify-annotations.mjs`（26/26），`AGENTS.md §4c/§5` 同步 |
 
 **支线（2026-08-21，已交付，不在仓库里）**：按 A4 打印版 PDF 把
 `DYQthesis/Defense/DYQ-defense-一体版-0821.html` 的内嵌讲稿换成口语版
@@ -99,7 +68,7 @@ npx tsx packages/cli/src/index.ts serve --no-open -p 8790 <scratchpad>/probe-dec
 
 **改了就跑的回归**：
 ```bash
-node scripts/verify-studio-tabs.mjs && node scripts/verify-editor.mjs && node scripts/verify-ai-pane.mjs && node scripts/verify-present-fit.mjs && python3 scripts/verify-bridge-orphan.py
+node scripts/verify-studio-tabs.mjs && node scripts/verify-editor.mjs && node scripts/verify-ai-pane.mjs && node scripts/verify-annotations.mjs && node scripts/verify-present-fit.mjs && python3 scripts/verify-bridge-orphan.py
 ```
 另有 n2 / studio-skins / select-deselect / anim-quicksettings / fx / newfx-studio 都能过。
 **`verify-polish.mjs` 是坏的**（引用早删掉的 `__SM_AI_REQUEST_ALL__`），HEAD 里就坏，别以为是自己弄的。
