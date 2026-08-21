@@ -601,15 +601,24 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     // rely on the browser blob-download (which some --app windows silently drop).
     if (url === '/api/export-html' && req.method === 'POST') {
       const nm = decodeURIComponent((/[?&]name=([^&]+)/.exec(req.url || '') || [])[1] || '') || (deck ? deck.name : 'deck');
+      // 「保存」用的两个开关：inPlace=1 要求必须写回原文件（写不到就明确失败，
+      // 绝不悄悄在别处新建一个——那会让用户以为自己覆盖了，其实原文件一个字没变）；
+      // reveal=0 不要弹访达（保存是高频动作，每次蹦一个窗口很吵）。
+      const inPlaceOnly = /[?&]inPlace=1/.test(req.url || '');
+      const wantReveal = !/[?&]reveal=0/.test(req.url || '');
       readBody(req).then((body) => {
         if (!body.trim()) { sendJson(res, { ok: false, error: 'empty html' }, 400); return; }
+        if (inPlaceOnly && !deckAbsPath) {
+          sendJson(res, { ok: false, error: 'no-path', hint: '桥不知道这份 deck 在磁盘上的位置' }, 409);
+          return;
+        }
         try {
           const safeBase = safeSeg(nm.replace(/\.[^.]+$/, '')) || 'deck';
           const outDir = deckAbsPath ? dirname(deckAbsPath) : join(homedir(), '.slidesmith', 'exports');
           mkdirSync(outDir, { recursive: true });
-          const outPath = join(outDir, safeBase + '.html');
+          const outPath = inPlaceOnly && deckAbsPath ? deckAbsPath : join(outDir, safeBase + '.html');
           writeFileSync(outPath, body);
-          revealFile(outPath);
+          if (wantReveal) revealFile(outPath);
           sendJson(res, { ok: true, path: outPath });
         } catch (e) { sendJson(res, { ok: false, error: String((e as Error)?.message || e) }, 500); }
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));

@@ -517,6 +517,28 @@ function download(name: string, content: string, mime: string): void {
 // once and remembers it; browsers without the File System Access API get a download.
 async function saveHtmlInPlace(): Promise<void> {
   const html = mode === 'html' ? await buildExportHtml() : renderDeckHtml(deck);
+  // 0) 连着桥就让桥写回原文件。
+  //
+  // **这一条以前没有，后果是 app 里的「保存」从来没真正保存过。** 下面那两条走的都是
+  // 浏览器的 File System Access API（`fileHandle` / `showSaveFilePicker`），而
+  // WKWebView 两个都没有，于是一路落到最后的「下载副本」——在 WKWebView 里那等于
+  // 什么都没发生，还会把 WebView 导航去 blob URL，表现是「左右栏突然没了」，
+  // 而用户以为自己已经存好了。
+  // inPlace=1：写不回原文件就明确失败，绝不悄悄在别处新建一份。
+  if (location.protocol.startsWith('http')) {
+    try {
+      const r = await fetch(
+        `${libBase()}/api/export-html?inPlace=1&reveal=0&name=${encodeURIComponent(fileBase)}.html`,
+        { method: 'POST', headers: { 'content-type': 'text/html;charset=utf-8' }, body: html });
+      const j = await r.json() as { ok: boolean; path?: string; error?: string };
+      if (j.ok && j.path) {
+        toast('已保存：' + j.path);
+        clearDraft(); syncExportToBridge();   // 桥里那份也换成新的，否则 ⌘R 会把改动"退回去"
+        return;
+      }
+      // 桥不知道这份 deck 在磁盘的哪儿（比如是拖进来的）→ 往下走浏览器那套
+    } catch { /* 桥没应答 → 往下走浏览器那套 */ }
+  }
   // 1) reuse a known handle → silent overwrite
   if (fileHandle) {
     try {
