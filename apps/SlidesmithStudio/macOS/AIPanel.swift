@@ -28,7 +28,9 @@ struct AIPanel: View {
             ("一键加提词", """
                 给当前 deck 生成 Apple Watch 上的每页提词。
 
-                1. 先 slidesmith_cues 读一遍现状：确认这份 deck 开了 watch mode，并看清哪些页已经有提词——**那些别动**。
+                1. 先 slidesmith_cues 读一遍现状，看清哪些页已经有提词——**那些别动**。
+                   如果它说没开 watch mode：读 plugin/slidesmith/skills/slides-presenter-mode/templates/watch-cues.js.template，
+                   把 {{CHANNEL}} 全换成它报的 channel，再调一次 slidesmith_cues 把整段放进 enableWatchMode，开好再往下走。
                 2. slidesmith_outline 拿目录，再分批用 withHtml 取正文（一次 12–15 页，别一次拉整份，会把上下文撑爆）。
                 3. 逐页拟提词，键用返回的 anchor，别自己造。
                 4. 每批用 slidesmith_cues 的 set 写回。默认只填空页，**不要传 replace**——用户可能已经手调过。

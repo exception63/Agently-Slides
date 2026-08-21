@@ -177,6 +177,7 @@ async function fetchImageDataUrl(rawUrl: string): Promise<{ dataUrl: string; byt
 //   Studio → bridge : { type:'ready' } | { type:'requests', request, images? } | { type:'exported', name, html }
 //   bridge → Studio : { type:'hello' } | { type:'import' } | { type:'patch' } | { type:'sync-request' }
 //                     | { type:'cues-request' } | { type:'set-cues', cues, replace }
+//                     | { type:'enable-watch', watchJs }
 //                     | { type:'notes-request', anchors } | { type:'set-notes', segments }
 //   Studio → bridge : … | { type:'cues', watchMode, pages, applied?, keptExisting?, unknownAnchors?, error? }
 //                     | { type:'notes', hasNotes, pages, applied?, appliedAnchors?, rejected?, error? }
@@ -207,6 +208,10 @@ export interface CueReport {
   /** deck 开没开 watch mode。false = 里面根本没有提词表，写不进去 */
   watchMode: boolean;
   deckMode: string;
+  /** deck 自己的广播频道名——烘 watch mode 时要拿它填 {{CHANNEL}}，别另起一个 */
+  channel?: string;
+  /** 只有 enableWatchMode 之后才有 */
+  enabled?: boolean;
   /** `issues` 为空 = 这一页合规。规则由 Studio 那一处（cueIssues）算，桥不复算 */
   pages: Array<{ index: number; anchor: string; title: string; cues: string[]; issues: string[] }>;
   /** 只有写入之后才有：实际落了几页 · 因已有内容而保留的 · 认不出的锚点 */
@@ -294,6 +299,9 @@ export interface BridgeHandle extends EventEmitter {
    *  have no cues yet — so re-running "一键加提词" never clobbers what the user已经手调过.
    *  Resolves with the Studio's fresh report (what landed, what was kept, bad anchors). */
   setCues(cues: Record<string, string[]>, opts?: { replace?: boolean; timeoutMs?: number }): Promise<CueReport | null>;
+  /** 把 watch mode 烘进 deck。`js` = skill 的 watch-cues.js.template 填好 {{CHANNEL}} 之后的成品；
+   *  模板只有 skill 那一份，桥和 Studio 都不留副本。 */
+  enableWatch(js: string, timeoutMs?: number): Promise<CueReport | null>;
   /** 讲稿现状。`anchors` 里点名的块才带 html 全文。 */
   notes(anchors?: string[], timeoutMs?: number): Promise<NoteReport | null>;
   /** 把改写好的讲稿块写回去：{ 锚点: '整块 HTML' }。**Studio 会验锚点还在不在**，
@@ -513,8 +521,13 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     }
     if (url === '/api/cues' && req.method === 'POST') {
       readBody(req).then(async (body) => {
-        let j: { cues?: Record<string, string[]>; replace?: boolean };
+        let j: { cues?: Record<string, string[]>; replace?: boolean; enableWatchMode?: string };
         try { j = JSON.parse(body); } catch { return sendJson(res, { ok: false, error: 'body 不是 JSON' }, 400); }
+        if (j && typeof j.enableWatchMode === 'string') {
+          const w = await handle.enableWatch(j.enableWatchMode);
+          if (!w) return sendJson(res, { ok: false, error: 'Studio 没连上（或没回话），watch mode 没烘进去' }, 409);
+          return sendJson(res, { ok: true, ...w });
+        }
         if (!j || !j.cues || typeof j.cues !== 'object') return sendJson(res, { ok: false, error: '缺 cues 字段' }, 400);
         const r = await handle.setCues(j.cues, { replace: !!j.replace });
         if (!r) return sendJson(res, { ok: false, error: 'Studio 没连上（或没回话），提词没写进去' }, 409);
@@ -893,6 +906,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   handle.cues = (timeoutMs = 3000) => askCues({ type: 'cues-request' }, timeoutMs);
   handle.setCues = (cues, opts = {}) =>
     askCues({ type: 'set-cues', cues, replace: !!opts.replace }, opts.timeoutMs || 5000);
+  handle.enableWatch = (js, timeoutMs = 8000) => askCues({ type: 'enable-watch', watchJs: js }, timeoutMs);
 
   function askNotes(msg: Record<string, unknown>, timeoutMs: number): Promise<NoteReport | null> {
     return new Promise((res) => {

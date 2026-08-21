@@ -1127,9 +1127,11 @@ function renderCuePane(): void {
   if (mode !== 'html') { box.innerHTML = '<div class="nosel">提词只对导入的 HTML deck 可用。</div>'; return; }
   const map = loadCues();
   if (!map) {
-    box.innerHTML = '<div class="nosel">这份 deck 没有开 <b>watch mode</b>。<br><br>'
-      + '用 <code>slides-presenter-mode</code> skill 开启后，deck 里会烘进提词表和「✦ 提词」按钮，'
-      + '这里就能逐页编辑了。</div>';
+    const ch = deckChannel();
+    box.innerHTML = '<div class="nosel">这份 deck 没有开 <b>watch mode</b>——里面没有提词表，写不进去。<br><br>'
+      + '最省事的办法：在 Claude 面板点 <b>一键加提词</b>，它会先把 watch mode 烘进去再拟提词'
+      + (ch ? '（频道名已认出：<code>' + esc(ch) + '</code>）' : '')
+      + '。<br><br>也可以自己跑 <code>slides-presenter-mode</code> skill 重新缝一遍。</div>';
     return;
   }
   const anchor = slideAnchor(cur);
@@ -1250,7 +1252,25 @@ interface CuePageInfo { index: number; anchor: string; title: string; cues: stri
 let cueUndo: Record<string, string[]> | null = null;
 let cueAiCount = 0;
 
-function cueReport(): { watchMode: boolean; deckMode: string; pages: CuePageInfo[] } {
+/**
+ * 这份 deck 的广播频道名。
+ *
+ * watch mode 的注入代码要用它拼 `{{CHANNEL}}-presenter-sync` 跟着翻页走；**填错了提词窗
+ * 就一辈子停在第一页**，两份 deck 同开还会串台。deck 自己的引擎里本来就写着一个
+ * （`const CONFIG = { channel: 'dyq-defense-2026', … }`），直接抄它，别另起一个。
+ */
+function deckChannel(): string {
+  const src = H.prelude + '\n' + H.trailing;
+  const pats = [
+    /\bchannel\s*:\s*['"]([^'"]+)['"]/,
+    /new\s+BroadcastChannel\(\s*['"]([^'"]+?)-presenter-sync['"]/,
+    /new\s+BroadcastChannel\(\s*['"]([^'"]+)['"]/,
+  ];
+  for (const re of pats) { const m = re.exec(src); if (m && m[1]) return m[1]; }
+  return '';
+}
+
+function cueReport(): { watchMode: boolean; deckMode: string; channel: string; pages: CuePageInfo[] } {
   const map = mode === 'html' ? loadCues() : null;
   const pages: CuePageInfo[] = mode === 'html'
     ? htmlSlides.map((s, i) => {
@@ -1259,7 +1279,7 @@ function cueReport(): { watchMode: boolean; deckMode: string; pages: CuePageInfo
       return { index: i + 1, anchor: a, title: s.title, cues: vals, issues: cueIssues(vals) };
     })
     : [];
-  return { watchMode: !!map, deckMode: mode, pages };
+  return { watchMode: !!map, deckMode: mode, channel: mode === 'html' ? deckChannel() : '', pages };
 }
 
 function sendCueReport(extra: Record<string, unknown> = {}): void {
@@ -1302,6 +1322,33 @@ function applyCuePatch(incoming: Record<string, string[]>, replace: boolean): vo
     setTimeout(syncExportToBridge, 300);
   }
   sendCueReport({ applied, keptExisting: kept, unknownAnchors: unknown });
+}
+
+/**
+ * 把 watch mode 烘进这份 deck —— `js` 是 skill 那份 `watch-cues.js.template`
+ * 填好 `{{CHANNEL}}` 之后的成品。
+ *
+ * **模板不抄一份到 Studio 里**：抄了就是第二个真相源，skill 那边一改，这边就开始漂。
+ * Studio 只做它才做得了的两件事：报出频道名、把成品塞进 `#deck` 之外的位置。
+ */
+function enableWatchMode(js: string): void {
+  if (mode !== 'html') { sendCueReport({ enabled: false, error: '当前不是 HTML deck' }); return; }
+  if (loadCues()) { sendCueReport({ enabled: false, error: '这份 deck 已经开着 watch mode 了，不用再烘一遍' }); return; }
+  if (!/window\.__SM_CUES__\s*=\s*\{/.test(js)) {
+    sendCueReport({ enabled: false, error: '交来的代码里没有 window.__SM_CUES__ = { … }; 那句赋值——'
+      + '提词表就是靠它存的，没有它烘进去也写不了' });
+    return;
+  }
+  H.trailing += '\n<script>\n' + js + '\n</' + 'script>\n';
+  // 提词表现在就是个空对象，直接坐实缓存 —— 不用等预览 iframe 重渲染完再去读，
+  // 那一步是异步的，紧接着的写入会扑空。
+  cueMap = {}; cueLoaded = true;
+  markDirty();
+  renderHtmlEdit();          // 让预览把新脚本跑起来（✦提词 按钮也才会出现）
+  setTimeout(syncExportToBridge, 500);
+  if (!($('[data-hpane="cue"]') as HTMLElement | null)?.hidden) renderCuePane();
+  toast('已开启 watch mode —— 现在可以写提词了');
+  sendCueReport({ enabled: true });
 }
 
 function undoCuePatch(): void {
@@ -3163,7 +3210,7 @@ function connectBridge(): void {
   });
   ws.addEventListener('message', (e: MessageEvent) => {
     let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; owner?: { label: string; since: number } | null; port?: number;
-      cues?: Record<string, string[]>; replace?: boolean;
+      cues?: Record<string, string[]>; replace?: boolean; watchJs?: string;
       anchors?: string[]; segments?: Record<string, string> };
     try { m = JSON.parse(String(e.data)); } catch { return; }
     // hello carries the handshake: which session owns this bridge + its port. Re-sent
@@ -3180,6 +3227,7 @@ function connectBridge(): void {
     // __SM_CUES__，所以提词必须有自己的一条道。两条都用 {type:'cues'} 回话。
     else if (m.type === 'cues-request') sendCueReport();
     else if (m.type === 'set-cues' && m.cues && typeof m.cues === 'object') applyCuePatch(m.cues, !!m.replace);
+    else if (m.type === 'enable-watch' && typeof m.watchJs === 'string') enableWatchMode(m.watchJs);
     // 讲稿。同理：__TXB64__ 也在 #deck 之外，apply_patch 够不着。
     else if (m.type === 'notes-request') sendNotesReport(Array.isArray(m.anchors) ? m.anchors : []);
     else if (m.type === 'set-notes' && m.segments && typeof m.segments === 'object') applyNotesPatch(m.segments);

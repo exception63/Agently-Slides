@@ -185,32 +185,47 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
           .describe('要写入的提词表：{ "锚点": ["短语", …] }，如 {"s1-boom":["无缝嵌入"]}。不传 = 只读。'),
         replace: z.boolean().optional()
           .describe('true = 连已有提词的页也覆盖。默认 false（只填空页，重跑安全）。'),
+        enableWatchMode: z.string().optional()
+          .describe('没开 watch mode 时用它开：把 plugin/slidesmith/skills/slides-presenter-mode/templates/'
+            + 'watch-cues.js.template 读出来、把 {{CHANNEL}} 全部换成本工具报回的 channel，整段填在这里。'
+            + '模板只有 skill 那一份，别自己另写一份提词表代码。'),
       },
     },
-    async ({ set, replace }) => {
-      const r = set ? await bridge.setCues(set, { replace: !!replace }) : await bridge.cues();
+    async ({ set, replace, enableWatchMode }) => {
+      const r = enableWatchMode ? await bridge.enableWatch(enableWatchMode)
+        : set ? await bridge.setCues(set, { replace: !!replace })
+          : await bridge.cues();
       if (!r) {
         return text({ ok: false,
           hint: 'Studio 没连上（或没回话）。提词的读写都要现场问 Studio 要——它手里那份才是浏览器求值过的真相。' });
       }
       if (!r.watchMode) {
-        return text({ ok: false, watchMode: false, error: r.error,
-          hint: '这份 deck 没开 watch mode，里面没有 window.__SM_CUES__ 可写。'
-            + '要先用 slides-presenter-mode skill 以 watch mode 重新缝一次（它会烘进提词表 + ✦提词 按钮）。' });
+        return text({ ok: false, watchMode: false, error: r.error, channel: r.channel,
+          hint: '这份 deck 没开 watch mode，里面没有 window.__SM_CUES__ 可写。**先把它开了再回来**：'
+            + '读 plugin/slidesmith/skills/slides-presenter-mode/templates/watch-cues.js.template，'
+            + '把里面的 {{CHANNEL}} 全部换成上面报的 channel'
+            + (r.channel ? `（本 deck = ${r.channel}）` : '（本 deck 没认出频道名，去问用户）')
+            + '，然后再调一次本工具、把整段代码放在 enableWatchMode 里。开好之后照常拟提词。' });
       }
       const missing = r.pages.filter((p) => !p.cues.length).map((p) => `${p.index} [${p.anchor}]`);
       const bad = r.pages.filter((p) => p.cues.length && p.issues.length)
         .map((p) => `${p.index} [${p.anchor}] ${p.issues.join(' · ')}`);
       return text({
-        ok: true, watchMode: true, wrote: set ? (r.applied || 0) : undefined,
+        ok: true, watchMode: true, channel: r.channel,
+        enabledWatchMode: enableWatchMode ? !!r.enabled : undefined,
+        note: enableWatchMode && !r.enabled ? r.error : undefined,
+        wrote: set ? (r.applied || 0) : undefined,
         keptExisting: r.keptExisting, unknownAnchors: r.unknownAnchors,
         total: r.pages.length, withCues: r.pages.length - missing.length,
         missing, violations: bad,
         // 读的时候才给整份表（拟提词要看标题和锚点）；写完只报账，不再倒一遍
         pages: set ? undefined : r.pages,
-        hint: (missing.length || bad.length)
-          ? '还有页没过关（见 missing / violations），补齐再交差。'
-          : '每页都有提词且全部合规。',
+        hint: enableWatchMode
+          ? (r.enabled ? 'watch mode 已烘进 deck，提词表现在是空的——接着逐页拟提词、用 set 写回。'
+            : '没有重复烘（见 note）。watch mode 本来就开着，直接拟提词即可。')
+          : (missing.length || bad.length)
+            ? '还有页没过关（见 missing / violations），补齐再交差。'
+            : '每页都有提词且全部合规。',
       });
     },
   );
