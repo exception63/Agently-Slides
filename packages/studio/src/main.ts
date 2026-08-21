@@ -1920,6 +1920,7 @@ function wireFullDeckEditing(d: Document): void {
     .forEach((el) => (el as HTMLElement).setAttribute('contenteditable', 'true'));
   const deckEl = d.querySelector('#deck'); if (!deckEl) return;
   deckEl.addEventListener('click', (e) => {
+    followSlideFromDeck(e.target);   // 点哪一页，左栏就跟到哪一页（点空白也算）
     let t = e.target as Node | null; while (t && t.nodeType !== 1) t = (t as Node).parentNode;
     const el = t as HTMLElement | null;
     // a click on the slide background / empty area (not a leaf element) clears the selection, Keynote-style
@@ -1970,8 +1971,11 @@ function renderHtmlEdit(): void {
     [60, 250, 700, 1500].forEach((ms) => setTimeout(() => { refitPreview(); refreshDeckTokenInputs(); }, ms));
     ifr.addEventListener('load', () => setTimeout(() => refitPreview(), 60), { once: true });
     // never-lose-work + history for text edits done straight in the deck DOM
-    d.addEventListener('input', () => markDirty(), true);
-    d.addEventListener('focusin', (e) => { if ((e.target as HTMLElement)?.isContentEditable) pushHistory('text'); }, true);
+    d.addEventListener('input', (e) => { followSlideFromDeck(e.target); markDirty(); }, true);
+    d.addEventListener('focusin', (e) => {
+      followSlideFromDeck(e.target);   // 光标一落进某页就跟过去，不用等打字
+      if ((e.target as HTMLElement)?.isContentEditable) pushHistory('text');
+    }, true);
     // paste an image straight onto a slide → inline it
     d.addEventListener('paste', (e) => {
       const items = (e as ClipboardEvent).clipboardData?.items; if (!items) return;
@@ -2034,13 +2038,47 @@ function harvestTopbar(d: Document): void {
   });
   if (changed) H.prelude = holder.innerHTML;
 }
+/** 左栏高亮跟到第 cur 行，并把它滚进可视区 —— 44 页的列表里只换个底色是看不见的。 */
+function markLeftActive(): void {
+  let row: HTMLElement | null = null;
+  document.querySelectorAll('#slides .srow').forEach((r, idx) => {
+    const on = idx === cur; r.classList.toggle('active', on); if (on) row = r as HTMLElement;
+  });
+  const box = $('#slides'); if (!row || !box) return;
+  const br = box.getBoundingClientRect(), rr = (row as HTMLElement).getBoundingClientRect();
+  let dy = 0;
+  if (rr.top < br.top + 6) dy = rr.top - br.top - 6;
+  else if (rr.bottom > br.bottom - 6) dy = rr.bottom - br.bottom + 6;
+  if (dy) { try { box.scrollTo({ top: box.scrollTop + dy, behavior: 'smooth' }); } catch { box.scrollTop += dy; } }
+}
+/** 用户在预览里点了 / 改了某一页 → 让「当前页」跟过去。
+ *  和 selectHtmlSlide 的区别：**不滚动预览**（人正看着那一页，把它滚走很讨厌），
+ *  也不清掉选中元素（就是它把我们带过来的）。
+ *  不只是左栏好看：`cur` 同时决定「本页」的修改意见记到哪一页、提词面板显示哪一页、
+ *  以及报给桥/app 的选中页 —— 不跟着走的话，在第 8 页写的意见会记到第 1 页去。 */
+function followSlideFromDeck(node: EventTarget | null): void {
+  if (mode !== 'html') return;
+  const d = ($('#preview') as HTMLIFrameElement | null)?.contentDocument; if (!d) return;
+  const n = node as Node | null;
+  const start = (n && n.nodeType === 1 ? n as Element : n?.parentElement || null);
+  const sec = start?.closest('#deck .slide'); if (!sec) return;
+  const all = Array.prototype.slice.call(d.querySelectorAll('#deck .slide')) as Element[];
+  const i = all.indexOf(sec); if (i < 0 || i === cur) return;
+  cur = i;
+  // 跟 nav-poll 对表：记下 deck **此刻**认为的活动页，等它自己变了（用户用 deck 自己的
+  // 翻页/方向键）再让 poll 接管。直接写 i 的话，有 .active 的 deck 会在 300ms 内把我们扳回去。
+  lastSyncIdx = activeSlideIndex();
+  markLeftActive();
+  if (!($('[data-hpane="script"]') as HTMLElement | null)?.hidden) renderCuePane();
+  updateAiTarget();
+}
 function selectHtmlSlide(i: number): void {
   cur = Math.max(0, Math.min(htmlSlides.length - 1, i));
   // 提词是按页的，换页就得重画（面板没开着时这一步很廉价，直接 return）
   if (!($('[data-hpane="script"]') as HTMLElement | null)?.hidden) renderCuePane();
   lastSyncIdx = cur; // we are the source of truth now; keep the nav-poll in step
   if (htmlSelEl) deselectHtml(); // a selection on the old page no longer applies
-  [].forEach.call(document.querySelectorAll('.srow'), (r: Element, idx: number) => r.classList.toggle('active', idx === cur));
+  markLeftActive();
   const d = ($('#preview') as HTMLIFrameElement).contentDocument;
   if (d) {
     const thumb = d.querySelector(`.thumb[data-idx="${cur}"]`) as HTMLElement | null;
