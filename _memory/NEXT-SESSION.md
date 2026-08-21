@@ -1,179 +1,130 @@
-# 下个会话交接 · 迭代：Studio「美化 + 交互重构」三批走（批次二起步）
+# 下个会话交接 · 做「批次二：Studio 右栏重构」
 
 > `/clear` 后先读 `_memory/active.md`（启动须知 + Studio 机制），再读本文件。**别通读仓库**，省 token。
 
 ---
 
-## 一、方向已定，别再讨论液态玻璃
+## 一、下一件事就是这个：右栏重构（一～两天）
 
-2026-08-21 讨论后用户拍板：**液态玻璃搁置**（结论：技术上能做，但要「有玻璃感」必须把三栏
-实心布局改成「deck 满幅 + 面板悬浮」，本质是改布局不是换皮，这一轮不划算）。
-改做「让工具更好用、更美观」，**分三批，每批单独截图验收**。
+**改哪儿**：`packages/studio/src/main.ts`（网页版和 app 共用同一份，改完 `node scripts/build-studio.mjs`）。
+右栏 markup 从 **4036 行** 起：`<aside class="right">` → `.railstrip`（折叠竖条）→ `#htmlpanel` → 五个 `.hpane`。
 
-### 批次一 · 已完成并 commit（`e794e78`），别重做
+| tab | `data-hpane` | 起始行 | 控件数 |
+|---|---|---|---|
+| 格式 | `fmt` | 4052 | 20 |
+| 设计 | `design` | 4098 | 10 |
+| 动画效果 | `anim` | 4120 | 14 |
+| AI 修改 | `ai` | 4158 | 19 |
+| 提词 | `cue` | — | 11 |
 
-| 做了什么 | 关键点 |
-|---|---|
-| `--sm-*` 设计令牌层 | 原来 532 处硬编码色 / 1 个变量 / 90 条 `body.dark` 手工覆盖；现在深色只重定义变量。**前缀必须是 `--sm-`**：`--accent`/`--ink`/`--paper` 是 deck 自己的令牌（换皮和调色板在用），撞名极难查 |
-| 藏掉预览里 deck 自带的段导航 | 顶栏 `▦`（`#deckNavTog`）开关，默认关，记 localStorage `sm-deckchrome` |
-| **Studio 接管 `--fit-scale`** | ⚠️ 最容易漏的一步。deck 自己的公式是 `innerWidth - 300 - 60`，那 300 是段导航宽度、**硬编码在 deck 里**。光藏不接管＝地方腾出来了幻灯片却不变大。接管后 672px → 972px（+45%）。播放态 `body.present` 让给 deck；另在 `fullscreenchange` 后补算一次（退出全屏时 resize 和 fullscreenchange 谁先到没保证） |
-| deck 顶栏在编辑预览里不折行 | 它按 1920 宽设计；只在编辑预览收紧 + nowrap，**导出文件一个字节不动**（规则在 `forEdit` 分支里） |
-| 草稿条 → 右下角卡片 | 原来横在顶部正中，正好盖住 deck 的标题栏 / 页码 /「全屏播放」 |
-| 顶栏分组 + 导出选项收进 `⚙` 浮层 | 三个几乎看不见的灰 checkbox 收进 `#expMenu`，每条配一行说明 |
+### 要做的四件
 
-### ⚠️ 架构问题已定案（2026-08-21，别再重开这个话题）
-
-用户提过「app 版 Studio 只有中间预览来自 HTML，其余全改成原生 Swift + 液态玻璃，以后只开发 app 版」。
-讨论后**决定：不脱耦，app 和网页版保持一体**。查证过的依据：
-
-- **右栏不是装饰，是预览里那个 DOM 的编辑器**：改字体/字号/颜色改的是选中的 HTML 元素，
-  拖拽手柄画在 iframe 上，换皮是往 deck 文档注 `<style>`。`main.ts` 里 75 处直接摸
-  `htmlSelEl`/gizmo/`contentEditable`/`getComputedStyle`。原生化**不会删掉 HTML Studio，
-  只是在它上面再加一层 Swift↔WebView 协议**，3700 行 deck 逻辑一行省不掉。
-- 右栏 74 个控件里 44 个在「格式/设计/动画」三个高耦合 tab。
-- `slidesmith_open` 走 `spawn('open', [url])` **开浏览器**——不是这个 app 的 Claude 会话
-  全靠它驱动 Studio；app-only 会废掉这条路。
-- 网页版还是 app 出问题时的退路（验证新改动一律 `serve -p 8790` 另起，别碰用户的 8765）。
-
-结论：Studio UI 一律改 `packages/studio/src/main.ts`，两边同时生效。只有 AI 面板是原生的。
-
-### AI 面板重做 · 已完成（commit c7ca556 / 1daeb76 / 07e337c 及其后）
-
-四项功能 + 视觉都做完了，细节见那几条 commit message。要点：
-- **中断走 stdin 控制协议，不是信号**——实测 SIGINT 在这套常驻用法下会把进程直接收掉。
-- 中断后**故意不 cancel 本地 SSE**：CLI 会正常收尾吐 result，掐了连接桥会丢进程。
-- 面板配色用 `SMPalette`，和 Studio 的 `--sm-*` 对齐（朱红 / 深色换琥珀）。
-- ⚠️ **合成点击和中文 keystroke 进不了 SwiftUI 控件**（菜单能点，控件不行）。
-  要验面板的对话态，只能请用户手动发一句。
-
-### 批次二 · 下一步做这个：右栏重构（一～两天）
-
-- 五个 tab 重新归类。**用户自述最常用 = 「AI 修改」+「提词 / 讲稿」**，按这个排优先级，别照搬现在的顺序
-- **讲稿提到一级入口**（现在只能塞在「AI 修改」里）
-- 折叠态改图标竖条 —— 现在是竖排单字（「格/式」「动/画/效/果」每字一行），几乎没法读
-- 每个面板砍说明文字，改成 `?` 悬浮提示（`.ihelp` 机制代码里已有，直接沿用）
-- 强调色 / 背景色 / 文字色三个原生 `<input type=color>` 大色块换成正经色板控件
-
-### 批次三 · 之后
-
-左栏页面列表加缩略图（彻底合并两套导航）· AI 待办流程状态可见性 · 快捷键梳理
+1. **五个 tab 重新归类，讲稿提到一级。**
+   用户自述最常用 = **「AI 修改」+「提词 / 讲稿」**，按这个排优先级，别照搬现在的顺序。
+   讲稿现在只能从「AI 修改」里的按钮打开（modal），不是一级入口。
+2. **折叠态别再竖排汉字。**
+   现在 `.railstrip button.striptab` 用 `writing-mode:vertical-rl`（3830 行），
+   于是「格/式」「动/画/效/果」每个字一行，几乎没法读。换成图标竖条。
+3. **面板里说明文字比控件还多** → 收进 `?` 悬浮提示。
+   机制现成：`<button class="ihelp" data-help="…">?</button>` + `wireHelp()`（2228 行），
+   照 4099 / 4159 行那两处的写法用即可。
+4. **三个原生 `<input type=color>` 换成网页内色板**（4057/4058/4060 行：`#hAccent` / `#hPaper` / `#hInk`）。
+   ⚠️ **这条同时治好用户报的「调色要等一两秒」**：实测网页里应用只要 7ms、序列化 2ms，
+   慢的是 **app 里 macOS 原生取色面板**往 WKWebView 送事件——换成网页内控件就不经过它了。
 
 ---
 
-## 一之二、验收怎么做（照做，别碰用户正在用的那份）
+## 二、验证怎么做（这台机器有个大坑，照做省两小时）
 
-用户的 Mac app + 真 deck 常年占着 **8765**，**别去动它**。另起一个：
+⚠️ **合成鼠标点击和键盘输入进不了这个 app**（SwiftUI 控件、WebView 都不行；中文 `keystroke` 尤其）。
+**只有辅助功能 API 的动作有效**，比如点菜单：
+```bash
+osascript -e 'tell application "System Events" to tell process "Slidesmith Studio" to click menu item "重新载入 Studio" of menu 1 of menu bar item "显示" of menu bar 1'
+```
+所以**所有网页 UI 的验证都在浏览器探针上做**，别试图驱动 app：
 
 ```bash
 cp ~/.slidesmith/exports/DYQ-defense-一体版-学术题词版.html <scratchpad>/probe-deck.html
 npx tsx packages/cli/src/index.ts serve --no-open -p 8790 <scratchpad>/probe-deck.html
 ```
-Playwright 开 `http://127.0.0.1:8790/` 截图。⚠️ Playwright MCP 只许写仓库内路径，
-截图落 `.playwright-mcp/`（已 gitignore）；给绝对路径到 scratchpad 会被拒。
-⚠️ 别点草稿条的「丢弃」——那可能是用户真的未保存草稿。
+Playwright 开 `http://127.0.0.1:8790/`（要测 app 里的样子就加 `?host=app`）。
+⚠️ Playwright MCP 只许写仓库内路径，截图落 `.playwright-mcp/`（已 gitignore）。
+⚠️ **别碰用户正开着的 8765**。
 
-改完 UI 一律 `node scripts/build-studio.mjs`，app 里 ⌘R「重新载入 Studio」。
+**模拟 WKWebView 的独门办法**：在浏览器里 `delete window.showSaveFilePicker`，
+就能精确复现 app 的环境（这次找保存的 bug 全靠它）。
+
+**看 app 的样子**用截图（`screencapture -R` 按窗口坐标截，别整屏——会把用户的聊天窗口截进去）：
+```bash
+osascript -e 'tell application "System Events" to tell process "Slidesmith Studio" to get {position, size} of front window'
+```
+
+**改了什么就要重建什么**：
+- `packages/studio/` → `node scripts/build-studio.mjs`（桥每请求重读，⌘R 即见）
+- `packages/bridge/` → **必须重启桥**（常驻进程不会重读源码）：重启 app，或 `lsof -ti tcp:8765 | xargs kill`
+- `apps/SlidesmithStudio/` → `./scripts/install-studio-app.sh` + 重启 app
 
 ---
 
-## 二、更早那一迭代做完的（都已 commit + 实测，别重做）
+## 三、这一轮做完的（都已 commit + 实测，别重做）
 
 | commit | 内容 |
 |---|---|
-| `e710d02` | **一键加提词**：`slidesmith_cues` 通道（apply_patch 够不着 `#deck` 之外的 `__SM_CUES__`）+ 提词面板全 deck 账 / 撤销 / 跳到下一个待处理 + app 预设 |
-| `34119c5` | **讲稿批注 → AI 改写**：`slidesmith_notes` 通道 + 讲稿 modal（划一段→加批注，批注挂锚点）+ **Studio 验锚点，丢了整块拒收** + 撤销 |
-| `edac2ac` | 修 **hasDeck 恒 false**（Studio 自己导入的 deck 桥不认）· 右栏可折叠 |
-| `ae300cc` | 一键加提词能**自己烘 watch mode**（Studio 报频道名，Claude 填模板，Studio 注入） |
-| `55c418b` | 菜单加**「重启 deck 桥」** · Studio 重连后自己把 deck 报回桥（自愈） |
-| `986f52f` | **重新导出沿用原房间号**（另给「换新房间号」开关）——否则每导一版手机都要重扫码 |
-| `19f0ff2` | **提词浮层重做 v0.5**：DOM 定页 / 页内浮层 / 按钮抄「演讲者」的皮 |
+| `e794e78` | **批次一**：`--sm-*` 令牌层（532 处硬编码 → 30）· 藏 deck 段导航并**接管 `--fit-scale`** · deck 顶栏防折行 · 草稿条改右下角 · 顶栏分组 + 导出选项收进 ⚙ |
+| `c7ca556` | Claude 桥加 `/interrupt`（**stdin 控制协议，不是信号**）· `/sessions` · `/history` |
+| `1daeb76` | Studio 把「当前选中页」报给桥，`/api/status` 带出来 |
+| `07e337c` | AI 面板四件：工具卡片（新接 `case "user"` 收 tool_result）· 上下文自动带 · 历史会话可回 · 停这一轮 |
+| `a6ea03b` | AI 面板视觉（`SMPalette` 对齐 Studio 令牌）+ **架构定案** |
+| `8aedc24` | 修用户截图逮到的六件（气泡漏前言 · 深色不同步 · 首屏不铺满 · 顶部三处文件名 · deck 顶栏可编辑 · 药丸加「带上」） |
+| `67c6a8f` `caa69ca` | **保存在 app 里从来没生效过**——两层根因，见下 |
+| `ced4c57` | 「另存为」接上原生 NSSavePanel（以前既不弹窗、还写在原文件上）· 文件菜单加 ⌘S / ⌘⇧S |
 
-用户那份真 deck（`~/.slidesmith/exports/DYQ-defense-一体版-学术题词版.html`，44 页）
-**已经手工升级到 v0.5 并实开验证过**，44 条提词全部合规，备份在同目录 `.bak-20260821`。
-
----
-
-## 三、Studio ↔ Claude 的三条写入通道（记住这张表，别再走弯路）
-
-| 写什么 | 在 deck 的哪里 | 用哪个工具 |
-|---|---|---|
-| 幻灯片正文 | `#deck > section[data-id]` | `slidesmith_apply_patch` |
-| 手表提词 | `#deck` **之外** 的 `window.__SM_CUES__` | `slidesmith_cues` |
-| 内嵌讲稿 | `#deck` **之外** 的 `window.__TXB64__`（base64） | `slidesmith_notes` |
-
-- 读之前一律先 `slidesmith_outline`（`data-id` 是 Studio 导入时才生成的，磁盘文件里通常没有）。
-- **提词的键只认 `slidesmith_cues` 自己返回的 anchor**，别拿 outline 的 id 顶替：deck 没写
-  `window.SLIDE_MAP`（只在 `deckAPI` 里暴露）时 outline 只能退到 `s1/s2/s3`，拿错了整批被判「不认识的锚点」。
-- `slidesmith_cues` 会报 `watchOutdated` —— 老版注入块（提词窗永远空白那一版）用
-  `enableWatchMode + replaceExisting=true` 换掉，提词表原样保留。
+### 架构定案（别再重开这个话题）
+用户提过「app 只留预览用 HTML、其余原生 Swift + 液态玻璃、以后只开发 app 版」，
+讨论后**决定不脱耦，app 和网页版保持一体**。依据见 `_memory/` 里的
+[studio-app-web-coupled] 记忆和 commit `a6ea03b`。要点：右栏是预览里那个 DOM 的编辑器
+（75 处直接摸 `htmlSelEl`/gizmo/`contentEditable`），原生化只会多一层协议，
+且 `slidesmith_open` 走的是开浏览器。
 
 ---
 
-## 四、这一迭代踩过的坑（会再犯的那几个）
+## 四、这一轮踩过、会再犯的坑
 
-1. **改了 `packages/bridge/` 的代码，光重装 app 没用**。app 看到 8765 上已有桥就「直接用它，别抢」，
-   而且不持有那个 Process、退出也收不掉 —— 网页是新的（桥每请求重读磁盘），桥进程还是旧的。
-   **走菜单「重启 deck 桥」**，或 `lsof -ti tcp:8765 | xargs kill`。
-   ⚠️ 8765 上那个进程可能同时是**某个 Claude 会话的 slidesmith MCP**（它探到端口空就自己当桥），
-   杀它会连带让那个会话的 `slidesmith_*` 工具失效 —— 用 curl 打 HTTP 接口照样能干活。
-2. **别猜广播频道名**。提词窗 v0.4 监听 `{{CHANNEL}}-presenter-sync`，而 editorial-slides 的引擎
-   广播在不带后缀的 `CONFIG.channel` → 一条都收不到 → 每页都显示「这一页没有提词」，
-   看着像提词没写进去，其实表是满的。**以 DOM 为准**（`deckAPI.idx` 优先），广播只当增强。
-3. **数 `.slide` 要 scope 到 `#deck`**：缩略图导航里的小图也顶着 `.slide` 类，16 页会数成 19 页。
-4. **同一份数据别留两处**：deck 里混进两份 `__SM_CUES__` 时，浏览器认最后一份、Studio 改第一份，
-   两边静默分家。已改成「有几块摘几块 + 全局替换所有赋值」。
-5. **预览 iframe 没就绪时别缓存「没有」**：`loadCues`/`loadNotes` 读到 undefined 会把它永久缓存，
-   明明有提词的 deck 从此显示「没有」。已加 `previewReady()` 守门。
-6. **写 JSON-RPC 测试别用 printf 拼**：payload 里有换行会把那一行 RPC 截断成静默失败，用 python 生成 jsonl。
-
----
-
-## 五、实测硬数据（写代码前看这个，别重新量）
-
-- **Apple Watch Ultra 3 = 211 × 257 点**；Series 11 46mm = 208 × 248 点 —— 一套规则通用
-- 19pt 半粗下：一条提词超过约 **10 个汉字**就折行；50 字直接铺满整屏
-- 表盘放得下 **5 行**短提词
-- 一份 45 页真讲稿里 27 页标了 `<strong>`，**约三分之一不合规** → 「不许直接倒进提词表」这条红线
+1. **「保存」在 app 里从来没生效过**，而且是两层：
+   ① `saveHtmlInPlace()` 只会走 File System Access API，WKWebView 两个都没有 →
+   落到 `download()` 兜底 → 在 WKWebView 里等于什么都没发生，**还把页面导航去 blob URL**
+   （症状：左右栏突然消失）。② 修好第一层后仍失败，因为**桥不知道这份 deck 是哪个文件**——
+   用户是在 Studio 里点「导入 HTML」打开的，网页拿不到路径。
+   现在：桥有 `/api/deck-path`，app 的 NSOpenPanel 回调负责上报；写不回原文件就**明确报错**，
+   绝不再静默假装成功。**新写任何"写盘"路径都要守这条：宁可明说失败。**
+2. **deck 顶栏（`.topbar__brand` / `__sub`）不在 `#deck` 里**，属于 `H.prelude`。
+   已放开 contenteditable + `harvestTopbar()` 写回：**只搬文字不搬结构**（prelude 里还躺着
+   `__SM_CUES__`/讲稿的 script，整块重序列化会出事）。
+3. **`--fit-scale` 是 deck 自己算的**，公式里把段导航的 300px 硬编码了。Studio 已接管；
+   注意**不能赌监听器注册顺序**（ready() 跑的时候 deck 引擎脚本还没执行），要隔几拍补算。
+4. **Studio → 桥的上报通道**（`tellBridge()`）现在有 `selection` 和 `theme` 两条，
+   右栏要往 app 报什么，照抄这个模式即可。
+5. 系统保存面板归 macOS `openAndSavePanelService` 独立进程，**脚本按不到它的按钮**。
 
 ---
 
-## 六、怎么测（照做，省一小时）
+## 五、更早那些迭代的结论（还有效）
 
-```bash
-npx tsx packages/cli/src/index.ts serve --no-open -p 8790 <deck.html>
-```
-- Playwright 开 `http://127.0.0.1:8790/`，等 `/api/status` 的 `connected:1`
-- `curl /api/cues`、`curl -XPOST /api/cues`；讲稿同理 `/api/notes`
-- MCP 客户端模式也验一遍：`npx tsx packages/cli/src/index.ts mcp -p 8790` 喂 jsonl
-- 没有现成的 watch-mode / 一体版 deck 做夹具，往 `dogfood-slidesmith-intro/slides.html` 尾部注入
-  `window.__SM_CUES__ = {}` / `window.__TXB64__ = "…"` 现造（`</body>` 有两处，取 `rindex`）
-- Studio 页面重新导航会弹 beforeunload，Playwright 要 `browser_handle_dialog` 接一下
-- 要在真 deck 上验：拷到 scratchpad 起个 `python3 -m http.server` 用 http 打开（Playwright 拦 `file://`）
-
-手机遥控侧：`cd plugin/slidesmith/skills/phone-remote/relay && node relay.mjs --port 8799`
-（8787 被 WebXR-Lab 占着）。模拟器用 **Series 11 46mm**（`F9E3C0EB-781E-40B3-9DFE-84859C78F881`），
-Ultra 3 模拟器连不上中转。
-
-装 Mac app：`./scripts/install-studio-app.sh`。
-装真机：`DEVELOPMENT_TEAM=C5BH6BHB9Q -allowProvisioningUpdates`，iPhone UDID `A32A899E-AF60-588B-A3EB-B3E738E31CEF`。
+- **提词/讲稿的三条写入通道**：正文 `slidesmith_apply_patch`（`#deck > section[data-id]`）·
+  手表提词 `slidesmith_cues`（`window.__SM_CUES__`）· 内嵌讲稿 `slidesmith_notes`（`window.__TXB64__`）。
+  读之前一律先 `slidesmith_outline`；提词的键只认 `slidesmith_cues` 自己返回的 anchor。
+- **数 `.slide` 要 scope 到 `#deck`**（缩略图导航里的小图也顶着 `.slide` 类）。
+- **同一份数据别留两处**：`__SM_CUES__` 混进两块时浏览器认最后一份、Studio 改第一份，静默分家。
+- **别猜广播频道名**，以 DOM 为准（`deckAPI.idx` 优先）。
+- **git push 走 SSH-over-443**（origin 已切），别再耗 HTTPS。
+- 手机遥控中转：`plugin/slidesmith/skills/phone-remote/relay && node relay.mjs --port 8799`（8787 被占）。
+- 装 app：`./scripts/install-studio-app.sh`。
 
 ---
 
-## 七、这台机器的两个坑（已记进长期记忆 `mac-dev-env-quirks`）
+## 六、未决 / 别自作主张
 
-1. **模拟器 MCP 截图必崩** —— macOS 27 beta 的 CoreImage/Metal bug。
-   绕过：MCP 负责 `tap`/`swipe`，`xcrun simctl io <udid> screenshot` 负责看。
-2. **iPhone 无线调试断了、手表是好的** → 不是网络问题，是 iPhone 不广播 `_remotepairing._tcp`。
-   排查 `dns-sd -B _remotepairing._tcp local.`，出现在 **if 14** 就是通了。
-   待用户试：重启 iPhone → 关开开发者模式 → 还原位置与隐私。
-
----
-
-## 八、⚠️ 未决 / 别自作主张
-
-- **三文件联动版**：讲稿在隔壁文件，Studio 读不到 → **讲稿批注对它不可用**（modal 会明说）。
-  点「演讲者」也开不出来（开的是相对路径 `演讲者模式.html`）。**一体版才是首选交付形态**，这条一直没修。
-- **导出 PPTX**：方案早已定稿（headless 截图 + python-pptx），动手前先问用户「图片版可接受吗」。
+- **三文件联动版**：讲稿在隔壁文件，Studio 读不到 → 讲稿批注对它不可用。一体版才是首选交付形态。
+- **导出 PPTX**：方案早定稿（headless 截图 + python-pptx），动手前先问用户「图片版可接受吗」。
 - **`~/.zshrc` 明文存着邮箱 SMTP 密码和 Gamma API key**，已提示用户，未处理。
 - **协作环**：`slidesmith_get_requests` 返回的请求是用户主动提交的，**照做**，别判 stale 拒绝。
-- **git push 走 SSH-over-443**（origin 已切），别再耗 HTTPS。
