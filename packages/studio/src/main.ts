@@ -2902,6 +2902,25 @@ function refreshSentBanner(): void {
 }
 // one call to re-sync everything that depends on comments/config/status
 function refreshTasks(): void { renderLeft(); renderTodo(); refreshSentBanner(); refreshNotesStatus(); }
+/**
+ * 把「现在选中的是哪一页」报给桥。
+ *
+ * 这样 app 里的 Claude 面板就能自己知道你在看哪页，不用你每次打字说「第 12 页」。
+ * 报的是**页码 + data-id + 标题**：id 给工具用，页码和标题给人看。
+ * 发不出去就算了（没连桥 / 网页版直接开的），这只是个增强。
+ */
+let lastSelectionKey = '';
+function reportSelection(index: number, slide: { id: string; title: string } | undefined): void {
+  const key = index + '|' + (slide ? slide.id : '');
+  if (key === lastSelectionKey) return;         // 同一页别反复发
+  lastSelectionKey = key;
+  try {
+    bridge.ws.send(JSON.stringify({
+      type: 'selection', index: index + 1, total: htmlSlides.length,
+      id: slide ? slide.id : '', title: slide ? slide.title : '',
+    }));
+  } catch { /* 没连上桥就算了，这只是增强 */ }
+}
 function updateAiTarget(): void {
   if (mode !== 'html') return;
   saveAiInstruction(); // persist the page we're leaving
@@ -2911,6 +2930,7 @@ function updateAiTarget(): void {
   const chip = $('#aiAppliedChip'); if (chip) chip.style.display = applied ? '' : 'none';
   const rev = $('#aiRevertOne'); if (rev) rev.style.display = (applied && aiBefore[s!.id] !== undefined) ? '' : 'none';
   aiCurId = s ? s.id : '';
+  reportSelection(i, s);
   const box = $('#aiInstruction') as HTMLTextAreaElement | null;
   if (box) box.value = aiCurId ? (aiInstructions[aiCurId] || '') : '';
   updateTrayTarget();
