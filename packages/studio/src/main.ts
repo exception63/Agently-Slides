@@ -3207,6 +3207,18 @@ function connectBridge(): void {
   ws.addEventListener('open', () => {
     bridge.connected = true; bridge.everConnected = true; bridge.tries = 0;
     updateBridgeBadge(); toast('已连接 Claude Code');
+    // **桥空手上线时，把我们手里这份报给它。** 桥重启过、或者 deck 是在桥起来之前
+    // 就打开的话，桥那边 hasDeck 一直是 false —— AI 看到的是「Studio 里没打开任何
+    // deck」，而屏幕上明明开着。
+    //
+    // 先问一句再推，不能直接推：桥自己有 deck 的话，它在连上这一刻就会推 import
+    // 下来，两条消息撞在一起会把用户开着的那份换成桥手里的旧货。
+    setTimeout(() => {
+      if (mode !== 'html' || !htmlSlides.length) return;
+      fetch('/api/status').then((r) => r.json()).then((st: { hasDeck?: boolean }) => {
+        if (!st.hasDeck) syncExportToBridge();
+      }).catch(() => { /* 老桥没有这个接口就算了 */ });
+    }, 700);
   });
   ws.addEventListener('message', (e: MessageEvent) => {
     let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; owner?: { label: string; since: number } | null; port?: number;

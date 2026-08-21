@@ -171,7 +171,9 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
         '带 set 调用 = 写进去。\n\n' +
         '**为什么不能用 slidesmith_apply_patch 写**：提词表存在 `window.__SM_CUES__`，它落在 `#deck` 之外，' +
         'apply_patch 只按 data-id 替换 `#deck` 里的 `<section>`，够不着它。\n\n' +
-        '**键必须是锚点**，就是本工具（和 slidesmith_outline）返回的那个 id / anchor，别自己造。\n\n' +
+        '**键必须用本工具返回的 anchor**，别自己造，也别拿 slidesmith_outline 的 id 顶替——'
+        + '有些 deck 上那两个对不上（outline 在服务端复算，deck 没写 window.SLIDE_MAP 时它只能退到 s1/s2/s3），'
+        + '拿错了整批会被判成「不认识的锚点」。\n\n' +
         '**⭐ 硬约束（Apple Watch Ultra 3 / Series 11 实测得出，别放宽）**：\n' +
         '· 每页 **1–5 条**（表盘放得下 5 行）\n' +
         '· 每条 **≤10 个汉字**（英文 ≤16 字符）—— 超了就折行，整句话上去等于显示讲稿全文\n' +

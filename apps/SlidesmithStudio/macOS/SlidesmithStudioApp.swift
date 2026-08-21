@@ -64,6 +64,9 @@ struct SlidesmithStudioApp: App {
             Button("重新载入 Studio") { NotificationCenter.default.post(name: .smReloadStudio, object: nil) }
                 .keyboardShortcut("r")
             Divider()
+            // 改了 packages/bridge/ 的代码之后必须走这一条：网页是新的（桥每请求重读磁盘），
+            // 跑着的桥进程却还是旧的——而且它可能是上一次 app 留下的，重启 app 也收不掉。
+            Button("重启 deck 桥") { Task { await deck.restart() } }
             Button("选择仓库位置…") { chooseRepo() }
             Button("打开桥接日志") {
                 NSWorkspace.shared.open(RepoLocator.logURL(ClaudeBridge.logName))

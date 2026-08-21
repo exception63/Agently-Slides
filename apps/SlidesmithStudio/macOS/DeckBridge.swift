@@ -114,6 +114,43 @@ final class DeckBridge {
         }
     }
 
+    /// 重启 deck 桥 —— **连"不是我拉起的那条"也一起换掉**。
+    ///
+    /// 为什么需要这个：`reallyStart()` 看到 8765 上已经有人在跑就直接接上去（避免和
+    /// 用户自己在终端跑的 `slidesmith serve` 抢端口）。代价是——**上一次 app 留下的
+    /// 旧桥会一直活着**，退出 app 也收不掉它，因为 app 不持有那个 Process。
+    /// 于是改了 `packages/bridge/` 的代码之后，你重装、重启、重新载入全都没用：
+    /// 网页是新的（桥每请求重读磁盘上那份 HTML），跑着的桥还是旧的那个进程。
+    /// 这条路专门用来把它换掉。
+    func restart() async {
+        note = "正在重启 deck 桥…"
+        pollTask?.cancel(); pollTask = nil
+        waitTask?.cancel(); waitTask = nil
+        if let process { process.terminate(); self.process = nil }
+        else { killWhoeverHoldsPort() }   // 接来的那条：我们没有 Process，只能按端口收
+        running = false
+        // 等端口真的空出来再拉新的，否则新进程撞到 EADDRINUSE 会静默退到随机端口
+        for _ in 0..<40 {
+            if await get("api/status", timeout: 1) == nil { break }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        await reallyStart()
+        if running { note = nil; reloadStudio() }
+    }
+
+    private func killWhoeverHoldsPort() {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "lsof -ti tcp:\(Self.port) | xargs -r kill"]
+        p.environment = RepoLocator.childEnvironment()
+        try? p.run()
+        p.waitUntilExit()
+    }
+
+    private func reloadStudio() {
+        NotificationCenter.default.post(name: .smReloadStudio, object: nil)
+    }
+
     func shutdown() {
         pollTask?.cancel(); pollTask = nil
         waitTask?.cancel(); waitTask = nil
