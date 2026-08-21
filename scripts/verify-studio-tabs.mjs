@@ -1,4 +1,4 @@
-// Verify the Keynote-style Studio rework: 3 top tabs (格式 / 动画效果 / AI 修改),
+// Verify the Keynote-style Studio rework: 5 top tabs (AI / 讲稿 / 格式 / 动画 / 设计),
 // font picker, B/I/U + alignment toggles, animation sub-tabs (进入 / 动作 / 消失) with
 // a new exit animation, the 嵌入字体 export option, and that exit-on-nav works in the
 // exported deck. Network is used only for the font-embedding check (skipped if offline).
@@ -48,7 +48,7 @@ try {
       oldAiPanel: !document.getElementById('aiPaste'),
     };
   });
-  ok('3 top tabs = 格式/动画效果/AI 修改', shape.htabs.join(',') === '格式,动画效果,AI 修改', shape.htabs.join(','));
+  ok('5 top tabs = AI/讲稿/格式/动画/设计', shape.htabs.join(',') === 'AI,讲稿,格式,动画,设计', shape.htabs.join(','));
   ok('animation sub-tabs = 进入/强调/动作/消失', shape.stabs.join(',') === '进入,强调,动作,消失', shape.stabs.join(','));
   ok('font picker populated (≥12 fonts)', shape.fontCount >= 12, 'got ' + shape.fontCount);
   ok('font picker has CJK (Noto SC) + EN (Inter)', shape.hasNoto && shape.hasInter);

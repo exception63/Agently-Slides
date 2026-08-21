@@ -184,7 +184,7 @@ don't re-touch a page they reverted unless they ask again.
 
 ### 4c. The unified AI-tasks request (`.ai-tasks.md`)
 
-The Studio's **AI 修改** pane funnels everything into one to-do list and one send. A submitted
+The Studio's **AI** pane (the first right-rail tab) funnels everything into one to-do list and one send. A submitted
 request (name ends `.ai-tasks.md`) bundles, in one file: the **deck-level ask** (+ a structure
 overview), and a per-page block for every page that has a **改字** (comment), a **配图**
 (illustration the human queued), and/or **导入图** (their own staged images). Each page block

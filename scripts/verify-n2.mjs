@@ -51,8 +51,9 @@ try {
   }, EDITED);
 
   // 2) change the accent token via the inspector color input
+  //    （配色已从「格式」并到「设计」tab —— 同一批 --accent/--paper/--ink 令牌只留一份）
   await page.evaluate(() => {
-    const i = document.getElementById('hAccent');
+    const i = document.getElementById('dAccent');
     i.value = '#ff2d55';
     i.dispatchEvent(new Event('input', { bubbles: true }));
   });

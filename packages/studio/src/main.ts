@@ -352,7 +352,7 @@ function renderInsertPane(): void {
   if (mode !== 'html') { box.innerHTML = '<div class="lpane-soon">插入作用于导入的 HTML deck。<br>先导入一个 HTML 再用。</div>'; return; }
   box.innerHTML = '<div class="insgrid">'
     + '<button class="inscard" data-act="image"><b>插入图片</b><span>从本地选图，插入到当前页</span></button>'
-    + '<button class="inscard" data-act="ai"><b>AI 配图 / 图表</b><span>转到右侧「AI 修改」，描述要生成的配图或图表</span></button>'
+    + '<button class="inscard" data-act="ai"><b>AI 配图 / 图表</b><span>转到右栏「AI」，描述要生成的配图或图表</span></button>'
     + '</div><div class="lpane-soon" style="text-align:left;padding:10px 4px">更多插入项（新页 / 引用 / 表格）会随 HTML 模式增删页能力一起补上。</div>';
   box.querySelectorAll('.inscard').forEach((el) => el.addEventListener('click', () => {
     const act = (el as HTMLElement).dataset.act;
@@ -1441,8 +1441,8 @@ function applyCuePatch(incoming: Record<string, string[]>, replace: boolean): vo
   if (applied) {
     cueUndo = snapshot; cueAiCount = applied;
     persistCues();
-    if (!($('[data-hpane="cue"]') as HTMLElement | null)?.hidden) renderCuePane();
-    toast('Claude 写入 ' + applied + ' 页提词 —— 请在「提词」面板逐页过一遍');
+    if (!($('[data-hpane="script"]') as HTMLElement | null)?.hidden) renderCuePane();
+    toast('Claude 写入 ' + applied + ' 页提词 —— 请在右栏「讲稿」里逐页过一遍');
     setTimeout(syncExportToBridge, 300);
   }
   sendCueReport({ applied, keptExisting: kept, unknownAnchors: unknown });
@@ -1502,7 +1502,7 @@ function enableWatchMode(js: string, replace = false): void {
   markDirty();
   renderHtmlEdit();          // 让预览把新脚本跑起来（✦提词 按钮也才会出现）
   setTimeout(syncExportToBridge, 500);
-  if (!($('[data-hpane="cue"]') as HTMLElement | null)?.hidden) renderCuePane();
+  if (!($('[data-hpane="script"]') as HTMLElement | null)?.hidden) renderCuePane();
   toast(existing ? '提词注入代码已升级到新版（提词表保留）' : '已开启 watch mode —— 现在可以写提词了');
   sendCueReport({ enabled: true, upgraded: !!existing });
 }
@@ -1926,6 +1926,7 @@ function wireFullDeckEditing(d: Document): void {
     if (!el || !el.closest('#deck .slide') || el.classList.contains('slide')) { deselectHtml(); return; }
     if (htmlSelEl) (htmlSelEl as HTMLElement).classList.remove('sm-sel');
     htmlSelEl = el; el.classList.add('sm-sel'); showHtmlSel(true, el); showGizmo(el);
+    revealElementTab();
   }, true);
   // a click anywhere outside the deck (iframe margins / gaps between slides) also clears it — but never on the gizmo handles
   d.addEventListener('click', (e) => {
@@ -1966,7 +1967,7 @@ function renderHtmlEdit(): void {
     // 那段引擎脚本还没执行；它一执行就按自己的公式（减掉段导航的 300px）写一遍
     // --fit-scale，把我们刚算好的覆盖掉——表现就是"首屏没铺满，⌘R 之后才对"。
     // 隔几拍各补一次，再加一次 load 兜底，谁最后跑都不影响结果。
-    [60, 250, 700, 1500].forEach((ms) => setTimeout(() => refitPreview(), ms));
+    [60, 250, 700, 1500].forEach((ms) => setTimeout(() => { refitPreview(); refreshDeckTokenInputs(); }, ms));
     ifr.addEventListener('load', () => setTimeout(() => refitPreview(), 60), { once: true });
     // never-lose-work + history for text edits done straight in the deck DOM
     d.addEventListener('input', () => markDirty(), true);
@@ -2036,7 +2037,7 @@ function harvestTopbar(d: Document): void {
 function selectHtmlSlide(i: number): void {
   cur = Math.max(0, Math.min(htmlSlides.length - 1, i));
   // 提词是按页的，换页就得重画（面板没开着时这一步很廉价，直接 return）
-  if (!($('[data-hpane="cue"]') as HTMLElement | null)?.hidden) renderCuePane();
+  if (!($('[data-hpane="script"]') as HTMLElement | null)?.hidden) renderCuePane();
   lastSyncIdx = cur; // we are the source of truth now; keep the nav-poll in step
   if (htmlSelEl) deselectHtml(); // a selection on the old page no longer applies
   [].forEach.call(document.querySelectorAll('.srow'), (r: Element, idx: number) => r.classList.toggle('active', idx === cur));
@@ -2053,6 +2054,13 @@ function selectHtmlSlide(i: number): void {
   updateAiTarget();
 }
 // —— inspector: tokens / theme / selected-element style + anim ——
+/** 选中元素后，把右栏拨到「格式」——除非已经停在同样按元素工作的「动画」上。 */
+function revealElementTab(): void {
+  const act = document.querySelector('.htab.active') as HTMLElement | null;
+  const cur = act?.dataset.htab || '';
+  if (cur === 'fmt' || cur === 'anim') return;
+  (document.querySelector('.htab[data-htab="fmt"]') as HTMLElement | null)?.click();
+}
 function showHtmlSel(on: boolean, el?: HTMLElement): void {
   if (!on) hideGizmo();
   // toggle every "selected element" panel (格式 + 动画效果 tabs) and their empty-state hints
@@ -2066,6 +2074,7 @@ function showHtmlSel(on: boolean, el?: HTMLElement): void {
   (($('#hFont') as HTMLSelectElement)).value = fontIdForStack(el.style.fontFamily);
   (($('#hFs') as HTMLInputElement)).value = el.style.fontSize ? String(parseInt(el.style.fontSize, 10)) : '';
   (($('#hColor') as HTMLInputElement)).value = toHex(el.style.color || cs.color) || '#000000';
+  syncSwatches();
   (($('#hWeight') as HTMLSelectElement)).value = el.style.fontWeight || '';
   // bold / italic / underline toggles reflect the element's current inline style
   const wt = parseInt(el.style.fontWeight || '', 10);
@@ -2241,6 +2250,164 @@ function wireHelp(): void {
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
   window.addEventListener('scroll', hide, true);
+}
+// ---- 网页内色板 ----------------------------------------------------------
+// 为什么不用原生 <input type="color">：在 Mac app（WKWebView）里它打开的是 macOS
+// 取色面板，那是独立进程，每次改色要跨进程把事件送回 WebView —— 用户报的「调色要等
+// 一两秒」就是这一段。网页里真正的应用只花 7ms、序列化 2ms。改成页面内控件后
+// 整条路都留在 WebView 里，拖到哪就是哪。
+// 实现上保留同 id 的 <input type="hidden">：既有的 refreshHtmlInspector（读 .value）
+// 和 onInput（听 'input'）一行都不用改，我们只是换掉了「人怎么选色」这一层。
+const SW_PRESETS: string[] = [
+  '#000000', '#1c1c1f', '#3a3a3e', '#6a6a6e', '#9a9a9e', '#c9c9cd', '#ececee', '#ffffff',
+  '#7b2d1c', '#b5402a', '#d4553c', '#e07a4e', '#f0b34a', '#e8c547', '#c2b280', '#8a7a52',
+  '#2f5d3a', '#4f8a5b', '#7ba05b', '#2f6f5e', '#2b6a8f', '#378add', '#5a6fd0', '#7a5fb0',
+  '#a8508f', '#c2456b', '#4a3f35', '#7b6a55', '#e8e6e1', '#f2ede4', '#faf8f4', '#0a0a0b',
+];
+let swBtn: HTMLElement | null = null;
+let swH = 0, swS = 0, swV = 0;
+function hexToRgb(h: string): [number, number, number] {
+  const v = toHex(h) || '#888888'; const n = parseInt(v.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgbToHex(r: number, g: number, b: number): string {
+  return '#' + [r, g, b].map((n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')).join('');
+}
+function rgbToHsv(r: number, g: number, b: number): [number, number, number] {
+  r /= 255; g /= 255; b /= 255;
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d) {
+    if (mx === r) h = ((g - b) / d) % 6; else if (mx === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+    h *= 60; if (h < 0) h += 360;
+  }
+  return [h, mx ? d / mx : 0, mx];
+}
+function hsvToHex(h: number, s: number, v: number): string {
+  const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c;
+  const t = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x]
+    : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+  return rgbToHex((t[0] + m) * 255, (t[1] + m) * 255, (t[2] + m) * 255);
+}
+function swatchInput(btn: HTMLElement): HTMLInputElement | null {
+  return document.getElementById(btn.dataset.for || '') as HTMLInputElement | null;
+}
+/** 把每个色板按钮的色块 + hex 文字跟它背后的隐藏 input 对齐（程序改 .value 不发事件，得手动叫一次）。 */
+function syncSwatches(): void {
+  document.querySelectorAll('.swatch').forEach((el) => {
+    const btn = el as HTMLElement; const inp = swatchInput(btn); if (!inp) return;
+    const hex = toHex(inp.value) || '';
+    const chip = btn.querySelector('.sw-chip') as HTMLElement | null;
+    const txt = btn.querySelector('.sw-hex') as HTMLElement | null;
+    if (chip) chip.style.background = hex || 'transparent';
+    if (txt) txt.textContent = hex || '—';
+  });
+}
+/** 本 deck 正在用的颜色 —— 配色最省事的来源就是「这份 deck 已有的颜色」。 */
+function liveToken(name: string): string {
+  const d = ($('#preview') as HTMLIFrameElement | null)?.contentDocument;
+  if (!d || !d.defaultView || !d.documentElement) return '';
+  return d.defaultView.getComputedStyle(d.documentElement).getPropertyValue(name).trim();
+}
+function deckTokenHex(name: string): string {
+  return toHex(H.overrides[name] || liveToken(name) || H.baseTokens[name] || '');
+}
+function refreshDeckTokenInputs(): void {
+  const tk = (name: string, id: string) => { const inp = $(id) as HTMLInputElement | null; if (inp) inp.value = deckTokenHex(name) || '#888888'; };
+  tk('--accent', '#dAccent'); tk('--accent-2', '#dAccent2'); tk('--paper', '#dPaper'); tk('--ink', '#dInk');
+  syncSwatches();
+}
+function deckSwatchColors(): string[] {
+  const out: string[] = [];
+  ['--accent', '--accent-2', '--accent-3', '--paper', '--paper-soft', '--ink', '--ink-3', '--good'].forEach((t) => {
+    const hex = deckTokenHex(t);
+    if (hex && out.indexOf(hex) < 0) out.push(hex);
+  });
+  return out.slice(0, 8);
+}
+function swCellsHtml(list: string[], cur: string): string {
+  return list.map((c) => '<button type="button" class="sw-cell' + (c === cur ? ' on' : '')
+    + '" data-c="' + c + '" title="' + c.toUpperCase() + '" style="background:' + c + '"></button>').join('');
+}
+/** 写值 = 设隐藏 input + 手动派 'input' —— 既有的 onInput 处理器照常接管，零改动。 */
+function swApply(hex: string): void {
+  if (!swBtn) return;
+  const inp = swatchInput(swBtn); if (!inp) return;
+  inp.value = hex;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  syncSwatches();
+  const prev = $('#swPrev') as HTMLElement | null; if (prev) prev.style.background = hex;
+  const hx = $('#swHex') as HTMLInputElement | null; if (hx && document.activeElement !== hx) hx.value = hex.toUpperCase();
+  const pop = $('#swPop'); if (pop) pop.querySelectorAll('.sw-cell').forEach((c) => c.classList.toggle('on', (c as HTMLElement).dataset.c === hex));
+}
+function swPaint(): void {
+  const area = $('#swArea') as HTMLElement | null, dot = $('#swDot') as HTMLElement | null;
+  if (area) area.style.backgroundColor = hsvToHex(swH, 1, 1);
+  if (dot) { dot.style.left = (swS * 100) + '%'; dot.style.top = ((1 - swV) * 100) + '%'; dot.style.background = hsvToHex(swH, swS, swV); }
+  const hue = $('#swHue') as HTMLInputElement | null; if (hue) hue.value = String(Math.round(swH));
+}
+function swClose(): void {
+  const pop = $('#swPop'); if (pop) pop.classList.remove('show');
+  if (swBtn) swBtn.classList.remove('open');
+  swBtn = null;
+}
+function swOpen(btn: HTMLElement): void {
+  const pop = $('#swPop') as HTMLElement | null; if (!pop) return;
+  refreshDeckTokenInputs();   // 打开的这一刻再对一次真值，别拿旧快照当当前色
+  if (swBtn === btn) { swClose(); return; }
+  swClose();
+  swBtn = btn; btn.classList.add('open');
+  const inp = swatchInput(btn);
+  const hex = toHex(inp?.value || '') || '#888888';
+  const [r, g, b] = hexToRgb(hex); const hsv = rgbToHsv(r, g, b);
+  swH = hsv[0]; swS = hsv[1]; swV = hsv[2];
+  const deckList = deckSwatchColors();
+  const dk = $('#swDeckWrap') as HTMLElement | null;
+  if (dk) { dk.style.display = deckList.length ? '' : 'none'; const g2 = dk.querySelector('.sw-grid'); if (g2) g2.innerHTML = swCellsHtml(deckList, hex); }
+  const gr = $('#swGrid'); if (gr) gr.innerHTML = swCellsHtml(SW_PRESETS, hex);
+  const hx = $('#swHex') as HTMLInputElement | null; if (hx) hx.value = hex.toUpperCase();
+  const prev = $('#swPrev') as HTMLElement | null; if (prev) prev.style.background = hex;
+  swPaint();
+  pop.classList.add('show');
+  // 定位：右栏贴着窗口右缘，先按按钮左对齐再夹回可视区；下方放不下就翻到上方
+  const rc = btn.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  pop.style.left = Math.max(8, Math.min(rc.left, window.innerWidth - 8 - pw)) + 'px';
+  pop.style.top = (rc.bottom + 6 + ph < window.innerHeight ? rc.bottom + 6 : Math.max(8, rc.top - 6 - ph)) + 'px';
+}
+function wireSwatches(): void {
+  const pop = $('#swPop') as HTMLElement | null; if (!pop) return;
+  document.addEventListener('click', (e) => {
+    const t = e.target as HTMLElement;
+    const btn = t.closest('.swatch') as HTMLElement | null;
+    if (btn) { e.preventDefault(); e.stopPropagation(); swOpen(btn); return; }
+    if (!t.closest('#swPop')) swClose();
+  });
+  document.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Escape') swClose(); });
+  window.addEventListener('resize', swClose);
+  pop.querySelectorAll('.sw-grid').forEach((g) => g.addEventListener('click', (e) => {
+    const c = (e.target as HTMLElement).closest('.sw-cell') as HTMLElement | null; if (!c) return;
+    const hex = c.dataset.c || ''; const [r, gg, b] = hexToRgb(hex); const hsv = rgbToHsv(r, gg, b);
+    swH = hsv[0]; swS = hsv[1]; swV = hsv[2]; swPaint(); swApply(hex);
+  }));
+  const area = $('#swArea') as HTMLElement | null;
+  if (area) {
+    const pick = (ev: PointerEvent): void => {
+      const r = area.getBoundingClientRect();
+      swS = Math.max(0, Math.min(1, (ev.clientX - r.left) / r.width));
+      swV = Math.max(0, Math.min(1, 1 - (ev.clientY - r.top) / r.height));
+      swPaint(); swApply(hsvToHex(swH, swS, swV));
+    };
+    area.addEventListener('pointerdown', (e) => { area.setPointerCapture((e as PointerEvent).pointerId); pick(e as PointerEvent); });
+    area.addEventListener('pointermove', (e) => { if ((e as PointerEvent).buttons) pick(e as PointerEvent); });
+  }
+  const hue = $('#swHue') as HTMLInputElement | null;
+  if (hue) hue.addEventListener('input', () => { swH = parseFloat(hue.value) || 0; swPaint(); swApply(hsvToHex(swH, swS, swV)); });
+  const hx = $('#swHex') as HTMLInputElement | null;
+  if (hx) hx.addEventListener('input', () => {
+    const hex = toHex(hx.value.trim().replace(/^#?/, '#')); if (!hex) return;
+    const [r, g, b] = hexToRgb(hex); const hsv = rgbToHsv(r, g, b);
+    swH = hsv[0]; swS = hsv[1]; swV = hsv[2]; swPaint(); swApply(hex);
+  });
 }
 // 暂存盘：按「所属 slide」分组展示（缩略图自动换行，绝不横向滚动）。图片在导入时就绑定到
 // 当时选中的页（addTrayImage 用 currentSlideId），所以不再需要每张图选页——顶部提示「导入到第 N 页」
@@ -2868,10 +3035,8 @@ function refreshHtmlInspector(): void {
   // so we don't duplicate it here (avoids a localStorage tug-of-war).
   const wrap = $('#hThemeWrap'); if (wrap) wrap.style.display = 'none';
   const skinSel = $('#hSkin') as HTMLSelectElement | null; if (skinSel) skinSel.value = H.skin || '';
-  const tk = (name: string, id: string) => { const inp = $(id) as HTMLInputElement; if (inp) inp.value = toHex(H.overrides[name] || H.baseTokens[name] || '') || '#888888'; };
-  tk('--accent', '#hAccent'); tk('--paper', '#hPaper'); tk('--ink', '#hInk');
   // 设计旋钮 tab：颜色镜像 H.overrides，字体下拉按覆盖的字体栈反查，字号/留白滑块按基准比值反推
-  tk('--accent', '#dAccent'); tk('--accent-2', '#dAccent2'); tk('--paper', '#dPaper'); tk('--ink', '#dInk');
+  refreshDeckTokenInputs();
   const fontSel = (id: string, name: string) => { const s = $(id) as HTMLSelectElement | null; if (s) s.value = fontIdForStack(H.overrides[name] || ''); };
   fontSel('#dFontDisplay', '--font-display'); fontSel('#dFontSans', '--font-sans');
   const rng = (id: string, out: string, rep: string) => {
@@ -2881,6 +3046,7 @@ function refreshHtmlInspector(): void {
     if (o) o.textContent = pct + '%';
   };
   rng('#dType', '#dTypeOut', '--t-body'); rng('#dPad', '#dPadOut', '--pad-x');
+  syncSwatches();
 }
 function exportHtmlDeck(): string {
   harvestAll();
@@ -3285,6 +3451,16 @@ function setRightCollapsed(on: boolean): void {
   try { localStorage.setItem(RAIL_KEY, on ? '1' : '0'); } catch { /* noop */ }
   if (on) renderRailStrip();
 }
+// 折叠窄条只有 34px 宽。原先竖排汉字（writing-mode:vertical-rl）在这个宽度下
+// 「动/画/效/果」变成一字一行，几乎读不出来 → 改成图标 + tooltip（悬停给全名）。
+const RAIL_ICON_WRAP = '<svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">';
+const RAIL_ICONS: Record<string, string> = {
+  ai: RAIL_ICON_WRAP + '<path d="M7.4 2.2l1.3 3.5 3.5 1.3-3.5 1.3-1.3 3.5-1.3-3.5L2.6 7l3.5-1.3z" fill="currentColor" stroke="none"/><path d="M13.2 10.4l.75 2 2 .75-2 .75-.75 2-.75-2-2-.75 2-.75z" fill="currentColor" stroke="none"/></svg>',
+  script: RAIL_ICON_WRAP + '<rect x="3.4" y="2.4" width="11.2" height="13.2" rx="1.7"/><path d="M6.1 6.1h5.8M6.1 9h5.8M6.1 11.9h3.8"/></svg>',
+  fmt: RAIL_ICON_WRAP + '<path d="M4.3 14.8L9 3.2l4.7 11.6"/><path d="M6.2 10.6h5.6"/></svg>',
+  anim: RAIL_ICON_WRAP + '<circle cx="6.6" cy="9" r="3.1"/><path d="M11.6 4.9a6 6 0 010 8.2"/><path d="M14.1 2.6a9.3 9.3 0 010 12.8"/></svg>',
+  design: RAIL_ICON_WRAP + '<path d="M9 2.3c-3.7 0-6.7 2.9-6.7 6.6 0 3.7 3 6.7 6.7 6.7 1 0 1.7-.7 1.7-1.5 0-.4-.15-.7-.4-1a1.3 1.3 0 01.95-2.2h1.4c1.9 0 3.05-1.5 3.05-3.4 0-3-2.95-5.2-6.7-5.2z"/><circle cx="5.9" cy="7.6" r=".95" fill="currentColor" stroke="none"/><circle cx="9" cy="5.6" r=".95" fill="currentColor" stroke="none"/><circle cx="12.2" cy="7.6" r=".95" fill="currentColor" stroke="none"/></svg>',
+};
 function renderRailStrip(): void {
   const box = $('#railStripTabs'); if (!box) return;
   // 哪条 tab 栏正开着就抄哪条 —— 两种模式的 tab 不一样，写死一份迟早对不上
@@ -3292,10 +3468,13 @@ function renderRailStrip(): void {
   const tabs = Array.from(document.querySelectorAll(htmlOn ? '.htab' : '.tab')) as HTMLElement[];
   box.innerHTML = '';
   tabs.forEach((t) => {
+    const label = (t.textContent || '').trim();
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'striptab' + (t.classList.contains('active') ? ' active' : '');
-    b.textContent = t.textContent || '';
-    // 点窄条上的名字 = 展开 + 直接切到那一页，不用展开后再找一次
+    b.innerHTML = RAIL_ICONS[t.dataset.icon || ''] || '<span class="stlabel">' + esc(label.slice(0, 1)) + '</span>';
+    b.title = t.getAttribute('title') || label;   // 折叠时名字靠 tooltip 给
+    b.setAttribute('aria-label', label);
+    // 点窄条上的图标 = 展开 + 直接切到那一页，不用展开后再找一次
     b.addEventListener('click', () => { setRightCollapsed(false); t.click(); });
     box.appendChild(b);
   });
@@ -3602,6 +3781,9 @@ body.inapp .ehead .brand,body.inapp .ehead .dn{display:none}.ehead .dn{opacity:.
 .cbox .chint{font-size:13px;color:var(--sm-ink-3);margin:14px 0 6px;font-weight:600}
 .cbox .csteps{margin:0;padding-left:22px;font-size:13px;line-height:1.95;color:var(--sm-ink-2)}
 .cbox code{background:var(--sm-surface-3);border-radius:var(--sm-r-xs);padding:1px 6px;font-size:12px;font-family:ui-monospace,Menlo,monospace}
+.cfaint{font-size:11.5px;color:var(--sm-ink-4);line-height:1.65;margin:2px 0 9px}
+#cueBody .oprow{flex-wrap:wrap}
+#cueBody .oprow button{flex:1 1 auto;font-size:12px;padding:6px 8px;white-space:nowrap}
 .cbox .cfaint{font-size:12px;color:var(--sm-ink-4);margin-top:14px;line-height:1.7;border-top:1px solid var(--sm-line);padding-top:11px}
 .cbox .cclose{margin-top:16px;width:100%}
 .emain{flex:1;display:flex;min-height:0}
@@ -3772,6 +3954,30 @@ body.dark .sechead{color:#8a8a8e}
 body.dark .ihelp{border-color:#3a3a3d}
 body.dark .ihelp:hover{background:#3a2417}
 body.dark .helppop{background:#0f0f12;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+/* 网页内色板：色块按钮 + 弹层（HSV 方块 + 色相条 + hex + 预设） */
+.swatch{display:flex;align-items:center;gap:7px;width:100%;padding:6px 8px;background:var(--sm-surface-3);border:1px solid var(--sm-line-2);border-radius:var(--sm-r-sm);cursor:pointer;font-family:inherit;font-size:12px;color:var(--sm-ink-2);text-align:left}
+.swatch:hover{border-color:var(--sm-accent-line);background:var(--sm-surface-4)}
+.swatch.open{border-color:var(--sm-accent);box-shadow:0 0 0 2px var(--sm-accent-tint)}
+.sw-chip{flex:0 0 auto;width:18px;height:18px;border-radius:var(--sm-r-xs);border:1px solid rgba(0,0,0,.18);background:#888;box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
+.sw-hex{font-variant-numeric:tabular-nums;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.swpop{position:fixed;z-index:95;width:238px;padding:11px;background:var(--sm-surface);border:1px solid var(--sm-line-2);border-radius:var(--sm-r-lg);box-shadow:var(--sm-shadow-1),0 18px 46px rgba(0,0,0,.18);display:none}
+.swpop.show{display:block}
+.sw-area{position:relative;height:112px;border-radius:var(--sm-r-sm);cursor:crosshair;touch-action:none;background-color:#f00;
+  background-image:linear-gradient(to top,#000,rgba(0,0,0,0)),linear-gradient(to right,#fff,rgba(255,255,255,0))}
+.sw-dot{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.45);pointer-events:none}
+.sw-hue{-webkit-appearance:none;appearance:none;width:100%;height:11px;margin:11px 0 9px;border-radius:var(--sm-r-pill);cursor:pointer;border:0;
+  background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
+.sw-hue::-webkit-slider-thumb{-webkit-appearance:none;width:15px;height:15px;border-radius:50%;background:#fff;border:1px solid rgba(0,0,0,.35);box-shadow:0 1px 3px rgba(0,0,0,.3);cursor:pointer}
+.sw-row{display:flex;align-items:center;gap:7px}
+.sw-prev{flex:0 0 auto;width:24px;height:24px;border-radius:var(--sm-r-xs);border:1px solid var(--sm-line-2)}
+.sw-hexin{flex:1;min-width:0;padding:5px 7px;font-family:inherit;font-size:12px;font-variant-numeric:tabular-nums;text-transform:uppercase;background:var(--sm-surface-3);border:1px solid var(--sm-line-2);border-radius:var(--sm-r-xs);color:var(--sm-ink)}
+.sw-sec{font-size:10px;letter-spacing:.12em;color:var(--sm-ink-4);margin:11px 0 5px;font-weight:700}
+.sw-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+.sw-cell{width:100%;aspect-ratio:1;padding:0;border:1px solid rgba(0,0,0,.14);border-radius:var(--sm-r-xs);cursor:pointer;transition:transform .1s}
+.sw-cell:hover{transform:scale(1.15)}
+.sw-cell.on{box-shadow:0 0 0 2px var(--sm-accent)}
+body.dark .sw-cell,body.dark .sw-chip{border-color:rgba(255,255,255,.16)}
+body.dark .swpop{box-shadow:0 18px 46px rgba(0,0,0,.6)}
 .illbox{border:0.5px solid var(--sm-line);border-radius:var(--sm-r-md);background:var(--sm-warm-1);padding:9px 10px;margin:6px 0 8px}
 .illrow{display:flex;align-items:center;gap:8px;margin-bottom:7px}
 .illrow:last-child{margin-bottom:0}
@@ -3827,16 +4033,18 @@ body.dragging .drop{display:flex;background:rgba(181,64,42,.12);border-color:var
 .railstrip{display:none;flex-direction:column;align-items:center;gap:6px;padding:10px 0;height:100%;overflow:hidden}
 .railstrip #railStripTabs{display:flex;flex-direction:column;align-items:center;gap:6px;min-height:0;overflow:auto}
 .railstrip .railtog{flex:0 0 auto;font-size:16px;padding:2px 0}
-.railstrip button.striptab{writing-mode:vertical-rl;white-space:nowrap;background:transparent;border:0;padding:8px 3px;
-  font-size:12.5px;color:var(--sm-ink-3);cursor:pointer;font-family:inherit;letter-spacing:.12em;border-radius:var(--sm-r-xs)}
+.railstrip button.striptab{display:flex;align-items:center;justify-content:center;width:26px;height:26px;flex:0 0 auto;
+  background:transparent;border:0;padding:0;color:var(--sm-ink-3);cursor:pointer;border-radius:var(--sm-r-sm);font-family:inherit}
+.railstrip button.striptab svg{width:17px;height:17px;display:block}
+.railstrip button.striptab .stlabel{font-size:12.5px;font-weight:600}
 .railstrip button.striptab:hover{background:var(--sm-surface-2);color:var(--sm-ink)}
-.railstrip button.striptab.active{color:var(--sm-accent);font-weight:600}
+.railstrip button.striptab.active{color:var(--sm-accent);background:var(--sm-accent-tint)}
 body.panelcollapsed .right{width:34px}
 body.panelcollapsed .right>div{display:none!important}
 body.panelcollapsed .right>.railstrip{display:flex!important}
 body.dark .railstrip button.striptab{color:#9a9a9e}
 body.dark .railstrip button.striptab:hover{background:#242427;color:#f0f0f2}
-body.dark .railstrip button.striptab.active{color:#f0b34a}
+body.dark .railstrip button.striptab.active{color:#f0b34a;background:#3a2417}
 .tabs{display:flex;border-bottom:1px solid var(--sm-line-2);flex:0 0 auto}
 .tab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:12px 0;font-size:13px;color:var(--sm-ink-3);cursor:pointer;font-family:inherit}
 .tab:hover{background:var(--sm-surface-2)}.tab.active{color:var(--sm-accent);border-bottom-color:var(--sm-accent);font-weight:600}
@@ -3890,7 +4098,7 @@ body.dark .achip{background:#26262a;border-color:#34343a;color:#cfcfd4}body.dark
 .tgl:hover{background:var(--sm-surface-4)}
 .tgl.on{background:var(--sm-accent-solid);border-color:var(--sm-accent);color:#fff}
 .bbsep{width:1px;height:22px;background:var(--sm-line-2);margin:0 3px}
-.right h3{font-size:11px;letter-spacing:.14em;color:var(--sm-ink-4);margin:18px 0 8px;font-weight:700}.pane h3:first-child{margin-top:0}
+.right h3{display:flex;align-items:center;gap:6px;font-size:11px;letter-spacing:.14em;color:var(--sm-ink-4);margin:18px 0 8px;font-weight:700}.pane h3:first-child{margin-top:0}
 .right select,.right textarea,.right input{width:100%;padding:8px 10px;border:1px solid var(--sm-line-2);border-radius:var(--sm-r-sm);font-size:14px;background:var(--sm-surface);font-family:inherit}
 .right textarea{resize:vertical;line-height:1.5}
 .field{margin-bottom:10px}.field label{display:block;font-size:12px;color:var(--sm-ink-3);margin-bottom:4px}
@@ -4039,39 +4247,72 @@ function buildUI(): void {
       <div id="railStripTabs"></div>
     </div>
     <div id="htmlpanel" style="display:none">
+      <!-- tab 顺序＝使用频率：AI 修改 / 讲稿最常用，排前面；deck 级设计旋钮不常动，垫底。 -->
       <div class="htabs">
-        <button class="htab active" data-htab="fmt">格式</button>
-        <button class="htab" data-htab="design">设计</button>
-        <button class="htab" data-htab="anim">动画效果</button>
-        <button class="htab" data-htab="ai">AI 修改</button>
-        <button class="htab" data-htab="cue">提词</button>
+        <button class="htab active" data-htab="ai" data-icon="ai" title="AI 修改 —— 模糊的重活交给 Claude">AI</button>
+        <button class="htab" data-htab="script" data-icon="script" title="讲稿 / 提词 —— 副屏讲稿与手表提词">讲稿</button>
+        <button class="htab" data-htab="fmt" data-icon="fmt" title="格式 —— 选中元素的字体 / 颜色 / 位置">格式</button>
+        <button class="htab" data-htab="anim" data-icon="anim" title="动画 —— 选中元素的进入 / 强调 / 动作 / 消失">动画</button>
+        <button class="htab" data-htab="design" data-icon="design" title="设计 —— 整份 deck 的皮肤 / 配色 / 字体 / 字号">设计</button>
         <button class="railtog" type="button" title="折叠面板，把地方让给预览">›</button>
       </div>
 
-      <!-- ===== 格式 ===== -->
-      <div class="pane hpane" data-hpane="fmt">
-        <h3>主题 / 配色</h3>
-        <div class="field"><label>皮肤</label><select id="hSkin"></select></div>
-        <div class="field" id="hThemeWrap" style="display:none"><label>主题</label><select id="hTheme"></select></div>
-        <div class="grid2">
-          <div class="field"><label>强调色</label><input id="hAccent" type="color"></div>
-          <div class="field"><label>背景色</label><input id="hPaper" type="color"></div>
+      <!-- ===== AI 修改 ===== -->
+      <div class="pane hpane" data-hpane="ai">
+        <div class="sechead sectop">交给 AI<button class="ihelp" type="button" data-help="人做细活（点字、换色、动画）；复杂的交给 AI——写修改意见、为页面配图，凑成一个待办，一键发送。">?</button><span class="grow"></span><label class="confirm-tog" title="开启后 AI 的改动先以「提议」呈现，点保留才算数；关闭则改完直接生效"><input id="aiConfirmTog" type="checkbox"> 先问我</label></div>
+        <div class="proposal-bar" id="aiProposalBar" style="display:none"><span class="proposal-dot">●</span><span id="aiProposalTxt">AI 提议了改动，请确认</span><span class="grow"></span><button id="aiKeep" class="mini">保留</button><button id="aiRevertAll" class="mini revert">还原</button></div>
+
+        <div class="sechead">整份 deck<button class="ihelp" type="button" data-help="对整份 deck 的统一要求，AI 自动挑相关页改。例：统一标题字号；精简过长的页。">?</button></div>
+        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的统一要求（可留空）"></textarea></div>
+
+        <div class="sechead">本页<button class="ihelp" type="button" data-help="给当前页写修改意见，或为它配图。切换页会自动保存。">?</button></div>
+        <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">AI 已修改</span><button id="aiRevertOne" class="mini revert" style="display:none">还原本页</button></div>
+        <div class="field"><textarea id="aiInstruction" rows="3" placeholder="这一页想怎么改？例：三个要点改成左右两栏。"></textarea></div>
+        <div class="oprow"><button id="aiClearOne" title="清空本页的修改意见">清空</button></div>
+        <div class="illbox">
+          <div class="illrow"><span class="illlabel">配图<button class="ihelp" type="button" data-help="矢量＝Claude 直接画 SVG（免费、可编辑）；图表＝按数据/描述画 SVG 图表（柱/折线/饼/雷达/散点…）；照片＝本机 codex 生成（按张计额度）。成品都进图片库。">?</button></span>
+            <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量</button><button type="button" class="segbtn" data-illtype="chart">图表</button><button type="button" class="segbtn" data-illtype="photo">照片</button></div>
+          </div>
+          <textarea id="illHint" rows="2" placeholder="想要什么画面（可留空）"></textarea>
+          <div class="illrow illrow-act"><button id="illDataPick" class="mini" title="导入 CSV / 数字 / 文本数据文件，内容会填进上面的框" style="display:none">导入数据文件</button><span id="illDataNote" class="illnote"></span><span class="grow"></span><button id="illAdd" class="primary-mini" title="把本页 + 所选配图类型加入待办">＋ 加入</button></div>
         </div>
-        <div class="field"><label>文字色</label><input id="hInk" type="color"></div>
-        <button id="hTokReset" class="mini">复原配色</button>
+        <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
 
-        <h3>插入</h3>
-        <div class="oprow"><button id="hInsertImg">插入图片</button></div>
-        <div class="hint" style="margin-top:6px">图片以内联方式写入 HTML，导出后离线可用。也可在预览中直接粘贴图片；若已选中元素，将插入其后。</div>
+        <div class="sechead">导入图片<button class="ihelp" type="button" data-help="流程：先在左侧点你要配图的那一页 → 再导入 / 搜图，图片就自动归到那一页 → 多页都配好后一键发给 AI 排版。放错了？点缩略图角上的「⤴」即可移到当前选中页。">?</button><span class="grow"></span><button id="imgSearchOpen" class="mini" title="从免费图库搜图，点一下即加入暂存盘（无需手动下载导入）">搜图</button></div>
+        <div class="tray-target" id="trayTarget">导入 / 搜图将加到：<b id="trayTargetTxt">（先在左侧选一页）</b></div>
+        <div id="trayDrop" class="tray-drop"><div class="tray-drop-in"><b>拖拽图片到此处</b><span>或</span><button id="trayPick" class="mini">导入图片</button></div></div>
+        <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
+        <div id="trayGrid" class="tray-grid"></div>
 
-        <h3>选中元素</h3>
-        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑；选中后可调整字体、字号与颜色。<br>打字时空格 / 方向键归输入，按 <b>Esc</b> 退出文本框即可继续用键盘翻页。</div>
+        <div class="sechead">待办<button class="ihelp" type="button" data-help="上面的「改字 / 配图 / 导入图」和「讲稿」里的批注都汇总在这里。点「一键发送给 AI」一次全部交给 Claude。">?</button><span class="grow"></span><span class="sendnote" id="aiSendNote" style="display:none">含照片·计费</span></div>
+        <div id="aiTodo" class="aitodo"></div>
+        <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
+
+        <div class="sechead">图片库<button class="ihelp" type="button" data-help="AI 生成过的矢量 / 图表 / 照片都存在这里（~/.slidesmith/library/），可重新插入到对应页或删除。">?</button><span class="grow"></span><button id="genOpenLib" class="mini">打开</button></div>
+
+        <div class="sechead">视觉自检<button class="ihelp" type="button" data-help="检查每页的内容溢出、文字对比度、坏图，点结果可跳到对应页。">?</button><span class="grow"></span><button id="auditRun" class="mini">检查</button></div>
+        <div id="auditOut" class="auditout"></div>
+      </div>
+
+      <!-- ===== 讲稿 / 提词（原先讲稿只是 AI tab 里的一个按钮，提词是独立 tab；
+             两者是同一件事的两半——讲给人听的和抬腕看的——合并提到一级） ===== -->
+      <div class="pane hpane" data-hpane="script" hidden>
+        <div class="sechead sectop">内嵌讲稿<button class="ihelp" type="button" data-help="讲稿不给直接编辑——它带着锚点和讲法/金句/数据块，手改必然弄漂，副屏同步和手表提词会一起坏。改法是：打开讲稿、划一段、加一条批注，交给 Claude 在守住结构的前提下改写。批注会进「AI」tab 的待办。">?</button><span class="grow"></span><button id="notesOpen" class="mini">打开讲稿</button></div>
+        <div class="notes-status" id="notesStatus">—</div>
+
+        <div class="sechead">本页提词<button class="ihelp" type="button" data-help="Apple Watch 上会显示的提词。抬腕零点几秒要能读完，所以每条不超过 10 个汉字，而且要是内容锚点（「无缝嵌入」）而不是结构标签（「第一部分」）。表盘放得下 5 行——skill 出品以 5 条为上限，这里可以再手动加，但手表上会变成要翻页。">?</button></div>
+        <div id="cueBody"></div>
+      </div>
+
+      <!-- ===== 格式（选中元素） ===== -->
+      <div class="pane hpane" data-hpane="fmt" hidden>
+        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑。<button class="ihelp" type="button" data-help="选中后可调整字体、字号、颜色、粗细与位置。打字时空格 / 方向键归输入，按 Esc 退出文本框即可继续用键盘翻页。">?</button></div>
         <div id="hSel" class="hselon" style="display:none">
           <div class="tag" id="hSelTag">—</div>
           <div class="field"><label>字体</label><select id="hFont"></select></div>
           <div class="grid2">
             <div class="field"><label>字号(px)</label><input id="hFs" type="number" min="8" placeholder="默认"></div>
-            <div class="field"><label>颜色</label><input id="hColor" type="color"></div>
+            <div class="field"><label>颜色</label><input id="hColor" type="hidden"><button class="swatch" type="button" data-for="hColor"><i class="sw-chip"></i><span class="sw-hex">—</span></button></div>
           </div>
           <div class="field"><label>样式</label>
             <div class="btnbar">
@@ -4087,33 +4328,13 @@ function buildUI(): void {
           <div class="field"><label>粗细</label><select id="hWeight"><option value="">默认</option><option>300</option><option>400</option><option>500</option><option>600</option><option>700</option><option>900</option></select></div>
           <div class="grid2">
             <div class="field"><label>宽度(px)</label><input id="hElW" type="number" min="20" placeholder="自动"></div>
-            <div class="field"><label>位置 / 大小</label><button id="hBoxReset" class="mini" title="清除拖动产生的位移与尺寸">复位</button></div>
+            <div class="field"><label>位置 / 大小<button class="ihelp" type="button" data-help="拖动选框上方的 ✥ 可移动，拖动右下角的 ◢ 可调整大小；「复位」清除拖动产生的位移与尺寸。">?</button></label><button id="hBoxReset" class="mini" title="清除拖动产生的位移与尺寸">复位</button></div>
           </div>
-          <div class="hint" style="margin-top:0">拖动选框上方的 <b>✥</b> 可移动，拖动右下角的 <b>◢</b> 可调整大小。</div>
           <div class="oprow"><button id="hElUp" title="次序上移">↑ 次序</button><button id="hElDown" title="次序下移">↓ 次序</button><button id="hElDel" class="danger" title="删除该元素">删除</button></div>
         </div>
-      </div>
 
-      <!-- ===== 设计旋钮（deck 级 · 即时生效 · 零 token） ===== -->
-      <div class="pane hpane" data-hpane="design" hidden>
-        <div class="sechead sectop">整份 deck 的设计旋钮<button class="ihelp" type="button" data-help="对整份 deck 生效的「全局旋钮」：主色 / 字体 / 字号 / 留白。拖一下立刻变、零 token、不经过 AI——人手高频细活就在这里调。">?</button></div>
-        <h3>配色</h3>
-        <div class="grid2">
-          <div class="field"><label>主色</label><input id="dAccent" type="color"></div>
-          <div class="field"><label>强调色 2</label><input id="dAccent2" type="color"></div>
-        </div>
-        <div class="grid2">
-          <div class="field"><label>背景色</label><input id="dPaper" type="color"></div>
-          <div class="field"><label>文字色</label><input id="dInk" type="color"></div>
-        </div>
-        <h3>字体</h3>
-        <div class="field"><label>标题字体</label><select id="dFontDisplay"></select></div>
-        <div class="field"><label>正文字体</label><select id="dFontSans"></select></div>
-        <h3>字号 / 留白</h3>
-        <div class="field"><label>字号 <span class="tweakout" id="dTypeOut">100%</span></label><input id="dType" type="range" min="70" max="130" step="1" value="100"></div>
-        <div class="field"><label>留白 <span class="tweakout" id="dPadOut">100%</span></label><input id="dPad" type="range" min="70" max="130" step="1" value="100"></div>
-        <div class="oprow"><button id="dReset" class="mini">复原设计旋钮</button></div>
-        <div class="dghint">字号 / 留白按设计令牌整体缩放，对正文、引言、说明等一致生效；少数皮肤的封面巨标题用固定字号，不随此旋钮变化。所有改动均写入 HTML，导出后离线一致。</div>
+        <div class="sechead">插入<button class="ihelp" type="button" data-help="图片以内联方式写入 HTML，导出后离线可用。也可在预览中直接粘贴图片；若已选中元素，将插入其后。">?</button></div>
+        <div class="oprow"><button id="hInsertImg">插入图片</button></div>
       </div>
 
       <!-- ===== 动画效果 ===== -->
@@ -4144,64 +4365,43 @@ function buildUI(): void {
             <div class="oprow"><button id="hAnimPlay2" title="在本页重放进入 / 动作">▶ 预览</button></div>
           </div>
           <div class="spane" data-spane="out" hidden>
-            <div class="field"><label title="离开本页时播放一次">消失动画</label><select id="hAnimOut"></select></div>
+            <div class="field"><label title="离开本页时播放一次">消失动画<button class="ihelp" type="button" data-help="放映翻页时自动播放消失动画；编辑时可用「▶ 预览」看效果。">?</button></label><select id="hAnimOut"></select></div>
             <div class="oprow"><button id="hAnimPlayOut" title="在本页预览消失动画">▶ 预览</button></div>
-            <div class="hint">放映翻页时自动播放消失动画；编辑时可用此按钮预览。</div>
           </div>
-          <h3>触发方式</h3>
+          <h3>触发方式<button class="ihelp" type="button" data-help="触发方式作用于本 deck 的进入与动作动画；放映时按 B 可关闭全部动画。">?</button></h3>
           <div class="field"><select id="hFxMode"><option value="auto">自动 · 进入页面即播放</option><option value="manual">手动 · 点击页面才播放</option></select></div>
-          <div class="hint">触发方式作用于本 deck 的进入与动作动画；放映时按 <b>B</b> 可关闭全部动画。</div>
         </div>
       </div>
 
-      <!-- ===== AI 修改 ===== -->
-      <div class="pane hpane" data-hpane="ai" hidden>
-        <div class="sechead sectop">交给 AI<button class="ihelp" type="button" data-help="人做细活（点字、换色、动画）；复杂的交给 AI——写修改意见、为页面配图，凑成一个待办，一键发送。">?</button><span class="grow"></span><label class="confirm-tog" title="开启后 AI 的改动先以「提议」呈现，点保留才算数；关闭则改完直接生效"><input id="aiConfirmTog" type="checkbox"> 先问我</label></div>
-        <div class="proposal-bar" id="aiProposalBar" style="display:none"><span class="proposal-dot">●</span><span id="aiProposalTxt">AI 提议了改动，请确认</span><span class="grow"></span><button id="aiKeep" class="mini">保留</button><button id="aiRevertAll" class="mini revert">还原</button></div>
-
-        <div class="sechead">整份 deck<button class="ihelp" type="button" data-help="对整份 deck 的统一要求，AI 自动挑相关页改。例：统一标题字号；精简过长的页。">?</button></div>
-        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的统一要求（可留空）"></textarea></div>
-
-        <div class="sechead">本页<button class="ihelp" type="button" data-help="给当前页写修改意见，或为它配图。切换页会自动保存。">?</button></div>
-        <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">AI 已修改</span><button id="aiRevertOne" class="mini revert" style="display:none">还原本页</button></div>
-        <div class="field"><textarea id="aiInstruction" rows="3" placeholder="这一页想怎么改？例：三个要点改成左右两栏。"></textarea></div>
-        <div class="oprow"><button id="aiClearOne" title="清空本页的修改意见">清空</button></div>
-        <div class="illbox">
-          <div class="illrow"><span class="illlabel">配图<button class="ihelp" type="button" data-help="矢量＝Claude 直接画 SVG（免费、可编辑）；图表＝按数据/描述画 SVG 图表（柱/折线/饼/雷达/散点…）；照片＝本机 codex 生成（按张计额度）。成品都进图片库。">?</button></span>
-            <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量</button><button type="button" class="segbtn" data-illtype="chart">图表</button><button type="button" class="segbtn" data-illtype="photo">照片</button></div>
-          </div>
-          <textarea id="illHint" rows="2" placeholder="想要什么画面（可留空）"></textarea>
-          <div class="illrow illrow-act"><button id="illDataPick" class="mini" title="导入 CSV / 数字 / 文本数据文件，内容会填进上面的框" style="display:none">导入数据文件</button><span id="illDataNote" class="illnote"></span><span class="grow"></span><button id="illAdd" class="primary-mini" title="把本页 + 所选配图类型加入待办">＋ 加入</button></div>
+      <!-- ===== 设计（deck 级 · 即时生效 · 零 token）
+             皮肤和配色原先在「格式」里又有一份（#hAccent/#hPaper/#hInk 和这里的
+             #dAccent/#dPaper/#dInk 写的是同一批令牌），现已合并到这里，只留一份。 ===== -->
+      <div class="pane hpane" data-hpane="design" hidden>
+        <div class="sechead sectop">整份 deck 的设计旋钮<button class="ihelp" type="button" data-help="对整份 deck 生效的「全局旋钮」：皮肤 / 配色 / 字体 / 字号 / 留白。拖一下立刻变、零 token、不经过 AI——人手高频细活就在这里调。所有改动都写入 HTML，导出后离线一致。">?</button></div>
+        <div class="field"><label>皮肤</label><select id="hSkin"></select></div>
+        <div class="field" id="hThemeWrap" style="display:none"><label>主题</label><select id="hTheme"></select></div>
+        <h3>配色</h3>
+        <div class="grid2">
+          <div class="field"><label>主色</label><input id="dAccent" type="hidden"><button class="swatch" type="button" data-for="dAccent"><i class="sw-chip"></i><span class="sw-hex">—</span></button></div>
+          <div class="field"><label>强调色 2</label><input id="dAccent2" type="hidden"><button class="swatch" type="button" data-for="dAccent2"><i class="sw-chip"></i><span class="sw-hex">—</span></button></div>
         </div>
-        <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
-
-        <div class="sechead">导入图片<button class="ihelp" type="button" data-help="流程：先在左侧点你要配图的那一页 → 再导入 / 搜图，图片就自动归到那一页 → 多页都配好后一键发给 AI 排版。放错了？点缩略图角上的「⤴」即可移到当前选中页。">?</button><span class="grow"></span><button id="imgSearchOpen" class="mini" title="从免费图库搜图，点一下即加入暂存盘（无需手动下载导入）">搜图</button></div>
-        <div class="tray-target" id="trayTarget">导入 / 搜图将加到：<b id="trayTargetTxt">（先在左侧选一页）</b></div>
-        <div id="trayDrop" class="tray-drop"><div class="tray-drop-in"><b>拖拽图片到此处</b><span>或</span><button id="trayPick" class="mini">导入图片</button></div></div>
-        <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
-        <div id="trayGrid" class="tray-grid"></div>
-
-        <div class="sechead">讲稿<button class="ihelp" type="button" data-help="讲稿不给直接编辑——它带着锚点和讲法/金句/数据块，手改必然弄漂，副屏同步和手表提词会一起坏。改法是：划一段、加一条批注，交给 Claude 在守住结构的前提下改写。">?</button><span class="grow"></span><button id="notesOpen" class="mini">打开讲稿</button></div>
-        <div class="notes-status" id="notesStatus">—</div>
-
-        <div class="sechead">待办<button class="ihelp" type="button" data-help="上面的「改字 / 配图 / 导入图」都汇总在这里。点「一键发送给 AI」一次全部交给 Claude。">?</button><span class="grow"></span><span class="sendnote" id="aiSendNote" style="display:none">含照片·计费</span></div>
-        <div id="aiTodo" class="aitodo"></div>
-        <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
-
-        <div class="sechead">图片库<button class="ihelp" type="button" data-help="AI 生成过的矢量 / 图表 / 照片都存在这里（~/.slidesmith/library/），可重新插入到对应页或删除。">?</button><span class="grow"></span><button id="genOpenLib" class="mini">打开</button></div>
-
-        <div class="sechead">视觉自检<button class="ihelp" type="button" data-help="检查每页的内容溢出、文字对比度、坏图，点结果可跳到对应页。">?</button><span class="grow"></span><button id="auditRun" class="mini">检查</button></div>
-        <div id="auditOut" class="auditout"></div>
+        <div class="grid2">
+          <div class="field"><label>背景色</label><input id="dPaper" type="hidden"><button class="swatch" type="button" data-for="dPaper"><i class="sw-chip"></i><span class="sw-hex">—</span></button></div>
+          <div class="field"><label>文字色</label><input id="dInk" type="hidden"><button class="swatch" type="button" data-for="dInk"><i class="sw-chip"></i><span class="sw-hex">—</span></button></div>
+        </div>
+        <h3>字体</h3>
+        <div class="field"><label>标题字体</label><select id="dFontDisplay"></select></div>
+        <div class="field"><label>正文字体</label><select id="dFontSans"></select></div>
+        <h3>字号 / 留白<button class="ihelp" type="button" data-help="字号 / 留白按设计令牌整体缩放，对正文、引言、说明等一致生效；少数皮肤的封面巨标题用固定字号，不随此旋钮变化。">?</button></h3>
+        <div class="field"><label>字号 <span class="tweakout" id="dTypeOut">100%</span></label><input id="dType" type="range" min="70" max="130" step="1" value="100"></div>
+        <div class="field"><label>留白 <span class="tweakout" id="dPadOut">100%</span></label><input id="dPad" type="range" min="70" max="130" step="1" value="100"></div>
+        <div class="oprow"><button id="dReset" class="mini">复原设计旋钮</button></div>
       </div>
-    </div>
-    <div class="pane hpane" data-hpane="cue" hidden>
-      <div class="sechead">本页提词<button class="ihelp" type="button" data-help="Apple Watch 上会显示的提词。抬腕零点几秒要能读完，所以每条不超过 10 个汉字，而且要是内容锚点（「无缝嵌入」）而不是结构标签（「第一部分」）。表盘放得下 5 行——skill 出品以 5 条为上限，这里可以再手动加，但手表上会变成要翻页。">?</button></div>
-      <div id="cueBody"></div>
     </div>
     <div class="tabs">
-      <button class="tab active" data-tab="format">格式</button>
-      <button class="tab" data-tab="anim">动画效果</button>
-      <button class="tab" data-tab="doc">文稿</button>
+      <button class="tab active" data-tab="format" data-icon="fmt" title="格式">格式</button>
+      <button class="tab" data-tab="anim" data-icon="anim" title="动画效果">动画效果</button>
+      <button class="tab" data-tab="doc" data-icon="script" title="文稿">文稿</button>
       <button class="railtog" type="button" title="折叠面板，把地方让给预览">›</button>
     </div>
     <div class="pane" data-pane="format">
@@ -4296,7 +4496,15 @@ function buildUI(): void {
     <div id="imgSearchGrid" class="libgrid"></div>
   </div>
 </div>
-<div class="helppop" id="helpPop"></div>`;
+<div class="helppop" id="helpPop"></div>
+<div class="swpop" id="swPop">
+  <div class="sw-area" id="swArea"><i class="sw-dot" id="swDot"></i></div>
+  <input class="sw-hue" id="swHue" type="range" min="0" max="360" step="1" value="0" aria-label="色相">
+  <div class="sw-row"><i class="sw-prev" id="swPrev"></i><input class="sw-hexin" id="swHex" maxlength="7" spellcheck="false" aria-label="十六进制颜色"></div>
+  <div id="swDeckWrap"><div class="sw-sec">本 DECK 在用</div><div class="sw-grid"></div></div>
+  <div class="sw-sec">常用</div>
+  <div class="sw-grid" id="swGrid"></div>
+</div>`;
 
   function fillSel(id: string, values: readonly string[], labels?: Record<string, string>, defaultLabel?: string): HTMLSelectElement {
     const sel = $(id) as HTMLSelectElement; sel.innerHTML = '';
@@ -4336,10 +4544,6 @@ function buildUI(): void {
   // --- v2 HTML 模式 inspector: tokens / theme / selected element ---
   const onInput = (id: string, fn: (v: string) => void) =>
     ($(id) as HTMLInputElement).addEventListener('input', (e) => fn((e.target as HTMLInputElement).value));
-  onInput('#hAccent', (v) => setHtmlToken('--accent', v));
-  onInput('#hPaper', (v) => setHtmlToken('--paper', v));
-  onInput('#hInk', (v) => setHtmlToken('--ink', v));
-  $('#hTokReset').addEventListener('click', () => { harvestAll(); H.overrides = {}; renderHtmlEdit(); refreshHtmlInspector(); });
   // —— 设计旋钮 tab：deck 级配色 / 字体 / 字号 / 留白（即时生效、零 token、写入 H.overrides 一并导出）
   onInput('#dAccent', (v) => setHtmlToken('--accent', v));
   onInput('#dAccent2', (v) => setHtmlToken('--accent-2', v));
@@ -4426,7 +4630,8 @@ function buildUI(): void {
     const name = (tb as HTMLElement).dataset.htab;
     document.querySelectorAll('.htab').forEach((x) => x.classList.toggle('active', x === tb));
     document.querySelectorAll('.hpane').forEach((p) => ((p as HTMLElement).hidden = (p as HTMLElement).dataset.hpane !== name));
-    if (name === 'cue') renderCuePane();
+    if (name === 'script') { renderCuePane(); refreshNotesStatus(); }
+    if (name === 'design') refreshDeckTokenInputs();
     else if (name === 'ai') refreshNotesStatus();
   }));
   // 讲稿批注
@@ -4487,6 +4692,7 @@ function buildUI(): void {
   $('#imgSearchQ').addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') { e.preventDefault(); void runImageSearch(); } });
   $('#searchModal').addEventListener('click', (e) => { if (e.target === $('#searchModal')) closeImageSearch(); });
   wireHelp();
+  wireSwatches();
   renderTodo();
   { const z = $('#trayDrop'); if (z) {
     z.addEventListener('dragenter', (e) => { e.preventDefault(); setTrayOver(true); });
