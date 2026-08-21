@@ -1,41 +1,57 @@
-# 下个会话交接 · 迭代：用 Claude design 按「苹果液态玻璃」重做 Studio 界面
+# 下个会话交接 · 迭代：Studio「美化 + 交互重构」三批走（批次二起步）
 
 > `/clear` 后先读 `_memory/active.md`（启动须知 + Studio 机制），再读本文件。**别通读仓库**，省 token。
 
 ---
 
-## 一、⚠️ 开工第一件事：**先和用户讨论，别直接动手**
+## 一、方向已定，别再讨论液态玻璃
 
-用户明确说了：这一迭代要「用 Claude design 按苹果 **Liquid Glass（液态玻璃）** 风格重新设计 Studio」，
-但**先讨论「目前这套基于 HTML 的界面，到底能不能改造出来」**。
+2026-08-21 讨论后用户拍板：**液态玻璃搁置**（结论：技术上能做，但要「有玻璃感」必须把三栏
+实心布局改成「deck 满幅 + 面板悬浮」，本质是改布局不是换皮，这一轮不划算）。
+改做「让工具更好用、更美观」，**分三批，每批单独截图验收**。
 
-讨论时手里要有的事实（下面这些是查证过的，别重新摸）：
+### 批次一 · 已完成并 commit（`e794e78`），别重做
 
-- **Studio 就是一份 HTML**：`packages/studio/src/main.ts` 里那一大坨 CSS 字符串 + markup 字符串，
-  `node scripts/build-studio.mjs` 打包成 `studio/slidesmith-studio.html`（单文件、自包含、约 1.3 MB）。
-- **Mac app 和网页版是同一份**：app 里是 WKWebView 加载 `http://localhost:8765/`，
-  和浏览器打开的是同一个 URL、同一个文件。**改一次两边同时生效，不存在两个版本**（用户问过这个）。
-  app 自己只多原生外壳：顶栏药丸、Claude 面板、菜单（Swift）。
-- **液态玻璃在 WKWebView 里能做到哪一步**（要在讨论里说清楚，别含糊）：
-  - `backdrop-filter: blur() saturate()` — Safari/WKWebView 支持好，这是「玻璃」的主体
-  - 真正的 Liquid Glass 还要**折射/边缘高光/随内容流动**，纯 CSS 只能仿到「毛玻璃 + 高光描边」
-  - 想更像，得上 SVG filter（`feTurbulence`/`feDisplacementMap`）或 WebGL —— **性能代价要先掂量**，
-    Studio 左栏有几十张实时缩略图 iframe，再叠全局 backdrop-filter 会不会掉帧，**必须先做小样测**
-  - 原生 `NSVisualEffectView` 只能给 app 外壳用，**WebView 里的内容拿不到系统材质**
-  - 深色/浅色两套都要（Studio 有 `body.dark`）
-- **右栏已经挤到顶**：格式/设计/动画效果/AI 修改/提词 五个 tab，讲稿批注只能塞进「AI 修改」里。
-  这本身就是「布局该重做」的信号 —— 重设计时把讲稿提到一级入口值得考虑。
-- 右栏现在**可折叠**（折成 34px 竖条，条上竖排 tab 名，点哪个展开到哪个，状态存 localStorage）。
+| 做了什么 | 关键点 |
+|---|---|
+| `--sm-*` 设计令牌层 | 原来 532 处硬编码色 / 1 个变量 / 90 条 `body.dark` 手工覆盖；现在深色只重定义变量。**前缀必须是 `--sm-`**：`--accent`/`--ink`/`--paper` 是 deck 自己的令牌（换皮和调色板在用），撞名极难查 |
+| 藏掉预览里 deck 自带的段导航 | 顶栏 `▦`（`#deckNavTog`）开关，默认关，记 localStorage `sm-deckchrome` |
+| **Studio 接管 `--fit-scale`** | ⚠️ 最容易漏的一步。deck 自己的公式是 `innerWidth - 300 - 60`，那 300 是段导航宽度、**硬编码在 deck 里**。光藏不接管＝地方腾出来了幻灯片却不变大。接管后 672px → 972px（+45%）。播放态 `body.present` 让给 deck；另在 `fullscreenchange` 后补算一次（退出全屏时 resize 和 fullscreenchange 谁先到没保证） |
+| deck 顶栏在编辑预览里不折行 | 它按 1920 宽设计；只在编辑预览收紧 + nowrap，**导出文件一个字节不动**（规则在 `forEdit` 分支里） |
+| 草稿条 → 右下角卡片 | 原来横在顶部正中，正好盖住 deck 的标题栏 / 页码 /「全屏播放」 |
+| 顶栏分组 + 导出选项收进 `⚙` 浮层 | 三个几乎看不见的灰 checkbox 收进 `#expMenu`，每条配一行说明 |
 
-**建议问用户的**：重做的边界是只换皮（配色/材质/圆角/间距），还是连三栏布局和交互流程一起动？
-两者工作量差一个数量级。
+### 批次二 · 下一步做这个：右栏重构（一～两天）
 
-⚠️ 改 UI 会碰 `main.ts` 里那些 CSS/markup 字符串，改完必须 `node scripts/build-studio.mjs`，
-然后在 app 里 ⌘R「重新载入 Studio」。
+- 五个 tab 重新归类。**用户自述最常用 = 「AI 修改」+「提词 / 讲稿」**，按这个排优先级，别照搬现在的顺序
+- **讲稿提到一级入口**（现在只能塞在「AI 修改」里）
+- 折叠态改图标竖条 —— 现在是竖排单字（「格/式」「动/画/效/果」每字一行），几乎没法读
+- 每个面板砍说明文字，改成 `?` 悬浮提示（`.ihelp` 机制代码里已有，直接沿用）
+- 强调色 / 背景色 / 文字色三个原生 `<input type=color>` 大色块换成正经色板控件
+
+### 批次三 · 之后
+
+左栏页面列表加缩略图（彻底合并两套导航）· AI 待办流程状态可见性 · 快捷键梳理
 
 ---
 
-## 二、上一迭代做完的（都已 commit + 实测，别重做）
+## 一之二、验收怎么做（照做，别碰用户正在用的那份）
+
+用户的 Mac app + 真 deck 常年占着 **8765**，**别去动它**。另起一个：
+
+```bash
+cp ~/.slidesmith/exports/DYQ-defense-一体版-学术题词版.html <scratchpad>/probe-deck.html
+npx tsx packages/cli/src/index.ts serve --no-open -p 8790 <scratchpad>/probe-deck.html
+```
+Playwright 开 `http://127.0.0.1:8790/` 截图。⚠️ Playwright MCP 只许写仓库内路径，
+截图落 `.playwright-mcp/`（已 gitignore）；给绝对路径到 scratchpad 会被拒。
+⚠️ 别点草稿条的「丢弃」——那可能是用户真的未保存草稿。
+
+改完 UI 一律 `node scripts/build-studio.mjs`，app 里 ⌘R「重新载入 Studio」。
+
+---
+
+## 二、更早那一迭代做完的（都已 commit + 实测，别重做）
 
 | commit | 内容 |
 |---|---|
