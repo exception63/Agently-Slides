@@ -630,7 +630,14 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
           const safeBase = safeSeg(nm.replace(/\.[^.]+$/, '')) || 'deck';
           const outDir = deckAbsPath ? dirname(deckAbsPath) : join(homedir(), '.slidesmith', 'exports');
           mkdirSync(outDir, { recursive: true });
-          const outPath = inPlaceOnly && deckAbsPath ? deckAbsPath : join(outDir, safeBase + '.html');
+          let outPath = inPlaceOnly && deckAbsPath ? deckAbsPath : join(outDir, safeBase + '.html');
+          // 「另存为」不是「保存」：它算出来的目标要是正好压在原文件上，就换个名字。
+          // 不然点「另存为」会静默覆盖原稿——那是最不该发生的一种数据丢失。
+          if (!inPlaceOnly && deckAbsPath && resolve(outPath) === resolve(deckAbsPath)) {
+            let n = 1;
+            do { outPath = join(outDir, `${safeBase} 副本${n > 1 ? ' ' + n : ''}.html`); n += 1; }
+            while (existsSync(outPath) && n < 100);
+          }
           writeFileSync(outPath, body);
           if (wantReveal) revealFile(outPath);
           sendJson(res, { ok: true, path: outPath });

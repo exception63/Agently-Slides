@@ -4590,6 +4590,24 @@ function buildUI(): void {
   //   ③ 退回 blob 下载，并明确告知落到「下载」文件夹
   $('#expHtml').addEventListener('click', async () => {
     const html = mode === 'html' ? await buildExportHtml() : renderDeckHtml(deck);
+    // 在 app 壳里：交给原生弹真正的「另存为」面板，用户自己挑位置和文件名。
+    //
+    // **这条以前没有，后果是「另存为」根本没在另存**：它走桥写盘，而桥只会写到
+    // deck 旁边的同名文件——桥一旦知道原文件路径，那就是原文件本身，
+    // 「另存为」等于变成了第二个「保存」，而且不弹任何窗口。
+    const native = (window as unknown as {
+      webkit?: { messageHandlers?: { smSaveAs?: { postMessage(m: unknown): Promise<string | null> } } };
+    }).webkit?.messageHandlers?.smSaveAs;
+    if (native) {
+      try {
+        const saved = await native.postMessage({ name: fileBase + '.html', html });
+        if (saved) toast('✅ 已另存为：' + saved + '（已在访达高亮）');
+        return;                       // 用户取消也到此为止，别再往下走
+      } catch (e) {
+        toast('另存为失败：' + ((e as Error).message || e), true);
+        return;
+      }
+    }
     if (location.protocol.startsWith('http')) {
       try {
         const r = await fetch(`${libBase()}/api/export-html?name=${encodeURIComponent(fileBase)}.html`, {

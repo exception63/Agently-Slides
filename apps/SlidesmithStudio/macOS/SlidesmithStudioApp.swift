@@ -58,6 +58,12 @@ struct SlidesmithStudioApp: App {
             Button("打开 deck…") { openDeck() }
                 .keyboardShortcut("o")
         }
+        CommandGroup(replacing: .saveItem) {
+            Button("保存") { NotificationCenter.default.post(name: .smSaveDeck, object: nil) }
+                .keyboardShortcut("s", modifiers: .command)
+            Button("另存为…") { NotificationCenter.default.post(name: .smSaveDeckAs, object: nil) }
+                .keyboardShortcut("s", modifiers: [.command, .shift])
+        }
         CommandGroup(after: .toolbar) {
             Button("显示 / 隐藏 Claude 面板") { showAI.toggle() }
                 .keyboardShortcut("a", modifiers: [.command, .shift])
@@ -98,6 +104,11 @@ struct SlidesmithStudioApp: App {
 
 extension Notification.Name {
     static let smReloadStudio = Notification.Name("sm.reload.studio")
+    /// ⌘S / ⌘⇧S。**Mac app 该有这两个快捷键**——保存按钮长在网页顶栏里，
+    /// 只能用鼠标点，这在 Mac 上是说不过去的。菜单项转成通知，由 WebView 去按网页那颗按钮
+    /// （保存的全部逻辑在网页里，原生这边不该有第二份）。
+    static let smSaveDeck = Notification.Name("sm.save.deck")
+    static let smSaveDeckAs = Notification.Name("sm.save.deck.as")
 }
 
 /// **app 退出时必须把两条桥都收掉。** 不收的话，node 和 python3（以及 python3

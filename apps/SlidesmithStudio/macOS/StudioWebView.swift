@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
 /// Studio 网页那一块。
@@ -44,6 +45,13 @@ struct StudioWebView: NSViewRepresentable {
         config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         config.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
 
+        // 「另存为」要真的弹系统面板。**网页那边没有这个能力**：WKWebView 没有
+        // showSaveFilePicker，而走桥写盘只能写到固定位置——用户点「另存为」却弹不出
+        // 选路径的窗口，等于没有另存为。这个通道让网页把 html 交给原生去弹 NSSavePanel。
+        // 浏览器里没有 window.webkit，网页会自己回落到原来那套，一份文件两边通用。
+        config.userContentController.addScriptMessageHandler(
+            context.coordinator, contentWorld: .page, name: "smSaveAs")
+
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.uiDelegate = context.coordinator
         webView.navigationDelegate = context.coordinator
@@ -52,6 +60,7 @@ struct StudioWebView: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground")
         webView.load(URLRequest(url: Self.hosted(url)))
         context.coordinator.webView = webView
+        context.coordinator.observeMenuCommands()
         return webView
     }
 
@@ -74,13 +83,14 @@ struct StudioWebView: NSViewRepresentable {
     }
 
     @MainActor
-    final class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandlerWithReply {
 
         weak var webView: WKWebView?
         var lastReloadToken = 0
         /// `window.open` 开出来的子窗口。**必须留着强引用**——不留的话窗口一显示
         /// 就被回收，表现是"点动画库闪一下就没了"。
         private var childWindows: [NSWindow] = []
+        private var menuObservers: [NSObjectProtocol] = []
 
         // MARK: - window.open
 
@@ -158,6 +168,54 @@ struct StudioWebView: NSViewRepresentable {
             request.httpMethod = "POST"
             request.timeoutInterval = 5
             URLSession.shared.dataTask(with: request).resume()
+        }
+
+        // MARK: - 菜单命令 → 按网页上那颗按钮
+
+        /// **保存的逻辑全在网页里**（收集编辑、组装、写回），原生这边不该有第二份实现。
+        /// 菜单项要做的只是替用户按一下那颗按钮。
+        func observeMenuCommands() {
+            guard menuObservers.isEmpty else { return }
+            let map: [(Notification.Name, String)] = [(.smSaveDeck, "#saveHtml"), (.smSaveDeckAs, "#expHtml")]
+            for (name, selector) in map {
+                menuObservers.append(NotificationCenter.default.addObserver(
+                    forName: name, object: nil, queue: .main) { [weak self] _ in
+                        MainActor.assumeIsolated {
+                            self?.webView?.evaluateJavaScript(
+                                "document.querySelector('\(selector)')?.click()")
+                        }
+                    })
+            }
+        }
+
+        // MARK: - 另存为（网页 → 原生 NSSavePanel）
+
+        func userContentController(_ userContentController: WKUserContentController,
+                                   didReceive message: WKScriptMessage,
+                                   replyHandler: @escaping (Any?, String?) -> Void) {
+            guard message.name == "smSaveAs",
+                  let body = message.body as? [String: Any],
+                  let html = body["html"] as? String else {
+                replyHandler(nil, "另存为：参数不对")
+                return
+            }
+            let panel = NSSavePanel()
+            panel.nameFieldStringValue = (body["name"] as? String) ?? "deck.html"
+            panel.allowedContentTypes = [.html]
+            panel.canCreateDirectories = true
+            panel.begin { response in
+                guard response == .OK, let url = panel.url else {
+                    replyHandler(nil, nil)          // 用户取消 —— 不是错误
+                    return
+                }
+                do {
+                    try html.write(to: url, atomically: true, encoding: .utf8)
+                    NSWorkspace.shared.activateFileViewerSelecting([url])
+                    replyHandler(url.path, nil)
+                } catch {
+                    replyHandler(nil, "写不进去：\(error.localizedDescription)")
+                }
+            }
         }
 
         // MARK: - alert / confirm / prompt
