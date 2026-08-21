@@ -32,6 +32,25 @@
 
 ---
 
+## 一之二、左栏导航跟随（用户点名要的） —— `2c60851`
+
+在预览里**点某一页 / 光标落进某一页 / 在某一页打字** → 左栏高亮跟过去并**滚进可视区**。
+新增 `followSlideFromDeck()`（接在 `#deck` 的 click / focusin / input 上）和 `markLeftActive()`。
+
+**原来为什么不动**：`activeSlideIndex()` 只认 `#deck .slide.active` 这个类，
+而 deck 在 Studio 的连续滚动视图里**从来不加它** —— 那个 300ms nav 轮询一次都没生效过。
+**连带修好一个真 bug**：`cur` 同时决定「本页」修改意见记到哪一页，所以改前
+「点进第 8 页写意见 → 记到第 1 页」。
+
+⚠️ **防轮询扳回去的写法**：follow 之后 `lastSyncIdx = activeSlideIndex()`（deck 此刻的想法），
+**不是**新页号 —— 否则有 `.active` 的 deck 会在 300ms 内把你扳回去。
+
+**未做（下次可问用户）**：纯滚动预览时左栏不跟随。`deckAPI.idx` 是跟着滚的
+（`deckAPI = {setActive,next,prev,goSeg,openPresenter,idx,total,SLIDE_MAP,SLIDE_TITLES}`），
+接上去很容易；但那样「翻着看一眼别的页」也会把 AI 修改意见的目标页换掉，所以先没做。
+
+---
+
 ## 二、下一件事：跟用户确认再动手
 
 批次一（视觉令牌层）、批次二（右栏）都做完了。**批次三还没定内容** —— 开工前先问用户。
