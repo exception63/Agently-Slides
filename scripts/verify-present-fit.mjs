@@ -64,6 +64,11 @@ try {
     return !!(d && d.querySelector('#deck .slide'));
   }, { timeout: 8000 });
   await mk.waitForTimeout(700);
+  // 勾上「嵌入手机遥控」——同一份导出顺带测遥控按钮在放映时该不该露脸
+  await mk.evaluate(() => {
+    const t = document.getElementById('embedRemote');
+    if (t && !t.checked) { t.checked = true; t.dispatchEvent(new Event('change', { bubbles: true })); }
+  });
   const exported = await mk.evaluate(() => window.__SM_EXPORT_HTML__());
   await mk.close();
 
@@ -97,6 +102,49 @@ try {
   }
 
   // ---------- 2) 对照组：摘掉修复 → 必须挂 ----------
+  // ---------- 1b) 导出件里的「📱 手机遥控」按钮：放映时必须消失，退出后必须回来 ----------
+  ok('导出确实烘进了手机遥控', exported.includes('sm-phone-remote-start') && exported.includes('📱 手机遥控'));
+  {
+    const rp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    await rp.goto('file://' + file, { waitUntil: 'domcontentloaded' });
+    await rp.waitForTimeout(600);
+    const r = await rp.evaluate(async () => {
+      const sleep = (ms) => new Promise((x) => setTimeout(x, ms));
+      const vis = (el) => !!(el && el.getClientRects().length);
+      const btn = [...document.querySelectorAll('button')].find((b) => /手机遥控/.test(b.textContent || ''));
+      if (!btn) return { noBtn: true };
+      const before = vis(btn);
+      // 把配对弹层也打开 —— 它是 inset:0 的全屏遮罩，忘了关就会盖住整场
+      btn.click(); await sleep(250);
+      const overlay = btn.parentElement.querySelector('div[style*="inset: 0px"][style*="2147483647"]')
+        || [...document.body.children].find((e) => e.className === 'sm-pr-ui' && e.tagName === 'DIV');
+      const overlayBefore = vis(overlay);
+      // 进放映
+      const play = [...document.querySelectorAll('button')].find((b) => /全屏播放|播放/.test(b.textContent || ''));
+      if (play) play.click(); else document.body.classList.add('present');
+      await sleep(450);
+      const during = vis(btn), overlayDuring = vis(overlay);
+      // 退出放映。**真的退出全屏**：只摘 class 的话文档仍处在原生全屏，
+      // `:fullscreen .sm-pr-ui` 照样命中，按钮"回不来"是测试自己造的假象。
+      try { if (document.fullscreenElement) await document.exitFullscreen(); } catch (e) { /* headless 可能不给 */ }
+      document.body.classList.remove('present', 'fullscreen');
+      await sleep(350);
+      const after = vis(btn);
+      // 只有 body.present、没有原生全屏的路子也要覆盖：WKWebView / 浏览器拒了
+      // requestFullscreen 时就是这个状态，光靠 :fullscreen 那条就漏了。
+      document.body.classList.add('present'); await sleep(200);
+      const presentOnly = vis(btn);
+      document.body.classList.remove('present');
+      return { before, during, after, overlayBefore, overlayDuring, presentOnly };
+    });
+    ok('放映前遥控按钮看得见', r.before === true, JSON.stringify(r));
+    ok('放映时遥控按钮消失', r.during === false, JSON.stringify(r));
+    ok('退出放映后按钮回来', r.after === true, JSON.stringify(r));
+    ok('配对二维码遮罩放映时也不挡画面', r.overlayBefore === true && r.overlayDuring === false, JSON.stringify(r));
+    ok('只有 body.present（原生全屏被拒）时也照样隐藏', r.presentOnly === false, JSON.stringify(r));
+    await rp.close();
+  }
+
   const bp = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   await bp.goto('file://' + broken, { waitUntil: 'domcontentloaded' });
   await bp.waitForTimeout(500);

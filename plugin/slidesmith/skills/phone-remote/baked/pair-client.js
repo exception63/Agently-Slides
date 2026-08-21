@@ -293,6 +293,7 @@
   // —— 遥控按钮 ——
   var btn = document.createElement('button');
   btn.type = 'button';
+  btn.className = 'sm-pr-ui';
   btn.textContent = '📱 手机遥控';
   btn.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:2147483646;border:none;border-radius:999px;' +
     'padding:10px 16px;font:600 14px/1 system-ui,-apple-system,"PingFang SC",sans-serif;cursor:pointer;' +
@@ -326,6 +327,7 @@
   function onIce(c) { if (!pc || !pc.remoteDescription) { pendingIce.push(c); return; } try { pc.addIceCandidate(c); } catch (e) {} }
   function setTransport(isP2p) { var msg = card.querySelector('#__sm_pairmsg'); if (msg && msg.textContent.indexOf('✅') === 0) msg.textContent = '✅ 手机已连接（' + (isP2p ? '局域网直连' : '云端') + '）· 可关闭本窗'; }
   var overlay = document.createElement('div');
+  overlay.className = 'sm-pr-ui';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;' +
     'background:rgba(6,6,9,.72);backdrop-filter:blur(3px);font-family:system-ui,-apple-system,"PingFang SC",sans-serif';
   var card = document.createElement('div');
@@ -446,7 +448,22 @@
     if (msg) { msg.textContent = '⚠️ ' + text; msg.style.color = '#c0392b'; }
   }
 
+  // 遥控这套 UI 只在编辑 / 浏览时有用。**一进放映就得消失**：投出去给全场看的画面上
+  // 不该挂一颗黄色药丸；配对二维码那层更要命——它是 inset:0 的全屏遮罩，忘了关就直接
+  // 盖住整场幻灯片（配对成功那句提示写的是"可关闭本窗"，也就是说人确实会不关）。
+  //
+  // 用 CSS 而不是 JS 监听：进放映的路子有好几条（按钮、快捷键、系统全屏、演讲者视图），
+  // 挨个监听迟早漏一条；挂选择器则一次全覆盖，退出放映也自动还原。
+  // `:fullscreen` 单独成条 —— 浏览器不认这个伪类时会把**整条规则**丢掉，
+  // 和前面那条写在一起的话，body.present 那几个选择器会被一起带走。
+  // 黑屏遮罩（black）不在此列：它就是给放映用的。
+  var prCss = document.createElement('style');
+  prCss.textContent =
+    'body.present .sm-pr-ui,body.fullscreen .sm-pr-ui,body.presenter-mode .sm-pr-ui{display:none!important}'
+    + ':fullscreen .sm-pr-ui{display:none!important}'
+    + ':-webkit-full-screen .sm-pr-ui{display:none!important}';
+
   btn.onclick = showChooser;
-  function mount() { document.body.appendChild(black); document.body.appendChild(btn); document.body.appendChild(overlay); }
+  function mount() { (document.head || document.documentElement).appendChild(prCss); document.body.appendChild(black); document.body.appendChild(btn); document.body.appendChild(overlay); }
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 })();

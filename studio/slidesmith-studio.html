@@ -5234,6 +5234,7 @@ var qrcode = function() {
   // \u2014\u2014 \u9065\u63A7\u6309\u94AE \u2014\u2014
   var btn = document.createElement('button');
   btn.type = 'button';
+  btn.className = 'sm-pr-ui';
   btn.textContent = '\u{1F4F1} \u624B\u673A\u9065\u63A7';
   btn.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:2147483646;border:none;border-radius:999px;' +
     'padding:10px 16px;font:600 14px/1 system-ui,-apple-system,"PingFang SC",sans-serif;cursor:pointer;' +
@@ -5267,6 +5268,7 @@ var qrcode = function() {
   function onIce(c) { if (!pc || !pc.remoteDescription) { pendingIce.push(c); return; } try { pc.addIceCandidate(c); } catch (e) {} }
   function setTransport(isP2p) { var msg = card.querySelector('#__sm_pairmsg'); if (msg && msg.textContent.indexOf('\u2705') === 0) msg.textContent = '\u2705 \u624B\u673A\u5DF2\u8FDE\u63A5\uFF08' + (isP2p ? '\u5C40\u57DF\u7F51\u76F4\u8FDE' : '\u4E91\u7AEF') + '\uFF09\xB7 \u53EF\u5173\u95ED\u672C\u7A97'; }
   var overlay = document.createElement('div');
+  overlay.className = 'sm-pr-ui';
   overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:none;align-items:center;justify-content:center;' +
     'background:rgba(6,6,9,.72);backdrop-filter:blur(3px);font-family:system-ui,-apple-system,"PingFang SC",sans-serif';
   var card = document.createElement('div');
@@ -5387,8 +5389,23 @@ var qrcode = function() {
     if (msg) { msg.textContent = '\u26A0\uFE0F ' + text; msg.style.color = '#c0392b'; }
   }
 
+  // \u9065\u63A7\u8FD9\u5957 UI \u53EA\u5728\u7F16\u8F91 / \u6D4F\u89C8\u65F6\u6709\u7528\u3002**\u4E00\u8FDB\u653E\u6620\u5C31\u5F97\u6D88\u5931**\uFF1A\u6295\u51FA\u53BB\u7ED9\u5168\u573A\u770B\u7684\u753B\u9762\u4E0A
+  // \u4E0D\u8BE5\u6302\u4E00\u9897\u9EC4\u8272\u836F\u4E38\uFF1B\u914D\u5BF9\u4E8C\u7EF4\u7801\u90A3\u5C42\u66F4\u8981\u547D\u2014\u2014\u5B83\u662F inset:0 \u7684\u5168\u5C4F\u906E\u7F69\uFF0C\u5FD8\u4E86\u5173\u5C31\u76F4\u63A5
+  // \u76D6\u4F4F\u6574\u573A\u5E7B\u706F\u7247\uFF08\u914D\u5BF9\u6210\u529F\u90A3\u53E5\u63D0\u793A\u5199\u7684\u662F"\u53EF\u5173\u95ED\u672C\u7A97"\uFF0C\u4E5F\u5C31\u662F\u8BF4\u4EBA\u786E\u5B9E\u4F1A\u4E0D\u5173\uFF09\u3002
+  //
+  // \u7528 CSS \u800C\u4E0D\u662F JS \u76D1\u542C\uFF1A\u8FDB\u653E\u6620\u7684\u8DEF\u5B50\u6709\u597D\u51E0\u6761\uFF08\u6309\u94AE\u3001\u5FEB\u6377\u952E\u3001\u7CFB\u7EDF\u5168\u5C4F\u3001\u6F14\u8BB2\u8005\u89C6\u56FE\uFF09\uFF0C
+  // \u6328\u4E2A\u76D1\u542C\u8FDF\u65E9\u6F0F\u4E00\u6761\uFF1B\u6302\u9009\u62E9\u5668\u5219\u4E00\u6B21\u5168\u8986\u76D6\uFF0C\u9000\u51FA\u653E\u6620\u4E5F\u81EA\u52A8\u8FD8\u539F\u3002
+  // \`:fullscreen\` \u5355\u72EC\u6210\u6761 \u2014\u2014 \u6D4F\u89C8\u5668\u4E0D\u8BA4\u8FD9\u4E2A\u4F2A\u7C7B\u65F6\u4F1A\u628A**\u6574\u6761\u89C4\u5219**\u4E22\u6389\uFF0C
+  // \u548C\u524D\u9762\u90A3\u6761\u5199\u5728\u4E00\u8D77\u7684\u8BDD\uFF0Cbody.present \u90A3\u51E0\u4E2A\u9009\u62E9\u5668\u4F1A\u88AB\u4E00\u8D77\u5E26\u8D70\u3002
+  // \u9ED1\u5C4F\u906E\u7F69\uFF08black\uFF09\u4E0D\u5728\u6B64\u5217\uFF1A\u5B83\u5C31\u662F\u7ED9\u653E\u6620\u7528\u7684\u3002
+  var prCss = document.createElement('style');
+  prCss.textContent =
+    'body.present .sm-pr-ui,body.fullscreen .sm-pr-ui,body.presenter-mode .sm-pr-ui{display:none!important}'
+    + ':fullscreen .sm-pr-ui{display:none!important}'
+    + ':-webkit-full-screen .sm-pr-ui{display:none!important}';
+
   btn.onclick = showChooser;
-  function mount() { document.body.appendChild(black); document.body.appendChild(btn); document.body.appendChild(overlay); }
+  function mount() { (document.head || document.documentElement).appendChild(prCss); document.body.appendChild(black); document.body.appendChild(btn); document.body.appendChild(overlay); }
   if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
 })();
 `;var Se={editorial:{css:`/* \u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550
