@@ -39,6 +39,7 @@ import datetime
 import json
 import os
 import pathlib
+import queue
 import re
 import shutil
 import signal
@@ -167,6 +168,16 @@ def deck_fact() -> str:
             + ("" if connected else "（注意：Studio 当前显示未连接）") + "\n")
 
 
+def _assistant_text(rec: dict) -> str:
+    """从一条 assistant 事件里抠出纯文字（丢弃的孤儿轮次要留个念想）。"""
+    content = ((rec.get("message") or {}).get("content")) or []
+    if not isinstance(content, list):
+        return ""
+    out = [b.get("text", "") for b in content
+           if isinstance(b, dict) and b.get("type") == "text"]
+    return " ".join(t.strip() for t in out if t.strip())[:300]
+
+
 def _user_message(text: str) -> str:
     """常驻会话的 stdin 吃的是 stream-json，一行一条用户消息。"""
     return json.dumps({
@@ -198,6 +209,15 @@ class Session:
         # 正跑着（self.lock 被占着）的时候还能往 stdin 里塞话。
         self._stdin_lock = threading.Lock()
         self._stderr_tail: list[str] = []
+        # stdout 也必须常驻有人读 —— 理由见 `_read_stdout`。
+        self._out_q: "queue.Queue[str | None]" = queue.Queue()
+        # 孤儿轮次：不是任何一句用户输入引起的那些输出。丢掉但**不静默吞掉**。
+        self._orphan_texts: list[str] = []
+        self.orphan_turns = 0
+        self.last_discarded = 0
+        # 排干时若发现有一轮孤儿正吐到一半，这个旗子让下一轮先把它读完再收自己的。
+        self._orphan_in_flight = False
+        self.orphan_split_seen = False   # 抓到过「吐了一半」的孤儿轮次吗（回归脚本要断言这条路真走到了）
         # 这一轮还在跑吗 / 从什么时候开始跑的。回收线程靠它分辨"闲着"和"正忙着"。
         self.busy = False
         self.turn_began = 0.0
@@ -215,6 +235,7 @@ class Session:
         # stderr 必须有人一直读。管道缓冲区满了写端就会阻塞，
         # 表现出来是"它突然不说话了"，而且看不出任何原因——常驻进程特有的坑。
         threading.Thread(target=self._drain_stderr, daemon=True).start()
+        threading.Thread(target=self._read_stdout, daemon=True).start()
 
     def interrupt(self) -> bool:
         """结束**当前这一轮**，但让会话活着。
@@ -236,6 +257,80 @@ class Session:
             return True
         except Exception:                                          # noqa: BLE001
             return False
+
+    def _read_stdout(self):
+        """**stdout 也得一直有人读**，理由有两条，第二条是真栽过的事故。
+
+        ① 和 stderr 同一个物理原因：管道缓冲区（64KB）满了写端就阻塞。
+           `--verbose --include-partial-messages` 一轮就能吐几十 KB，很容易撞上。
+
+        ② **CLI 会自己发起没有用户输入的轮次。** 后台 Bash 任务（`run_in_background`）
+           跑完时，harness 往会话里塞一条 `<task-notification>`，模型回一句，
+           照样吐一整轮、末尾照样一个 `result`。这种轮次不属于任何一句用户的话。
+           原来的做法是「喂一句 → 读到 result 为止」，读完就没人再读 stdout 了，
+           于是这些无主输出躺在管子里；用户下一句一进来，`_pump` 第一行就读到它，
+           碰上它的 `result` 立刻收工——**秒回一段陈年答案，真答案顺延一格**。
+           用户看到的就是「我说的话没执行，还蹦出一句莫名其妙的回复」，
+           而且此后每一句都错位，越错越远。（2026-08-21 实测复现，见 git log。）
+
+        所以：这个线程永远在读，读到的行进队列；哪一轮该收哪些行由 `_pump` 决定。
+        """
+        try:
+            for line in self.proc.stdout:
+                line = line.strip()
+                if line:
+                    self._out_q.put(line)
+        except Exception:                                          # noqa: BLE001
+            pass
+        finally:
+            self._out_q.put(None)          # EOF 哨兵
+
+    def _discard_pending(self) -> int:
+        """喂新话之前，把队列里还没人认领的行全丢掉。
+
+        能躺在这里的只有两种，**都不是**接下来这句话的答案：
+        ① 上一轮客户端半路断线留下的尾巴；② 上面说的孤儿轮次。
+
+        **第一轮不会误伤 `system/init`**：实测过，这个 CLI 在收到第一句输入之前
+        stdout 一个字都不吐（空等 6 秒，0 行），`init` 是第一轮回应的一部分。
+        
+        丢归丢，正文留几条进 `_orphan_texts`（`/api/sessions` 看得到、日志里也打一行），
+        别学那种"静默吞掉"的写法。
+        """
+        n = 0
+        last_was_result = True
+        while True:
+            try:
+                line = self._out_q.get_nowait()
+            except queue.Empty:
+                break
+            if line is None:
+                self._out_q.put(None)      # EOF 放回去，让 _pump 去报"会话中途退出"
+                break
+            n += 1
+            try:
+                rec = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            kind = rec.get("type")
+            last_was_result = kind == "result"
+            if kind == "result":
+                self.orphan_turns += 1
+            elif kind == "assistant":
+                txt = _assistant_text(rec)
+                if txt:
+                    self._orphan_texts.append(txt)
+                    del self._orphan_texts[:-6]
+        # 排干时正好有一轮吐到一半 → 它剩下的行还会来，下一轮得先把它读完
+        self._orphan_in_flight = n > 0 and not last_was_result
+        if self._orphan_in_flight:
+            self.orphan_split_seen = True
+        self.last_discarded = n
+        if n:
+            print(f"· 丢弃 {n} 行无主输出（孤儿轮次；累计 {self.orphan_turns} 轮）"
+                  + (" · 还有一轮没吐完，下一轮先把它排掉" if self._orphan_in_flight else ""),
+                  flush=True)
+        return n
 
     def _drain_stderr(self):
         for line in self.proc.stderr:
@@ -273,24 +368,35 @@ class Session:
                 self.last_used = time.time()
 
     def _pump(self, prompt: str):
+        self._discard_pending()   # 管子里现存的都是无主的，绝不能算进这一轮
         with self._stdin_lock:
             self.proc.stdin.write(_user_message(prompt) + "\n")
             self.proc.stdin.flush()
 
         while True:
-            line = self.proc.stdout.readline()
-            if not line:
+            line = self._out_q.get()
+            if line is None:
                 raise RuntimeError(f"会话中途退出：{self.stderr_tail()}")
-            line = line.strip()
-            if not line:
+            try:
+                kind = json.loads(line).get("type")
+            except json.JSONDecodeError:
+                kind = None
+            # 还有一轮孤儿吐到一半（CLI 一次只跑一轮，我们这句在它后面排队），
+            # 先把它读完再开始收自己的 —— 否则又是「答案错位一格」。
+            if self._orphan_in_flight:
+                if kind == "assistant":
+                    txt = _assistant_text(json.loads(line))
+                    if txt:
+                        self._orphan_texts.append(txt); del self._orphan_texts[:-6]
+                if kind == "result":
+                    self._orphan_in_flight = False
+                    self.orphan_turns += 1
+                self.last_discarded += 1
                 continue
             yield line
             # `result` 是一轮的收尾。认它，不认别的——认错了下一轮的输出会被算进这一轮。
-            try:
-                if json.loads(line).get("type") == "result":
-                    break
-            except json.JSONDecodeError:
-                continue
+            if kind == "result":
+                break
         self.turns += 1
         self.last_used = time.time()
 
@@ -327,6 +433,9 @@ class Session:
             "permission_mode": self.permission_mode, "effort": self.effort,
             "turns": self.turns, "idle_for": round(self.idle_for, 1),
             "age": round(time.time() - self.started_at, 1),
+            # 后台任务完成时 CLI 自己起的那些轮次：丢了多少、最后几句说了什么
+            "orphan_turns": self.orphan_turns,
+            "orphan_last": self._orphan_texts[-3:],
         }
 
 
@@ -785,7 +894,10 @@ class Handler(BaseHTTPRequestHandler):
             self._bridge_event("error", message=str(exc))
         finally:
             turn.close()
-        self._bridge_event("done", took=round(time.time() - began, 3))
+        # 丢了多少行无主输出也说一声 —— 静默丢弃正是这个 bug 能藏这么久的原因
+        self._bridge_event("done", took=round(time.time() - began, 3),
+                           discarded=session.last_discarded,
+                           orphan_turns=session.orphan_turns)
 
     def _chat_oneshot(self, prompt: str, model: str, resume: str, perm: str,
                       effort: str | None = None):
