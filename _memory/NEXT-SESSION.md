@@ -21,6 +21,31 @@
 | 草稿条 → 右下角卡片 | 原来横在顶部正中，正好盖住 deck 的标题栏 / 页码 /「全屏播放」 |
 | 顶栏分组 + 导出选项收进 `⚙` 浮层 | 三个几乎看不见的灰 checkbox 收进 `#expMenu`，每条配一行说明 |
 
+### ⚠️ 架构问题已定案（2026-08-21，别再重开这个话题）
+
+用户提过「app 版 Studio 只有中间预览来自 HTML，其余全改成原生 Swift + 液态玻璃，以后只开发 app 版」。
+讨论后**决定：不脱耦，app 和网页版保持一体**。查证过的依据：
+
+- **右栏不是装饰，是预览里那个 DOM 的编辑器**：改字体/字号/颜色改的是选中的 HTML 元素，
+  拖拽手柄画在 iframe 上，换皮是往 deck 文档注 `<style>`。`main.ts` 里 75 处直接摸
+  `htmlSelEl`/gizmo/`contentEditable`/`getComputedStyle`。原生化**不会删掉 HTML Studio，
+  只是在它上面再加一层 Swift↔WebView 协议**，3700 行 deck 逻辑一行省不掉。
+- 右栏 74 个控件里 44 个在「格式/设计/动画」三个高耦合 tab。
+- `slidesmith_open` 走 `spawn('open', [url])` **开浏览器**——不是这个 app 的 Claude 会话
+  全靠它驱动 Studio；app-only 会废掉这条路。
+- 网页版还是 app 出问题时的退路（验证新改动一律 `serve -p 8790` 另起，别碰用户的 8765）。
+
+结论：Studio UI 一律改 `packages/studio/src/main.ts`，两边同时生效。只有 AI 面板是原生的。
+
+### AI 面板重做 · 已完成（commit c7ca556 / 1daeb76 / 07e337c 及其后）
+
+四项功能 + 视觉都做完了，细节见那几条 commit message。要点：
+- **中断走 stdin 控制协议，不是信号**——实测 SIGINT 在这套常驻用法下会把进程直接收掉。
+- 中断后**故意不 cancel 本地 SSE**：CLI 会正常收尾吐 result，掐了连接桥会丢进程。
+- 面板配色用 `SMPalette`，和 Studio 的 `--sm-*` 对齐（朱红 / 深色换琥珀）。
+- ⚠️ **合成点击和中文 keystroke 进不了 SwiftUI 控件**（菜单能点，控件不行）。
+  要验面板的对话态，只能请用户手动发一句。
+
 ### 批次二 · 下一步做这个：右栏重构（一～两天）
 
 - 五个 tab 重新归类。**用户自述最常用 = 「AI 修改」+「提词 / 讲稿」**，按这个排优先级，别照搬现在的顺序

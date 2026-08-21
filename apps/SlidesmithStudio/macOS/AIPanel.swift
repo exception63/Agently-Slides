@@ -9,6 +9,32 @@ import SwiftUI
 ///
 /// Enter 发送、Shift+Enter 换行。输入框一获得焦点就 warmup——冷启动那十几秒
 /// 藏在你打字的时间里。
+/// 面板配色。**刻意和 Studio 网页那套 `--sm-*` 令牌对齐**——app 和网页是同一个
+/// 产品的两个壳；强调色不一样的话，同一份 deck 在两边看着像两个软件。
+enum SMPalette {
+    /// 朱红。深色底上朱红发闷，换琥珀——Studio 那边也是这么做的。
+    static func accent(_ s: ColorScheme) -> Color {
+        s == .dark ? Color(red: 0.941, green: 0.702, blue: 0.290)
+                   : Color(red: 0.710, green: 0.251, blue: 0.165)
+    }
+    /// 强调淡底（用户气泡、选中态）
+    static func accentTint(_ s: ColorScheme) -> Color {
+        s == .dark ? Color(red: 0.227, green: 0.141, blue: 0.090)
+                   : Color(red: 0.984, green: 0.918, blue: 0.902)
+    }
+    static func accentLine(_ s: ColorScheme) -> Color {
+        s == .dark ? Color(red: 0.478, green: 0.290, blue: 0.173)
+                   : Color(red: 0.906, green: 0.710, blue: 0.667)
+    }
+    /// 输入区那块底
+    static func field(_ s: ColorScheme) -> Color {
+        s == .dark ? Color(white: 0.14) : Color(white: 0.97)
+    }
+    static func hairline(_ s: ColorScheme) -> Color {
+        s == .dark ? Color(white: 0.28) : Color(white: 0.87)
+    }
+}
+
 struct AIPanel: View {
 
     @Environment(ClaudeBridge.self) private var claude
@@ -17,19 +43,34 @@ struct AIPanel: View {
     @State private var input = ""
     @FocusState private var inputFocused: Bool
     @State private var showHistory = false
+    @Environment(\.colorScheme) private var scheme
     /// 发问时要不要把「你正看着哪一页」一起带上。默认带——不带的话
     /// 用户就得每次自己打「第 12 页」，这正是要解决的事。
     @AppStorage("sm.ai.attachSelection") private var attachSelection = true
 
-    private var quickPrompts: [(String, String)] {
-        [
-            ("讲讲这份 deck", "看一眼我现在 Studio 里开着的这份 deck（用 slidesmith_status 确认是哪份），说说它的结构和你觉得最弱的三页。先别改。"),
-            ("统一视觉", "检查当前 deck 每一页的排版一致性：字号层级、留白、对齐、强调色用法。找出跑偏的页，逐页说清问题，再用 slidesmith_apply_patch 改回来。"),
-            ("压缩文字", "当前 deck 里凡是正文超过三行的页，都改写得更短更有力——留观点去铺垫，别丢信息。改完用 slidesmith_apply_patch 回写。"),
-            ("配张图", "看看当前 deck 哪一页最需要一张图（空得慌或者概念抽象），画一张贴合内容的内联 SVG 放进去。风格跟着这套皮肤的设计令牌走。"),
+    struct QuickPrompt: Identifiable {
+        var id: String { title }
+        var title: String
+        var icon: String
+        /// 一句话说清它会干什么。**光有标题不够**——「统一视觉」到底会动哪些东西，
+        /// 不点一次是不知道的，而这正是让人不敢点的原因。
+        var blurb: String
+        var prompt: String
+    }
+
+    private var quickPrompts: [QuickPrompt] {
+        let raw: [(String, String, String, String)] = [
+            ("讲讲这份 deck", "text.magnifyingglass", "读一遍，说结构和最弱的三页，不动手", "看一眼我现在 Studio 里开着的这份 deck（用 slidesmith_status 确认是哪份），说说它的结构和你觉得最弱的三页。先别改。"),
+            ("统一视觉", "wand.and.rays", "找出排版跑偏的页，逐页说清再改回来",
+             "检查当前 deck 每一页的排版一致性：字号层级、留白、对齐、强调色用法。找出跑偏的页，逐页说清问题，再用 slidesmith_apply_patch 改回来。"),
+            ("压缩文字", "text.append", "正文超过三行的页改写得更短更有力",
+             "当前 deck 里凡是正文超过三行的页，都改写得更短更有力——留观点去铺垫，别丢信息。改完用 slidesmith_apply_patch 回写。"),
+            ("配张图", "photo.on.rectangle.angled", "挑最空的一页，画一张贴合内容的矢量图",
+             "看看当前 deck 哪一页最需要一张图（空得慌或者概念抽象），画一张贴合内容的内联 SVG 放进去。风格跟着这套皮肤的设计令牌走。"),
             // 手表提词。**硬约束写在 slidesmith_cues 工具自己的说明里**，这里只讲流程——
             // 规则同时抄一份在这里的话，两处迟早各改各的。
-            ("一键加提词", """
+            ("一键加提词", "applewatch", "给每一页拟手表上的提词，只填空页",
+             """
                 给当前 deck 生成 Apple Watch 上的每页提词。
 
                 1. 先 slidesmith_cues 读一遍现状，看清哪些页已经有提词——**那些别动**。
@@ -43,6 +84,7 @@ struct AIPanel: View {
                 硬约束在 slidesmith_cues 的工具说明里，一条都不能破。最后告诉我写了多少页、哪几页你拿不准，我在「提词」面板里逐页过。
                 """),
         ]
+        return raw.map { QuickPrompt(title: $0.0, icon: $0.1, blurb: $0.2, prompt: $0.3) }
     }
 
     var body: some View {
@@ -67,7 +109,7 @@ struct AIPanel: View {
                 .fill(claude.connected ? .green : .orange)
                 .frame(width: 7, height: 7)
             Text(claude.connected ? "Claude" : "未连接")
-                .font(.system(size: 12, weight: .medium))
+                .font(.system(size: 12.5, weight: .semibold))
 
             if claude.liveSessions > 0 {
                 // **常驻要看得见。** 桥是 app 悄悄拉起来的，它的 stdout 没人看；
@@ -246,24 +288,49 @@ struct AIPanel: View {
     }
 
     private var empty: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("这就是你终端里的 Claude Code")
-                .font(.system(size: 13, weight: .semibold))
-            Text("工作目录是 presentsystems 仓库，skill、MCP、CLAUDE.md 全都在。\n它改的就是左边这份 deck，改完你立刻看得见。")
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("这就是你终端里的 Claude Code")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("工作目录是 presentsystems 仓库，skill、MCP、CLAUDE.md 全都在。它改的就是左边这份 deck，改完你立刻看得见。")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(2)
+            }
 
-            VStack(alignment: .leading, spacing: 6) {
-                ForEach(quickPrompts, id: \.0) { title, prompt in
-                    Button(title) { claude.send(prompt) }
-                        .buttonStyle(.link)
-                        .font(.system(size: 12))
+            // 预设做成卡片，每条带一句「它会干什么」。
+            // 原来是五条裸蓝链接，看着像调试页，而且不点一次不知道会发生什么。
+            VStack(spacing: 6) {
+                ForEach(quickPrompts) { q in
+                    Button { claude.send(withContext(q.prompt)) } label: {
+                        HStack(alignment: .top, spacing: 9) {
+                            Image(systemName: q.icon)
+                                .font(.system(size: 13))
+                                .foregroundStyle(SMPalette.accent(scheme))
+                                .frame(width: 18, height: 18)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(q.title).font(.system(size: 12.5, weight: .medium))
+                                Text(q.blurb)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 10).padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(SMPalette.field(scheme), in: RoundedRectangle(cornerRadius: 9))
+                        .overlay(RoundedRectangle(cornerRadius: 9)
+                            .strokeBorder(SMPalette.hairline(scheme), lineWidth: 0.5))
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(.top, 4)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
 
     @ViewBuilder
@@ -271,20 +338,35 @@ struct AIPanel: View {
         switch role {
         case .user:
             HStack {
-                Spacer(minLength: 40)
+                Spacer(minLength: 44)
                 Text(text)
                     .font(.system(size: 12.5))
+                    .lineSpacing(2)
                     .textSelection(.enabled)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 8)
+                    .background(SMPalette.accentTint(scheme),
+                                in: RoundedRectangle(cornerRadius: 11))
+                    .overlay(RoundedRectangle(cornerRadius: 11)
+                        .strokeBorder(SMPalette.accentLine(scheme), lineWidth: 0.5))
             }
         case .notice:
-            Text(text)
-                .font(.system(size: 11.5))
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // 面板自己说的话。**要一眼看出「这不是 Claude 说的」**——
+            // 以前和正文一样是左对齐灰字，混在一起分不清谁在说话。
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .padding(.top, 1)
+                Text(text)
+                    .font(.system(size: 11.5))
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 9).padding(.vertical, 6)
+            .background(SMPalette.field(scheme), in: RoundedRectangle(cornerRadius: 7))
         case .assistant:
             VStack(alignment: .leading, spacing: 6) {
                 if !tools.isEmpty {
@@ -296,6 +378,7 @@ struct AIPanel: View {
                 }
                 markdown(text)
                     .font(.system(size: 12.5))
+                    .lineSpacing(2.5)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -377,9 +460,13 @@ struct AIPanel: View {
                             .font(.system(size: 10))
                         Text(sel.label).font(.system(size: 11)).lineLimit(1)
                     }
-                    .foregroundStyle(attachSelection ? Color.accentColor : Color.secondary)
-                    .padding(.horizontal, 8).padding(.vertical, 3)
-                    .background(.quinary, in: Capsule())
+                    .foregroundStyle(attachSelection ? SMPalette.accent(scheme) : Color.secondary)
+                    .padding(.horizontal, 9).padding(.vertical, 3.5)
+                    .background(attachSelection ? SMPalette.accentTint(scheme)
+                                                : SMPalette.field(scheme), in: Capsule())
+                    .overlay(Capsule().strokeBorder(
+                        attachSelection ? SMPalette.accentLine(scheme) : SMPalette.hairline(scheme),
+                        lineWidth: 0.5))
                     .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
@@ -399,8 +486,8 @@ struct AIPanel: View {
                 // 预设也得**聊起来之后还够得着**：那几条链接只长在空状态里，
                 // 发过一句话就再也点不到了，而「一键加提词」恰恰是聊到一半才想起来的活。
                 Menu {
-                    ForEach(quickPrompts, id: \.0) { title, prompt in
-                        Button(title) { claude.send(prompt) }
+                    ForEach(quickPrompts) { q in
+                        Button(q.title) { claude.send(withContext(q.prompt)) }
                     }
                 } label: {
                     Image(systemName: "wand.and.stars").font(.system(size: 14))
@@ -444,7 +531,11 @@ struct AIPanel: View {
                 }
             }
             .padding(8)
-            .background(.quinary, in: RoundedRectangle(cornerRadius: 9))
+            .background(SMPalette.field(scheme), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(
+                inputFocused ? SMPalette.accent(scheme).opacity(0.55) : SMPalette.hairline(scheme),
+                lineWidth: inputFocused ? 1.5 : 0.5))
+            .animation(.easeOut(duration: 0.12), value: inputFocused)
         }
         .padding(10)
     }
