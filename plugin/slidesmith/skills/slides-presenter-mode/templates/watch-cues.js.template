@@ -1,18 +1,29 @@
 /* ============================================================================
- * WATCH-CUES · 手表提词（slides-presenter-mode v0.4 · watch mode 专用）
+ * WATCH-CUES · 手表提词（slides-presenter-mode v0.5 · watch mode 专用）
  * ----------------------------------------------------------------------------
  * 注入到**主屏 slides**。开启 watch mode 时才烘进去，不开就完全不存在。
  *
  * 做三件事：
  *   ① 存一份按锚点索引的提词表 window.__SM_CUES__
- *   ② 加一个 `✦ 提词` 按钮
- *   ③ 点开一个**排版与 Apple Watch 一致**的预览窗，跟着翻页走
+ *   ② 加一个 `✦ 提词` 按钮（外观跟着「演讲者」那颗走，不另起一套）
+ *   ③ 开一个**排版与 Apple Watch 一致**的浮层，跟着翻页走
  *
  * 手表那一端不用这段代码：它通过遥控协议拿 anchor，自己查同一张表。
- * 这个预览窗的意义是——上台前在电脑上确认「待会儿手腕上会看到什么」，
+ * 这个浮层的意义是——上台前在电脑上确认「待会儿手腕上会看到什么」，
  * 而不是真的举着表一页页试。
  *
- * 占位符：{{CHANNEL}} 换成本 deck 专属频道名（**别写死**，两份 deck 同开会串台）
+ * v0.5 改了三件事（都是 2026-08-21 真机用出来的）：
+ *   · **当前页以 DOM 为准，不再靠猜频道名**。v0.4 监听 `{{CHANNEL}}-presenter-sync`，
+ *     可 editorial-slides 出的引擎广播在 `CONFIG.channel`（**没有那个后缀**），于是
+ *     一条消息都收不到 → 每页都渲染成「这一页没有提词」，看着像提词表没写进去，
+ *     其实表是满的。pair-client 早踩过同一个坑，它的结论是「猜中频道名 ≠ 真能收到
+ *     广播」，所以常驻一条 DOM 兜底——这里照办。广播能收到就用（更准），收不到也不瞎。
+ *   · **浮层代替弹窗**。弹窗每翻一页就被主窗口压到下层，等于没有；而且会被拦截。
+ *     浮层在页面里，永远在最上面；进入全屏放映时自动藏起来（别投到大屏上）。
+ *   · **按钮抄「演讲者」那颗的 class**，不再往工具栏里塞一个没样式的裸 button。
+ *
+ * 占位符：{{CHANNEL}} 换成本 deck 专属频道名（**别写死**，两份 deck 同开会串台）。
+ *   —— 现在它只用于「有广播就顺带收一下」这条增强路径；填错了不再导致功能失效。
  * ========================================================================== */
 
 /* ---------------------------------------------------------------------------
@@ -34,10 +45,21 @@ window.__SM_CUES__ = {
 
 (function () {
   'use strict';
-  var CUES = window.__SM_CUES__ || {};
+  // 每次读 window.__SM_CUES__，不在这里 var 一份快照 —— Studio 的提词面板改完是
+  // 直接改这个对象的，快照会让浮层一直显示旧内容。
+  function cues() { return window.__SM_CUES__ || {}; }
+
+  function esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
 
   /* -------------------------------------------------------------------------
-   * ② 按钮 —— 放在演讲者按钮旁边；找不到工具栏就浮在左下角
+   * ② 按钮 —— 放在「演讲者」旁边，**抄它的 class**
+   *
+   * v0.4 往工具栏里 append 一个裸 <button>，在任何有皮肤的 deck 上都显得格格不入。
+   * 皮肤各不相同、也没有稳定的类名可写死，所以最稳的办法是照抄邻居：工具栏里已经
+   * 有一颗长得对的按钮（演讲者），把它的 class 拿过来用。
    * ---------------------------------------------------------------------- */
   var btn = document.createElement('button');
   btn.type = 'button';
@@ -46,7 +68,19 @@ window.__SM_CUES__ = {
   btn.title = '预览手表上会看到的提词';
 
   var bar = document.querySelector('.topbar, .sm-topbar, #topbar');
+  var sibling = null;
   if (bar) {
+    var all = bar.querySelectorAll('button, a[role="button"]');
+    for (var i = all.length - 1; i >= 0; i--) {
+      var t = (all[i].textContent || '');
+      if (/演讲者|presenter/i.test(t)) { sibling = all[i]; break; }
+      if (!sibling) sibling = all[i];      // 找不到「演讲者」就抄最后一颗
+    }
+  }
+  if (bar && sibling && sibling.className) {
+    btn.className = sibling.className;
+    sibling.parentNode.insertBefore(btn, sibling.nextSibling);
+  } else if (bar) {
     bar.appendChild(btn);
   } else {
     btn.style.cssText = 'position:fixed;left:14px;bottom:60px;z-index:2147483646;border:none;' +
@@ -56,95 +90,185 @@ window.__SM_CUES__ = {
   }
 
   /* -------------------------------------------------------------------------
-   * ③ 预览窗 —— 刻意做成表盘比例、同样的字号层级，所见即腕上所见
+   * ③ 浮层 —— 页面内，永远在最上面
+   *
+   * 为什么不是 window.open：弹窗一旦失去焦点就沉到主窗口下面，而讲者每翻一页都在
+   * 主窗口上操作 —— 结果就是「开了等于没开」。浮层在同一个页面里，不存在这个问题，
+   * 顺带也躲开了弹窗拦截。代价是它会出现在投影画面上，所以**进全屏放映自动隐藏**。
    * ---------------------------------------------------------------------- */
-  var win = null;
+  var panel = null, head = null, body = null, foot = null;
 
-  function cueDoc() {
-    return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>提词预览</title><style>' +
-      'html,body{margin:0;height:100%;background:#000;color:#fff;' +
-      'font:400 15px/1.5 -apple-system,system-ui,"PingFang SC",sans-serif}' +
-      // 211×257 点 ≈ Ultra 3。给个同比例的框，别让人在大屏上误判「放得下」
-      '.watch{width:211px;height:257px;margin:18px auto;padding:10px 8px;box-sizing:border-box;' +
-      'border-radius:26px;border:1px solid #2a2a2c;overflow:hidden}' +
-      '.hd{color:#f5b73f;font:700 12px/1.25 system-ui;margin-bottom:8px}' +
-      '.cue{display:flex;gap:6px;align-items:baseline;margin:8px 0}' +
-      '.mk{color:#f5b73f;font-size:12px;flex:none}' +
-      '.tx{font:600 19px/1.25 system-ui,"PingFang SC",sans-serif}' +
-      '.empty{color:#8a8a8e;font-size:13px}' +
-      '.note{max-width:211px;margin:0 auto;color:#8a8a8e;font-size:11px;line-height:1.6;text-align:center}' +
-      '.bad{color:#ff6b6b}' +
-      '</style></head><body><div class="watch" id="w"></div>' +
-      '<div class="note" id="n">这就是手表上会看到的样子</div></body></html>';
+  function build() {
+    panel = document.createElement('div');
+    panel.id = 'smCuePanel';
+    panel.style.cssText = 'position:fixed;left:18px;bottom:74px;z-index:2147483647;width:231px;' +
+      'background:#0d0d0f;border:1px solid #2a2a2c;border-radius:16px;padding:10px;' +
+      'box-shadow:0 12px 40px rgba(0,0,0,.55);' +
+      'font:400 15px/1.5 -apple-system,system-ui,"PingFang SC",sans-serif;color:#fff;' +
+      'user-select:none;cursor:grab';
+
+    var hd = document.createElement('div');
+    hd.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px';
+    head = document.createElement('div');
+    head.style.cssText = 'color:#f5b73f;font:700 12px/1.25 system-ui;flex:1;overflow:hidden;' +
+      'white-space:nowrap;text-overflow:ellipsis';
+    var x = document.createElement('button');
+    x.type = 'button'; x.textContent = '✕';
+    x.style.cssText = 'border:0;background:transparent;color:#8a8a8e;cursor:pointer;font-size:13px;padding:0 2px';
+    x.addEventListener('click', function (e) { e.stopPropagation(); hide(); });
+    hd.appendChild(head); hd.appendChild(x);
+
+    // 211×257 点 ≈ Ultra 3。给个同比例的框，别让人在大屏上误判「放得下」
+    body = document.createElement('div');
+    body.style.cssText = 'width:211px;height:257px;padding:10px 8px;box-sizing:border-box;' +
+      'border-radius:20px;border:1px solid #2a2a2c;background:#000;overflow:hidden';
+
+    foot = document.createElement('div');
+    foot.style.cssText = 'width:211px;margin:8px auto 0;color:#8a8a8e;font-size:11px;line-height:1.6;text-align:center';
+
+    panel.appendChild(hd); panel.appendChild(body); panel.appendChild(foot);
+    document.body.appendChild(panel);
+    makeDraggable(panel);
   }
 
-  function render(state) {
-    if (!win || win.closed) return;
-    var d = win.document, w = d.getElementById('w'), n = d.getElementById('n');
-    if (!w) return;
-    var list = (state && CUES[state.anchor]) || [];
-    var head = state ? ((state.slideIdx + 1) + '/' + state.total +
-      (state.title ? ' · ' + state.title : '')) : '';
-    var html = '<div class="hd">' + esc(head) + '</div>';
+  // 拖得动 —— 浮层挡住内容时，让人挪开比让人关掉好
+  function makeDraggable(el) {
+    var sx = 0, sy = 0, ox = 0, oy = 0, on = false;
+    el.addEventListener('mousedown', function (e) {
+      if (e.target && e.target.tagName === 'BUTTON') return;
+      var r = el.getBoundingClientRect();
+      on = true; sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+      el.style.cursor = 'grabbing'; e.preventDefault();
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!on) return;
+      el.style.left = Math.max(0, ox + e.clientX - sx) + 'px';
+      el.style.top = Math.max(0, oy + e.clientY - sy) + 'px';
+      el.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', function () { on = false; el.style.cursor = 'grab'; });
+  }
+
+  function shown() { return !!panel && panel.style.display !== 'none'; }
+  function hide() { if (panel) panel.style.display = 'none'; }
+  function show() {
+    if (!panel) build();
+    panel.style.display = '';
+    render();
+  }
+
+  function render() {
+    if (!shown()) return;
+    var st = state();
+    var list = (st && cues()[st.anchor]) || [];
+    head.textContent = st ? ((st.idx + 1) + '/' + st.total + (st.title ? ' · ' + st.title : '')) : '—';
+
     if (!list.length) {
-      html += '<div class="empty">这一页没有提词</div>';
+      body.innerHTML = '<div style="color:#8a8a8e;font-size:13px">这一页没有提词</div>';
     } else {
+      var html = '';
       for (var i = 0; i < list.length; i++) {
-        html += '<div class="cue"><span class="mk">✦</span><span class="tx">' + esc(list[i]) + '</span></div>';
+        html += '<div style="display:flex;gap:6px;align-items:baseline;margin:8px 0">' +
+          '<span style="color:#f5b73f;font-size:12px;flex:none">✦</span>' +
+          '<span style="font:600 19px/1.25 system-ui,\'PingFang SC\',sans-serif">' + esc(list[i]) + '</span></div>';
       }
+      body.innerHTML = html;
     }
-    w.innerHTML = html;
 
     // 就地体检：把违规当场说出来，别等上了台才发现
-    if (n) {
-      var bad = [];
-      if (!list.length) bad.push('这一页没有提词');
-      if (list.length > 5) bad.push('条数 ' + list.length + '，超过 5 条手表要翻页');
-      for (var j = 0; j < list.length; j++) {
-        if (list[j].length > 10) bad.push('「' + list[j].slice(0, 8) + '…」' + list[j].length + ' 字，超上限 10');
-      }
-      n.className = bad.length ? 'note bad' : 'note';
-      n.textContent = bad.length ? '⚠ ' + bad.join(' · ') : '这就是手表上会看到的样子';
+    var bad = [];
+    if (!list.length) bad.push('这一页没有提词');
+    if (list.length > 5) bad.push('条数 ' + list.length + '，超过 5 条手表要翻页');
+    for (var j = 0; j < list.length; j++) {
+      if (list[j].length > 10) bad.push('「' + list[j].slice(0, 8) + '…」' + list[j].length + ' 字，超上限 10');
     }
+    foot.style.color = bad.length ? '#ff6b6b' : '#8a8a8e';
+    foot.textContent = bad.length ? '⚠ ' + bad.join(' · ') : '这就是手表上会看到的样子';
   }
 
-  function esc(t) {
-    return String(t == null ? '' : t)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  }
+  btn.addEventListener('click', function () { shown() ? hide() : show(); });
 
-  btn.addEventListener('click', function () {
-    if (win && !win.closed) { win.focus(); render(lastState); return; }
-    win = window.open('', 'sm-cue-preview', 'width=270,height=380,menubar=no,toolbar=no,location=no,status=no');
-    if (!win) { alert('提词预览窗被拦截了 · 请允许弹窗后再试。'); return; }
-    win.document.open(); win.document.write(cueDoc()); win.document.close();
-    setTimeout(function () { render(lastState); }, 60);
-  });
+  // 给 Studio 用：它在面板里改完提词是直接改 window.__SM_CUES__ 这个对象的，
+  // 改完喊一声，浮层当场跟上——否则要等下一次翻页才刷新，人会以为没写进去。
+  window.__SM_CUE_REFRESH__ = function () { render(); };
 
   /* -------------------------------------------------------------------------
-   * 跟随翻页 —— 和副屏走同一条通道，不另起炉灶
+   * 当前页 —— **以 DOM 为准**
+   *
+   * v0.4 只认 `{{CHANNEL}}-presenter-sync` 上的广播，而各家引擎的频道名各写各的
+   * （editorial-slides 用的是不带后缀的 `CONFIG.channel`）→ 一条都收不到 → 全空。
+   * DOM 是所有引擎共同的最小公分母：谁是当前页，看 `.slide.active` 就知道；
+   * 锚点从 deck 自己的 `deckAPI.SLIDE_MAP` 查，和手表链路查的是同一张表。
    * ---------------------------------------------------------------------- */
-  var lastState = null;
+  var pushed = null;   // 广播送来的状态（有就优先，它带作者定义的 anchor）
+
+  function domState() {
+    var api = window.deckAPI || null;
+    // **先信 deckAPI.idx**，它是引擎自己的页码，不会数错。
+    // 退到数 DOM 时必须 scope 到 #deck —— 缩略图导航里的小图也顶着 .slide 类，
+    // 全局 querySelectorAll('.slide') 会把它们一起数进去（实测 16 页数成 19 页）。
+    var scope = document.querySelector('#deck') || document.querySelector('.deck');
+    var slides = scope ? scope.children.length ? scope.querySelectorAll(':scope > .slide, :scope > .slide-wrap > .slide') : [] : [];
+    if (!slides.length && scope) slides = scope.querySelectorAll('.slide');
+    if (!slides.length) slides = document.querySelectorAll('.slide');
+    if (!slides.length) return null;
+    var idx = (api && typeof api.idx === 'number') ? api.idx : -1;
+    if (idx < 0) {
+      for (var i = 0; i < slides.length; i++) {
+        if (slides[i].classList.contains('active')) { idx = i; break; }
+      }
+    }
+    if (idx < 0) idx = 0;
+    var map = (api && api.SLIDE_MAP) || window.SLIDE_MAP || [];
+    var titles = (api && api.SLIDE_TITLES) || window.SLIDE_TITLES || [];
+    return {
+      idx: idx,
+      total: (api && api.total) || slides.length,
+      anchor: map[idx] || ('sm-note-' + idx),
+      title: titles[idx] || ''
+    };
+  }
+
+  function state() {
+    var d = domState();
+    // 广播只在「说的是同一页」时才采信 —— 它的 anchor 是作者定义的，比 DOM 推的准；
+    // 页码对不上说明那条广播来自别的 deck（同源同名频道会串台），忽略它。
+    if (pushed && d && pushed.idx === d.idx) return pushed;
+    return d || pushed;
+  }
 
   function absorb(s) {
     if (!s || typeof s.slideIdx !== 'number') return;
-    lastState = s;
-    render(s);
+    pushed = { idx: s.slideIdx, total: s.total || 0, anchor: s.anchor || '', title: s.title || '' };
+    render();
   }
 
+  // 盯 DOM：翻页就是 .slide 上 class 的变化，一个 observer 就够，不用轮询
+  try {
+    var mo = new MutationObserver(function () { render(); });
+    var deckEl = document.querySelector('#deck') || document.body;
+    mo.observe(deckEl, { attributes: true, subtree: true, attributeFilter: ['class'] });
+  } catch (e) { setInterval(function () { render(); }, 500); }
+
+  // 广播作为增强：收得到更好，收不到也不影响
   try {
     var bc = new BroadcastChannel('{{CHANNEL}}-presenter-sync');
     bc.onmessage = function (e) { absorb(e.data); };
-  } catch (e) { /* 老浏览器没有 BroadcastChannel，靠下面的 localStorage 兜底 */ }
+  } catch (e) { /* 老浏览器没有 BroadcastChannel */ }
+  try {
+    var bc2 = new BroadcastChannel('{{CHANNEL}}');
+    bc2.onmessage = function (e) { absorb(e.data); };
+  } catch (e) { /* noop */ }
 
   window.addEventListener('storage', function (e) {
     if (e.key !== '{{CHANNEL}}-presenter-state' || !e.newValue) return;
     try { absorb(JSON.parse(e.newValue)); } catch (x) { /* noop */ }
   });
 
-  // 开窗时可能已经翻过几页了，先吃一口缓存的状态
-  try {
-    var cached = localStorage.getItem('{{CHANNEL}}-presenter-state');
-    if (cached) lastState = JSON.parse(cached);
-  } catch (e) { /* noop */ }
+  // 全屏放映时藏起来 —— 浮层在页面里，不藏会被投到大屏上
+  document.addEventListener('fullscreenchange', function () {
+    if (!panel) return;
+    if (document.fullscreenElement) { panel.dataset.smWas = shown() ? '1' : ''; hide(); }
+    else if (panel.dataset.smWas === '1') { panel.dataset.smWas = ''; show(); }
+  });
 })();

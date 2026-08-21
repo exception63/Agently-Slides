@@ -44,7 +44,7 @@ export interface BridgeFacade {
   /** 手表提词表的读 / 写。null = Studio 没连上或没回话 */
   cues(): Promise<CueReport | null>;
   setCues(cues: Record<string, string[]>, opts: { replace: boolean }): Promise<CueReport | null>;
-  enableWatch(js: string): Promise<CueReport | null>;
+  enableWatch(js: string, opts: { replace: boolean }): Promise<CueReport | null>;
   /** 内嵌讲稿的读 / 写 */
   notes(anchors: string[]): Promise<NoteReport | null>;
   setNotes(segments: Record<string, string>): Promise<NoteReport | null>;
@@ -66,7 +66,7 @@ export function localFacade(bridge: BridgeHandle): BridgeFacade {
     async outline(withHtml) { await bridge.syncFromStudio(); return bridge.outline(withHtml); },
     cues: () => bridge.cues(),
     setCues: (cues, opts) => bridge.setCues(cues, opts),
-    enableWatch: (js) => bridge.enableWatch(js),
+    enableWatch: (js, opts) => bridge.enableWatch(js, opts),
     notes: (anchors) => bridge.notes(anchors),
     setNotes: (segments) => bridge.setNotes(segments),
     async status() { return bridge.status(); },
@@ -176,11 +176,11 @@ export async function probeRemote(base: string, timeoutMs = 1200): Promise<Bridg
       return (r && r['ok']) ? (r as unknown as CueReport) : null;
     },
 
-    async enableWatch(js) {
+    async enableWatch(js, opts) {
       const r = await jsonFetch(`${root}/api/cues`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ enableWatchMode: js }),
+        body: JSON.stringify({ enableWatchMode: js, replaceExisting: opts.replace }),
         timeoutMs: 30000,
       }).catch(() => null);
       return (r && r['ok']) ? (r as unknown as CueReport) : null;

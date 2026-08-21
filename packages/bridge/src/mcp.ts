@@ -191,10 +191,14 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
           .describe('没开 watch mode 时用它开：把 plugin/slidesmith/skills/slides-presenter-mode/templates/'
             + 'watch-cues.js.template 读出来、把 {{CHANNEL}} 全部换成本工具报回的 channel，整段填在这里。'
             + '模板只有 skill 那一份，别自己另写一份提词表代码。'),
+        replaceExisting: z.boolean().optional()
+          .describe('已经开着 watch mode 时，用它把旧的注入块换成新版（提词表原样保留）。'
+            + '老版 deck 的毛病：提词窗永远显示「这一页没有提词」（它监听 {{CHANNEL}}-presenter-sync，'
+            + '而 editorial-slides 的引擎广播在不带后缀的频道上）、弹窗每翻页就被压到下层、按钮不跟皮肤。'),
       },
     },
-    async ({ set, replace, enableWatchMode }) => {
-      const r = enableWatchMode ? await bridge.enableWatch(enableWatchMode)
+    async ({ set, replace, enableWatchMode, replaceExisting }) => {
+      const r = enableWatchMode ? await bridge.enableWatch(enableWatchMode, { replace: !!replaceExisting })
         : set ? await bridge.setCues(set, { replace: !!replace })
           : await bridge.cues();
       if (!r) {
@@ -213,7 +217,7 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
       const bad = r.pages.filter((p) => p.cues.length && p.issues.length)
         .map((p) => `${p.index} [${p.anchor}] ${p.issues.join(' · ')}`);
       return text({
-        ok: true, watchMode: true, channel: r.channel,
+        ok: true, watchMode: true, channel: r.channel, watchOutdated: r.watchOutdated || undefined,
         enabledWatchMode: enableWatchMode ? !!r.enabled : undefined,
         note: enableWatchMode && !r.enabled ? r.error : undefined,
         wrote: set ? (r.applied || 0) : undefined,
@@ -222,8 +226,13 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
         missing, violations: bad,
         // 读的时候才给整份表（拟提词要看标题和锚点）；写完只报账，不再倒一遍
         pages: set ? undefined : r.pages,
-        hint: enableWatchMode
-          ? (r.enabled ? 'watch mode 已烘进 deck，提词表现在是空的——接着逐页拟提词、用 set 写回。'
+        hint: (r.watchOutdated && !enableWatchMode)
+          ? '⚠ 这份 deck 烘的是**旧版**提词注入代码：它监听 {{CHANNEL}}-presenter-sync，而多数引擎'
+            + '广播在不带后缀的频道上 → deck 里点 ✦提词 永远显示「这一页没有提词」（表其实是满的）；'
+            + '而且是弹窗，一翻页就被压到下层。用 enableWatchMode + replaceExisting=true 换成新版，提词表会原样保留。'
+          : enableWatchMode
+          ? (r.enabled ? (r.upgraded ? '注入代码已换成新版，提词表原样保留。让用户点一下 ✦提词 看看。'
+            : 'watch mode 已烘进 deck，提词表现在是空的——接着逐页拟提词、用 set 写回。')
             : '没有重复烘（见 note）。watch mode 本来就开着，直接拟提词即可。')
           : (missing.length || bad.length)
             ? '还有页没过关（见 missing / violations），补齐再交差。'

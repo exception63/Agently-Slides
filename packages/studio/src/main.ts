@@ -1119,19 +1119,36 @@ function loadCues(): Record<string, string[]> | null {
 function persistCues(): void {
   if (!cueMap) return;
   const json = JSON.stringify(cueMap, null, 2);
-  const re = /(window\.__SM_CUES__\s*=\s*)\{[\s\S]*?\}(\s*;)/;
+  // **全局替换、两处都写**：万一 deck 里混进了两份 __SM_CUES__ 赋值（历史注入 + 新注入），
+  // 只写第一份的话，浏览器用的是最后一份 —— Studio 面板显示得好好的，deck 和手表拿到的
+  // 却是另一份，而且没有任何报错。让每一份都是同一张表，谁赢都对。
+  const re = /(window\.__SM_CUES__\s*=\s*)\{[\s\S]*?\}(\s*;)/g;
   let done = false;
   for (const key of ['trailing', 'prelude'] as const) {
     const src = H[key];
-    if (!done && re.test(src)) {
+    if (re.test(src)) {
+      re.lastIndex = 0;
       // 用函数替换：提词里可能含 $ 之类的字符，字符串替换会被当特殊记号解释
       H[key] = src.replace(re, (_m, a: string, b: string) => a + json + b);
       done = true;
     }
+    re.lastIndex = 0;
   }
   // **只标脏，不重渲染预览**：提词不影响幻灯片外观，为敲一个字就重载整份 deck
-  // 会丢掉滚动位置和选中态。deck 里那个「✦ 提词」窗要等下次自然重渲染才跟上。
-  if (done) markDirty();
+  // 会丢掉滚动位置和选中态。
+  //
+  // 但预览里那个活对象要就地更新——不然 deck 上的「✦ 提词」浮层显示的还是旧表，
+  // 面板里明明写好了、浮层却说「这一页没有提词」，看着就像根本没写进去。
+  if (done) {
+    try {
+      const w = previewWin() as (Window & { __SM_CUES__?: Record<string, string[]>; __SM_CUE_REFRESH__?: () => void }) | null;
+      if (w) {
+        w.__SM_CUES__ = JSON.parse(json) as Record<string, string[]>;
+        if (typeof w.__SM_CUE_REFRESH__ === 'function') w.__SM_CUE_REFRESH__();
+      }
+    } catch { /* 预览没就绪就算了，下次重渲染自然会带上 */ }
+    markDirty();
+  }
 }
 
 function renderCuePane(): void {
@@ -1282,7 +1299,7 @@ function deckChannel(): string {
   return '';
 }
 
-function cueReport(): { watchMode: boolean; deckMode: string; channel: string; pages: CuePageInfo[] } {
+function cueReport(): { watchMode: boolean; watchOutdated: boolean; deckMode: string; channel: string; pages: CuePageInfo[] } {
   const map = mode === 'html' ? loadCues() : null;
   const pages: CuePageInfo[] = mode === 'html'
     ? htmlSlides.map((s, i) => {
@@ -1291,7 +1308,12 @@ function cueReport(): { watchMode: boolean; deckMode: string; channel: string; p
       return { index: i + 1, anchor: a, title: s.title, cues: vals, issues: cueIssues(vals) };
     })
     : [];
-  return { watchMode: !!map, deckMode: mode, channel: mode === 'html' ? deckChannel() : '', pages };
+  const src = H.prelude + '\n' + H.trailing;
+  return {
+    watchMode: !!map,
+    watchOutdated: !!map && src.indexOf('__SM_CUE_REFRESH__') < 0,
+    deckMode: mode, channel: mode === 'html' ? deckChannel() : '', pages,
+  };
 }
 
 function sendCueReport(extra: Record<string, unknown> = {}): void {
@@ -1312,6 +1334,12 @@ function applyCuePatch(incoming: Record<string, string[]>, replace: boolean): vo
   if (!map) {
     sendCueReport({ applied: 0, error: '这份 deck 没开 watch mode（找不到 window.__SM_CUES__）。'
       + '先用 slides-presenter-mode skill 以 watch mode 重新缝一次，deck 里才有提词表可写。' });
+    return;
+  }
+  // 预览没就绪时 slideAnchor() 会退化成 'sm-note-N'，拿它当白名单会把一批**完全正确**的
+  // 锚点判成「不认识」——那个报错指错了方向，人会去改锚点，而锚点根本没错。
+  if (!previewReady()) {
+    sendCueReport({ applied: 0, error: '预览还在重载，锚点表暂时读不到。等一两秒再写一次（别改锚点，它们没错）。' });
     return;
   }
   const valid = new Set(htmlSlides.map((_s, i) => slideAnchor(i)));
@@ -1336,31 +1364,63 @@ function applyCuePatch(incoming: Record<string, string[]>, replace: boolean): vo
   sendCueReport({ applied, keptExisting: kept, unknownAnchors: unknown });
 }
 
+/** 找到并摘掉 deck 里已有的 watch-cues 注入块。返回是否摘到。 */
+function stripWatchBlock(): boolean {
+  // 新版注入带标记，精准；老版（skill 直接烘的 / 早期 Studio 注入的）没有标记，
+  // 只能按「含 __SM_CUES__ 赋值的那个 <script>」找。
+  // **有几块摘几块**，不是摘一块就收工：留一块下来就等于留了第二份提词表，
+  // 而浏览器只认最后那份，Studio 却在改前面那份 —— 两边静默分家。
+  const marked = /<!--sm-watch-cues-start-->[\s\S]*?<!--sm-watch-cues-end-->\s*/;
+  // `=\s*\{` 这个约束是必须的：pair-client 里有 `typeof window.__SM_CUES__ === 'object'`，
+  // 只写 `=` 会把整个手机遥控块一起摘掉。
+  const bare = /<script\b[^>]*>(?:(?!<\/script>)[\s\S])*?window\.__SM_CUES__\s*=\s*\{[\s\S]*?<\/script>\s*/i;
+  let n = 0;
+  for (const key of ['trailing', 'prelude'] as const) {
+    for (const re of [marked, bare]) {
+      while (re.test(H[key])) { H[key] = H[key].replace(re, ''); n++; if (n > 20) break; }
+    }
+  }
+  return n > 0;
+}
+
 /**
  * 把 watch mode 烘进这份 deck —— `js` 是 skill 那份 `watch-cues.js.template`
  * 填好 `{{CHANNEL}}` 之后的成品。
  *
  * **模板不抄一份到 Studio 里**：抄了就是第二个真相源，skill 那边一改，这边就开始漂。
- * Studio 只做它才做得了的两件事：报出频道名、把成品塞进 `#deck` 之外的位置。
+ * Studio 只负责两件它才做得了的事：报出频道名、把成品塞进 `#deck` 之外的位置。
+ *
+ * `replace=true` 用来**升级已经烘过的 deck**：摘掉旧块、换上新的，
+ * **提词表原样保留**（写回由 persistCues 完成，它认的是内存里那份 cueMap）。
  */
-function enableWatchMode(js: string): void {
+function enableWatchMode(js: string, replace = false): void {
   if (mode !== 'html') { sendCueReport({ enabled: false, error: '当前不是 HTML deck' }); return; }
-  if (loadCues()) { sendCueReport({ enabled: false, error: '这份 deck 已经开着 watch mode 了，不用再烘一遍' }); return; }
+  const existing = loadCues();
+  if (existing && !replace) {
+    sendCueReport({ enabled: false, error: '这份 deck 已经开着 watch mode 了。'
+      + '要换成新版注入代码（修了提词窗空白 / 弹窗被压 / 按钮不跟皮肤 三个毛病）就传 replaceExisting=true，提词表会原样保留。' });
+    return;
+  }
   if (!/window\.__SM_CUES__\s*=\s*\{/.test(js)) {
     sendCueReport({ enabled: false, error: '交来的代码里没有 window.__SM_CUES__ = { … }; 那句赋值——'
       + '提词表就是靠它存的，没有它烘进去也写不了' });
     return;
   }
-  H.trailing += '\n<script>\n' + js + '\n</' + 'script>\n';
-  // 提词表现在就是个空对象，直接坐实缓存 —— 不用等预览 iframe 重渲染完再去读，
-  // 那一步是异步的，紧接着的写入会扑空。
-  cueMap = {}; cueLoaded = true;
+  if (existing && !stripWatchBlock()) {
+    sendCueReport({ enabled: false, error: '在 deck 里找不到旧的 watch-cues 注入块，不敢盲目再加一份'
+      + '（会出现两份 __SM_CUES__，后一份覆盖前一份，Studio 改的却是前一份）' });
+    return;
+  }
+  H.trailing += '\n<!--sm-watch-cues-start-->\n<script>\n' + js + '\n</' + 'script>\n<!--sm-watch-cues-end-->\n';
+  // 升级：提词表原样写回新块。全新开启：坐实成空表——不用等预览 iframe 重渲染完
+  // 再去读，那一步是异步的，紧接着的写入会扑空。
+  if (existing) { persistCues(); } else { cueMap = {}; cueLoaded = true; }
   markDirty();
   renderHtmlEdit();          // 让预览把新脚本跑起来（✦提词 按钮也才会出现）
   setTimeout(syncExportToBridge, 500);
   if (!($('[data-hpane="cue"]') as HTMLElement | null)?.hidden) renderCuePane();
-  toast('已开启 watch mode —— 现在可以写提词了');
-  sendCueReport({ enabled: true });
+  toast(existing ? '提词注入代码已升级到新版（提词表保留）' : '已开启 watch mode —— 现在可以写提词了');
+  sendCueReport({ enabled: true, upgraded: !!existing });
 }
 
 function undoCuePatch(): void {
@@ -3234,7 +3294,7 @@ function connectBridge(): void {
   });
   ws.addEventListener('message', (e: MessageEvent) => {
     let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; owner?: { label: string; since: number } | null; port?: number;
-      cues?: Record<string, string[]>; replace?: boolean; watchJs?: string;
+      cues?: Record<string, string[]>; replace?: boolean; watchJs?: string; replaceWatch?: boolean;
       anchors?: string[]; segments?: Record<string, string> };
     try { m = JSON.parse(String(e.data)); } catch { return; }
     // hello carries the handshake: which session owns this bridge + its port. Re-sent
@@ -3251,7 +3311,7 @@ function connectBridge(): void {
     // __SM_CUES__，所以提词必须有自己的一条道。两条都用 {type:'cues'} 回话。
     else if (m.type === 'cues-request') sendCueReport();
     else if (m.type === 'set-cues' && m.cues && typeof m.cues === 'object') applyCuePatch(m.cues, !!m.replace);
-    else if (m.type === 'enable-watch' && typeof m.watchJs === 'string') enableWatchMode(m.watchJs);
+    else if (m.type === 'enable-watch' && typeof m.watchJs === 'string') enableWatchMode(m.watchJs, !!m.replaceWatch);
     // 讲稿。同理：__TXB64__ 也在 #deck 之外，apply_patch 够不着。
     else if (m.type === 'notes-request') sendNotesReport(Array.isArray(m.anchors) ? m.anchors : []);
     else if (m.type === 'set-notes' && m.segments && typeof m.segments === 'object') applyNotesPatch(m.segments);
