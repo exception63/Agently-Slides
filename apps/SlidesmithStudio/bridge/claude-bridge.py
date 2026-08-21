@@ -47,6 +47,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.parse
 import urllib.request
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -193,6 +194,9 @@ class Session:
         # 一个进程同一时刻只能跑一轮：stdin 喂第二句时第一句还没吐完，
         # 两轮的输出会在同一个 stdout 上交织，谁也认不出哪行属于哪轮。
         self.lock = threading.Lock()
+        # stdin 另配一把锁。**不能复用上面那把**——中断的全部意义就是在一轮
+        # 正跑着（self.lock 被占着）的时候还能往 stdin 里塞话。
+        self._stdin_lock = threading.Lock()
         self._stderr_tail: list[str] = []
         # 这一轮还在跑吗 / 从什么时候开始跑的。回收线程靠它分辨"闲着"和"正忙着"。
         self.busy = False
@@ -211,6 +215,27 @@ class Session:
         # stderr 必须有人一直读。管道缓冲区满了写端就会阻塞，
         # 表现出来是"它突然不说话了"，而且看不出任何原因——常驻进程特有的坑。
         threading.Thread(target=self._drain_stderr, daemon=True).start()
+
+    def interrupt(self) -> bool:
+        """结束**当前这一轮**，但让会话活着。
+
+        走 stdin 的控制协议，**不是信号**。实测过：这套常驻用法下 SIGINT 会把
+        进程直接收掉（空闲时和跑一半时都一样），会话就没了；而控制报文是
+        「这一轮到此为止」——进程还在、上下文还在、下一句接着聊。
+        CLI 在 `system/init` 里报 `interrupt_receipt_v1` 就是支持它的意思。
+        """
+        if self.proc.poll() is not None:
+            return False
+        msg = {"type": "control_request",
+               "request_id": "int-" + uuid.uuid4().hex[:8],
+               "request": {"subtype": "interrupt"}}
+        try:
+            with self._stdin_lock:
+                self.proc.stdin.write(json.dumps(msg, ensure_ascii=False) + "\n")
+                self.proc.stdin.flush()
+            return True
+        except Exception:                                          # noqa: BLE001
+            return False
 
     def _drain_stderr(self):
         for line in self.proc.stderr:
@@ -248,8 +273,9 @@ class Session:
                 self.last_used = time.time()
 
     def _pump(self, prompt: str):
-        self.proc.stdin.write(_user_message(prompt) + "\n")
-        self.proc.stdin.flush()
+        with self._stdin_lock:
+            self.proc.stdin.write(_user_message(prompt) + "\n")
+            self.proc.stdin.flush()
 
         while True:
             line = self.proc.stdout.readline()
@@ -302,6 +328,142 @@ class Session:
             "turns": self.turns, "idle_for": round(self.idle_for, 1),
             "age": round(time.time() - self.started_at, 1),
         }
+
+
+def _transcript_dir() -> pathlib.Path:
+    """claude 把每段会话按「工作目录名转义后」分目录存 jsonl。"""
+    munged = re.sub(r"[^A-Za-z0-9]", "-", PROJECT_ROOT)
+    return pathlib.Path.home() / ".claude" / "projects" / munged
+
+
+def _first_user_text(path: pathlib.Path, scan_lines: int = 80) -> str:
+    """拿会话的第一句用户话当标题。只扫开头几十行——整份读完可能是几十 MB。"""
+    try:
+        with path.open(encoding="utf-8", errors="replace") as fh:
+            for n, line in enumerate(fh):
+                if n >= scan_lines:
+                    break
+                try:
+                    rec = json.loads(line)
+                except ValueError:
+                    continue
+                if rec.get("type") != "user":
+                    continue
+                content = (rec.get("message") or {}).get("content")
+                if isinstance(content, str):
+                    text = content
+                elif isinstance(content, list):
+                    # 工具结果也是 user 角色，别拿它当标题
+                    text = "".join(b.get("text", "") for b in content
+                                   if isinstance(b, dict) and b.get("type") == "text")
+                else:
+                    text = ""
+                text = _strip_preamble(text)
+                if text:
+                    return text[:120]
+    except OSError:
+        pass
+    return ""
+
+
+def _live_session_ids() -> set[str]:
+    """此刻还有常驻进程的那些会话。POOL 在下面才建，靠晚绑定拿。"""
+    pool = globals().get("POOL")
+    if pool is None:
+        return set()
+    with pool._lock:                                               # noqa: SLF001
+        return set(pool._sessions.keys())                          # noqa: SLF001
+
+
+def _strip_preamble(text: str) -> str:
+    """把面板每轮贴的那段环境前言剥掉，留用户真正说的第一句。
+
+    不剥的话历史列表里一半的标题都是「〔现在〕2026-08-21 10:00（周五）」，
+    彼此看着一模一样，等于没有标题。
+    """
+    body = text or ""
+    # 前言是 time_anchor() + deck_fact() + 这一行，用户的话全在它后面
+    marker = "以下是用户说的话："
+    if marker in body:
+        body = body.split(marker, 1)[1]
+    lines = []
+    for raw in body.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        # 〔…〕开头的是前言；<…> 开头的是我们自己包的上下文标签
+        if line.startswith("〔") or line.startswith("<"):
+            continue
+        lines.append(line)
+    return " ".join(lines).strip()
+
+
+def list_transcripts(limit: int = 40) -> list[dict]:
+    """这个项目下的历史会话，新的在前。"""
+    d = _transcript_dir()
+    if not d.is_dir():
+        return []
+    out = []
+    for p in sorted(d.glob("*.jsonl"), key=lambda x: x.stat().st_mtime, reverse=True)[:limit]:
+        st = p.stat()
+        out.append({
+            "session_id": p.stem,
+            "updated": st.st_mtime,
+            "bytes": st.st_size,
+            "title": _first_user_text(p) or "（没有开场白）",
+            "live": p.stem in _live_session_ids(),
+        })
+    return out
+
+
+def read_transcript(session_id: str, max_turns: int = 400) -> list[dict]:
+    """把一段会话摊成面板能直接显示的轮次。工具调用只留名字和目标，不带正文。"""
+    p = _transcript_dir() / f"{session_id}.jsonl"
+    if not p.is_file():
+        return []
+    turns: list[dict] = []
+    with p.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+            kind = rec.get("type")
+            if kind not in ("user", "assistant"):
+                continue
+            content = (rec.get("message") or {}).get("content")
+            blocks = content if isinstance(content, list) else (
+                [{"type": "text", "text": content}] if isinstance(content, str) else [])
+            text = "".join(b.get("text", "") for b in blocks
+                           if isinstance(b, dict) and b.get("type") == "text").strip()
+            if kind == "user":
+                # 用户那侧同样要剥前言，否则历史里每句话前面都顶着一坨时间和 deck 状态
+                text = _strip_preamble(text)
+            tools = [{"name": b.get("name", ""), "input": _tool_gist(b.get("input"))}
+                     for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use"]
+            if not text and not tools:
+                continue          # 纯 tool_result 的那些 user 轮，界面上没意义
+            turns.append({"role": kind, "text": text, "tools": tools})
+            if len(turns) >= max_turns:
+                break
+    return turns
+
+
+def _tool_gist(inp) -> str:
+    """工具参数里挑一个「它动的是什么」出来。整包 input 可能是一整页 HTML。"""
+    if not isinstance(inp, dict):
+        return ""
+    for key in ("data_id", "dataId", "anchor", "file_path", "path", "pattern",
+                "command", "deck", "url", "query", "prompt"):
+        v = inp.get(key)
+        if isinstance(v, str) and v.strip():
+            return v.strip()[:120]
+    # apply_patch 那类：数不清就报个规模
+    for key in ("sections", "cues", "notes", "edits"):
+        v = inp.get(key)
+        if isinstance(v, (list, dict)):
+            return f"{len(v)} 项"
+    return ""
 
 
 class SessionPool:
@@ -364,6 +526,11 @@ class SessionPool:
             s.close()
             print(f"· 会话 {s.id[:8]} 被挤出池子（上限 {MAX_SESSIONS}），退了", flush=True)
         return session
+
+    def interrupt(self, session_id: str) -> bool:
+        with self._lock:
+            session = self._sessions.get(session_id)
+        return bool(session and session.interrupt())
 
     def drop(self, session_id: str) -> bool:
         with self._lock:
@@ -479,6 +646,12 @@ class Handler(BaseHTTPRequestHandler):
                 "deck_bridge": DECK_BRIDGE,
                 **POOL.snapshot(),
             })
+        elif self.path == "/sessions":
+            self._json({"sessions": list_transcripts()})
+        elif self.path.startswith("/history"):
+            sid = urllib.parse.parse_qs(
+                urllib.parse.urlparse(self.path).query).get("session", [""])[0]
+            self._json({"session_id": sid, "turns": read_transcript(sid) if sid else []})
         else:
             self._json({"error": "not found"}, 404)
 
@@ -488,6 +661,7 @@ class Handler(BaseHTTPRequestHandler):
             "/chat": self._chat,
             "/warmup": self._warmup,
             "/stop": self._stop,
+            "/interrupt": self._interrupt,
             "/config": self._config,
             "/quit": self._quit,
         }.get(self.path)
@@ -538,6 +712,11 @@ class Handler(BaseHTTPRequestHandler):
     def _stop(self):
         sid = self._read_body().get("session_id", "")
         self._json({"stopped": POOL.drop(sid)})
+
+    def _interrupt(self):
+        """叫停当前这一轮，会话留着。"""
+        sid = self._read_body().get("session_id", "")
+        self._json({"interrupted": POOL.interrupt(sid)})
 
     def _config(self):
         """改档位 / 改空闲超时。改成 off 会顺手把常驻的都关掉。"""
