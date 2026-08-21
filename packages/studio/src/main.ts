@@ -198,6 +198,8 @@ let htmlSelEl: Element | null = null; // currently selected element inside the e
 let htmlGotoAfterRender = -1; // restore this slide after a re-render (e.g. after applying a patch)
 let fxMode: 'auto' | 'manual' = 'auto'; // 动效播放模式：auto=进入页面即播 / manual=点击页面才播（写进导出的 <html data-smfx>）
 let embedPhoneRemote = false; // 勾选「嵌入手机遥控」后，导出的 deck 会烘进「📱 手机遥控」按钮 + 配对客户端（云端/局域网可选）
+let newRoomOnExport = false;  // 勾了才换新房间号；默认沿用 deck 里已有的，免得每导一版就要重扫码
+let lastExportRoom = '';      // 上一次导出实际用的房间号（导出后提示里报出来）
 
 // ---- never-lose-work: a dirty flag + debounced localStorage draft + undo/redo history.
 // All HTML-mode mutations route through markDirty()/pushHistory() so edits survive a
@@ -818,14 +820,24 @@ function assembleDeck(forEdit = false): string {
   // 手机遥控：先剥离任何旧注入（幂等，防 re-import 累积），再按需（仅导出、勾选时）烘进。
   // 注意：注入内容含 `$`（qr 库/客户端里有），必须用「函数替换」——字符串替换会把 $'/$&/$1 当特殊
   // 记号解释，导致注入的 JS 被腐蚀（曾致「二维码生成失败」）。
+  //
+  // **房间号沿用旧的**（除非用户勾了「换新房间号」）。房间号就是配对凭证，烘死在文件里，
+  // 手机扫过一次就记住了。每导出一次就换一个的话，同一份 deck 迭代五版就要重扫五次码——
+  // 而且忘了重扫的表现极其难认：手机连的是旧房间，手表照样有内容（老 deck 的兜底提词），
+  // 只是**和你刚生成的那套对不上**。真要换号勾一下即可。
+  const inheritedRoom = (/window\.__SM_ROOM__\s*=\s*"([^"]+)"/.exec(doc) || [])[1] || '';
+  const inheritedDeckId = (/window\.__SM_DECK_ID__\s*=\s*"([^"]+)"/.exec(doc) || [])[1] || '';
   doc = doc.replace(/<!--sm-phone-remote-start-->[\s\S]*?<!--sm-phone-remote-end-->/g, '');
   if (!forEdit && embedPhoneRemote) {
     // 房间号 = 配对凭证（烘死 → 二维码永久不变）；deck id = 广播频道名，保证同一台
     // 电脑上同时开着的两份 deck 不会串台（BroadcastChannel 按同源+频道名广播）。
+    const room = (!newRoomOnExport && inheritedRoom) ? inheritedRoom : smRoomId();
+    const deckId = (!newRoomOnExport && inheritedDeckId) ? inheritedDeckId : ('sm-' + smRoomId().slice(0, 12));
     const inject = PHONE_REMOTE_JS
-      .replace('__SM_ROOMVAL__', smRoomId())
-      .replace('__SM_DECKIDVAL__', 'sm-' + smRoomId().slice(0, 12));
+      .replace('__SM_ROOMVAL__', room)
+      .replace('__SM_DECKIDVAL__', deckId);
     doc = insertBeforeBodyEnd(doc, inject + '\n');
+    lastExportRoom = room;
   }
   // 编辑预览：把外链 Google Fonts 改成「非阻塞」加载，否则没翻墙时浏览器会卡在 fonts.googleapis.com
   // 等渲染 →「加载特别慢 / 看不到 slides / 换肤黑屏」。文字先用系统字体即时显示，字体到了再升级。
@@ -3661,6 +3673,7 @@ function buildUI(): void {
   <span class="sep"></span>
   <label class="embedck" title="导出 / 保存时将用到的字体子集内嵌进 HTML，离线或更换设备也能正确显示，文件略大"><input id="embedFonts" type="checkbox"> 嵌入字体</label>
   <label class="embedck" title="导出的 HTML 里加一个「📱 手机遥控」按钮：任何电脑打开→点它→手机扫码配对→用手机翻页（云端任意网络 / 局域网离线可选）"><input id="embedRemote" type="checkbox"> 嵌入手机遥控</label>
+  <label class="embedck" id="newRoomWrap" style="display:none" title="房间号就是配对凭证。默认沿用这份 deck 里已有的——同一份稿子改多少版，手机都不用重扫码。勾上才铸一个新号（旧二维码随之作废）"><input id="newRoom" type="checkbox"> 换新房间号</label>
   <button id="expPdf">导出 PDF</button>
   <button id="expHtml" title="另存为：下载一份新的 HTML 副本，不覆盖原文件">另存为</button>
   <button id="saveHtml" class="primary" title="保存：覆盖导入的源 HTML；首次保存会让你选一次文件，之后一键覆盖">保存</button>
@@ -4157,7 +4170,12 @@ function buildUI(): void {
   $('#auditRun').addEventListener('click', () => renderAuditReport(auditImportedDeck()));
   $('#expPdf').addEventListener('click', exportPdf);
   const remoteTog = $('#embedRemote') as HTMLInputElement | null;
-  if (remoteTog) { remoteTog.checked = embedPhoneRemote; remoteTog.addEventListener('change', () => { embedPhoneRemote = remoteTog.checked; if (embedPhoneRemote) toast('导出的 HTML 将带「📱 手机遥控」按钮'); }); }
+  const newRoomTog = $('#newRoom') as HTMLInputElement | null;
+  const newRoomWrap = $('#newRoomWrap') as HTMLElement | null;
+  const syncRoomTog = () => { if (newRoomWrap) newRoomWrap.style.display = embedPhoneRemote ? '' : 'none'; };
+  if (remoteTog) { remoteTog.checked = embedPhoneRemote; remoteTog.addEventListener('change', () => { embedPhoneRemote = remoteTog.checked; syncRoomTog(); if (embedPhoneRemote) toast('导出的 HTML 将带「📱 手机遥控」按钮'); }); }
+  if (newRoomTog) { newRoomTog.checked = newRoomOnExport; newRoomTog.addEventListener('change', () => { newRoomOnExport = newRoomTog.checked; if (newRoomOnExport) toast('导出时会铸新房间号 —— 手机要重扫码'); }); }
+  syncRoomTog();
 
   // --- 文稿: notes + note blocks ---
   ($('#notes') as HTMLTextAreaElement).addEventListener('input', (e) => {
@@ -4225,7 +4243,11 @@ function buildUI(): void {
           method: 'POST', headers: { 'content-type': 'text/html;charset=utf-8' }, body: html,
         });
         const j = await r.json() as { ok: boolean; path?: string; error?: string };
-        if (j.ok && j.path) { toast('✅ 已另存为：' + j.path + '（已在访达高亮）'); return; }
+        if (j.ok && j.path) {
+          toast('✅ 已另存为：' + j.path + '（已在访达高亮）'
+            + (embedPhoneRemote ? (newRoomOnExport ? ' · 已换新房间号，手机需重扫码' : ' · 沿用原房间号，手机不用重扫') : ''));
+          return;
+        }
       } catch { /* bridge 不可用 → 往下走 */ }
     }
     const w = window as unknown as { showSaveFilePicker?: (o?: unknown) => Promise<FsFileHandle> };
