@@ -275,9 +275,11 @@ function renderLeft(): void {
       const row = document.createElement('div');
       row.className = 'srow' + (i === cur ? ' active' : '');
       const seg = s.seg && s.seg !== '0' ? `<span class="sseg">${esc(s.seg)}</span>` : '';
+      // 元素批注也是「这一页有活挂着」，和改字同一个 ● —— 否则批注完往回翻，左栏看不出哪几页动过
+      const nAnn = slideAnnsOf(s.id).length;
       const badge = aiApplied.has(s.id) ? '<span class="sbadge done" title="AI 已修改本页">✓</span>'
         : aiSent.has(s.id) ? '<span class="sbadge sent" title="已发送，等待 Claude 修改">●</span>'
-        : aiInstructions[s.id] ? '<span class="sbadge todo" title="有待发送给 AI 的修改说明">●</span>' : '';
+        : (aiInstructions[s.id] || nAnn) ? `<span class="sbadge todo" title="${aiInstructions[s.id] ? '有待发送给 AI 的修改说明' : ''}${aiInstructions[s.id] && nAnn ? ' · ' : ''}${nAnn ? nAnn + ' 条元素批注待发送' : ''}">●</span>` : '';
       row.innerHTML = `<span class="snum">${i + 1}</span>${seg}<span class="stt">${esc(s.title)}</span>${badge}`;
       row.addEventListener('click', () => selectHtmlSlide(i));
       box.appendChild(row);
@@ -601,6 +603,7 @@ let importedFromBridge = false;
 function importFile(name: string, text: string): void {
   cueMap = null; cueLoaded = false;   // 换了 deck，提词缓存作废
   notesDoc = null; notesLoaded = false; notesUndo = null; noteAnns = []; notePick = null;  // 讲稿同理
+  slideAnns = []; annPick = null;   // 元素批注挂在具体某页的某个元素上，换 deck 就作废
   fileHandle = null; // a new deck arrived → drop any stale writable handle; open-picker/drop re-set it after
   if (/\.html?$/i.test(name) || /^\s*<(!doctype|html|section|div|body)/i.test(text)) loadHtmlDeck(name, text);
   else loadDeck(name, text);
@@ -1645,11 +1648,12 @@ function openNotes(): void {
   if (!doc) {
     if (frame) (frame as HTMLElement).style.display = 'none';
     if (empty) { (empty as HTMLElement).style.display = ''; }
-    renderNoteAnns();
+    renderNoteAnns(); refreshNotesFoot();
     return;
   }
   if (empty) (empty as HTMLElement).style.display = 'none';
   const ub = $('#notesUndoBtn'); if (ub) (ub as HTMLElement).style.display = notesUndo ? '' : 'none';
+  refreshNotesFoot();
   if (frame) {
     (frame as HTMLElement).style.display = '';
     frame.onload = () => {
@@ -1818,6 +1822,185 @@ const NOTES_FRAME_JS = `(function(){
   });
 })();`;
 
+// ================= slides 上的元素批注 =================
+//
+// **和讲稿批注同一个形状**：给 AI 一段原文当锚点，而不是坐标或选择器。
+// 理由很实在——每一页都可能被 AI 整页重写，坐标当场失效、选择器会被改没；
+// 而「原文开头那几个字」是最经得起重写的东西。tag + 本页第几个 只作兜底。
+//
+// 这些批注**只活在编辑态**：既不写进 htmlSlides（所以导出/保存天然干净），
+// 角标也是画在预览 iframe 里一层独立的浮层上，放映时用 CSS 整层藏掉。
+interface SlideAnnSel { tag: string; nth: number; cls: string; snippet: string }
+interface SlideAnn { id: string; slideId: string; page: number; sel: SlideAnnSel; note: string }
+let slideAnns: SlideAnn[] = [];
+let slideAnnSeq = 0;
+/** 批注小窗当前对着的那个元素（窗口一开，预览里的选中随时可能被点掉，所以要记下来） */
+let annPick: { slideId: string; page: number; sel: SlideAnnSel } | null = null;
+let annBadgeRaf = 0;
+
+function slideAnnsOf(slideId: string): SlideAnn[] { return slideAnns.filter((a) => a.slideId === slideId); }
+function previewDoc(): Document | null { return ($('#preview') as HTMLIFrameElement | null)?.contentDocument || null; }
+function annSlideEl(d: Document, slideId: string): HTMLElement | null {
+  const idx = htmlSlides.findIndex((s) => s.id === slideId); if (idx < 0) return null;
+  return (Array.prototype.slice.call(d.querySelectorAll('#deck .slide'))[idx] as HTMLElement) || null;
+}
+/** 元素 → 锚点。snippet＝点中那一刻抄下的前 40 字，是给 AI 认位置的主锚点。 */
+function annSelOf(el: Element): { slideId: string; page: number; sel: SlideAnnSel } | null {
+  const slide = el.closest('#deck .slide'); if (!slide) return null;
+  const d = slide.ownerDocument; if (!d) return null;
+  const page = Array.prototype.slice.call(d.querySelectorAll('#deck .slide')).indexOf(slide) + 1;
+  const slideId = htmlSlides[page - 1]?.id || slide.getAttribute('data-id') || '';
+  if (!slideId) return null;
+  const tag = el.tagName.toLowerCase();
+  const same = Array.prototype.slice.call(slide.querySelectorAll(tag)) as Element[];
+  let snippet = (el.textContent || '').replace(/\s+/g, ' ').trim();
+  // 图片 / 纯图形没有文字 —— 退而用 alt / aria-label，再没有就只剩 tag+序号
+  if (!snippet) snippet = (el.getAttribute('alt') || el.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+  const cls = String(el.getAttribute('class') || '').split(/\s+/).filter((c) => c && c.indexOf('sm-') !== 0).join(' ');
+  return { slideId, page, sel: { tag, nth: same.indexOf(el) + 1, cls, snippet: snippet.length > 40 ? snippet.slice(0, 40) : snippet } };
+}
+/** 反过来：按批注在预览里找回那个元素。**原文优先** —— 批注之后用户又手动挪过 DOM 的话，nth 会漂。 */
+function annElement(d: Document, a: SlideAnn): HTMLElement | null {
+  const slide = annSlideEl(d, a.slideId); if (!slide) return null;
+  const same = Array.prototype.slice.call(slide.querySelectorAll(a.sel.tag)) as HTMLElement[];
+  if (a.sel.snippet) {
+    const hit = same.filter((e) => (e.textContent || '').replace(/\s+/g, ' ').trim().indexOf(a.sel.snippet) === 0)[0];
+    if (hit) return hit;
+  }
+  return same[a.sel.nth - 1] || null;
+}
+
+// ---- 预览里的角标层 ----
+function ensureAnnStyle(d: Document): void {
+  if (d.getElementById('sm-ann-css')) return;
+  const st = d.createElement('style'); st.id = 'sm-ann-css';
+  st.textContent = '.sm-annlayer{position:fixed;inset:0;z-index:2147482000;pointer-events:none}'
+    + '.sm-annring{position:fixed;border:1.5px dashed rgba(224,144,42,.95);border-radius:4px;box-sizing:border-box;pointer-events:none}'
+    + '.sm-annbadge{position:fixed;min-width:19px;height:19px;padding:0 5px;box-sizing:border-box;border:0;border-radius:10px;'
+    + 'background:#e0902a;color:#fff;font:700 11px/19px system-ui,-apple-system,"PingFang SC",sans-serif;text-align:center;'
+    + 'pointer-events:auto;cursor:pointer;box-shadow:0 1px 5px rgba(0,0,0,.35);font-family:inherit}';
+  d.head.appendChild(st);
+  // 角标只属于编辑态。导出天然干净（这一层不在 htmlSlides 里），**放映也不能出现** ——
+  // 投给全场看的画面上不该挂着橙色小圆点。用 CSS 不用 JS 监听：进放映的路子有好几条
+  // （deck 的播放按钮、快捷键、系统全屏、演讲者视图），挨个监听迟早漏一条。
+  // `:fullscreen` 必须**单独成条** —— 浏览器不认这个伪类会把整条规则丢掉，
+  // 和 body.present 那几个写在一起就会被一起带走。
+  const hide = d.createElement('style'); hide.id = 'sm-ann-hide-css';
+  hide.textContent = 'body.present .sm-annlayer,body.fullscreen .sm-annlayer,body.presenter-mode .sm-annlayer{display:none!important}'
+    + ':fullscreen .sm-annlayer{display:none!important}'
+    + ':-webkit-full-screen .sm-annlayer{display:none!important}';
+  d.head.appendChild(hide);
+}
+/** 滚动一次会连发几十个事件 —— 合并到下一帧再画 */
+function scheduleAnnBadges(): void {
+  if (annBadgeRaf) return;
+  annBadgeRaf = requestAnimationFrame(() => { annBadgeRaf = 0; renderAnnBadges(); });
+}
+function renderAnnBadges(): void {
+  const d = previewDoc(); if (!d || !d.body) return;
+  let layer = d.getElementById('sm-annlayer') as HTMLElement | null;
+  if (!slideAnns.length) { if (layer) layer.remove(); return; }
+  ensureAnnStyle(d);
+  if (!layer) { layer = d.createElement('div'); layer.id = 'sm-annlayer'; layer.className = 'sm-annlayer'; d.body.appendChild(layer); }
+  layer.innerHTML = '';
+  const vh = d.defaultView?.innerHeight || 0;
+  // 同一个元素上可以挂好几条批注 —— 共用一个角标，点开看全部
+  const groups: { el: HTMLElement; idx: number; anns: SlideAnn[] }[] = [];
+  slideAnns.forEach((a, i) => {
+    const el = annElement(d, a); if (!el) return;
+    const g = groups.filter((x) => x.el === el)[0];
+    if (g) g.anns.push(a); else groups.push({ el, idx: i + 1, anns: [a] });
+  });
+  groups.forEach((g) => {
+    const r = g.el.getBoundingClientRect();
+    if (!r.width && !r.height) return;
+    if (r.bottom < -160 || r.top > vh + 160) return;   // 视口外的不画（44 页的 deck 里绝大多数都在外面）
+    const ring = d.createElement('div'); ring.className = 'sm-annring';
+    ring.style.left = (r.left - 3) + 'px'; ring.style.top = (r.top - 3) + 'px';
+    ring.style.width = (r.width + 6) + 'px'; ring.style.height = (r.height + 6) + 'px';
+    layer!.appendChild(ring);
+    const b = d.createElement('button'); b.type = 'button'; b.className = 'sm-annbadge';
+    b.textContent = g.anns.length > 1 ? `${g.idx}+` : String(g.idx);
+    b.title = g.anns.map((a) => a.note).join('\n');
+    b.style.left = (r.right - 10) + 'px'; b.style.top = (r.top - 9) + 'px';
+    b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openAnnFor(g.el); });
+    layer!.appendChild(b);
+  });
+}
+
+// ---- 批注小窗 ----
+function openAnnFor(el: Element): void {
+  const info = annSelOf(el);
+  if (!info) { toast('请先在预览里点中幻灯片上的一个元素', true); return; }
+  annPick = info;
+  const m = $('#annModal'); if (m) (m as HTMLElement).style.display = 'flex';
+  const w = $('#annWhere');
+  if (w) w.textContent = `第 ${info.page} 页 · <${info.sel.tag}>（本页第 ${info.sel.nth} 个）` + (info.sel.cls ? ` · class="${info.sel.cls}"` : '');
+  const s = $('#annSnip');
+  if (s) s.textContent = info.sel.snippet ? `「${info.sel.snippet}」` : '（这个元素没有文字，AI 按 标签 + 本页第几个 + 批注内容 找它）';
+  const t = $('#annText') as HTMLTextAreaElement | null; if (t) { t.value = ''; setTimeout(() => t.focus(), 30); }
+  renderAnnList();
+}
+function closeAnnModal(): void { const m = $('#annModal'); if (m) (m as HTMLElement).style.display = 'none'; annPick = null; }
+function addSlideAnn(): void {
+  const t = $('#annText') as HTMLTextAreaElement | null;
+  const txt = (t?.value || '').trim();
+  if (!annPick) { toast('先在预览里点中一个元素', true); return; }
+  if (!txt) { toast('写一句这个元素要怎么改', true); return; }
+  slideAnns.push({ id: 'sann-' + (++slideAnnSeq), slideId: annPick.slideId, page: annPick.page, sel: annPick.sel, note: txt });
+  if (t) t.value = '';
+  refreshTasks(); renderAnnBadges(); renderAnnList();
+  toast(`已加批注：第 ${annPick.page} 页 · 元素 —— 和其余待办一起，在「AI」tab 一次发送`);
+}
+function removeSlideAnn(id: string): void {
+  slideAnns = slideAnns.filter((a) => a.id !== id);
+  refreshTasks(); renderAnnBadges(); renderAnnList();
+}
+function renderAnnList(): void {
+  const box = $('#annList'); if (!box) return;
+  const mine = annPick ? slideAnnsOf(annPick.slideId) : [];
+  const cnt = $('#annCount'); if (cnt) cnt.textContent = mine.length ? `本页 ${mine.length} 条` : '';
+  const foot = $('#annFoot');
+  if (foot) {
+    const instr = annPick && aiInstructions[annPick.slideId] && !aiApplied.has(annPick.slideId);
+    foot.innerHTML = slideAnns.length
+      ? `全 deck 共 <b>${slideAnns.length}</b> 条元素批注，都在「AI」tab 的待办里，和改字 / 配图 / 导入图<b>一次发送</b>。`
+        + (instr ? '　本页另有一条「整页修改意见」，两者会一起交给 AI。' : '')
+      : '';
+  }
+  if (!mine.length) {
+    box.innerHTML = '<div class="qempty">这一页还没有元素批注。写一句上面的话再点「加批注」即可。<br><br>'
+      + '批注挂在<b>元素的原文</b>上（不是坐标），跟着那句话走；汇总进「AI」tab 的待办，和其余待办一次发给 Claude。</div>';
+    return;
+  }
+  box.innerHTML = '';
+  mine.forEach((a) => {
+    const same = !!annPick && a.sel.tag === annPick.sel.tag && a.sel.nth === annPick.sel.nth;
+    const row = document.createElement('div'); row.className = 'annrow' + (same ? ' cur' : '');
+    row.innerHTML = `<div class="annhead"><span class="todochip ann">${same ? '本元素' : '本页'}</span>`
+      + `<code>&lt;${esc(a.sel.tag)}&gt; 第 ${a.sel.nth} 个</code><button class="todo-del" title="删掉这条批注" aria-label="移除">✕</button></div>`
+      + `<div class="annquote">${esc(a.sel.snippet ? '「' + a.sel.snippet + '」' : '（无文字元素）')}</div>`
+      + `<div class="annnote">${esc(a.note)}</div>`;
+    row.querySelector('.todo-del')!.addEventListener('click', () => removeSlideAnn(a.id));
+    row.querySelector('.annquote')!.addEventListener('click', () => {
+      const d = previewDoc(); const el = d ? annElement(d, a) : null;
+      if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(() => renderAnnBadges(), 400); }
+    });
+    box.appendChild(row);
+  });
+}
+/** 给 Claude 的那一段：认位置的规矩（只在有元素批注时随请求发一次） */
+function aiSlideAnnSpec(): string {
+  return `## 元素批注规则（凡带「元素批注」小节的页：认准是哪个元素，只改它）
+用户在预览里点中了页面上的**某一个元素**，写下一条批注。定位那个元素时：
+1. **以「原文开头」为主锚点** —— 那是点中那一刻抄下来的前 40 字，最经得起改写。
+2. \`<tag> 本页第 N 个\` 和 \`class\` 是**兜底**：用户加完批注又手改过那句话时才靠它们。
+3. 两者对不上，以**原文**为准；实在都对不上，按批注的意思在该页挑语义上最贴近的那个元素。
+4. **只动被点名的元素**，别顺手重写整页；同一页若另有「修改要求」，那条才是整页级的。
+改完照常返回该页整个 \`<section data-id>\`（元素批注和改字 / 配图共用同一次输出）。
+`;
+}
+
 // ---------- 讲稿的对外接口：Claude ↔ 桥 ↔ 这里 ----------
 interface NotePageInfo { index: number; anchor: string; title: string; chars: number; annotations: { quote: string; note: string }[]; html?: string }
 /** Claude 上一次改写之前的整份讲稿 —— 撤销用 */
@@ -1945,15 +2128,15 @@ function wireFullDeckEditing(d: Document): void {
   // a click anywhere outside the deck (iframe margins / gaps between slides) also clears it — but never on the gizmo handles
   d.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement | null;
-    if (!tg || tg.closest('#deck') || tg.closest('.sm-gizmo')) return;
+    if (!tg || tg.closest('#deck') || tg.closest('.sm-gizmo') || tg.closest('.sm-annlayer')) return;
     deselectHtml();
   }, true);
   // keep the move/resize gizmo glued to the element while the deck scrolls or rescales
   // (the gizmo is position:fixed, so without this it detaches and floats on screen)
   try {
     const win = d.defaultView as Window;
-    win.addEventListener('scroll', () => positionGizmo(), true); // capture: also catch scroll on inner scrollers
-    win.addEventListener('resize', () => positionGizmo());
+    win.addEventListener('scroll', () => { positionGizmo(); scheduleAnnBadges(); }, true); // capture: also catch scroll on inner scrollers
+    win.addEventListener('resize', () => { positionGizmo(); scheduleAnnBadges(); });
   } catch { /* noop */ }
 }
 function renderHtmlEdit(): void {
@@ -1981,7 +2164,7 @@ function renderHtmlEdit(): void {
     // 那段引擎脚本还没执行；它一执行就按自己的公式（减掉段导航的 300px）写一遍
     // --fit-scale，把我们刚算好的覆盖掉——表现就是"首屏没铺满，⌘R 之后才对"。
     // 隔几拍各补一次，再加一次 load 兜底，谁最后跑都不影响结果。
-    [60, 250, 700, 1500].forEach((ms) => setTimeout(() => { refitPreview(); refreshDeckTokenInputs(); }, ms));
+    [60, 250, 700, 1500].forEach((ms) => setTimeout(() => { refitPreview(); refreshDeckTokenInputs(); renderAnnBadges(); }, ms));
     ifr.addEventListener('load', () => setTimeout(() => refitPreview(), 60), { once: true });
     // never-lose-work + history for text edits done straight in the deck DOM
     d.addEventListener('input', (e) => { followSlideFromDeck(e.target); markDirty(); }, true);
@@ -2559,10 +2742,15 @@ function aiImageGenSpec(): string {
 `;
 }
 // a per-page block: optional 修改要求 + optional 配图(矢量/照片) + optional 待插入图片 + current HTML
-function aiTaskBlock(s: HtmlSlide, i: number, o: { instr?: string; gen?: { type: 'vector' | 'chart' | 'photo'; hint: string }; trayImgs?: TrayImage[] }): string {
+function aiTaskBlock(s: HtmlSlide, i: number, o: { instr?: string; gen?: { type: 'vector' | 'chart' | 'photo'; hint: string }; trayImgs?: TrayImage[]; anns?: SlideAnn[] }): string {
   const trayImgs = o.trayImgs || [];
+  const anns = o.anns || [];
   let b = `### 第 ${i + 1} 页 · ${s.title}  (data-id: \`${s.id}\`)\n`;
   if (o.instr) b += `**修改要求：** ${o.instr}\n`;
+  if (anns.length) b += `**元素批注（针对本页里的具体元素，逐条照办）：**\n`
+    + anns.map((a) => `- 元素：\`<${a.sel.tag}>\`（本页第 ${a.sel.nth} 个${a.sel.cls ? ` · class="${a.sel.cls}"` : ''}）`
+      + (a.sel.snippet ? ` · 原文开头「${a.sel.snippet}」` : ' · 无文字')
+      + `\n  批注：${a.note}`).join('\n') + '\n';
   if (o.gen?.type === 'vector') b += `**配图（矢量 SVG · 你直接画内联 <svg>）：** ${o.gen.hint || '按本页内容画一张贴合的示意图'}\n`;
   if (o.gen?.type === 'chart') { const h = o.gen.hint || '按本页内容选图型并作图'; b += h.includes('\n') ? `**图表（按以下数据/描述画内联 <svg> 图表）：**\n${FENCE}\n${h}\n${FENCE}\n` : `**图表（按数据/描述画内联 <svg> 图表）：** ${h}\n`; }
   if (o.gen?.type === 'photo') b += `**配图（照片级 · 用 codex 生成→存图片库→内联）：** ${o.gen.hint || '按本页内容生成一张合适的照片'}\n`;
@@ -2577,8 +2765,9 @@ function buildAllRequest(): { name: string; count: number; content: string; imag
   harvestAll(); saveAiInstruction();
   const hasDeck = !!aiDeckInstruction.trim();
   const pages = htmlSlides.map((s, i) => ({ s, i })).filter(({ s }) =>
-    (aiInstructions[s.id] && !aiApplied.has(s.id)) || genQueue[s.id] || trayImagesForSlide(s.id).length);
+    (aiInstructions[s.id] && !aiApplied.has(s.id)) || genQueue[s.id] || trayImagesForSlide(s.id).length || slideAnnsOf(s.id).length);
   const hasNoteAnns = noteAnns.length > 0;
+  const hasSlideAnns = slideAnns.length > 0;
   if (!pages.length && !hasDeck && !hasNoteAnns) return null;
   const anyVec = Object.values(genQueue).some((g) => g.type === 'vector');
   const anyChart = Object.values(genQueue).some((g) => g.type === 'chart');
@@ -2589,24 +2778,27 @@ function buildAllRequest(): { name: string; count: number; content: string; imag
   if (anyChart) body += aiChartSpec();
   if (anyPhoto) body += aiImageGenSpec();
   if (trayImages.length) body += aiImagePreamble();
+  if (hasSlideAnns) body += aiSlideAnnSpec();
   if (hasNoteAnns) body += aiNotesBlock();
   body += (pages.length ? '\n## 需要处理的页\n' : '') + pages.map(({ s, i }) => aiTaskBlock(s, i, {
     instr: (aiInstructions[s.id] && !aiApplied.has(s.id)) ? aiInstructions[s.id] : '',
     gen: genQueue[s.id],
     trayImgs: trayImagesForSlide(s.id),
+    anns: slideAnnsOf(s.id),
   })).join('\n') + (pages.length ? aiOutputSpec() : '');
-  return { name: `${fileBase}.ai-tasks.md`, count: pages.length + (hasDeck ? 1 : 0) + noteAnns.length, content: body, images: trayPayload() };
+  // count 要和待办条目数对得上（用户在按钮上看到几项，桥那边就该收到几项）
+  return { name: `${fileBase}.ai-tasks.md`, count: todoItems().length, content: body, images: trayPayload() };
 }
-function submitAll(): void {
+function submitAll(): boolean {
   const r = buildAllRequest();
-  if (!r) { toast('待办清单是空的：写修改意见、加配图、或导入图片', true); return; }
+  if (!r) { toast('待办清单是空的：写修改意见、加配图、或导入图片', true); return false; }
   const sentNow = htmlSlides.filter((s) => aiInstructions[s.id] && !aiApplied.has(s.id)).map((s) => s.id);
-  if (sendOverBridge(r, `已一键发送 ${r.count} 项给 Claude`)) {
-    sentNow.forEach((id) => aiSent.add(id)); // 改字 → 已发送（结果回灌后变 已改）
-    Object.keys(genQueue).forEach((k) => delete genQueue[k]); // 配图请求一次性，发出后清空（成品出现在页面 + 图片库）
-    if (aiDeckInstruction.trim()) { aiDeckInstruction = ''; const box = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (box) box.value = ''; }
-    refreshTasks();
-  }
+  if (!sendOverBridge(r, `已一键发送 ${r.count} 项给 Claude`)) return false;
+  sentNow.forEach((id) => aiSent.add(id)); // 改字 → 已发送（结果回灌后变 已改）
+  Object.keys(genQueue).forEach((k) => delete genQueue[k]); // 配图请求一次性，发出后清空（成品出现在页面 + 图片库）
+  if (aiDeckInstruction.trim()) { aiDeckInstruction = ''; const box = $('#aiDeckInstruction') as HTMLTextAreaElement | null; if (box) box.value = ''; }
+  refreshTasks();
+  return true;
 }
 // 本页「配图」：把当前页按所选类型 + 提示加入配图清单
 function addIllustToQueue(): void {
@@ -2642,6 +2834,11 @@ function todoItems(): { label: string; desc: string; page: number; cls: string; 
     const g = genQueue[s.id];
     if (g) { const lab = g.type === 'vector' ? '配图 · 矢量' : g.type === 'chart' ? '配图 · 图表' : '配图 · 照片'; const cls = g.type === 'vector' ? 'vec' : g.type === 'chart' ? 'chart' : 'photo'; items.push({ label: lab, desc: g.hint || '（按内容自动）', page: i + 1, cls, remove: () => genUnmark(s.id) }); }
     trayImagesForSlide(s.id).forEach((t) => items.push({ label: t.placed ? '导入图 · 已放置' : '导入图', desc: t.name, page: i + 1, cls: 'tray', remove: () => removeTrayImage(t.id) }));
+    // 元素批注和「整页修改意见」并列（一页可以两者同时有），走同一次发送
+    slideAnnsOf(s.id).forEach((a) => items.push({
+      label: '批注 · 元素', desc: (a.sel.snippet ? `「${a.sel.snippet}」→ ` : `<${a.sel.tag}> → `) + a.note,
+      page: i + 1, cls: 'ann', remove: () => removeSlideAnn(a.id),
+    }));
   });
   // 讲稿批注也是待办的一种——同一个「一键发送」把它们一起交出去，
   // 用户不该为了改讲稿再学一套流程。
@@ -2662,7 +2859,7 @@ function refreshNotesStatus(): void {
 function renderTodo(): void {
   const box = $('#aiTodo'); if (!box) return; box.innerHTML = '';
   const items = todoItems();
-  if (!items.length) box.innerHTML = '<div class="qempty">待办清单为空。写「本页修改意见」、在「本页 · 配图」加配图、导入图片、或在讲稿里加批注，都会出现在这里。</div>';
+  if (!items.length) box.innerHTML = '<div class="qempty">待办清单为空。写「本页修改意见」、在「本页 · 配图」加配图、导入图片、在预览里点中元素按 💬 加批注、或在讲稿里加批注，都会出现在这里。</div>';
   items.forEach((it) => {
     const row = document.createElement('div'); row.className = 'todorow';
     row.innerHTML = `<span class="todochip ${it.cls}">${it.label}</span>` + (it.page ? `<span class="todopg">第 ${it.page} 页</span>` : '')
@@ -2674,6 +2871,36 @@ function renderTodo(): void {
   const btn = $('#aiSendAll') as HTMLButtonElement | null;
   if (btn) { btn.disabled = items.length === 0; btn.textContent = items.length ? `一键发送给 AI · ${items.length} 项` : '一键发送给 AI'; }
   const note = $('#aiSendNote'); if (note) (note as HTMLElement).style.display = photo ? '' : 'none';
+  refreshTodoBadge(items);
+  refreshNotesFoot(items);
+}
+/** 待办按类别数一遍，给「一次发的到底是什么」一个说得清的句子 */
+function todoSummary(items = todoItems()): string {
+  const order: [string, string][] = [['deck', '整份要求'], ['edit', '改字'], ['vec', '配图·矢量'], ['chart', '配图·图表'], ['photo', '配图·照片'], ['tray', '导入图'], ['ann', '元素批注'], ['note', '讲稿批注']];
+  const c: Record<string, number> = {};
+  items.forEach((it) => { c[it.cls] = (c[it.cls] || 0) + 1; });
+  return order.filter(([k]) => c[k]).map(([k, name]) => `${name} ${c[k]}`).join(' · ');
+}
+/** AI tab 上的数字角标 —— 待办数原先只在 AI tab 里面看得到，人在别的 tab 就完全不知道有东西挂着 */
+function refreshTodoBadge(items = todoItems()): void {
+  const el = $('#aiTabNum') as HTMLElement | null; if (!el) return;
+  // 数字为 0 时连字都不留：角标就在 tab 文本里，留个 "0" 会让 tab 的 textContent 变成「AI0」
+  el.textContent = items.length ? String(items.length) : '';
+  el.hidden = items.length === 0;
+  el.title = items.length ? `待办 ${items.length} 项：${todoSummary(items)}` : '';
+  if (document.body.classList.contains('panelcollapsed')) renderRailStrip();
+}
+/** 讲稿弹窗底栏：说清这一按发出去的是什么 */
+function refreshNotesFoot(items = todoItems()): void {
+  const txt = $('#notesFootTxt'); const btn = $('#notesSendAll') as HTMLButtonElement | null;
+  if (!txt || !btn) return;
+  btn.disabled = items.length === 0;
+  btn.textContent = items.length ? `一键发送给 AI · ${items.length} 项` : '一键发送给 AI';
+  if (!items.length) { txt.innerHTML = '待办是空的 —— 在左边讲稿里划一段文字，会浮出「加批注」。'; return; }
+  const mine = items.filter((it) => it.cls === 'note').length;
+  const rest = items.length - mine;
+  txt.innerHTML = `本次发送 <b>${items.length}</b> 项：${esc(todoSummary(items))}`
+    + (rest ? '　—— 讲稿批注会<b>连同其余待办一起</b>交给 AI，不是单独发。' : '');
 }
 
 // ---- 图片库 panel: browse / re-insert / delete the generated-image library ----
@@ -2832,7 +3059,10 @@ function ensureGizmoStyle(d: Document): void {
   st.textContent = '.sm-gizmo{position:fixed;z-index:2147483000;border:1.5px solid #3a86ff;pointer-events:none;box-sizing:border-box}'
     + '.sm-gizmo .h{position:absolute;width:15px;height:15px;background:#fff;border:1.5px solid #3a86ff;border-radius:3px;pointer-events:auto}'
     + '.sm-gizmo .se{right:-8px;bottom:-8px;cursor:nwse-resize}'
-    + '.sm-gizmo .mv{position:absolute;left:50%;top:-32px;transform:translateX(-50%);min-width:28px;height:24px;padding:0 6px;background:#3a86ff;color:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;pointer-events:auto;cursor:move;box-shadow:0 2px 6px rgba(0,0,0,.3)}';
+    + '.sm-gizmo .gbar{position:absolute;left:50%;top:-32px;transform:translateX(-50%);display:flex;gap:6px;pointer-events:none}'
+    + '.sm-gizmo .gbar > *{pointer-events:auto;min-width:28px;height:24px;padding:0 6px;border:0;border-radius:6px;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.3);font-family:inherit;line-height:1}'
+    + '.sm-gizmo .mv{background:#3a86ff;cursor:move}'
+    + '.sm-gizmo .ann{background:#e0902a;cursor:pointer;font-size:13px}';
   d.head.appendChild(st);
 }
 function hideGizmo(): void { if (gizmoEl) { gizmoEl.remove(); gizmoEl = null; } }
@@ -2846,10 +3076,17 @@ function showGizmo(el: HTMLElement): void {
   const d = el.ownerDocument; if (!d || !d.body) return;
   hideGizmo(); ensureGizmoStyle(d);
   const g = d.createElement('div'); g.className = 'sm-gizmo';
-  g.innerHTML = '<div class="mv" title="拖动移动本元素">✥</div><div class="h se" title="拖动改变大小"></div>';
+  // 三个把手：移动 ✥ / 加 AI 批注 💬 / 缩放 ◢。批注这颗和另外两颗并排，
+  // 是因为「点中一个元素」之后人最想干的三件事就是这三件。
+  g.innerHTML = '<div class="gbar"><div class="mv" title="拖动移动本元素">✥</div>'
+    + '<button class="ann" type="button" title="给这个元素加一条 AI 批注（进「AI」tab 的待办，一次发送）">💬</button></div>'
+    + '<div class="h se" title="拖动改变大小"></div>';
   d.body.appendChild(g); gizmoEl = g; positionGizmo();
   (g.querySelector('.mv') as HTMLElement).addEventListener('mousedown', (e) => startGizmoDrag(e as MouseEvent, 'move'));
   (g.querySelector('.se') as HTMLElement).addEventListener('mousedown', (e) => startGizmoDrag(e as MouseEvent, 'resize'));
+  const ab = g.querySelector('.ann') as HTMLElement;
+  ab.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); });
+  ab.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); if (htmlSelEl) openAnnFor(htmlSelEl); });
 }
 function startGizmoDrag(e: MouseEvent, mode: 'move' | 'resize'): void {
   if (!htmlSelEl) return; e.preventDefault(); e.stopPropagation();
@@ -3356,6 +3593,8 @@ function applyAiPatch(text: string, preview = false): void {
     if (idx >= 0 && htmlSlides[idx]) { if (id) { sec.setAttribute('data-id', id); if (aiBefore[id] === undefined) aiBefore[id] = htmlSlides[idx].html; aiApplied.add(id); aiSent.delete(id); ids.push(id); if (preview) proposed.add(id); } imgs += backfillTrayImages(sec); htmlSlides[idx].html = sec.outerHTML; applied++; if (firstIdx < 0) firstIdx = idx; }
   });
   if (!applied) { toast('补丁的 data-id 不匹配任何页', true); return; }
+  // 改过的那几页的元素批注算办完了，从待办里撤掉（和「改字」→ ✓ 已改 同一个道理）
+  if (ids.length) slideAnns = slideAnns.filter((a) => ids.indexOf(a.slideId) < 0);
   if (imgs) renderTray(); // mark just-placed tray images
   htmlGotoAfterRender = firstIdx; // stay on the patched slide after re-render
   renderHtmlEdit(); refreshTasks(); markDirty();
@@ -3523,12 +3762,16 @@ function renderRailStrip(): void {
   const tabs = Array.from(document.querySelectorAll(htmlOn ? '.htab' : '.tab')) as HTMLElement[];
   box.innerHTML = '';
   tabs.forEach((t) => {
-    const label = (t.textContent || '').trim();
+    // 角标挂在 tab 里面，直接 textContent 会连数字一起抄进来（「AI3」）——所以有 .tlab 就认它
+    const label = ((t.querySelector('.tlab') as HTMLElement | null)?.textContent || t.textContent || '').trim();
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'striptab' + (t.classList.contains('active') ? ' active' : '');
     b.innerHTML = RAIL_ICONS[t.dataset.icon || ''] || '<span class="stlabel">' + esc(label.slice(0, 1)) + '</span>';
     b.title = t.getAttribute('title') || label;   // 折叠时名字靠 tooltip 给
     b.setAttribute('aria-label', label);
+    // 面板折起来时更要看得见「有 N 项待办挂着」——不然连那颗数字都被收走了
+    const num = t.querySelector('.tabnum') as HTMLElement | null;
+    if (num && !num.hidden) { const s = document.createElement('span'); s.className = 'stripnum'; s.textContent = num.textContent || ''; b.appendChild(s); }
     // 点窄条上的图标 = 展开 + 直接切到那一页，不用展开后再找一次
     b.addEventListener('click', () => { setRightCollapsed(false); t.click(); });
     box.appendChild(b);
@@ -3952,6 +4195,27 @@ body.dark .gen-hint{background:#12151b;border-color:#2c323d;color:#cfd2d8}
 .annnote{font-size:12.5px;line-height:1.6;color:var(--sm-ink)}
 .todochip.note{background:var(--sm-mark);color:var(--sm-mark-ink)}
 .notes-status{font-size:11.5px;color:var(--sm-ink-4);padding:2px 2px 6px}
+.annbox{width:min(560px,92vw)}
+.annpick{padding:12px 16px;border-bottom:1px solid var(--sm-line);background:var(--sm-warm-1)}
+.annwhere{font-size:11px;color:var(--sm-ink-4);margin-bottom:5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.annsnip{font-size:12.5px;line-height:1.6;color:var(--sm-ink-2);background:var(--sm-mark);border-radius:var(--sm-r-xs);padding:7px 9px;margin-bottom:9px}
+.annpick #annText{width:100%;box-sizing:border-box;resize:vertical;font-family:inherit;font-size:12.5px;line-height:1.55;border:1px solid var(--sm-line-warm);border-radius:var(--sm-r-sm);padding:7px 9px;background:var(--sm-surface);color:#2a2a2d;margin-bottom:8px}
+.annpick #annText:focus{outline:none;border-color:var(--sm-accent)}
+.annlist{max-height:40vh}
+/* 弹窗有 560px 宽，.oprow 默认 flex:1 会把「加批注」拉成一条大横杠 —— 收回自然宽度、靠右 */
+.annpick .oprow{justify-content:flex-end;margin-top:0}
+.annpick .oprow button{flex:0 0 auto;min-width:92px;padding:7px 16px}
+.annpick .oprow .hintk{flex:1;font-size:11px;color:var(--sm-ink-4);align-self:center}
+.annrow.cur{border-color:var(--sm-accent-line);background:var(--sm-warm-1)}
+body.dark .annpick{border-color:#2c323d;background:#1d2027}
+body.dark .annpick #annText{background:#12151b;border-color:#2c323d;color:#e8e8ea}
+body.dark .annrow.cur{background:#241f18;border-color:#5a4326}
+.notesfoot{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--sm-line);background:var(--sm-surface-2);flex:0 0 auto}
+.notesfoot-txt{font-size:12px;color:var(--sm-ink-3);line-height:1.5}
+.notesfoot-txt b{color:var(--sm-ink)}
+body.dark .notesfoot{border-color:#2c323d;background:#1b1e25}
+body.dark .notesfoot-txt{color:#9a9a9e}
+body.dark .notesfoot-txt b{color:#e8e8ea}
 body.dark .noteside,body.dark .notepick{border-color:#2c323d}
 body.dark .notepick{background:#1d2027}
 body.dark .annrow{border-color:#2c323d}
@@ -4056,6 +4320,7 @@ body.dark .illbox #illHint{background:#202022;color:#e8e8ea;border-color:#3a3a3d
 .todochip.chart{color:#2c6e7f;background:#e3f0f3}
 .todochip.photo{color:var(--sm-warn-ink);background:var(--sm-warn-tint)}
 .todochip.tray{color:var(--sm-warn-ink);background:var(--sm-accent-tint)}
+.todochip.ann{color:#8a6a2a;background:#ffe9a8}
 .todopg{flex:0 0 auto;font-size:10px;color:var(--sm-accent);font-weight:700;font-variant-numeric:tabular-nums}
 .tododesc{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--sm-ink-2)}
 .todo-del{flex:0 0 auto;width:22px;height:22px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--sm-warm-line);border-radius:var(--sm-r-sm);background:var(--sm-surface-2);color:var(--sm-ink-3);font-size:12px;cursor:pointer;padding:0;transition:background .12s,color .12s,border-color .12s}
@@ -4110,6 +4375,12 @@ body.dark .railstrip button.striptab.active{color:#f0b34a;background:#3a2417}
 .htabs,.ltabs{display:flex;border-bottom:1px solid var(--sm-line-2);flex:0 0 auto}
 .htab,.ltab{flex:1;background:transparent;border:0;border-bottom:2px solid transparent;padding:12px 0;font-size:13px;color:var(--sm-ink-3);cursor:pointer;font-family:inherit}
 .htab:hover,.ltab:hover{background:var(--sm-surface-2)}.htab.active,.ltab.active{color:var(--sm-accent);border-bottom-color:var(--sm-accent);font-weight:600}
+/* 待办数角标：待办数原先只在 AI tab *里面* 看得到，人停在别的 tab 就完全不知道有东西挂着 */
+.tabnum{display:inline-block;margin-left:5px;min-width:16px;height:16px;padding:0 4px;box-sizing:border-box;border-radius:8px;background:var(--sm-accent-solid);color:#fff;font:700 10px/16px system-ui,-apple-system,sans-serif;text-align:center;vertical-align:1px;font-variant-numeric:tabular-nums}
+.tabnum[hidden]{display:none}
+.striptab{position:relative}
+.stripnum{position:absolute;top:3px;right:3px;min-width:14px;height:14px;padding:0 3px;box-sizing:border-box;border-radius:7px;background:var(--sm-accent-solid);color:#fff;font:700 9px/14px system-ui,-apple-system,sans-serif;text-align:center;font-variant-numeric:tabular-nums}
+body.dark .tabnum,body.dark .stripnum{background:#B5402A}
 .lpane{flex:1;min-height:0;display:flex;flex-direction:column}.lpane[hidden]{display:none}
 .lscroll{flex:1;overflow:auto;padding:10px}
 .lpane-soon{color:var(--sm-ink-4);font-size:13px;line-height:1.7;padding:18px 14px;text-align:center}
@@ -4304,7 +4575,7 @@ function buildUI(): void {
     <div id="htmlpanel" style="display:none">
       <!-- tab 顺序＝使用频率：AI 修改 / 讲稿最常用，排前面；deck 级设计旋钮不常动，垫底。 -->
       <div class="htabs">
-        <button class="htab active" data-htab="ai" data-icon="ai" title="AI 修改 —— 模糊的重活交给 Claude">AI</button>
+        <button class="htab active" data-htab="ai" data-icon="ai" title="AI 修改 —— 模糊的重活交给 Claude"><span class="tlab">AI</span><span class="tabnum" id="aiTabNum" hidden></span></button>
         <button class="htab" data-htab="script" data-icon="script" title="讲稿 / 提词 —— 副屏讲稿与手表提词">讲稿</button>
         <button class="htab" data-htab="fmt" data-icon="fmt" title="格式 —— 选中元素的字体 / 颜色 / 位置">格式</button>
         <button class="htab" data-htab="anim" data-icon="anim" title="动画 —— 选中元素的进入 / 强调 / 动作 / 消失">动画</button>
@@ -4339,7 +4610,7 @@ function buildUI(): void {
         <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
         <div id="trayGrid" class="tray-grid"></div>
 
-        <div class="sechead">待办<button class="ihelp" type="button" data-help="上面的「改字 / 配图 / 导入图」和「讲稿」里的批注都汇总在这里。点「一键发送给 AI」一次全部交给 Claude。">?</button><span class="grow"></span><span class="sendnote" id="aiSendNote" style="display:none">含照片·计费</span></div>
+        <div class="sechead">待办<button class="ihelp" type="button" data-help="上面的「改字 / 配图 / 导入图」、幻灯片上的元素批注（预览里点中元素 → 💬）、以及「讲稿」里的批注，都汇总在这里。点「一键发送给 AI」一次全部交给 Claude —— 只有这一颗发送键，其它地方的发送按钮按的也是它。">?</button><span class="grow"></span><span class="sendnote" id="aiSendNote" style="display:none">含照片·计费</span></div>
         <div id="aiTodo" class="aitodo"></div>
         <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
 
@@ -4361,7 +4632,7 @@ function buildUI(): void {
 
       <!-- ===== 格式（选中元素） ===== -->
       <div class="pane hpane" data-hpane="fmt" hidden>
-        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑。<button class="ihelp" type="button" data-help="选中后可调整字体、字号、颜色、粗细与位置。打字时空格 / 方向键归输入，按 Esc 退出文本框即可继续用键盘翻页。">?</button></div>
+        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑。<button class="ihelp" type="button" data-help="选中后可调整字体、字号、颜色、粗细与位置；元素上方那排把手：✥ 拖动移动 · 💬 给这个元素加一条 AI 批注 · 右下角 ◢ 缩放。打字时空格 / 方向键归输入，按 Esc 退出文本框即可继续用键盘翻页。">?</button></div>
         <div id="hSel" class="hselon" style="display:none">
           <div class="tag" id="hSelTag">—</div>
           <div class="field"><label>字体</label><select id="hFont"></select></div>
@@ -4527,6 +4798,27 @@ function buildUI(): void {
         <div id="noteList" class="notelist"></div>
       </div>
     </div>
+    <!-- 用户被这里卡过一次：批注写完了，但发送键只在右栏 AI tab 里，弹窗里一颗都没有。
+         这条底栏补上入口，**并且写清楚这一按发出去的是整个待办**（改字/配图/导入图/批注），
+         不是只发讲稿这几条——否则人会以为「只发了刚写的」。 -->
+    <div class="notesfoot">
+      <span class="notesfoot-txt" id="notesFootTxt"></span>
+      <span class="grow"></span>
+      <button id="notesSendAll" class="primary-mini" disabled>一键发送给 AI</button>
+    </div>
+  </div>
+</div>
+<div class="libmodal" id="annModal" style="display:none">
+  <div class="libbox annbox">
+    <div class="libhead"><span class="ctitle">元素批注</span><span id="annCount" class="lib-count"></span><span class="grow"></span><button id="annClose" class="mini cclose">关闭</button></div>
+    <div class="annpick">
+      <div class="annwhere" id="annWhere"></div>
+      <div class="annsnip" id="annSnip"></div>
+      <textarea id="annText" rows="3" placeholder="这个元素要怎么改？例：这句太长，砍一半；这张图换成横版；这个数字改成 2025。"></textarea>
+      <div class="oprow"><span class="hintk">⌘/Ctrl + Enter 也可提交</span><button id="annCancel" class="mini">取消</button><button id="annAdd" class="primary-mini">加批注</button></div>
+    </div>
+    <div id="annList" class="notelist annlist"></div>
+    <div class="notesfoot"><span class="notesfoot-txt" id="annFoot"></span></div>
   </div>
 </div>
 <div class="libmodal" id="libModal" style="display:none">
@@ -4698,6 +4990,13 @@ function buildUI(): void {
     const b = $('#notePickBox'); if (b) (b as HTMLElement).style.display = 'none';
   });
   $('#notesUndoBtn').addEventListener('click', undoNotesPatch);
+  // 弹窗里那颗发送键发的是**整个待办**。发完把弹窗关掉、切到 AI tab——
+  // 让人当场看见「刚才那一按到底送走了什么」，而不是留在讲稿里猜。
+  $('#notesSendAll').addEventListener('click', () => {
+    if (!submitAll()) return;
+    closeNotes();
+    (document.querySelector('.htab[data-htab="ai"]') as HTMLElement | null)?.click();
+  });
   // 讲稿 iframe 里点了「加批注」
   window.addEventListener('message', (e: MessageEvent) => {
     const d = e.data as { type?: string; anchor?: string; quote?: string } | null;
@@ -4737,6 +5036,15 @@ function buildUI(): void {
   // image tray: import + the dedicated drop-zone highlight (drop handled at window level)
   $('#trayPick').addEventListener('click', trayFilesPicker);
   $('#genOpenLib').addEventListener('click', openLibrary);
+  // 元素批注小窗
+  $('#annClose').addEventListener('click', closeAnnModal);
+  $('#annCancel').addEventListener('click', closeAnnModal);
+  $('#annAdd').addEventListener('click', addSlideAnn);
+  $('#annModal').addEventListener('click', (e) => { if (e.target === $('#annModal')) closeAnnModal(); });
+  ($('#annText') as HTMLTextAreaElement).addEventListener('keydown', (e) => {
+    const ev = e as KeyboardEvent;
+    if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey)) { ev.preventDefault(); addSlideAnn(); }
+  });
   $('#libClose').addEventListener('click', closeLibrary);
   $('#libReload').addEventListener('click', loadLibrary);
   $('#libModal').addEventListener('click', (e) => { if (e.target === $('#libModal')) closeLibrary(); });
@@ -4943,7 +5251,13 @@ function buildUI(): void {
   (window as unknown as { __SM_BUILD_EXPORT__: () => Promise<string> }).__SM_BUILD_EXPORT__ = buildExportHtml;
   (window as unknown as { __SM_SAVE_HTML__: typeof saveHtmlInPlace }).__SM_SAVE_HTML__ = saveHtmlInPlace;
   (window as unknown as { __SM_HAS_FILE_HANDLE__: () => boolean }).__SM_HAS_FILE_HANDLE__ = () => !!fileHandle;
-  (window as unknown as { __SM_SET_INSTR__: (id: string, t: string) => void }).__SM_SET_INSTR__ = (id, t) => { if (t) { aiInstructions[id] = t; aiApplied.delete(id); } else { delete aiInstructions[id]; } if (mode === 'html') refreshTasks(); };
+  (window as unknown as { __SM_SET_INSTR__: (id: string, t: string) => void }).__SM_SET_INSTR__ = (id, t) => {
+    if (t) { aiInstructions[id] = t; aiApplied.delete(id); } else { delete aiInstructions[id]; }
+    // 写的正好是当前页的话，文本框也得跟着变 —— 否则下一次 saveAiInstruction()
+    // 会拿那个还空着的文本框把刚写进去的意见抹掉（真人走 UI 不会遇到，脚本会）。
+    if (id === aiCurId) { const b = $('#aiInstruction') as HTMLTextAreaElement | null; if (b) b.value = t || ''; }
+    if (mode === 'html') refreshTasks();
+  };
   (window as unknown as { __SM_APPLY_PATCH__: typeof applyAiPatch }).__SM_APPLY_PATCH__ = applyAiPatch;
   // image-tray hooks (for automation / headless verification)
   (window as unknown as { __SM_TRAY_ADD__: typeof addTrayImage }).__SM_TRAY_ADD__ = addTrayImage;
@@ -4984,6 +5298,22 @@ function buildUI(): void {
   (window as unknown as { __SM_MOVE_SEL__: (dx: number, dy: number) => void }).__SM_MOVE_SEL__ = commitMove;
   (window as unknown as { __SM_RESIZE_SEL__: (w: number, h?: number) => void }).__SM_RESIZE_SEL__ = commitResize;
   (window as unknown as { __SM_GIZMO_ON__: () => boolean }).__SM_GIZMO_ON__ = () => !!gizmoEl;
+  // 元素批注（自动化 / 无头验证）
+  (window as unknown as { __SM_ANN_OPEN__: (slideId: string, sel: string) => boolean }).__SM_ANN_OPEN__ = (slideId, sel) => {
+    const d = previewDoc(); const slide = d ? annSlideEl(d, slideId) : null;
+    const el = slide?.querySelector(sel); if (!el) return false;
+    openAnnFor(el); return true;
+  };
+  (window as unknown as { __SM_ANN_ADD__: (slideId: string, sel: string, note: string) => boolean }).__SM_ANN_ADD__ = (slideId, sel, note) => {
+    const d = previewDoc(); const slide = d ? annSlideEl(d, slideId) : null;
+    const el = slide?.querySelector(sel); if (!el) return false;
+    openAnnFor(el);
+    const t = $('#annText') as HTMLTextAreaElement | null; if (t) t.value = note;
+    addSlideAnn(); return true;
+  };
+  (window as unknown as { __SM_ANN_LIST__: () => SlideAnn[] }).__SM_ANN_LIST__ = () => slideAnns.map((a) => ({ ...a, sel: { ...a.sel } }));
+  (window as unknown as { __SM_ANN_BADGES__: () => number }).__SM_ANN_BADGES__ = () => previewDoc()?.querySelectorAll('.sm-annlayer .sm-annbadge').length || 0;
+  (window as unknown as { __SM_ANN_CLOSE__: () => void }).__SM_ANN_CLOSE__ = closeAnnModal;
 
   // edits from the preview iframe
   window.addEventListener('message', (e) => {

@@ -31,7 +31,8 @@ try {
 
   // 1) three top tabs + embed checkbox + control shape
   const shape = await page.evaluate(() => {
-    const htabs = [...document.querySelectorAll('.htab')].map((b) => b.textContent.trim());
+    // AI tab 里挂着待办数角标，textContent 会连数字一起抄走 —— 有 .tlab 就认它
+    const htabs = [...document.querySelectorAll('.htab')].map((b) => (b.querySelector('.tlab') || b).textContent.trim());
     const stabs = [...document.querySelectorAll('.stab')].map((b) => b.textContent.trim());
     const fontOpts = [...document.querySelectorAll('#hFont option')].map((o) => o.value).filter(Boolean);
     const motionOpts = [...document.querySelectorAll('#hMotion option')].map((o) => o.value);

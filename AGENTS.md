@@ -171,7 +171,8 @@ request arrives), `curl -XPOST "<url>api/handshake?label=…"` handshakes, and
 `POST /api/patch` (`?preview=1` for a proposal) writes back.
 
 **What a request now contains** (the comment model — like Claude Design comments, but on
-real HTML): the human leaves a **comment per slide** ("把这页改成两栏…") and/or one
+real HTML): the human leaves a **comment per slide** ("把这页改成两栏…"), a **comment on one
+element** (select it in the preview → the 💬 handle on its gizmo), and/or one
 **deck-level ask** ("对整份 deck 说…"). A submitted request bundles: every pending page's
 comment + that page's current HTML, and — if there's a deck-level ask — that ask plus a
 **structure overview** (page № · `data-id` · title for ALL slides) so you can pick which
@@ -184,14 +185,25 @@ don't re-touch a page they reverted unless they ask again.
 
 ### 4c. The unified AI-tasks request (`.ai-tasks.md`)
 
-The Studio's **AI** pane (the first right-rail tab) funnels everything into one to-do list and one send. A submitted
-request (name ends `.ai-tasks.md`) bundles, in one file: the **deck-level ask** (+ a structure
-overview), and a per-page block for every page that has a **改字** (comment), a **配图**
+The Studio's **AI** pane (the first right-rail tab) funnels everything into one to-do list and one send —
+the tab itself carries a **count badge**, and the only send button anywhere is that pane's
+「一键发送给 AI · N 项」 (the transcript modal has a second button, but it fires the same one).
+A submitted request (name ends `.ai-tasks.md`) bundles, in one file: the **deck-level ask** (+ a structure
+overview), the **讲稿批注** (transcript comments, see below), and a per-page block for every page that
+has a **改字** (page comment), an **元素批注** (comment on one specific element), a **配图**
 (illustration the human queued), and/or **导入图** (their own staged images). Each page block
 spells out exactly what it wants — apply them together and return that page's `<section
 data-id>` once. The kinds of per-page directive:
 
 - **改字 (`**修改要求：**`)** — rewrite the page per the comment. Tokens only, keep the contract.
+- **元素批注 (`**元素批注（针对本页里的具体元素…`)** — the human clicked **one element** in the preview
+  and left a note on it. Each line gives the element as `` `<tag>` (本页第 N 个 · class="…") ·
+  原文开头「first ~40 chars」``. **The quoted text is the primary anchor** — it survives rewriting far
+  better than a position; `tag` + 本页第 N 个 + `class` are the fallback for when the human edited that
+  text after commenting. If the two disagree, trust the text; if neither resolves, pick the element on
+  that page the note obviously means. **Touch only the named element** — a page can carry both a
+  page-level 修改要求 and several element comments, and only the former is page-wide. A page's element
+  comments are cleared automatically once you patch that page (same as 改字 → ✓ 已改).
 - **配图 · 矢量 (`**配图（矢量 SVG…`)** — Claude has no image model, so *you draw an inline
   `<svg>`* fitting the page: depict the actual topic (not generic blobs), color via tokens
   (`var(--accent)` / `var(--accent-2)` / `var(--ink)`, never hard hex), self-contained vector
@@ -233,6 +245,12 @@ prompt, style, model, file, w, h, bytes, createdAt, usedInDeck }] }`). The Studi
 reads it via the bridge's `/api/library*` endpoints (browse / re-insert / delete). Keep the
 deck self-contained (inline base64 into the slide) while the library keeps the original.
 
+**讲稿批注** — the same request may also carry a `## 讲稿批注` section (the human highlighted a passage
+in the embedded transcript and commented on it). That one is **not** part of the patch: rewrite the whole
+anchor block and write it back with **`slidesmith_notes`**, never `apply_patch` — the transcript lives
+outside `#deck`. Its hard constraints (keep `<h3 id="…">` exactly, keep cue/golden/data blocks, keep
+`<strong>` seeds) are spelled out in that section and re-checked on write.
+
 Then `slidesmith_apply_patch` (`preview: true` if the request had `confirm: true`). Pages flip
 to ✓ 已改; placed 导入图 show 已放置; the human fine-tunes after. Honor the division of labor —
 the human does high-frequency fine edits (text, color, size, animation, move/delete) themselves.
@@ -242,8 +260,10 @@ the human does high-frequency fine edits (text, color, size, animation, move/del
 Best path: call `slidesmith_open(deckPath)` — the Studio opens in their browser already
 connected. Tell them to edit visually (click text, right panel for colors / fonts /
 animations / move·delete element, 「视觉自检」, 「导出 HTML / 导出 PDF」), and for
-complex changes to **leave a comment on the slide and hit 发送给 Claude** — you'll
-pick it up via `slidesmith_wait` (or `slidesmith_get_requests`).
+complex changes to **leave a comment and hit 一键发送给 AI** — page-level in the AI pane,
+per-element via the 💬 handle that appears when they select an element, per-passage inside
+「打开讲稿」. All of them land in the **same** to-do list (the AI tab shows the count) and go
+out in **one** send — you'll pick it up via `slidesmith_wait` (or `slidesmith_get_requests`).
 
 If you can't open it for them (no MCP), they can double-click `studio/slidesmith-studio.html`
 (offline) and drag the deck in; to connect to you, they click the top-bar **连接 Claude Code**
