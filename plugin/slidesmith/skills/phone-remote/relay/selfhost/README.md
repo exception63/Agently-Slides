@@ -55,7 +55,7 @@ window.__SM_QA_ROOM__     = "yourroom2026";   // 问答墙（qa-block 读它）
 
 | 角色 | 谁 | 能做什么 | 多实例 |
 |---|---|---|---|
-| `deck` | 放映端 | 与 remote 双向转发 | ✗ **先到先得**（要顶替须 `?takeover=1`） |
+| `deck` | 放映端 | 与 remote 双向转发 · **登记本房间的遥控密码** | ✗ **先到先得**（要顶替须 `?takeover=1`） |
 | `remote` | 手机 / iPad 遥控 | 与 deck 双向转发 | ✓ |
 | `ask` | 学生手机 | 只能发 `qa-add` | ✓ |
 | `wall` | 大屏问答页 | 只收 | ✓ |
@@ -82,6 +82,8 @@ window.__SM_QA_ROOM__     = "yourroom2026";   // 问答墙（qa-block 读它）
 服务端 → wall/host  {type:"qa-init", questions:[…], closed:false}      连上即发全量
                     {type:"qa-new", q:{id,t,ts}, total:N}
                     {type:"qa-cleared"} / {type:"qa-hidden", id} / {type:"qa-state", closed}
+服务端 → 遥控端 {type:"auth-required", reason:"need|bad|passcode-set", left:N}   要密码 / 密码错
+                {type:"auth-locked", wait:秒}                                     错太多次，冷却中
 host → 服务端   {type:"qa-clear"} / {type:"qa-hide", id} / {type:"qa-close"} / {type:"qa-open"}
                 {type:"qa-scroll", dir:1|-1}      翻大屏的问题墙（瞬时指令，不落盘）
 deck → 第二设备  deck-info 里带 qaRoom / qaAnchor —— iPad 据此自动开出问答面板并在
@@ -130,3 +132,16 @@ ls /var/lib/smrelay/                   # 各房间的问题留存
    直接挂 `onmessage` 会抛，把 `sendDeckInfo` 打断、讲稿第一次推送丢掉。
    表现极隐蔽：第二设备每 2 秒重问，第二次才拿到，看起来"只是慢了点"。
    托管在网页上（而不是 file://）时更容易触发。
+
+## 遥控密码
+
+连接时带 `&pass=<sha256 十六进制>`，哈希 = `sha256("slidesmith-remote:" + 密码)`。
+
+- **放映端（deck）登记**：第一个 deck 上线时带什么，这个房间就要什么；不带 = 这房间不设密码
+- **只拦 `remote` / `host`**。`ask`（学生提问）和 `wall`（大屏）**永远不要密码**
+- 连错 6 次 → 冷却 60 秒（正确密码也暂时挡下）
+- deck 一登记密码，会把此前没验过的 remote/host 请下线
+- **向后兼容**：不设密码的房间行为与从前完全一致，旧版客户端照常连
+
+⚠️ 哈希烘在 deck 里，而 deck 常常是公开分享的 —— **能读到 deck 源码的人就能拿到凭证**。
+它挡的是「扫了一眼大屏二维码就想遥控」，不是有备而来的人。要更强的隔离：别公开分享那一份。

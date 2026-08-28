@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// 遥控指令。与 deck 端 pair-client.js 的协议完全一致：{"type":"cmd","action":"next"}
 /// 所以手表发出的指令，现有的 deck 和中转一行都不用改就能接。
@@ -55,6 +56,9 @@ final class RelayClient: NSObject, ObservableObject {
     @Published private(set) var deckTitle = ""
     /// 被中转判定「另一个窗口接管了这个房间」时的提示；正常情况下一直是 nil。
     @Published private(set) var evictedNotice: String?
+    /// 放映端给这个房间设了遥控密码，但我们还没通过 —— iOS 界面据此弹输入框。
+    @Published private(set) var needsPasscode = false
+    @Published private(set) var passcodeNotice: String?
     /// 讲稿：锚点 → 纯文本。**只有手表用**（watchOS 没 WebKit，渲染不了 HTML）；
     /// iPhone 的讲稿页是 WebView 装整页，不看这里。
     @Published private(set) var notes: [String: String] = [:]
@@ -118,6 +122,7 @@ final class RelayClient: NSObject, ObservableObject {
         publish {
             self.isConnected = false; self.deckPresent = false; self.statusText = "已断开"
             self.deckState = nil; self.evictedNotice = nil
+            self.needsPasscode = false; self.passcodeNotice = nil
         }
     }
 
@@ -134,10 +139,14 @@ final class RelayClient: NSObject, ObservableObject {
             publish { self.lastError = "中转地址无效"; self.statusText = "地址无效" }
             return
         }
-        comps.queryItems = [
+        // 遥控密码：deck 设了密码时，中转要求同一个 sha256("slidesmith-remote:" + 密码)。
+        // 没设密码的 deck 不带这个参数，行为和以前完全一样。
+        var items = [
             URLQueryItem(name: "room", value: room),
             URLQueryItem(name: "role", value: "remote"),
         ]
+        if let h = Self.storedPassHash(room: room) { items.append(URLQueryItem(name: "pass", value: h)) }
+        comps.queryItems = items
         guard let url = comps.url else { return }
 
         publish { self.statusText = "连接中…" }
@@ -194,6 +203,33 @@ final class RelayClient: NSObject, ObservableObject {
                 self.receiveLoop()
             }
         }
+    }
+
+    // MARK: - 遥控密码
+
+    /// 密码 → sha256("slidesmith-remote:" + 密码) 十六进制。和网页端、Studio 用的是同一个盐。
+    static func passHash(_ code: String) -> String {
+        let d = SHA256.hash(data: Data(("slidesmith-remote:" + code).utf8))
+        return d.map { String(format: "%02x", $0) }.joined()
+    }
+    private static func passKey(_ room: String) -> String { "sm-pass-" + room }
+    static func storedPassHash(room: String) -> String? {
+        let v = UserDefaults.standard.string(forKey: passKey(room))
+        return (v?.isEmpty == false) ? v : nil
+    }
+    /// 存下这个房间的密码哈希并重连。存哈希不存明文。
+    func submitPasscode(_ code: String, room: String, relayBase: String? = nil) {
+        UserDefaults.standard.set(Self.passHash(code), forKey: Self.passKey(room))
+        publish { self.needsPasscode = false; self.passcodeNotice = nil }
+        self.room = nil                      // 强制重开连接（connect 里有"同房间且已连上就跳过"的短路）
+        connect(room: room, relayBase: relayBase)
+    }
+    /// 用户把密码弹窗划掉了：收起提示，但不重连（他可以稍后再点连接）。
+    func clearPasscodePrompt() {
+        publish { self.needsPasscode = false }
+    }
+    func forgetPasscode(room: String) {
+        UserDefaults.standard.removeObject(forKey: Self.passKey(room))
     }
 
     private func handle(text: String) {
@@ -279,6 +315,27 @@ final class RelayClient: NSObject, ObservableObject {
         // 中转只把 evicted 发给**被顶掉的那个 deck**（relay.mjs:105 / worker.mjs:55），
         // 遥控端正常收不到。留这个分支是防御性的：万一以后中转改成也通知遥控端，
         // 界面不至于继续显示「已连接」还往空房间发指令。
+        // 中转说「要密码」/「错太多次了」——存的哈希作废，让界面弹输入框。
+        case "auth-required", "auth-locked":
+            let reason = obj["reason"] as? String
+            let wait = obj["wait"] as? Int
+            let left = obj["left"] as? Int
+            if let r = room { forgetPasscode(room: r) }
+            wantsConnection = false          // 别再自动重连——拿着作废的哈希重试只会一直被拒
+            closeSocket()
+            publish {
+                self.isConnected = false; self.deckPresent = false
+                self.needsPasscode = true
+                if type == "auth-locked" {
+                    self.passcodeNotice = "密码错太多次，请 \(wait ?? 60) 秒后再试"
+                } else if reason == "bad" {
+                    self.passcodeNotice = "密码不对" + (left.map { "，还可以试 \($0) 次" } ?? "")
+                } else {
+                    self.passcodeNotice = "这份 slides 设了遥控密码"
+                }
+                self.statusText = "需要遥控密码"
+            }
+
         case "evicted":
             publish {
                 self.deckPresent = false

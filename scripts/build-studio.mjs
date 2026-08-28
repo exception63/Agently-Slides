@@ -79,6 +79,14 @@ const fxCanvasMod = `export const fxCanvasJs = ${JSON.stringify(fxCanvasJs)};`;
 // Studio 勾选「嵌入手机遥控」后烘进导出的 deck；默认指向用户已部署的 Cloudflare 云中转。
 const prDir = join(root, 'plugin/slidesmith/skills/phone-remote/baked');
 const phoneRemoteMod = `
+// 中转候选。**Cloudflare 仍是默认**（一直用得好、免费、免维护）；
+// 自托管那条是给"要给国内学生扫码"的场合准备的备选，两者协议完全一样。
+export const relayOptions = ${JSON.stringify([
+  { id: 'cf', label: 'Cloudflare（默认）', url: 'https://slidesmith-remote.zly-scu.workers.dev',
+    hint: '免费、免维护。自己和同事用没问题；给国内学生扫码可能打不开。' },
+  { id: 'sg', label: '新加坡 AWS（自托管）', url: 'https://live.zhouliying.com',
+    hint: '自己的域名和服务器，国内移动网络更稳。给学生扫码用这条。' },
+])};
 export const cloudRelay = ${JSON.stringify('https://slidesmith-remote.zly-scu.workers.dev')};
 export const qrLibJs = ${JSON.stringify(read(join(prDir, 'vendor-qrcode.js')))};
 export const pairClientJs = ${JSON.stringify(read(join(prDir, 'pair-client.js')))};

@@ -16,6 +16,7 @@ struct ContentView: View {
     @State private var tab: RemoteTab = .remote
     /// 讲稿页折叠：连分段控件一起收走，整屏留给讲稿
     @State private var collapsed = false
+    @State private var passcode = ""          // 遥控密码输入（只在内存里；存的是哈希）
 
     var body: some View {
         NavigationStack {
@@ -59,6 +60,12 @@ struct ContentView: View {
             // 讲稿页把导航栏整条藏掉。那条大标题在遥控页是招牌，在讲稿页纯粹是浪费——
             // 它一个人就吃掉约四分之一屏，而讲稿恰恰是越多越好。
             .toolbar(isTranscript ? .hidden : .visible, for: .navigationBar)
+            // 放映端给这份 slides 设了遥控密码 —— 输对才让翻页 / 看讲稿。
+            // 学生扫码提问不走这条路，永远不需要密码。
+            .sheet(isPresented: Binding(get: { relay.needsPasscode },
+                                        set: { if !$0 { relay.clearPasscodePrompt() } })) {
+                passcodeSheet
+            }
             .sheet(isPresented: $scanning) {
                 QRScannerView(
                     onFound: { found in
@@ -82,6 +89,42 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, _ in updateIdleTimer() }
         .onChange(of: link.pairing) { _, _ in updateIdleTimer() }
         .onAppear { updateIdleTimer() }
+    }
+
+    // MARK: - 遥控密码
+
+    private var passcodeSheet: some View {
+        VStack(spacing: 18) {
+            Text("🔒 遥控密码").font(.title2.weight(.bold))
+            Text(relay.passcodeNotice ?? "这份 slides 设了遥控密码")
+                .font(.subheadline).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+            SecureField("输入密码", text: $passcode)
+                .textFieldStyle(.roundedBorder)
+                .font(.title3.monospacedDigit())
+                .multilineTextAlignment(.center)
+                .keyboardType(.numberPad)
+                .submitLabel(.go)
+                .onSubmit(applyPasscode)
+            Button(action: applyPasscode) {
+                Text("进入").frame(maxWidth: .infinity).padding(.vertical, 6)
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(passcode.trimmingCharacters(in: .whitespaces).isEmpty)
+            Text("密码由讲者设定，只给自己用。\n学生扫码提问不需要密码。")
+                .font(.footnote).foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .padding(24)
+        .presentationDetents([.height(340)])
+    }
+
+    private func applyPasscode() {
+        let code = passcode.trimmingCharacters(in: .whitespaces)
+        guard !code.isEmpty, let p = link.pairing else { return }
+        relay.submitPasscode(code, room: p.room, relayBase: p.relayBase)
+        passcode = ""
     }
 
     /// 现在是不是在「讲稿」页（且已配对）

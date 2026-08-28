@@ -2,6 +2,9 @@
 // 依赖：同页先加载 vendor-qrcode.js（暴露全局 qrcode()）。
 // Studio 导出时注入本段，并可设：
 //   window.__SM_CLOUD_RELAY__ = 'https://xxx.workers.dev'   // 云中转地址（Studio 烘入）
+//   window.__SM_PASS__        = '<sha256 十六进制>'          // 遥控密码的哈希（Studio 烘入，可无）
+//     —— 烘的是 sha256(room + ':' + 密码)，不是明文；翻 deck 源码看不到密码本身。
+//     没有这一行 = 这份 deck 不设遥控密码，行为与旧版完全一致。
 //   window.__SM_LOCAL_RELAY__ = 'http://localhost:8787'     // 本机局域网中转（默认值）
 (function () {
   var CLOUD = (window.__SM_CLOUD_RELAY__ || 'https://slidesmith-remote.zly-scu.workers.dev').replace(/\/$/, '');
@@ -421,7 +424,8 @@
     var svg = qrSvg(phoneUrl, 224);
     card.innerHTML =
       '<div style="font-size:18px;font-weight:700;margin-bottom:2px">手机扫码配对</div>' +
-      '<div style="font-size:12.5px;color:#888;margin-bottom:16px">' + label + '连接 · 用手机相机扫下面二维码</div>' +
+      '<div style="font-size:12.5px;color:#888;margin-bottom:16px">' + label + '连接 · 用手机相机扫下面二维码'
+        + (hasPass() ? '<br><b style="color:#8a6224">扫码后需在手机上输入遥控密码</b>' : '') + '</div>' +
       '<div id="__sm_qr" style="width:224px;height:224px;margin:0 auto">' + (svg || '<div style="color:#c00;font-size:13px">二维码生成失败，手输下方网址</div>') + '</div>' +
       '<div id="__sm_pairmsg" style="font-size:13px;color:#888;margin-top:14px">等待手机连接…</div>' +
       '<div style="font-size:12px;color:#aaa;margin-top:8px;word-break:break-all">' + phoneUrl + '</div>' +
@@ -436,7 +440,10 @@
   // 放映端连接。中转是「先到先得」：房间里已经有放映端时会回 deck-busy，
   // 这时给一颗「接管」按钮让讲者显式抢过来——学生随手点一下是抢不走的。
   function openDeckWs(wsBaseHttp, room, label, takeover) {
-    try { ws = new WebSocket(wsBaseHttp.replace(/^http/, 'ws') + '/ws?room=' + room + '&role=deck' + (takeover ? '&takeover=1' : '')); }
+    // 放映端把密码哈希带上去登记：此后只有拿得出同一个哈希的手机才能当遥控端。
+    var pw = (typeof window.__SM_PASS__ === 'string' && /^[0-9a-f]{64}$/.test(window.__SM_PASS__)) ? window.__SM_PASS__ : '';
+    try { ws = new WebSocket(wsBaseHttp.replace(/^http/, 'ws') + '/ws?room=' + room + '&role=deck'
+      + (takeover ? '&takeover=1' : '') + (pw ? '&pass=' + pw : '')); }
     catch (e) { pairError('无法建立连接。'); return; }
     ws.onmessage = function (e) {
       var m; try { m = JSON.parse(e.data); } catch (x) { return; }
@@ -473,6 +480,9 @@
     sendDeckInfo();                                  // 对端一上线就把讲稿 + 当前页推过去
     var msg = card.querySelector('#__sm_pairmsg');
     if (msg) { msg.textContent = '✅ 手机已连接，可以开始遥控（可关闭本窗）'; msg.style.color = '#1a9d4b'; }
+  }
+  function hasPass() {
+    return typeof window.__SM_PASS__ === 'string' && /^[0-9a-f]{64}$/.test(window.__SM_PASS__);
   }
   function pairError(text) {
     var msg = card.querySelector('#__sm_pairmsg');

@@ -33,6 +33,7 @@ GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 ROLES = ("deck", "remote", "ask", "wall", "host")
 ROOM_RE = re.compile(r"^[A-Za-z0-9_-]{4,64}$")
 MAX_LEN, MAX_KEEP, MIN_GAP = 200, 300, 4.0     # 单条字数 / 留存条数 / 同设备提交间隔（秒）
+MAX_AUTH_FAIL, AUTH_COOLDOWN = 6, 60.0         # 密码连错几次 / 冷却多少秒
 MAX_ROOMS = 200
 
 def log(*a):
@@ -48,6 +49,7 @@ class WS:
         self.closed = False
         self.role = ""
         self.room = None
+        self.authed = False
         self.last_post = 0.0
 
     async def send(self, text):
@@ -138,6 +140,9 @@ class Room:
         self.socks = {r: set() for r in ROLES}
         self.questions = []
         self.closed_qa = False
+        self.passhash = ""      # 由第一个放映端登记；空＝这份 deck 没设遥控密码
+        self.fails = 0          # 密码连错次数
+        self.locked_until = 0.0
         self.touched = time.time()
         self._load()
 
@@ -247,9 +252,45 @@ async def on_message(ws, raw):
         await peer.send(raw)
 
 
-async def ws_session(ws, room_name, role, takeover=False):
+async def ws_session(ws, room_name, role, takeover=False, passhash=""):
     room = room_of(room_name)
     ws.room, ws.role = room, role
+
+    # ── 遥控密码闸 ──────────────────────────────────────────────
+    # 只拦 remote / host（遥控翻页、看讲稿、控问答）。
+    # **ask（学生提问）和 wall（大屏展示）永远不要密码** —— 学生扫码就该能提问，
+    # 加一道门等于把互动本身废掉。
+    #
+    # 密码由放映端在连接时登记（deck 里烘的是 sha256(room:code) 的十六进制，不是明文，
+    # 所以翻 deck 源码看不到码本身）。deck 没登记密码 = 这份 deck 不设密码，行为和以前完全一样，
+    # 老版本的 iPhone app 照常能用。
+    if role == "deck":
+        if not room.socks["deck"] or takeover:
+            room.passhash = passhash or ""
+            if room.passhash:
+                # 放映端一登记密码，就把先前没验过的遥控端请下去（它们是密码生效前混进来的）
+                for r in ("remote", "host"):
+                    for old in list(room.socks[r]):
+                        if not getattr(old, "authed", False):
+                            await old.send_json({"type": "auth-required", "reason": "passcode-set"})
+                            await old.close()
+                            room.socks[r].discard(old)
+    elif role in ("remote", "host") and room.passhash:
+        now = time.time()
+        if now < room.locked_until:
+            await ws.send_json({"type": "auth-locked", "wait": int(room.locked_until - now) + 1})
+            await ws.close(); return
+        if passhash != room.passhash:
+            room.fails += 1
+            if room.fails >= MAX_AUTH_FAIL:
+                room.locked_until = now + AUTH_COOLDOWN
+                room.fails = 0
+            await ws.send_json({"type": "auth-required",
+                                "reason": "bad" if passhash else "need",
+                                "left": max(0, MAX_AUTH_FAIL - room.fails)})
+            await ws.close(); return
+        room.fails = 0
+        ws.authed = True
 
     # 放映端：**先到先得**，而不是「新的顶掉旧的」。
     # 为什么改：slides 是公开分享的，台下任何人打开一次公开链接、点一下「手机遥控」，
@@ -353,7 +394,8 @@ async def handle(reader, writer):
                           "Connection: Upgrade\r\nSec-WebSocket-Accept: %s\r\n\r\n" % accept).encode())
             await writer.drain()
             takeover = (qs.get("takeover") or ["0"])[0] == "1"
-            await ws_session(WS(reader, writer), room, role, takeover)
+            passhash = re.sub(r"[^0-9a-f]", "", (qs.get("pass") or [""])[0].lower())[:64]
+            await ws_session(WS(reader, writer), room, role, takeover, passhash)
             return
 
         await http_reply(writer, "404 Not Found", "not found")

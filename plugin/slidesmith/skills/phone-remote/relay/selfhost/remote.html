@@ -20,6 +20,19 @@
   #modes { display:flex; gap:4px; background:var(--panel); border-radius:999px; padding:3px; flex:none; }
   #modes button { border:none; background:none; color:var(--dim); font:600 13px/1 -apple-system,system-ui,"PingFang SC",sans-serif; padding:8px 15px; border-radius:999px; }
   #modes button.on { background:var(--panel2); color:var(--amber); }
+  #gate { position:fixed; inset:0; z-index:99; display:none; align-items:center; justify-content:center;
+    background:rgba(8,9,12,.94); backdrop-filter:blur(6px); padding:24px; }
+  .gatebox { width:100%; max-width:340px; text-align:center; }
+  .gatetitle { font-size:20px; font-weight:800; margin-bottom:10px; }
+  #gateMsg { font-size:14px; color:var(--dim); line-height:1.6; margin-bottom:18px; }
+  #gateMsg.bad { color:#e8825a; }
+  #gateInput { width:100%; box-sizing:border-box; font:600 22px/1 -apple-system,system-ui,sans-serif;
+    text-align:center; letter-spacing:.34em; padding:15px 12px; border-radius:14px;
+    border:1px solid var(--line); background:var(--panel); color:var(--fg); }
+  #gateInput:focus { outline:none; border-color:var(--amber); }
+  #gateGo { width:100%; margin-top:12px; padding:15px; border:0; border-radius:14px;
+    background:var(--amber); color:#151515; font:700 16px/1 inherit; }
+  .gatehint { margin-top:16px; font-size:12px; color:var(--dim); line-height:1.7; }
   #warn { margin:0 12px 8px; padding:9px 12px; border-radius:12px; background:#3a2a12; color:var(--amber); font-size:12.5px; line-height:1.5; display:none; }
   #warn.show { display:block; }
   .pane { flex:1; display:none; flex-direction:column; min-height:0; }
@@ -94,6 +107,15 @@
       <button id="mQa">问答<span class="badge" id="qaBadge" style="display:none">0</span></button>
     </div>
   </header>
+  <div id="gate">
+    <div class="gatebox">
+      <div class="gatetitle">🔒 遥控密码</div>
+      <div id="gateMsg">这份 slides 设了遥控密码</div>
+      <input id="gateInput" type="password" inputmode="numeric" autocomplete="off" enterkeyhint="go" placeholder="输入密码">
+      <button id="gateGo">进入</button>
+      <div class="gatehint">密码由讲者设定，只给自己用。<br>学生扫码提问不需要密码。</div>
+    </div>
+  </div>
   <div id="warn">已连上中转，但<b>放映端还没打开</b>。请在电脑上打开这份 slides 并点「手机遥控」。</div>
 
   <!-- 遥控模式 -->
@@ -165,7 +187,7 @@
 
   function wsUrl() {
     var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return proto + '//' + location.host + '/ws?room=' + encodeURIComponent(ROOM) + '&role=remote';
+    return proto + '//' + location.host + '/ws?room=' + encodeURIComponent(ROOM) + '&role=remote' + passQS();
   }
   function setState(kind, text) { dot.className = (kind==='ok')?'ok':(kind==='bad'?'bad':''); stext.textContent = text; }
   function connLabel() { return deckPresent ? ('已连接放映端 · ' + (p2p ? '直连' : '云端')) : '等待放映端'; }
@@ -281,11 +303,58 @@
   }
   timerEl.addEventListener('click', function () { t0 = Date.now(); });   // 点一下归零
 
+  // ── 遥控密码 ───────────────────────────────────────────────
+  // 放映端登记了密码时，遥控端必须拿出同一个 sha256(room:密码) 才让进。
+  // 存哈希不存明文；记在这台设备上，同一房间下次不用再输。
+  // **学生的提问页不走这里** —— 提问永远不需要密码。
+  var SALT = 'slidesmith-remote:';          // 和 Studio 烘哈希时用的是同一个盐
+  var PASSKEY = 'sm-pass-' + ROOM, passHash = '';
+  try { passHash = localStorage.getItem(PASSKEY) || ''; } catch (e) { passHash = ''; }
+  function passQS() { return passHash ? '&pass=' + passHash : ''; }
+  function sha256hex(text) {
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+    });
+  }
+  function showGate(msg, bad) {
+    var g = document.getElementById('gate'); if (!g) return;
+    g.style.display = 'flex';
+    var t = document.getElementById('gateMsg');
+    if (t) { t.textContent = msg || '这份 slides 设了遥控密码'; t.className = bad ? 'bad' : ''; }
+    var i = document.getElementById('gateInput');
+    if (i) { i.value = ''; setTimeout(function () { try { i.focus(); } catch (e) {} }, 120); }
+  }
+  function hideGate() { var g = document.getElementById('gate'); if (g) g.style.display = 'none'; }
+  function submitPass() {
+    var i = document.getElementById('gateInput');
+    var v = (i && i.value || '').trim();
+    if (!v) { showGate('请输入遥控密码', true); return; }
+    sha256hex(SALT + v).then(function (h) {
+      passHash = h;
+      try { localStorage.setItem(PASSKEY, h); } catch (e) {}
+      hideGate();
+      try { if (ws) { ws.onclose = null; ws.close(); } } catch (e) {}
+      connect();
+    }).catch(function () { showGate('这台设备算不了哈希（页面需要 HTTPS）', true); });
+  }
+  function onAuth(m) {
+    try { localStorage.removeItem(PASSKEY); } catch (e) {}
+    passHash = '';
+    if (m.type === 'auth-locked') { showGate('密码错太多次，请 ' + (m.wait || 60) + ' 秒后再试', true); return; }
+    showGate(m.reason === 'bad' ? ('密码不对，还可以试 ' + (m.left == null ? '几' : m.left) + ' 次')
+                                : '这份 slides 设了遥控密码', m.reason === 'bad');
+  }
+
   function connect() {
     setState('', '连接中…');
     ws = new WebSocket(wsUrl());
     ws.onopen = function () { setState('', '等待放映端'); };
     ws.onmessage = function (e) { var m; try { m = JSON.parse(e.data); } catch (x) { return; }
+      if (m.type === 'auth-required' || m.type === 'auth-locked') {
+        ws.onclose = null;                       // 先别自动重连，等人输密码
+        try { ws.close(); } catch (x2) {}
+        setState('bad', '需要遥控密码'); onAuth(m); return;
+      }
       if (m.type === 'joined' || m.type === 'peer') reflectPeers(m.peers);
       else if (m.type === 'signal') { if (m.kind === 'offer') onOffer(m.data); else if (m.kind === 'ice') onIce(m.data); }
       else onDeckMsg(m);
@@ -293,6 +362,9 @@
     ws.onclose = function () { setState('bad', '连接断开，重连中…'); setTimeout(connect, 1500); };
     ws.onerror = function () { try { ws.close(); } catch (x) {} };
   }
+  var gg = document.getElementById('gateGo'); if (gg) gg.addEventListener('click', submitPass);
+  var gi = document.getElementById('gateInput');
+  if (gi) gi.addEventListener('keydown', function (e) { if (e.key === 'Enter') submitPass(); });
   connect();
 
   function haptic() { try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
@@ -380,13 +452,16 @@
   function qaState(cls, text) { qaDotR.className = cls || ''; qaStatR.textContent = text; }
   function qConnect() {
     var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    try { qws = new WebSocket(proto + '//' + location.host + '/ws?room=' + encodeURIComponent(ROOM) + '&role=host'); }
+    try { qws = new WebSocket(proto + '//' + location.host + '/ws?room=' + encodeURIComponent(ROOM) + '&role=host' + passQS()); }
     catch (e) { qRetry(); return; }
     qws.onopen = function () { qtries = 0; qaState('ok', '已连接'); };
     qws.onclose = function () { qaState('bad', '断开，重连中'); qRetry(); };
     qws.onerror = function () { /* onclose 会跟上 */ };
     qws.onmessage = function (e) {
       var d = null; try { d = JSON.parse(e.data); } catch (x) { return; }
+      if (d.type === 'auth-required' || d.type === 'auth-locked') {
+        qws.onclose = null; try { qws.close(); } catch (x2) {} onAuth(d); return;
+      }
       if (d.type === 'qa-init') { qItems = d.questions || []; qClosed = !!d.closed; qSeen = qItems.length; syncCloseBtn(); qaRender(); }
       else if (d.type === 'qa-new') { qItems.push(d.q); if (mode === 'qa') qSeen = qItems.length; qaRender(); }
       else if (d.type === 'qa-cleared') { qItems = []; qSeen = 0; qaRender(); }

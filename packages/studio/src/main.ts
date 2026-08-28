@@ -21,7 +21,7 @@ import { renderDeckHtml } from '@slidesmith/engine';
 import { listThemes } from '@slidesmith/themes';
 import { galleryHtml } from '@slidesmith/anim-gallery';
 import { fxCanvasJs } from '@slidesmith/fx-canvas';
-import { cloudRelay as PR_CLOUD, qrLibJs, pairClientJs } from '@slidesmith/phone-remote';
+import { cloudRelay as PR_CLOUD, relayOptions as PR_RELAYS, qrLibJs, pairClientJs } from '@slidesmith/phone-remote';
 import { SKINS, SKIN_ORDER } from '@slidesmith/skins';
 
 // ---- preview bridge: injected into the deck iframe for inline editing ----
@@ -199,6 +199,25 @@ let htmlGotoAfterRender = -1; // restore this slide after a re-render (e.g. afte
 let fxMode: 'auto' | 'manual' = 'auto'; // 动效播放模式：auto=进入页面即播 / manual=点击页面才播（写进导出的 <html data-smfx>）
 let embedPhoneRemote = false; // 勾选「嵌入手机遥控」后，导出的 deck 会烘进「📱 手机遥控」按钮 + 配对客户端（云端/局域网可选）
 let newRoomOnExport = false;  // 勾了才换新房间号；默认沿用 deck 里已有的，免得每导一版就要重扫码
+let relayId = 'cf';           // 用哪个云中转。**默认 Cloudflare** —— 一直用得好，别擅自改默认
+let remotePass = '';          // 遥控密码（明文只留在 Studio 内存里；烘进 deck 的是 sha256(room:密码)）
+try { relayId = localStorage.getItem('sm-relay') || 'cf'; } catch { /* noop */ }
+function relayUrl(): string {
+  const hit = PR_RELAYS.filter((r) => r.id === relayId)[0];
+  return (hit && hit.url) || PR_CLOUD;
+}
+let remotePassHash = '';      // 上面那个密码的 sha256，导出时同步取用
+const PASS_SALT = 'slidesmith-remote:';   // 手机端算哈希用的是同一个盐
+/** 密码 → sha256 十六进制。**烘哈希不烘明文**：deck 常常是公开分享的，
+ *  源码里直接写着密码等于没设。
+ *  ⚠️ 但要清楚它挡的是什么：它挡住「在台下扫了一眼大屏二维码就想遥控」的人；
+ *  真去下载 deck 文件、翻出这串哈希的人仍然进得来（哈希就是凭证本身）。
+ *  要更强的隔离就别公开分享那一份，现场用本地文件。 */
+async function computePassHash(code: string): Promise<void> {
+  if (!code) { remotePassHash = ''; return; }
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(PASS_SALT + code));
+  remotePassHash = Array.from(new Uint8Array(buf)).map((b) => ('0' + b.toString(16)).slice(-2)).join('');
+}
 let lastExportRoom = '';      // 上一次导出实际用的房间号（导出后提示里报出来）
 
 // ---- never-lose-work: a dirty flag + debounced localStorage draft + undo/redo history.
@@ -921,8 +940,10 @@ function assembleDeck(forEdit = false): string {
     const room = (!newRoomOnExport && inheritedRoom) ? inheritedRoom : smRoomId();
     const deckId = (!newRoomOnExport && inheritedDeckId) ? inheritedDeckId : ('sm-' + smRoomId().slice(0, 12));
     const inject = PHONE_REMOTE_JS
+      .replace('__SM_RELAYVAL__', relayUrl())
       .replace('__SM_ROOMVAL__', room)
-      .replace('__SM_DECKIDVAL__', deckId);
+      .replace('__SM_DECKIDVAL__', deckId)
+      .replace('__SM_PASSLINE__', remotePassHash ? `window.__SM_PASS__="${remotePassHash}";` : '');
     doc = insertBeforeBodyEnd(doc, inject + '\n');
     lastExportRoom = room;
   }
@@ -1162,8 +1183,8 @@ const FX_CANVAS_JS = '<script id="sm-fx-canvas">' + fxCanvasJs + '</scr' + 'ipt>
 // __SM_ROOM__ 占位符在导出时被替换成一个固定房间号（每份导出各一个），使这份 HTML 的配对二维码永久不变。
 const PHONE_REMOTE_JS =
   '<!--sm-phone-remote-start-->\n'
-  + '<script>window.__SM_CLOUD_RELAY__=' + JSON.stringify(PR_CLOUD) + ';window.__SM_ROOM__="__SM_ROOMVAL__";'
-  + 'window.__SM_DECK_ID__="__SM_DECKIDVAL__";</scr' + 'ipt>\n'
+  + '<script>window.__SM_CLOUD_RELAY__="__SM_RELAYVAL__";window.__SM_ROOM__="__SM_ROOMVAL__";'
+  + 'window.__SM_DECK_ID__="__SM_DECKIDVAL__";__SM_PASSLINE__</scr' + 'ipt>\n'
   + '<script>' + qrLibJs + '</scr' + 'ipt>\n'
   + '<script>' + pairClientJs + '</scr' + 'ipt>\n'
   + '<!--sm-phone-remote-end-->';
@@ -4321,6 +4342,15 @@ body.dark .illbox #illHint{background:#202022;color:#e8e8ea;border-color:#3a3a3d
 .todochip.photo{color:var(--sm-warn-ink);background:var(--sm-warn-tint)}
 .todochip.tray{color:var(--sm-warn-ink);background:var(--sm-accent-tint)}
 .todochip.ann{color:#8a6a2a;background:#ffe9a8}
+.prcfg{margin:6px 0 4px 24px;padding:9px 11px;border:1px solid var(--sm-line);border-radius:var(--sm-r-sm);background:var(--sm-surface-2);display:flex;flex-direction:column;gap:6px}
+.prrow{display:flex;align-items:center;gap:8px}
+.prrow label{flex:0 0 58px;font-size:12px;color:var(--sm-ink-3)}
+.prrow select,.prrow input{flex:1;min-width:0;font-family:inherit;font-size:12px;padding:5px 7px;border:1px solid var(--sm-line-2);border-radius:var(--sm-r-xs);background:var(--sm-surface);color:var(--sm-ink)}
+.prrow input:focus,.prrow select:focus{outline:none;border-color:var(--sm-accent)}
+.prhint{font-size:11px;line-height:1.6;color:var(--sm-ink-4)}
+.prhint b{color:var(--sm-ink-3)}
+body.dark .prcfg{background:#1b1e25;border-color:#2c323d}
+body.dark .prrow select,body.dark .prrow input{background:#12151b;border-color:#2c323d;color:#e8e8ea}
 .todopg{flex:0 0 auto;font-size:10px;color:var(--sm-accent);font-weight:700;font-variant-numeric:tabular-nums}
 .tododesc{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:var(--sm-ink-2)}
 .todo-del{flex:0 0 auto;width:22px;height:22px;line-height:1;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--sm-warm-line);border-radius:var(--sm-r-sm);background:var(--sm-surface-2);color:var(--sm-ink-3);font-size:12px;cursor:pointer;padding:0;transition:background .12s,color .12s,border-color .12s}
@@ -4538,6 +4568,12 @@ function buildUI(): void {
       <label class="embedck"><input id="embedFonts" type="checkbox"> <span>嵌入字体<span class="ck-sub">把用到的字体子集写进 HTML，换台电脑或离线也不走样，文件略大</span></span></label>
       <label class="embedck"><input id="embedRemote" type="checkbox"> <span>嵌入手机遥控<span class="ck-sub">导出的 HTML 里多一个「📱 手机遥控」按钮，扫码即可用手机翻页</span></span></label>
       <label class="embedck" id="newRoomWrap" style="display:none"><input id="newRoom" type="checkbox"> <span>换新房间号<span class="ck-sub">默认沿用这份 deck 原有的房间号，手机不用重新扫码；勾上才铸新号，旧二维码作废</span></span></label>
+      <div id="relayWrap" class="prcfg" style="display:none">
+        <div class="prrow"><label for="relaySel">中转</label><select id="relaySel"></select></div>
+        <div class="prhint" id="relayHint"></div>
+        <div class="prrow"><label for="remotePass">遥控密码</label><input id="remotePass" type="text" inputmode="numeric" autocomplete="off" placeholder="留空＝不设密码"></div>
+        <div class="prhint">设了之后，手机扫码要先输这个密码才能翻页 / 看讲稿 / 控问答。<b>学生扫码提问不受影响，永远不要密码。</b>密码以哈希形式烘进文件，源码里看不到明文。</div>
+      </div>
     </div>
     <button id="expPdf">导出 PDF</button>
     <button id="expHtml" title="另存为：下载一份新的 HTML 副本，不覆盖原文件">另存为</button>
@@ -5075,7 +5111,26 @@ function buildUI(): void {
   const remoteTog = $('#embedRemote') as HTMLInputElement | null;
   const newRoomTog = $('#newRoom') as HTMLInputElement | null;
   const newRoomWrap = $('#newRoomWrap') as HTMLElement | null;
-  const syncRoomTog = () => { if (newRoomWrap) newRoomWrap.style.display = embedPhoneRemote ? '' : 'none'; };
+  const relayWrap = $('#relayWrap') as HTMLElement | null;
+  const relaySel = $('#relaySel') as HTMLSelectElement | null;
+  const relayHint = $('#relayHint');
+  if (relaySel) {
+    relaySel.innerHTML = PR_RELAYS.map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join('');
+    relaySel.value = relayId;
+    const showHint = () => { const h = PR_RELAYS.filter((r) => r.id === relaySel.value)[0]; if (relayHint) relayHint.textContent = h ? h.hint : ''; };
+    showHint();
+    relaySel.addEventListener('change', () => {
+      relayId = relaySel.value;
+      try { localStorage.setItem('sm-relay', relayId); } catch { /* noop */ }
+      showHint(); toast('中转已切到：' + (PR_RELAYS.filter((r) => r.id === relayId)[0]?.label || relayId));
+    });
+  }
+  const passBox = $('#remotePass') as HTMLInputElement | null;
+  if (passBox) passBox.addEventListener('input', () => { remotePass = passBox.value.trim(); void computePassHash(remotePass); });
+  const syncRoomTog = () => {
+    if (newRoomWrap) newRoomWrap.style.display = embedPhoneRemote ? '' : 'none';
+    if (relayWrap) relayWrap.style.display = embedPhoneRemote ? '' : 'none';
+  };
   if (remoteTog) { remoteTog.checked = embedPhoneRemote; remoteTog.addEventListener('change', () => { embedPhoneRemote = remoteTog.checked; syncRoomTog(); if (embedPhoneRemote) toast('导出的 HTML 将带「📱 手机遥控」按钮'); }); }
   if (newRoomTog) { newRoomTog.checked = newRoomOnExport; newRoomTog.addEventListener('change', () => { newRoomOnExport = newRoomTog.checked; if (newRoomOnExport) toast('导出时会铸新房间号 —— 手机要重扫码'); }); }
   syncRoomTog();
@@ -5185,7 +5240,9 @@ function buildUI(): void {
         const j = await r.json() as { ok: boolean; path?: string; error?: string };
         if (j.ok && j.path) {
           toast('✅ 已另存为：' + j.path + '（已在访达高亮）'
-            + (embedPhoneRemote ? (newRoomOnExport ? ' · 已换新房间号，手机需重扫码' : ' · 沿用原房间号，手机不用重扫') : ''));
+            + (embedPhoneRemote ? (newRoomOnExport ? ' · 已换新房间号，手机需重扫码' : ' · 沿用原房间号，手机不用重扫') : '')
+            + (embedPhoneRemote ? ' · 中转 ' + (PR_RELAYS.filter((r) => r.id === relayId)[0]?.label || relayId)
+                + (remotePassHash ? ' · 已设遥控密码' : '') : ''));
           return;
         }
       } catch { /* bridge 不可用 → 往下走 */ }

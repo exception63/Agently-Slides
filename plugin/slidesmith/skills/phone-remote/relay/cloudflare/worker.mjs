@@ -55,6 +55,9 @@ const MIN_GAP = 4000;    // 同一台设备两次提交的最小间隔（毫秒�
 export class Room {
   constructor(state) {
     this.state = state;
+    this.passhash = '';          // 由第一个放映端登记；空＝这份 deck 不设遥控密码
+    this.fails = 0;
+    this.lockedUntil = 0;
     this.lastPost = new Map();   // ws → 上次提交时间（休眠会丢，属可接受）
   }
 
@@ -84,7 +87,42 @@ export class Room {
     // ⚠️ 只对 deck 生效。wall/host/ask 是多实例共存的（见文件头注释）。
     // 放映端**先到先得**（不是「新的顶掉旧的」）：slides 是公开分享的，
     // 台下谁点一下「手机遥控」都不该把讲台那份踢下线。讲者换机器时带 takeover=1。
-    const takeover = new URL(req.url).searchParams.get('takeover') === '1';
+    const url2 = new URL(req.url);
+    const takeover = url2.searchParams.get('takeover') === '1';
+    const passhash = (url2.searchParams.get('pass') || '').toLowerCase().replace(/[^0-9a-f]/g, '').slice(0, 64);
+
+    // ── 遥控密码闸 ──
+    // 只拦 remote / host（遥控翻页、看讲稿、控问答）。
+    // **ask（学生提问）和 wall（大屏）永远不要密码** —— 学生扫码就该能提问，加门等于废掉互动本身。
+    // 密码由放映端登记；deck 里烘的是 sha256(room:code) 的十六进制，不是明文。
+    // 没登记 = 这份 deck 不设密码，行为与以前完全一致（老版本 iPhone app 照常能用）。
+    if (role === 'deck') {
+      if (!this.state.getWebSockets('deck').length || takeover) {
+        this.passhash = passhash || '';
+        if (this.passhash) {
+          for (const r of ['remote', 'host']) {
+            for (const old of this.state.getWebSockets(r)) {
+              try { old.send(JSON.stringify({ type: 'auth-required', reason: 'passcode-set' })); old.close(1000, 'auth'); } catch (e) { /* noop */ }
+            }
+          }
+        }
+      }
+    } else if ((role === 'remote' || role === 'host') && this.passhash) {
+      const now = Date.now();
+      const reject = (obj) => {
+        const pr = new WebSocketPair();
+        this.state.acceptWebSocket(pr[1], ['rejected']);
+        try { pr[1].send(JSON.stringify(obj)); pr[1].close(1000, 'auth'); } catch (e) { /* noop */ }
+        return new Response(null, { status: 101, webSocket: pr[0] });
+      };
+      if (now < this.lockedUntil) return reject({ type: 'auth-locked', wait: Math.ceil((this.lockedUntil - now) / 1000) });
+      if (passhash !== this.passhash) {
+        this.fails += 1;
+        if (this.fails >= 6) { this.lockedUntil = now + 60000; this.fails = 0; }
+        return reject({ type: 'auth-required', reason: passhash ? 'bad' : 'need', left: Math.max(0, 6 - this.fails) });
+      }
+      this.fails = 0;
+    }
     if (role === 'deck' && this.state.getWebSockets('deck').length) {
       if (!takeover) {
         const pair0 = new WebSocketPair();
