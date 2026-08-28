@@ -1,0 +1,35 @@
+#!/usr/bin/env python3
+"""每天把 live.db 快照一份到 /srv/myspace/files/ —— 你现有的 `myspace sync pull`
+（Mac 上每天 12:30 那个 launchd 任务）会顺手把它拉回本地，不用另起一套备份。
+
+用 SQLite 自己的 backup API 而不是 cp：服务随时可能在写，直接拷会拷到半截的文件。
+"""
+import sqlite3, pathlib, time, shutil
+
+SRC = pathlib.Path("/var/lib/smrelay/live.db")
+DST = pathlib.Path("/srv/myspace/files/_slidesmith-live")
+if not SRC.exists():
+    raise SystemExit(0)
+DST.mkdir(parents=True, exist_ok=True)
+
+tmp = DST / "live.db.tmp"
+src = sqlite3.connect(f"file:{SRC}?mode=ro", uri=True)
+dst = sqlite3.connect(str(tmp))
+with dst:
+    src.backup(dst)
+dst.close(); src.close()
+tmp.replace(DST / "live.db")
+
+(DST / "说明.txt").write_text(
+    "Slidesmith Live 的互动记录数据库（每天自动快照一次）。\n"
+    "原件在服务器 /var/lib/smrelay/live.db，这里这份是给备份用的副本。\n"
+    "要看内容请打开 https://live.zhouliying.com （用 MySpace 的密码登录）。\n"
+    f"最近一次快照：{time.strftime('%Y-%m-%d %H:%M:%S')}\n", encoding="utf-8")
+
+# 属主给 MySpace 那套，免得 rsync 拉取时权限打架
+try:
+    shutil.chown(DST / "live.db", user="admin", group="admin")
+    shutil.chown(DST / "说明.txt", user="admin", group="admin")
+    shutil.chown(DST, user="admin", group="admin")
+except Exception:
+    pass

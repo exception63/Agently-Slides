@@ -21,7 +21,7 @@ WebSocket 服务端握手 + 帧解析总共两百行，不值得为它引入依�
   GET /q/<room>        学生提问页
   GET /ws?room=&role=  WebSocket
 """
-import asyncio, base64, hashlib, json, os, pathlib, re, struct, sys, time
+import asyncio, base64, hashlib, json, os, pathlib, re, sqlite3, struct, sys, time
 from urllib.parse import urlparse, parse_qs, unquote
 
 HOST = os.environ.get("SMRELAY_HOST", "127.0.0.1")
@@ -35,6 +35,53 @@ ROOM_RE = re.compile(r"^[A-Za-z0-9_-]{4,64}$")
 MAX_LEN, MAX_KEEP, MIN_GAP = 200, 300, 4.0     # 单条字数 / 留存条数 / 同设备提交间隔（秒）
 MAX_AUTH_FAIL, AUTH_COOLDOWN = 6, 60.0         # 密码连错几次 / 冷却多少秒
 MAX_ROOMS = 200
+SESSION_GAP = 30 * 60          # 放映端下线满这么久，就认为这一场讲完了
+DB = DATA / "live.db"
+
+
+# ═══════════════════ 存储：一个 SQLite 文件 ═══════════════════
+# 三层：课/活动（room）→ 场次（session）→ 条目（item）。
+# 「一门课一个房间、每次开讲自动分一场」就落在这个结构上：
+# slides 里的房间号一次烘死、二维码永不变，而每次上课各成一场，事后好分析。
+#
+# **不存任何设备标识**（用户明确要求）：只在场次上记一个「同时在线峰值」的数字，
+# 事后无法定位到任何人，但仍看得出参与规模。
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS room(
+  id TEXT PRIMARY KEY, name TEXT NOT NULL DEFAULT '', created INT NOT NULL,
+  archived INT NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS session(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL,
+  started INT NOT NULL, ended INT, peak INT NOT NULL DEFAULT 0,
+  FOREIGN KEY(room) REFERENCES room(id));
+CREATE TABLE IF NOT EXISTS item(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, session INT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'q', text TEXT NOT NULL, ts INT NOT NULL,
+  hidden INT NOT NULL DEFAULT 0,
+  FOREIGN KEY(session) REFERENCES session(id));
+CREATE INDEX IF NOT EXISTS ix_session_room ON session(room, started DESC);
+CREATE INDEX IF NOT EXISTS ix_item_session ON item(session, ts);
+"""
+_db = None
+
+def db():
+    global _db
+    if _db is None:
+        DATA.mkdir(parents=True, exist_ok=True)
+        _db = sqlite3.connect(str(DB))
+        _db.row_factory = sqlite3.Row
+        _db.executescript(SCHEMA)
+        _db.commit()
+    return _db
+
+def q1(sql, *a):
+    r = db().execute(sql, a).fetchone(); return r
+
+def qa_(sql, *a):
+    return db().execute(sql, a).fetchall()
+
+def ex(sql, *a):
+    c = db().execute(sql, a); db().commit(); return c
 
 def log(*a):
     print(time.strftime("[%F %T]"), *a, flush=True)
@@ -183,6 +230,39 @@ class Room:
         return not any(self.socks[r] for r in ROLES)
 
 
+# ── 场次生命周期 ─────────────────────────────────────────────
+# 放映端一上线就开一场；下线满 SESSION_GAP 才算讲完。
+# 中途刷新页面、网断一下重连，都还算同一场——现场这两件事天天发生。
+def ensure_room(rid, name=""):
+    if not q1("SELECT id FROM room WHERE id=?", rid):
+        ex("INSERT INTO room(id,name,created) VALUES(?,?,?)", rid, name or "", int(time.time()))
+
+def open_session(rid):
+    ensure_room(rid)
+    now = int(time.time())
+    cur = q1("SELECT id, started FROM session WHERE room=? AND ended IS NULL ORDER BY id DESC LIMIT 1", rid)
+    if cur:
+        return cur["id"]                       # 还开着，接着用（刷新/断线重连不该另起一场）
+    last = q1("SELECT id, ended FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
+    if last and last["ended"] and now - last["ended"] < SESSION_GAP:
+        ex("UPDATE session SET ended=NULL WHERE id=?", last["id"])   # 刚讲完又连回来 = 同一场
+        return last["id"]
+    return ex("INSERT INTO session(room,started) VALUES(?,?)", rid, now).lastrowid
+
+def touch_session_end(rid):
+    """放映端下线：先记个结束时间；真正判定讲完由清扫任务在 SESSION_GAP 后做。"""
+    ex("UPDATE session SET ended=? WHERE room=? AND ended IS NULL", int(time.time()), rid)
+
+def bump_peak(rid, n):
+    r = q1("SELECT id, peak FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
+    if r and n > (r["peak"] or 0):
+        ex("UPDATE session SET peak=? WHERE id=?", n, r["id"])
+
+def current_session(rid):
+    r = q1("SELECT id FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
+    return r["id"] if r else open_session(rid)
+
+
 ROOMS = {}
 
 def room_of(name):
@@ -225,6 +305,13 @@ async def on_message(ws, raw):
             room.questions.append(item)
             del room.questions[:-MAX_KEEP]
             room._save()
+            # 落进 SQLite：墙上那份是"这一场正在显示的"，库里这份是"永久账本"。
+            # 讲者清屏只清墙，不动账本——不然一清屏历史就没了。
+            try:
+                ex("INSERT INTO item(session,kind,text,ts) VALUES(?,?,?,?)",
+                   current_session(room.name), "q", text, item["ts"])
+            except Exception as e:
+                log("入库失败", room.name, e)
             await room.to(("wall", "host"), {"type": "qa-new", "q": item, "total": len(room.questions)})
             await ws.send_json({"type": "qa-ack", "ok": True, "total": len(room.questions)})
             return
@@ -236,7 +323,12 @@ async def on_message(ws, raw):
             room.questions = []; room._save()
             await room.to(("wall", "host"), {"type": "qa-cleared"})
         elif t == "qa-hide" and d.get("id"):
+            gone = [q for q in room.questions if q["id"] == d["id"]]
             room.questions = [q for q in room.questions if q["id"] != d["id"]]; room._save()
+            if gone:   # 账本里只标记，不删——事后复盘要看得到"当时撤下过什么"
+                try: ex("UPDATE item SET hidden=1 WHERE session=? AND ts=? AND text=?",
+                        current_session(room.name), gone[0]["ts"], gone[0]["t"])
+                except Exception: pass
             await room.to(("wall", "host"), {"type": "qa-hidden", "id": d["id"], "total": len(room.questions)})
         elif t == "qa-scroll":
             # 纯瞬时指令，不落盘：讲者在 iPad 上翻大屏的问题墙
@@ -308,6 +400,12 @@ async def ws_session(ws, room_name, role, takeover=False, passhash=""):
             await old.close()
             room.socks["deck"].discard(old)
     room.socks[role].add(ws)
+    if role == "deck":
+        try: open_session(room_name)
+        except Exception as e: log("开场失败", room_name, e)
+    elif role == "ask":
+        try: bump_peak(room_name, len(room.socks["ask"]))
+        except Exception: pass
     log("join", room_name, role, room.counts())
 
     await ws.send_json({"type": "joined", "role": role, "peers": room.counts()})
@@ -328,6 +426,9 @@ async def ws_session(ws, room_name, role, takeover=False, passhash=""):
     finally:
         room.socks[role].discard(ws)
         await ws.close()
+        if role == "deck" and not room.socks["deck"]:
+            try: touch_session_end(room_name)
+            except Exception: pass
         log("leave", room_name, role, room.counts())
         if role in ("deck", "remote"):
             await room.to(("remote" if role == "deck" else "deck",),
@@ -351,6 +452,143 @@ async def http_reply(w, status, body, ctype="text/plain; charset=utf-8", extra="
     await w.drain()
     w.close()
 
+# ═══════════════════ 管理台 API ═══════════════════
+# 门由 Caddy 的 forward_auth 把（复用 MySpace 的 msauth，密码天然同一个）。
+# 这里假定「能走到这儿的就是本人」——服务只监听 127.0.0.1，绕不过去。
+def csv_escape(v):
+    v = "" if v is None else str(v)
+    return '"' + v.replace('"', '""') + '"' if any(c in v for c in ',"\n\r') else v
+
+def admin_api(path, qs, body):
+    now = int(time.time())
+
+    if path == "/api/admin/overview":
+        rooms = []
+        for r in qa_("SELECT * FROM room WHERE archived=0 ORDER BY created DESC"):
+            live = ROOMS.get(r["id"])
+            st = q1("SELECT id,started,ended,peak FROM session WHERE room=? ORDER BY id DESC LIMIT 1", r["id"])
+            n = q1("SELECT COUNT(*) c FROM item WHERE session IN (SELECT id FROM session WHERE room=?)", r["id"])["c"]
+            ns = q1("SELECT COUNT(*) c FROM session WHERE room=?", r["id"])["c"]
+            rooms.append({
+                "id": r["id"], "name": r["name"], "created": r["created"],
+                "sessions": ns, "items": n,
+                "online": {"deck": len(live.socks["deck"]) if live else 0,
+                           "remote": len(live.socks["remote"]) if live else 0,
+                           "ask": len(live.socks["ask"]) if live else 0} if live else None,
+                "wallNow": len(live.questions) if live else 0,
+                "closed": bool(live.closed_qa) if live else False,
+                "last": ({"id": st["id"], "started": st["started"], "ended": st["ended"], "peak": st["peak"]}
+                         if st else None),
+            })
+        return {"ok": True, "now": now, "rooms": rooms,
+                "health": {"uptime": now - START_AT, "rooms": len(ROOMS)}}
+
+    if path == "/api/admin/sessions":
+        rid = (qs.get("room") or [""])[0]
+        out = []
+        rows = qa_("""SELECT s.*, (SELECT COUNT(*) FROM item WHERE session=s.id) n
+                       FROM session s WHERE s.room=? ORDER BY s.id ASC""", rid)
+        # 序号按**这个房间**从 1 数。session.id 是全库自增的，直接拿来显示的话
+        # 新房间的第一场会显示成「第 6 场」——看着像丢了五场。
+        for i, r in enumerate(rows):
+            out.append({"id": r["id"], "no": i + 1, "started": r["started"], "ended": r["ended"],
+                        "peak": r["peak"], "items": r["n"]})
+        out.reverse()
+        rm = q1("SELECT * FROM room WHERE id=?", rid)
+        return {"ok": True, "room": rid, "name": rm["name"] if rm else "", "sessions": out}
+
+    if path == "/api/admin/items":
+        sid = int((qs.get("session") or ["0"])[0] or 0)
+        rows = qa_("SELECT id,text,ts,hidden FROM item WHERE session=? ORDER BY ts", sid)
+        return {"ok": True, "session": sid,
+                "items": [{"id": r["id"], "t": r["text"], "ts": r["ts"], "hidden": bool(r["hidden"])} for r in rows]}
+
+    if path == "/api/admin/room" and body is not None:
+        act = body.get("action")
+        rid = str(body.get("id") or "").strip()
+        if act == "create":
+            rid = rid or ("r" + base64.b32encode(os.urandom(5)).decode().lower().rstrip("="))
+            if not ROOM_RE.match(rid): return {"ok": False, "error": "房间号只能是 4–64 位字母数字和 - _"}
+            if q1("SELECT id FROM room WHERE id=?", rid): return {"ok": False, "error": "这个房间号已经有了"}
+            ensure_room(rid, str(body.get("name") or ""))
+            return {"ok": True, "id": rid}
+        if not q1("SELECT id FROM room WHERE id=?", rid): return {"ok": False, "error": "没有这个房间"}
+        if act == "rename":
+            ex("UPDATE room SET name=? WHERE id=?", str(body.get("name") or ""), rid); return {"ok": True}
+        if act == "delete":
+            ex("DELETE FROM item WHERE session IN (SELECT id FROM session WHERE room=?)", rid)
+            ex("DELETE FROM session WHERE room=?", rid)
+            ex("DELETE FROM room WHERE id=?", rid)
+            ROOMS.pop(rid, None)
+            try: (DATA / (rid + ".json")).unlink()
+            except Exception: pass
+            return {"ok": True}
+        return {"ok": False, "error": "不认识的操作"}
+
+    if path == "/api/admin/control" and body is not None:
+        rid = str(body.get("room") or "")
+        act = str(body.get("action") or "")
+        live = ROOMS.get(rid)
+        if not live: return {"ok": False, "error": "这个房间现在没人连着"}
+        PENDING_CONTROL.append((live, act))
+        return {"ok": True}
+
+    if path == "/api/admin/export":
+        sid = int((qs.get("session") or ["0"])[0] or 0)
+        fmt = (qs.get("fmt") or ["csv"])[0]
+        st = q1("SELECT s.*, r.name rname FROM session s JOIN room r ON r.id=s.room WHERE s.id=?", sid)
+        rows = qa_("SELECT text,ts,hidden FROM item WHERE session=? ORDER BY ts", sid)
+        tf = lambda t: time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(t))
+        if fmt == "md":
+            head = "# %s · %s\n\n共 %d 条 · 同时在线峰值 %d\n\n" % (
+                (st["rname"] or st["room"]) if st else "?", tf(st["started"]) if st else "", len(rows),
+                (st["peak"] or 0) if st else 0)
+            body_ = "\n".join("%d. %s　`%s`%s" % (i + 1, r["text"], tf(r["ts"]),
+                                                  "　（现场已撤下）" if r["hidden"] else "")
+                               for i, r in enumerate(rows))
+            return ("text/markdown; charset=utf-8", (head + body_ + "\n").encode("utf-8"))
+        out = "\ufeff序号,时间,问题,现场是否撤下\n"     # BOM：Excel 打开中文才不乱码
+        for i, r in enumerate(rows):
+            out += "%d,%s,%s,%s\n" % (i + 1, csv_escape(tf(r["ts"])), csv_escape(r["text"]),
+                                      "是" if r["hidden"] else "否")
+        return ("text/csv; charset=utf-8", out.encode("utf-8"))
+
+    return {"ok": False, "error": "未知接口"}
+
+
+START_AT = int(time.time())
+PENDING_CONTROL = []      # 管理台按的控制键：(room, action)，由事件循环里的小任务发出去
+
+
+async def drain_control():
+    """管理台是同步 HTTP，发不了 WebSocket；攒在这里由异步侧代发。"""
+    while True:
+        await asyncio.sleep(0.25)
+        while PENDING_CONTROL:
+            live, act = PENDING_CONTROL.pop(0)
+            try:
+                if act == "clear":
+                    live.questions = []; live._save()
+                    await live.to(("wall", "host"), {"type": "qa-cleared"})
+                elif act in ("close", "open"):
+                    live.closed_qa = (act == "close"); live._save()
+                    await live.to(("wall", "host", "ask"), {"type": "qa-state", "closed": live.closed_qa})
+            except Exception as e:
+                log("控制指令失败", act, e)
+
+
+async def sweep_sessions():
+    """放映端下线满 SESSION_GAP 就把那一场封存（ended 已写，这里只做日志和收敛）。"""
+    while True:
+        await asyncio.sleep(120)
+        try:
+            for k, v in list(ROOMS.items()):
+                if v.empty() and time.time() - v.touched > SESSION_GAP:
+                    del ROOMS[k]
+        except Exception:
+            pass
+
+
 async def handle(reader, writer):
     try:
         line = await asyncio.wait_for(reader.readline(), 15)
@@ -371,8 +609,37 @@ async def handle(reader, writer):
         u = urlparse(target)
         path, qs = unquote(u.path), parse_qs(u.query)
 
-        if path in ("/", "/health"):
+        if path == "/health":
             await http_reply(writer, "200 OK", "ok"); return
+
+        if path == "/" and method == "GET":
+            html = None
+            try: html = (ASSETS / "admin.html").read_text("utf-8")
+            except Exception: pass
+            if html is None:
+                await http_reply(writer, "200 OK", "ok"); return       # 管理台还没装，退回探测响应
+            await http_reply(writer, "200 OK", html, "text/html; charset=utf-8"); return
+
+        if path.startswith("/api/admin/"):
+            body = None
+            if method == "POST":
+                n = int(headers.get("content-length") or 0)
+                raw = await reader.readexactly(n) if 0 < n <= 1 << 20 else b""
+                try: body = json.loads(raw.decode("utf-8") or "{}")
+                except Exception: body = {}
+            try:
+                r = admin_api(path, qs, body)
+            except Exception as e:
+                log("管理接口出错", path, repr(e))
+                r = {"ok": False, "error": str(e)}
+            if isinstance(r, tuple):            # 导出：(content-type, bytes)
+                ct, data = r
+                fn = "slidesmith-live." + ("md" if "markdown" in ct else "csv")
+                await http_reply(writer, "200 OK", data, ct,
+                                 'Content-Disposition: attachment; filename="%s"\r\n' % fn)
+                return
+            await http_reply(writer, "200 OK", json.dumps(r, ensure_ascii=False),
+                             "application/json; charset=utf-8"); return
 
         m = re.match(r"^/(r|q)/([A-Za-z0-9_-]{4,64})$", path)
         if m and method == "GET":
@@ -410,10 +677,37 @@ async def handle(reader, writer):
         except Exception: pass
 
 
+def migrate_json():
+    """老版本把每个房间存成一个 .json。首次启动时把它们收进库，别丢历史。"""
+    n = 0
+    for f in sorted(DATA.glob("*.json")):
+        rid = f.stem
+        if not ROOM_RE.match(rid) or q1("SELECT id FROM room WHERE id=?", rid):
+            continue
+        try:
+            d = json.loads(f.read_text("utf-8"))
+        except Exception:
+            continue
+        qs_ = d.get("questions") or []
+        ensure_room(rid, "")
+        if qs_:
+            sid = ex("INSERT INTO session(room,started,ended) VALUES(?,?,?)",
+                     rid, qs_[0].get("ts", 0) // 1000 or int(time.time()),
+                     d.get("updatedAt") or int(time.time())).lastrowid
+            for it in qs_:
+                ex("INSERT INTO item(session,kind,text,ts) VALUES(?,?,?,?)",
+                   sid, "q", it.get("t", ""), (it.get("ts") or 0) // 1000)
+        n += 1
+    if n: log("迁移了 %d 个老房间进库" % n)
+
+
 async def main():
     DATA.mkdir(parents=True, exist_ok=True)
+    db(); migrate_json()
+    asyncio.get_running_loop().create_task(drain_control())
+    asyncio.get_running_loop().create_task(sweep_sessions())
     srv = await asyncio.start_server(handle, HOST, PORT)
-    log("smrelay 起在 %s:%d · 数据 %s · 页面 %s" % (HOST, PORT, DATA, ASSETS))
+    log("Slidesmith Live 起在 %s:%d · 库 %s · 页面 %s" % (HOST, PORT, DB, ASSETS))
     async with srv:
         await srv.serve_forever()
 

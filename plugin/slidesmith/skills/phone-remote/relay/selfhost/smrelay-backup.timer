@@ -1,0 +1,9 @@
+[Unit]
+Description=每天快照一次 Slidesmith Live 的互动记录
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=yes
+
+[Install]
+WantedBy=timers.target

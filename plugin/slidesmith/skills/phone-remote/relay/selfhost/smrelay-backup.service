@@ -1,0 +1,6 @@
+[Unit]
+Description=Slidesmith Live 数据快照到 MySpace（供每日 sync pull 带回本地）
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/smrelay-backup
