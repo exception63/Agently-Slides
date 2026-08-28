@@ -2,10 +2,27 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "slidesmith",
   "displayName": "Slidesmith",
-  "version": "0.2.0",
-  "description": "HTML slides 一条龙：出片（/slidesmith:editorial-slides 多风格）→ 配讲稿（/slidesmith:transcripts_html）→ 副屏演讲者同步（/slidesmith:slides-presenter-mode）→ 浏览器 Studio 就地改 + Claude Code 桥接按 data-id 精准回写复杂改动。",
-  "author": { "name": "Slidesmith" },
+  "version": "0.3.0",
+  "description": "HTML slides 一条龙：出片（/slidesmith:editorial-slides 多风格）→ 配讲稿（/slidesmith:transcripts_html）→ 副屏演讲者同步（/slidesmith:slides-presenter-mode）→ 手机遥控翻页（/slidesmith:phone-remote）→ 现场互动 + 场次账本（/slidesmith:live，接自托管服务 live.zhouliying.com）→ 浏览器 Studio 就地改 + Claude Code 桥接按 data-id 精准回写复杂改动。",
+  "author": {
+    "name": "Slidesmith"
+  },
   "license": "MIT",
-  "keywords": ["slides", "presentation", "html", "studio", "editor", "keynote", "transcript", "presenter"],
-  "commands": ["./commands/slidesmith.md"]
+  "keywords": [
+    "slides",
+    "presentation",
+    "html",
+    "studio",
+    "editor",
+    "keynote",
+    "transcript",
+    "presenter",
+    "remote",
+    "live",
+    "qa",
+    "interaction"
+  ],
+  "commands": [
+    "./commands/slidesmith.md"
+  ]
 }

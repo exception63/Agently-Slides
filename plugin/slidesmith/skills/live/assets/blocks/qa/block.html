@@ -1,0 +1,188 @@
+<!-- ══════════════ 互动块 qa · 样式 ══════════════
+     全部走皮肤令牌（--paper/--ink/--rule/--accent/--font-*），22 张皮通用。
+     唯一写死的颜色是二维码底：**必须是白的**，深色皮上黑底二维码扫不出来。 -->
+<style id="sm-live-qa-css">
+.qrbox{width:230px;height:230px;background:#fff;border:1px solid var(--rule);border-radius:4px;
+  padding:12px;display:block;flex:none;box-sizing:border-box;}
+.qrbox svg{width:100%;height:100%;display:block;}
+.qrbox--lg{width:300px;height:300px;padding:14px;}
+.qrbox--pending{display:flex;align-items:center;justify-content:center;color:#555;
+  font-family:var(--font-mono);font-size:14px;text-align:center;line-height:1.6;word-break:break-all;padding:16px;}
+
+/* 问答页：左侧固定栏 + 右侧问题墙 */
+.qa-wrap{display:grid;grid-template-columns:340px 1fr;gap:54px;height:100%;min-height:0;}
+.qa-wallwrap{position:relative;min-height:0;display:flex;flex-direction:column;}
+.qa-side{display:flex;flex-direction:column;align-items:center;gap:16px;padding-top:6px;}
+.qa-side__title{font-family:var(--font-display);font-size:30px;font-weight:600;color:var(--ink);letter-spacing:.02em;}
+.qa-side__url{font-family:var(--font-mono);font-size:16px;color:var(--ink-3);letter-spacing:.02em;
+  word-break:break-all;text-align:center;line-height:1.5;max-width:320px;}
+.qa-side__stat{display:flex;align-items:center;gap:9px;font-family:var(--font-sans);font-size:17px;color:var(--ink-3);margin-top:2px;}
+.qa-dot{width:10px;height:10px;border-radius:50%;background:var(--ink-4);flex:none;}
+.qa-dot.on{background:var(--good,#3F6E55);}
+.qa-dot.off{background:var(--bad,#A24632);}
+.qa-side__count{font-family:var(--font-sans);font-size:19px;color:var(--ink-3);margin-top:auto;padding-bottom:6px;}
+.qa-side__count .num{font-size:34px;font-weight:700;color:var(--accent);margin-right:4px;}
+
+/* ⚠️ 问题墙必须是 grid，**不能用 column-count**：多栏在固定高度容器里是往「右」开新栏，
+   scrollHeight 永远等于 clientHeight，纵向怎么都滚不动（现场实测 705==705）。 */
+.qa-wall{position:relative;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;
+  display:grid;grid-template-columns:1fr 1fr;gap:20px 26px;align-content:start;
+  padding-right:10px;scroll-behavior:smooth;}
+/* 投影上默认滚动条几乎看不见，给一条明确的——听众也能感觉到「下面还有」 */
+.qa-wall::-webkit-scrollbar{width:10px;}
+.qa-wall::-webkit-scrollbar-thumb{background:var(--rule-strong);border-radius:5px;}
+.qa-wall::-webkit-scrollbar-track{background:transparent;}
+/* 还没翻到底时，底部压一条渐隐提示。第一条是老浏览器兜底，第二条才是不会串色的那版
+   （深色皮上从 rgba(0,0,0,0) 渐到浅纸色会发灰，用 color-mix 从「同色 0 透明度」起才干净） */
+.qa-more{position:absolute;left:0;right:10px;bottom:0;height:60px;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,0,0) 0%,var(--paper) 84%);
+  background:linear-gradient(180deg,color-mix(in srgb,var(--paper) 0%,transparent) 0%,var(--paper) 84%);
+  display:none;align-items:flex-end;justify-content:center;padding-bottom:2px;
+  font-family:var(--font-sans);font-size:17px;color:var(--ink-4);letter-spacing:.06em;}
+.qa-wall--overflow ~ .qa-more{display:flex;}
+.qa-wall--dense{grid-template-columns:1fr 1fr 1fr;gap:15px 20px;}
+.qa-card{margin:0;align-self:start;background:var(--paper-soft,#fff);border:1px solid var(--rule);
+  border-left:4px solid var(--accent);border-radius:4px;padding:18px 22px 16px;
+  animation:qaIn .42s cubic-bezier(.22,1,.36,1) both;}
+/* 学生提问是**运行时**才出现的文字，不可能预先进字体子集 —— 显式走系统字体栈，
+   否则一句话里认识的字用内嵌字体、不认识的掉回 fallback，同一行两种字形。 */
+.qa-card__t{font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  font-size:25px;line-height:1.5;color:var(--ink);letter-spacing:.005em;}
+.qa-wall--dense .qa-card__t{font-size:21px;line-height:1.5;}
+.qa-wall--dense .qa-card{padding:14px 17px 12px;}
+.qa-card__m{font-family:var(--font-mono);font-size:13px;color:var(--ink-4);margin-top:10px;letter-spacing:.06em;}
+.qa-card--new{border-left-color:var(--gold,var(--accent-2));}
+@keyframes qaIn{from{opacity:0;transform:translateY(-14px);}to{opacity:1;transform:none;}}
+@media (prefers-reduced-motion:reduce){.qa-card{animation:none;}}
+
+.qa-empty{grid-column:1/-1;position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;text-align:center;}
+.qa-empty__k{font-family:var(--font-display);font-size:38px;font-weight:600;color:var(--ink-4);}
+.qa-empty__t{font-family:var(--font-sans);font-size:22px;line-height:1.7;color:var(--ink-4);}
+.qa-wall--has .qa-empty{display:none;}
+</style>
+
+<script id="sm-live-qa-js">
+/* ══════════════ 互动块 qa · 放映端（问题墙）══════════════
+   角色 wall：只收不发，**多实例共存**。所以台下有人打开这份公开 slides
+   也不会把讲台这块屏踢下线（deck 角色才是「先到先得」的那个）。
+   连不上就退化成静态二维码 —— 学生照样能提问，只是不上大屏，讲者在 iPad 上看。 */
+(function () {
+  var RELAY = (window.__SM_CLOUD_RELAY__ || 'https://live.zhouliying.com').replace(/\/$/, '');
+  var ROOM  = window.__SM_QA_ROOM__ || '';
+  if (!ROOM) return;
+  var ASK_URL = RELAY + '/q/' + ROOM;
+
+  // ⚠️ 一律用 #deck 作用域，别用 getElementById —— 引擎会把每页**克隆**一份进左侧缩略图，
+  //    id 因此在文档里出现两次，而 segnav 排在 deck 之前，getElementById 拿到的是缩略图里
+  //    那个克隆；改了它，大屏上那张纹丝不动（这一条排查过一轮，别再踩）。
+  function q(sel) { return document.querySelector('#deck ' + sel); }
+  var wall = q('#qaWall');
+  var dot = q('#qaDot'), stat = q('#qaStat');
+  var cnt = q('#qaCount'), urlEl = q('#qaUrl');
+  if (urlEl) urlEl.textContent = ASK_URL.replace(/^https?:\/\//, '');
+
+  // —— 二维码 ——
+  function qrInto(el, text, px) {
+    if (!el) return;
+    try {
+      var qr = qrcode(0, 'M'); qr.addData(text); qr.make();
+      el.innerHTML = qr.createSvgTag({ cellSize: Math.max(3, Math.floor(px / qr.getModuleCount())), margin: 1, scalable: true });
+      var svg = el.querySelector('svg');
+      if (svg) { svg.setAttribute('width', '100%'); svg.setAttribute('height', '100%'); }
+      el.classList.remove('qrbox--pending');
+    } catch (e) {
+      el.classList.add('qrbox--pending');       // 二维码库没加载：至少把网址显出来
+      el.textContent = text;
+    }
+  }
+  qrInto(q('#qrAsk'), ASK_URL, 300);
+  // 顺带：页面上任何带 data-qr="网址" 的 .qrbox 都画出来（资料页放讲义/方案链接用）
+  Array.prototype.forEach.call(document.querySelectorAll('#deck .qrbox[data-qr]'), function (el) {
+    var u = el.getAttribute('data-qr');
+    if (u) qrInto(el, u, 230); else { el.classList.add('qrbox--pending'); el.textContent = '链接待定'; }
+  });
+
+  // —— 问题墙 ——
+  var items = [];
+  // 不截断。60 个人提问很容易过十几条，截断意味着「最早问的那几个人被无声删掉」——
+  // 而现场往往正是从最早那几条开始答。改成全部保留 + 墙可滚动 + iPad 上能翻。
+  function render() {
+    if (!wall) return;
+    wall.classList.toggle('qa-wall--has', items.length > 0);
+    wall.classList.toggle('qa-wall--dense', items.length > 5);
+    var empty = q('#qaEmpty');
+    var atTop = wall.scrollTop < 30;
+    wall.innerHTML = '';
+    if (empty) wall.appendChild(empty);
+    items.slice().reverse().forEach(function (it, i) {      // 新的在前
+      var d = document.createElement('article');
+      d.className = 'qa-card' + (i === 0 ? ' qa-card--new' : '');
+      var t = document.createElement('div'); t.className = 'qa-card__t'; t.textContent = it.t;
+      var m = document.createElement('div'); m.className = 'qa-card__m';
+      var dt = new Date(it.ts);
+      m.textContent = ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2);
+      d.appendChild(t); d.appendChild(m); wall.appendChild(d);
+    });
+    if (cnt) cnt.textContent = String(items.length);
+    // 停在顶部就保持在顶部（新问题正在那儿）；已经往下翻了就别把讲者拽回去
+    if (atTop) wall.scrollTop = 0;
+    updateMore();
+  }
+  function updateMore() {
+    if (!wall) return;
+    wall.classList.toggle('qa-wall--overflow', wall.scrollHeight - wall.clientHeight > 8);
+    var more = q('#qaMore');
+    if (more) {
+      var left = Math.max(0, wall.scrollHeight - wall.clientHeight - wall.scrollTop);
+      more.textContent = left > 8 ? '⌄ 下面还有' : '';
+    }
+  }
+
+  // —— 连接 ——
+  var ws = null, tries = 0;
+  function setStat(cls, text) {
+    if (dot) dot.className = 'qa-dot' + (cls ? ' ' + cls : '');
+    if (stat) stat.textContent = text;
+  }
+  function connect() {
+    var u = RELAY.replace(/^http/, 'ws') + '/ws?room=' + encodeURIComponent(ROOM) + '&role=wall';
+    try { ws = new WebSocket(u); } catch (e) { retry(); return; }
+    ws.onopen = function () { tries = 0; setStat('on', '已连接 · 实时'); };
+    ws.onclose = function () { setStat('off', '未连接 · 请看讲台'); retry(); };
+    ws.onerror = function () { /* onclose 会跟上 */ };
+    ws.onmessage = function (e) {
+      var d = null; try { d = JSON.parse(e.data); } catch (x) { return; }
+      if (d.type === 'qa-init') { items = d.questions || []; render(); }
+      else if (d.type === 'qa-new') { items.push(d.q); render(); }
+      else if (d.type === 'qa-cleared') { items = []; render(); }
+      else if (d.type === 'qa-hidden') { items = items.filter(function (x) { return x.id !== d.id; }); render(); }
+      else if (d.type === 'qa-scroll' && wall) {
+        // 讲者在 iPad 上翻大屏：一次翻约八成屏高，留一点重叠免得看漏
+        wall.scrollTop += (d.dir < 0 ? -1 : 1) * wall.clientHeight * 0.82;
+        setTimeout(updateMore, 420);
+      }
+    };
+  }
+  function retry() { if (tries > 60) { setStat('off', '连接失败 · 请看讲台'); return; } tries++; setTimeout(connect, Math.min(1200 * tries, 8000)); }
+  connect();
+  render();
+
+  // 把「问答页是哪一张」算出来交给 pair-client → iPad 端据此自动亮问答面板并自动切页。
+  // 锚点取 deck 引擎的 SLIDE_MAP，和讲稿锚点同一套，不会对不上。
+  // 引擎在 ready() 之后才跑，第一拍多半拿不到 —— 隔一拍补算，别赌时机。
+  (function markAnchor(n) {
+    try {
+      var all = Array.prototype.slice.call(document.querySelectorAll('#deck .slide'));
+      var i = all.indexOf(document.querySelector('#deck .qa-slide'));
+      var map = (window.deckAPI && window.deckAPI.SLIDE_MAP) || window.SLIDE_MAP;
+      if (i >= 0 && map && map[i]) { window.__SM_QA_ANCHOR__ = map[i]; return; }
+    } catch (e) { /* noop */ }
+    if ((n || 0) < 12) setTimeout(function () { markAnchor((n || 0) + 1); }, 400);
+  })(0);
+  if (wall) wall.addEventListener('scroll', updateMore, { passive: true });
+  window.__SM_QA__ = { url: ASK_URL, room: ROOM, count: function () { return items.length; },
+                       anchor: function () { return window.__SM_QA_ANCHOR__; },
+                       scroll: function (d) { if (wall) { wall.scrollTop += (d < 0 ? -1 : 1) * wall.clientHeight * 0.82; updateMore(); } } };
+})();
+</script>

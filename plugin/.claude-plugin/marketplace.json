@@ -1,13 +1,25 @@
 {
   "name": "slidesmith-local",
-  "owner": { "name": "Slidesmith" },
-  "description": "Slidesmith 本地市场 — HTML slides 一条龙插件（出片 + 讲稿 + 副屏同步 + 浏览器 Studio 就地改 + Claude Code 桥接回写）。",
+  "owner": {
+    "name": "Slidesmith"
+  },
+  "description": "Slidesmith 本地市场 — HTML slides 一条龙插件（出片 + 讲稿 + 副屏同步 + 手机遥控 + 现场互动 + 浏览器 Studio 就地改 + Claude Code 桥接回写）。",
   "plugins": [
     {
       "name": "slidesmith",
       "source": "./slidesmith",
-      "description": "Slidesmith — HTML slides 一条龙：出片(editorial-slides) + 讲稿(transcripts_html) + 副屏同步(slides-presenter-mode) + 浏览器 Studio 就地改 + Claude Code 桥接闭环(MCP: slidesmith_open / get_requests / apply_patch / status)。",
-      "keywords": ["slides", "presentation", "html", "studio", "transcript", "presenter"]
+      "description": "Slidesmith — HTML slides 一条龙：出片(editorial-slides) + 讲稿(transcripts_html) + 副屏同步(slides-presenter-mode) + 手机遥控(phone-remote) + 现场互动与场次账本(live) + 浏览器 Studio 就地改 + Claude Code 桥接闭环(MCP: slidesmith_open / get_requests / apply_patch / status)。",
+      "keywords": [
+        "slides",
+        "presentation",
+        "html",
+        "studio",
+        "transcript",
+        "presenter",
+        "remote",
+        "live",
+        "interaction"
+      ]
     }
   ]
 }

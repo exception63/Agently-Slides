@@ -1,0 +1,34 @@
+<!-- ══════════ 互动块 qa · 大屏那一页 ══════════
+     插进 deck 的 slides 里（通常放最后一段）。类名全部来自 _core/_components，
+     任何皮都能直接用；颜色走令牌，不写死。
+     __SEG__ / __SEGNAME__ 由 inject-live.mjs 填（默认新开最后一段）；class 里的
+     **qa-slide 必须留着** —— 块脚本靠它算出「问答是第几页」，iPad 翻到这页才会自动切过去。
+     ⚠️ data-seg **必须是数字**：引擎 segOf() 用 parseInt，写成 "LAST" 会算出 NaN，
+        锚点变成 sNaN-1、段导航里也找不到这一页。 -->
+<section data-seg="__SEG__" data-segname="__SEGNAME__" data-title="现场答疑" class="slide qa-slide">
+  <div class="head">
+    <div class="eyebrow head__eyebrow">Q &amp; A · 现场答疑</div>
+    <h2 class="title head__title">现在开始<em>提问</em></h2>
+    <p class="head__sub">扫描左侧二维码即可提问，无需登录、匿名提交，问题会实时出现在右侧。</p>
+  </div>
+  <div class="fill">
+    <div class="qa-wrap">
+      <aside class="qa-side">
+        <div id="qrAsk" class="qrbox qrbox--lg"></div>
+        <div class="qa-side__title">扫码提问</div>
+        <div class="qa-side__url" id="qaUrl">—</div>
+        <div class="qa-side__stat"><span class="qa-dot" id="qaDot"></span><span id="qaStat">未连接</span></div>
+        <div class="qa-side__count"><span class="num" id="qaCount">0</span> 个问题</div>
+      </aside>
+      <div class="qa-wallwrap">
+        <section class="qa-wall" id="qaWall" aria-live="polite">
+          <div class="qa-empty" id="qaEmpty">
+            <div class="qa-empty__k">等待提问</div>
+            <div class="qa-empty__t">扫描左侧二维码，写下你的问题<br>提交后即刻显示在这里</div>
+          </div>
+        </section>
+        <div class="qa-more" id="qaMore"></div>
+      </div>
+    </div>
+  </div>
+</section>
