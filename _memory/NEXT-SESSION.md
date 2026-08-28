@@ -11,13 +11,30 @@
 在 `plugin/slidesmith/skills/live/`。插件已升到 0.3.0 并 `claude plugin update` 过，
 `phone-remote` 也跟着第一次进了已装插件（之前它只在仓库里、命令行看不到）。
 
+### 管理台已经 AI 化（2026-08-28 当天追加）
+用户的原话：「我是指挥者，AI 是执行者」。所以给中转加了第二道门
+`/api/agent/*` + Bearer 令牌，和管理台 `/api/admin/*` **共用同一份业务逻辑**；
+客户端是 `skills/live/scripts/smlive.mjs`（rooms/new/rename/rm/sessions/items/export/
+clear/close/open/urls/whoami，都支持 `--json`）。令牌在服务器 `/etc/smrelay/token`，
+Mac 上 `~/.slidesmith/live.json`（0600）。**已部署上线并线上联调过**。
+
+顺手修掉两个线上真 bug：① 条目 `ts` 库里是毫秒、场次时间是秒，接口原样吐毫秒 ——
+管理台和导出把日期显示成**公元 58626 年**；现在接口对外统一成秒（WebSocket 那侧仍是毫秒，
+大屏靠它，别顺手改）。② 服务器跑 UTC，导出时间差 8 小时；`smrelay.service` 里设 `TZ=Asia/Shanghai`。
+
+⚠️ 部署走 `myspace ssh`（它转发 stdin，tar 管道直接推，不用 scp）；
+公网 SSH 从这台机器连不通，`~/.myspace/config.json` 的 `host` 现在指着 Tailscale `100.89.145.35`。
+
 ### 已经有的
 - **一种玩法 = 一个块目录** `assets/blocks/<key>/{slide.html, block.html, README.md}`
 - **注入器** `scripts/inject-live.mjs <deck> --room <号>`：插页 + 烘配置 + 二维码库 + 遥控客户端，
   **幂等 + 可逆到字节一致**，加新块不用改它
 - **块 qa**（扫码提问上墙）已从现场那份 `qa-block.html` 提炼成皮肤无关版，22 张皮通用
-- **回归** `node scripts/verify-live-inject.mjs`（16/16）：本地起一份中转 + 真浏览器跑
-  「学生提交 → 大屏出现」，**不碰线上、不写用户真账本**
+- **回归** `node scripts/verify-live-inject.mjs`（16/16 · 装配）和
+  `node scripts/verify-live-agent.mjs`（22/22 · 管理 CLI）：都自己起一份本地中转，
+  **不碰线上、不写用户真账本**。要连线上试就用一次性房间号，跑完删掉
+  ⚠️ `verify-live-service.mjs` 起服务前要先放一个 `oldroom01.json` 夹具，否则最后一条必挂
+  （不是回归，是缺夹具；脚本头部已注明）
 - 三份 references：`protocol.md` / `admin-console.md` / **`new-block.md`（加玩法必读）**
 
 ### ⚠️ 动手加第二种玩法前，先读 `references/new-block.md`

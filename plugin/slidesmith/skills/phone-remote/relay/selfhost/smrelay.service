@@ -10,6 +10,9 @@ Environment=SMRELAY_HOST=127.0.0.1
 Environment=SMRELAY_PORT=8092
 Environment=SMRELAY_DATA=/var/lib/smrelay
 Environment=SMRELAY_ASSETS=/opt/smrelay
+# 机器跑在 UTC。导出的 CSV / Markdown 和日志都用 time.localtime，不设这一条的话
+# 现场 17:45 提的问题会导成 09:45 —— 事后复盘对不上课表。
+Environment=TZ=Asia/Shanghai
 Restart=always
 RestartSec=2
 User=smrelay

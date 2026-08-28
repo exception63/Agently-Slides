@@ -4,7 +4,8 @@
 
 | | 路径 | 谁用 | 要密码吗 |
 |---|---|---|---|
-| **管理台** | `/` | 只有你 | **要**（复用 MySpace 的 msauth，密码天然同一个） |
+| **管理台** | `/` · `/api/admin/*` | 只有你 | **要**（复用 MySpace 的 msauth，密码天然同一个） |
+| **令牌接口** | `/api/agent/*` | **AI / 脚本**（smlive CLI） | 要 `Authorization: Bearer <令牌>` |
 | 学生互动页 | `/q/<房间>` | 学生 | **永远不要** |
 | 讲者控制台 | `/r/<房间>` | 你的 iPad | 中转按房间校验遥控密码 |
 | 中转 | `/ws` | deck | 同上 |
@@ -38,6 +39,36 @@
 
 **清屏只清大屏，账本一条不少**；「隐藏某条」在账本里只做标记不删 —— 事后复盘要看得到当时撤下过什么。
 
+## 令牌接口：让 AI 直接管
+
+管理台的门是 msauth（浏览器登录）。AI 没有浏览器、也不该拿到你的密码，
+所以同一批接口开了第二道门：`/api/agent/<和 admin 一样的后缀>` + `Authorization: Bearer <令牌>`。
+**业务逻辑只有一份**（`admin_api()`），门不同而已，不会分叉。
+
+- 令牌：`/etc/smrelay/token`（root:smrelay 0640）。`install.sh` **首次装时随机生成，之后不覆盖**。
+  改了不用重启服务 —— 按 mtime 自动重读。要换：删掉这个文件再跑一次 `install.sh`。
+- Mac 上：`node <slidesmith>/skills/live/scripts/smlive.mjs setup --token <令牌>`
+  → 写进 `~/.slidesmith/live.json`（0600）。
+- ⚠️ Caddy 里 `/api/agent/*` **必须绕开 forward_auth**（片段里已经有了）。
+  也**别写成 `/api/*`** —— 那会把管理台自己的 `/api/admin/*` 一起放行，等于拆掉密码门。
+- 审计：每次令牌调用都写 journal（`journalctl -u smrelay | grep agent`），令牌能删房间，得留痕。
+
+认证边界（改中转或 Caddy 后务必复验这几条）：
+
+```
+/  和 /api/admin/*        → 303 跳登录
+/api/agent/*              → 401（没带令牌）   ← 是 401 不是 303，才说明绕开了 forward_auth
+/q/*  /r/*  /ws  /health  → 200 畅通
+```
+
+## 时间单位与时区（都踩过）
+
+- 条目在库里存**毫秒**（墙上那份 `questions` 用 JS 的 `Date.now()`，入库原样带进来），
+  场次的 `started/ended` 是**秒**。接口曾经原样吐毫秒 → 管理台和导出把日期显示成**公元 58626 年**。
+  现在 HTTP 接口对外统一成秒（`secs()`），库里不动、老数据照样对。
+  **WebSocket 那侧仍是毫秒**（大屏 `new Date(q.ts)` 靠它），别顺手一起改。
+- 机器跑在 UTC。`smrelay.service` 里设了 `TZ=Asia/Shanghai`，否则现场 17:45 的提问导出成 09:45。
+
 ## 备份
 
 `smrelay-backup.timer` 每天 03:30 用 SQLite 的 backup API 快照一份到
@@ -66,8 +97,8 @@ Cloudflare Worker 版本身没问题，但 **`*.workers.dev` 这个域名在国�
 | 地址 | `https://live.zhouliying.com` |
 | 机器 | AWS Lightsail 新加坡（和 MySpace 同一台） |
 | 服务 | `smrelay.service`（systemd）· `127.0.0.1:8092` · 用户 `smrelay` |
-| 代码 | `/opt/smrelay/`（smrelay.py + remote.html + ask.html） |
-| 数据 | `/var/lib/smrelay/<room>.json`（问题留存，重启不丢） |
+| 代码 | `/opt/smrelay/`（smrelay.py + remote.html + ask.html + admin.html） |
+| 数据 | `/var/lib/smrelay/live.db`（SQLite：房间/场次/条目）· 令牌在 `/etc/smrelay/token` |
 | 入口 | Caddy 里 `live.zhouliying.com` 一段 → `reverse_proxy 127.0.0.1:8092` |
 
 实测：`/health` 175–190ms（比 workers.dev 的 285ms 还快）；WSS 经 Cloudflare 握手 191ms，
@@ -144,9 +175,22 @@ deck → 第二设备  deck-info 里带 qaRoom / qaAnchor —— iPad 据此自�
 
 ```bash
 D=plugin/slidesmith/skills/phone-remote/relay/selfhost
-ssh <server> 'rm -rf /tmp/smrelay && mkdir -p /tmp/smrelay'
-scp $D/{smrelay.py,remote.html,ask.html,smrelay.service,caddy-snippet.conf,install.sh} <server>:/tmp/smrelay/
-ssh <server> 'sudo bash /tmp/smrelay/install.sh'
+cd $D && tar czf - smrelay.py remote.html ask.html admin.html smrelay.service \
+  smrelay-backup smrelay-backup.service smrelay-backup.timer caddy-snippet.conf install.sh \
+  | myspace ssh 'rm -rf /tmp/smrelay && mkdir -p /tmp/smrelay && tar xzf - -C /tmp/smrelay && sudo bash /tmp/smrelay/install.sh'
+```
+
+⚠️ **公网 SSH（30022）从用户的网络连不通**（TCP 通、SSH banner 不来，路上有东西在干预）。
+走 Tailscale `100.89.145.35` 正常 —— `~/.myspace/config.json` 里把 `host` 换成它，
+然后用 `myspace ssh`（它支持 stdin，所以上面那条 tar 管道能用，不需要 scp）。
+
+**部署前先备份线上库**（服务随时在写，别用 cp）：
+
+```bash
+myspace ssh 'sudo install -d -m 700 /root/smlive-backup; sudo python3 -c "
+import sqlite3,time
+s=sqlite3.connect(\"/var/lib/smrelay/live.db\"); d=sqlite3.connect(\"/root/smlive-backup/live-%s.db\"%time.strftime(\"%Y%m%d-%H%M%S\"))
+s.backup(d)"'
 ```
 
 `install.sh` 幂等：建用户、装文件、起服务、**并入 Caddy 前先 `caddy validate`，校验不过就回滚**。

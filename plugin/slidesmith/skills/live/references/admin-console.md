@@ -34,25 +34,47 @@
 
 **清屏只清大屏，账本一条不少**；「隐藏某条」在账本里只做标记不删 —— 事后复盘要看得到当时撤下过什么。
 
-## AI 能不能替你操作管理台
+## 两道门，同一批接口
 
-**不能。** 管理台在登录后面，AI 手里没有你的密码，也不该有。分工是：
+| 门 | 路径 | 谁用 | 怎么进 |
+|---|---|---|---|
+| 网页管理台 | `/` · `/api/admin/*` | 人 | 浏览器登录 msauth（密码同 MySpace） |
+| **令牌接口** | `/api/agent/*` | **AI / 脚本** | `Authorization: Bearer <令牌>` |
 
-| 谁 | 干什么 |
-|---|---|
-| AI | 定房间号 · 装互动块进 deck · 本地跑通验证 · 把三个网址交给你 |
-| 你 | 在管理台建/改房间名 · 现场清屏关问答 · 课后导出 |
+业务逻辑只有一份（`admin_api()`），两道门只是门不同 —— **不会分叉**。
+令牌在服务器 `/etc/smrelay/token`（root:smrelay 0640，`install.sh` 首次装时随机生成），
+Mac 上存在 `~/.slidesmith/live.json`（0600）。改了令牌不用重启服务，按 mtime 自动重读。
 
-**不用先去管理台建房间**：房间号烘进 deck，放映端第一次连上时自动建、自动开场。
-去管理台只是为了给它起个中文名（「营销学 2026 秋」），中文名只给你自己看。
-
-## 接口（排障时用，需已登录的 cookie）
+⚠️ Caddy 里 `/api/agent/*` **必须绕开 forward_auth**，否则 AI 带着令牌也会被登录页挡住。
+边界实测（改中转或 Caddy 后务必复验）：
 
 ```
-GET  /api/admin/overview                 所有房间 + 在线情况
-GET  /api/admin/sessions?room=<房间>     场次列表（no 按房间从 1 数）
-GET  /api/admin/items?session=<场次id>   某场全部条目
-GET  /api/admin/export?session=<id>&fmt=csv|md
-POST /api/admin/room     {action:"create|rename|delete", id, name}
-POST /api/admin/control  {room, action:"clear|close|open"}
+/  和 /api/admin/*   → 303 跳登录        （人的门，没变）
+/api/agent/*         → 401（没带令牌）    ← 是 401 不是 303，说明确实绕开了
+/q/*  /r/*  /ws  /health → 200 畅通
 ```
+
+## 接口清单
+
+`/api/agent/X` 和 `/api/admin/X` 一一对应，X 相同：
+
+```
+GET  …/whoami                        连通性 + 令牌自检（版本 / 在线房间 / 房间总数）
+GET  …/overview                      所有房间 + 在线情况
+GET  …/sessions?room=<房间>          场次列表（no 按房间从 1 数）
+GET  …/items?session=<场次id>        某场全部条目（**ts 是秒**）
+GET  …/export?session=<id>&fmt=csv|md
+POST …/room     {action:"create|rename|delete", id, name}
+POST …/control  {room, action:"clear|close|open"}
+```
+
+平时不用自己拼这些，用 `scripts/smlive.mjs`（`node smlive.mjs help` 看命令）。
+
+## 时间单位（踩过）
+
+条目在库里存的是**毫秒**（墙上那份 `questions` 用 JS 的 `Date.now()`，入库原样带进来），
+而场次的 `started/ended` 是**秒**。接口曾经原样吐毫秒，管理台和导出都按秒解释它，
+**日期显示成公元 58626 年**。现在 HTTP 接口对外一律给秒（`secs()` 统一），库里不动。
+⚠️ WebSocket 那侧（`qa-init`/`qa-new`）仍是毫秒 —— 大屏的 `new Date(q.ts)` 靠它，别顺手改。
+
+服务器跑在 UTC，`smrelay.service` 里设了 `TZ=Asia/Shanghai`，否则现场 17:45 的提问会导成 09:45。

@@ -2,6 +2,10 @@
 // 跑法：先在本地起一份服务，再跑这个脚本 ——
 //   SMRELAY_DATA=/tmp/livedata SMRELAY_PORT=8899 python3 <技能>/relay/selfhost/smrelay.py &
 //   SP=/tmp node scripts/verify-live-service.mjs
+// ⚠️ 起服务**之前**先放一个老版本的房间文件，最后一条断言（"别的房间不受影响"）靠它：
+//   printf '{"questions":[{"id":"q1","t":"老问题","ts":1750000000000}],"updatedAt":1750000100}' \
+//     > $SP/livedata/oldroom01.json
+// 少了它会挂在 16/16 的最后一条，那不是回归，是缺夹具。
 // 覆盖：建房间 · 自动开场 · 提问入账 · 在线峰值 · 管理台远程控制 ·
 //       清屏不动账本 · 隔场自动分场 · 刷新不另起一场 · 导出 CSV/MD · 改名删除。
 import { chromium } from '/Users/zhouliying/同步空间/Claude Projects/SlidesHTML/presentsystems/node_modules/playwright-core/index.mjs';

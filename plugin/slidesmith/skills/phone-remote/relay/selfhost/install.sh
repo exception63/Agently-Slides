@@ -17,6 +17,16 @@ install -o root -g root -m 755 "$SRC/smrelay-backup" /usr/local/bin/smrelay-back
 install -o root -g root -m 644 "$SRC/smrelay-backup.service" /etc/systemd/system/smrelay-backup.service
 install -o root -g root -m 644 "$SRC/smrelay-backup.timer" /etc/systemd/system/smrelay-backup.timer
 
+# AI / 脚本用的 API 令牌。第一次装时随机生成，之后**不覆盖**（覆盖了 Mac 上那份就失效）。
+# root:smrelay 0640 —— 服务读得到，别人读不到。要换令牌：删掉这个文件再跑一次 install.sh。
+install -d -o root -g smrelay -m 750 /etc/smrelay
+if [ ! -s /etc/smrelay/token ]; then
+  head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | cut -c1-40 > /etc/smrelay/token
+  chown root:smrelay /etc/smrelay/token
+  chmod 640 /etc/smrelay/token
+  echo "· 新建了 API 令牌"
+fi
+
 python3 -c "import ast;ast.parse(open('$DST/smrelay.py').read())"   # 语法先过，别把坏文件推上线
 
 systemctl daemon-reload
@@ -26,6 +36,14 @@ systemctl restart smrelay
 sleep 1
 systemctl is-active --quiet smrelay && echo "✓ smrelay 已运行" || { journalctl -u smrelay -n 30 --no-pager; exit 1; }
 curl -fsS --max-time 5 http://127.0.0.1:8092/health && echo " ← 本机自测通过"
+
+# 令牌自测：拿真令牌打一次 /api/agent/whoami，装完就知道这道门通不通
+TOK=$(cat /etc/smrelay/token)
+if curl -fsS --max-time 5 -H "Authorization: Bearer $TOK" http://127.0.0.1:8092/api/agent/whoami | grep -q '"ok": *true'; then
+  echo "✓ API 令牌门通过"
+else
+  echo "✗ API 令牌门不通 —— 看 journalctl -u smrelay -n 30"; exit 1
+fi
 
 # Caddy：把片段并进去（只在还没有的时候）
 # Caddy 片段每次都按最新的**替换**（不是"有就跳过"）——认证规则改了必须跟上，
@@ -58,3 +76,8 @@ PY
     echo "✗ Caddy 校验不过，已回滚"; cp "$(ls -t /etc/caddy/Caddyfile.bak.* | head -1)" /etc/caddy/Caddyfile; exit 1
   fi
 fi
+
+echo
+echo "════════ 配到 Mac 上（只用做一次）════════"
+echo "  node <slidesmith>/skills/live/scripts/smlive.mjs setup --token $(cat /etc/smrelay/token)"
+echo "════════════════════════════════════════"

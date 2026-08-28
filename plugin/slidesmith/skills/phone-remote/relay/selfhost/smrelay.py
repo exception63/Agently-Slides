@@ -16,12 +16,15 @@ WebSocket 服务端握手 + 帧解析总共两百行，不值得为它引入依�
   host   讲者主持端  —— 收问题 + 发控制（清屏 / 隐藏 / 开关提问）
 
 路由：
-  GET /health          存活探测
-  GET /r/<room>        遥控 + 讲稿 + 问答主持页
-  GET /q/<room>        学生提问页
-  GET /ws?room=&role=  WebSocket
+  GET /health              存活探测
+  GET /r/<room>            遥控 + 讲稿 + 问答主持页
+  GET /q/<room>            学生提问页
+  GET /ws?room=&role=      WebSocket
+  *   /api/admin/<...>     管理台接口 —— 门在 Caddy（forward_auth → msauth）
+  *   /api/agent/<...>     同一批接口的**令牌版**，给 AI / 脚本用（smlive CLI）
+                           门在这里：Authorization: Bearer <令牌>，令牌在 /etc/smrelay/token
 """
-import asyncio, base64, hashlib, json, os, pathlib, re, sqlite3, struct, sys, time
+import asyncio, base64, hashlib, hmac, json, os, pathlib, re, sqlite3, struct, sys, time
 from urllib.parse import urlparse, parse_qs, unquote
 
 HOST = os.environ.get("SMRELAY_HOST", "127.0.0.1")
@@ -37,6 +40,8 @@ MAX_AUTH_FAIL, AUTH_COOLDOWN = 6, 60.0         # 密码连错几次 / 冷却多�
 MAX_ROOMS = 200
 SESSION_GAP = 30 * 60          # 放映端下线满这么久，就认为这一场讲完了
 DB = DATA / "live.db"
+TOKEN_FILE = pathlib.Path(os.environ.get("SMRELAY_TOKEN_FILE", "/etc/smrelay/token"))
+VERSION = "0.3.0"
 
 
 # ═══════════════════ 存储：一个 SQLite 文件 ═══════════════════
@@ -452,15 +457,66 @@ async def http_reply(w, status, body, ctype="text/plain; charset=utf-8", extra="
     await w.drain()
     w.close()
 
+# ═══════════════════ 令牌门（给 AI / 脚本用）═══════════════════
+# 管理台 `/` 和 `/api/admin/*` 的门在 Caddy 上（forward_auth → msauth，密码同 MySpace），
+# 那是给人用的：浏览器里登录一次，cookie 带着走。
+#
+# AI 和脚本没有浏览器也不该拿到用户的密码，所以给同一批接口开第二道门：
+# `/api/agent/*` + `Authorization: Bearer <令牌>`。**Caddy 上这条路径要绕开 forward_auth**
+# （否则 AI 拿着令牌也会被登录页挡住），门就完全落在下面这几行上——所以它必须简单到不会写错。
+#
+# 令牌存 /etc/smrelay/token（root:smrelay 0640），install.sh 首次装时随机生成。
+# 改了令牌不用重启：这里按 mtime 自动重读。
+_tok = {"v": None, "mt": -1}
+
+def agent_token():
+    try:
+        st = TOKEN_FILE.stat()
+    except Exception:
+        return os.environ.get("SMRELAY_TOKEN") or None      # 没有令牌文件 = 这道门关死
+    if st.st_mtime != _tok["mt"]:
+        try:
+            _tok["v"] = TOKEN_FILE.read_text("utf-8").strip() or None
+            _tok["mt"] = st.st_mtime
+        except Exception:
+            return None
+    return _tok["v"]
+
+def agent_ok(headers):
+    want = agent_token()
+    if not want:
+        return False
+    got = (headers.get("authorization") or "").strip()
+    if got.lower().startswith("bearer "):
+        got = got[7:].strip()
+    else:
+        got = (headers.get("x-sm-token") or "").strip()
+    return bool(got) and hmac.compare_digest(got, want)
+
+
 # ═══════════════════ 管理台 API ═══════════════════
 # 门由 Caddy 的 forward_auth 把（复用 MySpace 的 msauth，密码天然同一个）。
 # 这里假定「能走到这儿的就是本人」——服务只监听 127.0.0.1，绕不过去。
+def secs(t):
+    """条目的 ts 在库里是**毫秒**（墙上那份 questions 用的是 JS 的 Date.now()，入库时原样带进来），
+    而场次的 started/ended 是**秒**。两种单位混在同一个接口里，谁读谁猜错：
+    管理台 admin.html 和导出都按秒解释毫秒，日期直接变成公元 58626 年。
+    所以 **HTTP 接口对外一律给秒**，在这里统一。库里那份不动（不用迁移，老数据照样对）。
+    ⚠️ WebSocket 那侧（qa-init / qa-new）仍是毫秒 —— 大屏的 new Date(q.ts) 靠它，别顺手改。"""
+    t = int(t or 0)
+    return t // 1000 if t > 10 ** 11 else t
+
 def csv_escape(v):
     v = "" if v is None else str(v)
     return '"' + v.replace('"', '""') + '"' if any(c in v for c in ',"\n\r') else v
 
 def admin_api(path, qs, body):
     now = int(time.time())
+
+    if path == "/api/admin/whoami":
+        return {"ok": True, "service": "slidesmith-live", "version": VERSION,
+                "uptime": now - START_AT, "rooms_live": len(ROOMS),
+                "rooms_total": q1("SELECT COUNT(*) c FROM room WHERE archived=0")["c"]}
 
     if path == "/api/admin/overview":
         rooms = []
@@ -501,7 +557,7 @@ def admin_api(path, qs, body):
         sid = int((qs.get("session") or ["0"])[0] or 0)
         rows = qa_("SELECT id,text,ts,hidden FROM item WHERE session=? ORDER BY ts", sid)
         return {"ok": True, "session": sid,
-                "items": [{"id": r["id"], "t": r["text"], "ts": r["ts"], "hidden": bool(r["hidden"])} for r in rows]}
+                "items": [{"id": r["id"], "t": r["text"], "ts": secs(r["ts"]), "hidden": bool(r["hidden"])} for r in rows]}
 
     if path == "/api/admin/room" and body is not None:
         act = body.get("action")
@@ -543,13 +599,13 @@ def admin_api(path, qs, body):
             head = "# %s · %s\n\n共 %d 条 · 同时在线峰值 %d\n\n" % (
                 (st["rname"] or st["room"]) if st else "?", tf(st["started"]) if st else "", len(rows),
                 (st["peak"] or 0) if st else 0)
-            body_ = "\n".join("%d. %s　`%s`%s" % (i + 1, r["text"], tf(r["ts"]),
+            body_ = "\n".join("%d. %s　`%s`%s" % (i + 1, r["text"], tf(secs(r["ts"])),
                                                   "　（现场已撤下）" if r["hidden"] else "")
                                for i, r in enumerate(rows))
             return ("text/markdown; charset=utf-8", (head + body_ + "\n").encode("utf-8"))
         out = "\ufeff序号,时间,问题,现场是否撤下\n"     # BOM：Excel 打开中文才不乱码
         for i, r in enumerate(rows):
-            out += "%d,%s,%s,%s\n" % (i + 1, csv_escape(tf(r["ts"])), csv_escape(r["text"]),
+            out += "%d,%s,%s,%s\n" % (i + 1, csv_escape(tf(secs(r["ts"]))), csv_escape(r["text"]),
                                       "是" if r["hidden"] else "否")
         return ("text/csv; charset=utf-8", out.encode("utf-8"))
 
@@ -620,17 +676,30 @@ async def handle(reader, writer):
                 await http_reply(writer, "200 OK", "ok"); return       # 管理台还没装，退回探测响应
             await http_reply(writer, "200 OK", html, "text/html; charset=utf-8"); return
 
-        if path.startswith("/api/admin/"):
+        # 同一批接口，两道门：/api/admin/*（人 · Caddy 上的 msauth）和
+        # /api/agent/*（AI 和脚本 · 这里校验 Bearer 令牌）。业务逻辑只有一份。
+        if path.startswith("/api/admin/") or path.startswith("/api/agent/"):
+            agent = path.startswith("/api/agent/")
+            if agent and not agent_ok(headers):
+                log("agent 令牌不对", path)
+                await http_reply(writer, "401 Unauthorized",
+                                 json.dumps({"ok": False, "error": "令牌不对或没带；要 Authorization: Bearer <令牌>"},
+                                            ensure_ascii=False),
+                                 "application/json; charset=utf-8")
+                return
+            apath = "/api/admin/" + path[len("/api/agent/"):] if agent else path
             body = None
             if method == "POST":
                 n = int(headers.get("content-length") or 0)
                 raw = await reader.readexactly(n) if 0 < n <= 1 << 20 else b""
                 try: body = json.loads(raw.decode("utf-8") or "{}")
                 except Exception: body = {}
+            # 审计：令牌能删房间，日志里得留下是谁按的什么。journalctl -u smrelay 看得到。
+            if agent: log("agent", method, apath, (body or {}).get("action") or "")
             try:
-                r = admin_api(path, qs, body)
+                r = admin_api(apath, qs, body)
             except Exception as e:
-                log("管理接口出错", path, repr(e))
+                log("管理接口出错", apath, repr(e))
                 r = {"ok": False, "error": str(e)}
             if isinstance(r, tuple):            # 导出：(content-type, bytes)
                 ct, data = r
