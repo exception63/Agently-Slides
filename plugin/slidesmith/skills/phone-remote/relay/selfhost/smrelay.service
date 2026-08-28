@@ -1,0 +1,29 @@
+[Unit]
+Description=Slidesmith relay (phone remote + live Q&A)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/smrelay/smrelay.py
+Environment=SMRELAY_HOST=127.0.0.1
+Environment=SMRELAY_PORT=8092
+Environment=SMRELAY_DATA=/var/lib/smrelay
+Environment=SMRELAY_ASSETS=/opt/smrelay
+Restart=always
+RestartSec=2
+User=smrelay
+Group=smrelay
+StateDirectory=smrelay
+
+# 这台机器还跑着 MySpace，收紧一点：只允许它写自己的数据目录
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/smrelay
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=192M
+
+[Install]
+WantedBy=multi-user.target

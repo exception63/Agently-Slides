@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#27406B">
+<title>现场提问</title>
+<style>
+  /* 视觉与 slides 的 academic 皮一致：暖白纸 + 深靛青。字体全走系统栈，
+     手机上零网络依赖 —— 学生用的是自己的流量，不该为一次提问等字体。 */
+  :root{
+    --paper:#F8F6F1;--card:#FFFFFF;--rule:#DCD6C9;--rule-2:#EBE6DA;
+    --ink:#1C2024;--ink-2:#3A4047;--ink-3:#5E6670;--ink-4:#969CA6;
+    --accent:#27406B;--accent-2:#1B2E4D;--accent-soft:rgba(39,64,107,.08);
+    --ok:#2F6B4F;--warn:#9A6E2E;
+    --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Noto Sans SC",sans-serif;
+    --serif:"Songti SC","STSong","Noto Serif SC",serif;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;min-height:100%;}
+  body{display:flex;flex-direction:column;min-height:100dvh;}
+
+  header{padding:calc(env(safe-area-inset-top) + 22px) 22px 16px;border-bottom:1px solid var(--rule);}
+  .brand{font-size:12px;letter-spacing:.16em;color:var(--accent);font-weight:700;text-transform:uppercase;}
+  h1{font-family:var(--serif);font-size:27px;font-weight:600;margin:8px 0 0;letter-spacing:.01em;}
+  .sub{font-size:14px;color:var(--ink-3);margin-top:7px;line-height:1.55;}
+
+  main{flex:1;padding:20px 22px 8px;display:flex;flex-direction:column;}
+  label{font-size:13px;color:var(--ink-3);font-weight:600;letter-spacing:.02em;}
+  textarea{width:100%;margin-top:9px;min-height:150px;padding:14px;border:1px solid var(--rule);
+    border-radius:8px;background:var(--card);color:var(--ink);font-family:inherit;font-size:17px;
+    line-height:1.6;resize:none;outline:none;transition:border-color .15s,box-shadow .15s;}
+  textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .meta{display:flex;align-items:center;justify-content:space-between;margin-top:9px;font-size:12.5px;color:var(--ink-4);}
+  .meta .cnt.over{color:#B5402A;font-weight:600;}
+
+  button{width:100%;margin-top:16px;padding:16px;border:0;border-radius:8px;background:var(--accent);
+    color:#fff;font-family:inherit;font-size:17px;font-weight:600;letter-spacing:.04em;cursor:pointer;
+    transition:background .15s,opacity .15s;}
+  button:active{background:var(--accent-2);}
+  button:disabled{opacity:.42;cursor:not-allowed;}
+
+  .msg{margin-top:16px;padding:13px 15px;border-radius:8px;font-size:14.5px;line-height:1.6;display:none;}
+  .msg.on{display:block;}
+  .msg--ok{background:rgba(47,107,79,.09);color:var(--ok);border:1px solid rgba(47,107,79,.25);}
+  .msg--no{background:rgba(181,64,42,.08);color:#B5402A;border:1px solid rgba(181,64,42,.22);}
+  .msg--wait{background:rgba(154,110,46,.09);color:var(--warn);border:1px solid rgba(154,110,46,.25);}
+
+  .mine{margin-top:26px;border-top:1px solid var(--rule);padding-top:16px;display:none;}
+  .mine.on{display:block;}
+  .mine__k{font-size:12px;letter-spacing:.14em;color:var(--ink-4);font-weight:700;text-transform:uppercase;}
+  .mine__list{margin-top:11px;display:flex;flex-direction:column;gap:9px;}
+  .mine__item{background:var(--card);border:1px solid var(--rule-2);border-left:3px solid var(--accent);
+    border-radius:6px;padding:11px 13px;font-size:15px;line-height:1.55;color:var(--ink-2);}
+
+  footer{padding:16px 22px calc(env(safe-area-inset-bottom) + 20px);border-top:1px solid var(--rule);
+    display:flex;align-items:center;gap:9px;font-size:12.5px;color:var(--ink-4);}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--ink-4);flex:none;transition:background .2s;}
+  .dot.on{background:var(--ok);}
+  .dot.off{background:#B5402A;}
+  .grow{flex:1;}
+
+  .closed{display:none;padding:40px 22px;text-align:center;}
+  .closed.on{display:block;}
+  .closed__k{font-family:var(--serif);font-size:24px;font-weight:600;color:var(--ink);}
+  .closed__t{margin-top:12px;font-size:15px;line-height:1.7;color:var(--ink-3);}
+  @media (prefers-color-scheme: dark){
+    :root{--paper:#14171C;--card:#1B1F26;--rule:#2C323D;--rule-2:#242A33;
+      --ink:#F0EDE6;--ink-2:#CFD2D8;--ink-3:#9AA1AC;--ink-4:#767D88;
+      --accent:#8FA9CE;--accent-2:#7893BC;--accent-soft:rgba(143,169,206,.14);}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Live Q &amp; A · 现场提问</div>
+  <h1 id="ttl">现场提问</h1>
+  <div class="sub">匿名提交，无需登录。提交后你的问题会<b>实时出现在会场大屏</b>上。</div>
+</header>
+
+<div class="closed" id="closed">
+  <div class="closed__k">本场现场问答已结束</div>
+  <div class="closed__t">感谢参与。<br>如仍有问题，请通过学院的常规渠道咨询。</div>
+</div>
+
+<main id="main">
+  <label for="t">你的问题</label>
+  <textarea id="t" maxlength="200" placeholder="例：中期考核不合格还有没有补考机会？&#10;例：学术夏令营一般什么时候办？" autocomplete="off"></textarea>
+  <div class="meta"><span>一次一个问题，说得越具体越好</span><span class="cnt" id="cnt">0 / 200</span></div>
+  <button id="go" disabled>提　交</button>
+  <div class="msg" id="msg"></div>
+
+  <section class="mine" id="mine">
+    <div class="mine__k">我提交过的</div>
+    <div class="mine__list" id="mineList"></div>
+  </section>
+</main>
+
+<footer>
+  <span class="dot" id="dot"></span><span id="stat">连接中…</span>
+  <span class="grow"></span>
+  <span id="total"></span>
+</footer>
+
+<script>
+(function () {
+  var ROOM = __ROOM__, TITLE = __TITLE__;
+  if (TITLE) { document.getElementById('ttl').textContent = TITLE; document.title = TITLE; }
+
+  var t = document.getElementById('t'), go = document.getElementById('go'), cnt = document.getElementById('cnt');
+  var msg = document.getElementById('msg'), dot = document.getElementById('dot'), stat = document.getElementById('stat');
+  var total = document.getElementById('total'), mine = document.getElementById('mine'), mineList = document.getElementById('mineList');
+  var closedBox = document.getElementById('closed'), main = document.getElementById('main');
+  var ws = null, ready = false, closed = false, sending = false, tries = 0;
+
+  function say(kind, text) {
+    msg.className = 'msg on msg--' + kind; msg.textContent = text;
+    if (kind === 'ok') setTimeout(function () { msg.className = 'msg'; }, 3200);
+  }
+  function refreshBtn() {
+    var n = t.value.trim().length;
+    cnt.textContent = t.value.length + ' / 200';
+    cnt.className = 'cnt' + (t.value.length >= 200 ? ' over' : '');
+    go.disabled = !(n > 0 && ready && !closed && !sending);
+  }
+  t.addEventListener('input', refreshBtn);
+
+  function setClosed(v) {
+    closed = v;
+    closedBox.className = v ? 'closed on' : 'closed';
+    main.style.display = v ? 'none' : '';
+    refreshBtn();
+  }
+
+  function url() {
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return proto + '//' + location.host + '/ws?room=' + encodeURIComponent(ROOM) + '&role=ask';
+  }
+  function connect() {
+    try { ws = new WebSocket(url()); } catch (e) { retry(); return; }
+    ws.onopen = function () { tries = 0; ready = true; dot.className = 'dot on'; stat.textContent = '已连接'; refreshBtn(); };
+    ws.onclose = function () { ready = false; dot.className = 'dot off'; stat.textContent = '连接断开，正在重连…'; refreshBtn(); retry(); };
+    ws.onerror = function () { /* onclose 会跟着来 */ };
+    ws.onmessage = function (e) {
+      var d = null; try { d = JSON.parse(e.data); } catch (x) { return; }
+      if (d.type === 'qa-state') { setClosed(!!d.closed); if (typeof d.total === 'number') total.textContent = '现场共 ' + d.total + ' 个问题'; }
+      else if (d.type === 'qa-ack') {
+        sending = false; refreshBtn();
+        if (d.ok) {
+          addMine(t.value.trim()); t.value = ''; refreshBtn();
+          say('ok', '已提交，问题正在大屏上显示。');
+          if (typeof d.total === 'number') total.textContent = '现场共 ' + d.total + ' 个问题';
+        } else if (d.why === 'too-fast') say('wait', '提交太快了，请等 ' + (d.wait || 4) + ' 秒再试。');
+        else if (d.why === 'closed') { setClosed(true); }
+        else say('no', '没有提交成功，请重试。');
+      }
+    };
+  }
+  function retry() { if (tries > 40) return; tries++; setTimeout(connect, Math.min(1000 * tries, 6000)); }
+
+  function addMine(text) {
+    mine.className = 'mine on';
+    var d = document.createElement('div'); d.className = 'mine__item'; d.textContent = text;
+    mineList.insertBefore(d, mineList.firstChild);
+  }
+
+  go.addEventListener('click', function () {
+    var v = t.value.trim(); if (!v || !ready || sending) return;
+    sending = true; refreshBtn();
+    try { ws.send(JSON.stringify({ type: 'qa-add', text: v })); }
+    catch (e) { sending = false; refreshBtn(); say('no', '发送失败，请检查网络。'); return; }
+    // 服务端没回 ack 也别让按钮永远卡住
+    setTimeout(function () { if (sending) { sending = false; refreshBtn(); say('no', '服务器没有响应，请再试一次。'); } }, 6000);
+  });
+
+  connect();
+})();
+</script>
+</body>
+</html>

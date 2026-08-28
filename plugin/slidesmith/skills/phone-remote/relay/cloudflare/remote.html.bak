@@ -53,36 +53,6 @@
   #scriptNav button { border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--fg); padding:16px 4px; font-size:15px; font-weight:600; transition:transform .06s, background .15s; }
   #scriptNav button:active { transform:scale(.96); background:var(--panel2); }
   #scriptNav button.on { border-color:var(--amber); color:var(--amber); }
-
-  /* ——— 问答模式（主持视图）———
-     讲到问答页时 iPad 自动切过来：低头就能读全部问题，三颗键控制大屏。 */
-  #qaBar { display:flex; align-items:center; gap:10px; margin:0 12px 8px; padding:10px 14px; background:var(--panel); border-radius:16px; }
-  #qaBar .n { font:700 24px/1 "SF Mono",Menlo,monospace; color:var(--amber); }
-  #qaBar .lbl2 { font-size:12.5px; color:var(--dim); }
-  #qaBar .grow { flex:1; }
-  #qaBar .st { font-size:12px; color:var(--dim); display:flex; align-items:center; gap:6px; }
-  #qaBar .st i { width:8px; height:8px; border-radius:50%; background:var(--dim); display:block; }
-  #qaBar .st i.ok { background:var(--green); } #qaBar .st i.bad { background:var(--red); }
-  #qaList { flex:1; margin:0 12px; overflow:auto; -webkit-overflow-scrolling:touch; min-height:0;
-    display:flex; flex-direction:column; gap:9px; padding-bottom:4px; }
-  .qitem { background:var(--panel); border-radius:14px; padding:13px 15px; display:flex; gap:12px; align-items:flex-start; }
-  .qitem .qt { flex:1; font-size:16px; line-height:1.55; color:var(--fg); word-break:break-word; }
-  .qitem .qx { flex:none; border:1px solid var(--line); border-radius:10px; background:none; color:var(--dim);
-    font-size:12px; padding:7px 10px; }
-  .qitem .qx:active { background:var(--panel2); color:var(--fg); }
-  .qitem.done { opacity:.45; }
-  .qitem .qm { font:11px/1 "SF Mono",Menlo,monospace; color:var(--dim); margin-top:7px; letter-spacing:.08em; }
-  #qaEmptyR { flex:1; display:flex; align-items:center; justify-content:center; text-align:center;
-    color:var(--dim); font-size:14px; line-height:1.8; padding:30px; }
-  #qaNav { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; padding:10px 12px calc(12px + env(safe-area-inset-bottom)); }
-  #qaNav button { border:1px solid var(--line); border-radius:16px; background:var(--panel); color:var(--fg);
-    padding:16px 4px; font-size:15px; font-weight:600; transition:transform .06s, background .15s; }
-  #qaNav button:active { transform:scale(.96); background:var(--panel2); }
-  #qaNav button.danger { color:var(--red); border-color:#4a2222; }
-  #qaNav button.on { border-color:var(--amber); color:var(--amber); }
-  #mQa { display:none; } #mQa.show { display:block; }
-  #mQa .badge { display:inline-block; min-width:17px; padding:0 5px; margin-left:5px; border-radius:9px;
-    background:var(--amber); color:#181818; font:700 11px/17px -apple-system,system-ui,sans-serif; vertical-align:1px; }
 </style>
 </head>
 <body>
@@ -91,7 +61,6 @@
     <div id="modes">
       <button id="mPad" class="on">遥控</button>
       <button id="mScript">讲稿</button>
-      <button id="mQa">问答<span class="badge" id="qaBadge" style="display:none">0</span></button>
     </div>
   </header>
   <div id="warn">已连上中转，但<b>放映端还没打开</b>。请在电脑上打开这份 slides 并点「手机遥控」。</div>
@@ -132,31 +101,8 @@
     </div>
   </div>
 
-  <!-- 问答模式 = 主持视图：全部问题在手边，三颗键控制大屏 -->
-  <div class="pane" id="qaPane">
-    <div id="qaBar">
-      <div><div class="lbl2">现场提问</div><div class="n" id="qaN">0</div></div>
-      <div class="grow"></div>
-      <div class="st"><i id="qaDotR"></i><span id="qaStatR">未连接</span></div>
-    </div>
-    <div id="qaList"><div id="qaEmptyR">还没有人提问。<br>大屏上的二维码扫一下就能提。</div></div>
-    <div id="qaNav">
-      <button id="qaUp">大屏 ⬆</button>
-      <button id="qaDown">大屏 ⬇</button>
-      <button id="qaClose">关闭提问</button>
-      <button id="qaClear" class="danger">清屏</button>
-    </div>
-  </div>
-
 <script>
   var ROOM = __ROOM__;
-  // 问答面板**默认就在**。原来要 ?qa=1 才出现——那等于"漏一个参数就没有这个功能"，
-  // 现场没人记得住 URL。房间没开问答时它只是空着，没有代价。想关掉用 ?qa=0。
-  // 问答页锚点由放映端在 deck-info 里告知（window.__SM_QA_ANCHOR__），不用手填。
-  var QP = new URLSearchParams(location.search);
-  var QA_ON = QP.get('qa') !== '0';
-  var QA_ANCHOR = QP.get('qaAnchor') || '';
-  var qaAutoFrom = null;   // 自动切进问答前停在哪个模式，翻走了好切回去
   var dot = document.getElementById('dot'), stext = document.getElementById('statusText'), warn = document.getElementById('warn');
   var blackOn = false, ws = null, deckPresent = false;
   // WebRTC 直连（P2P）——手机是 answerer；连上后指令走数据通道，否则回落 WS 云中转
@@ -228,12 +174,7 @@
   // 放映端发来的东西：两条路（中转 ws / 直连 dc）进来的都走这里
   function onDeckMsg(m) {
     if (!m) return;
-    if (m.type === 'deck-info') {
-      loadScript(m.txb64);
-      // 放映端顺便告诉我们「问答页是哪一张」，翻到那张就自动切到问答面板
-      if (m.qaAnchor && !QP.get('qaAnchor')) QA_ANCHOR = m.qaAnchor;
-      if (m.state) { applyState(m.state); startTimer(); }
-    }
+    if (m.type === 'deck-info') { loadScript(m.txb64); if (m.state) { applyState(m.state); startTimer(); } }
     else if (m.type === 'state') { applyState(m.state); startTimer(); }
   }
   function toFrame(msg) { try { frame.contentWindow.postMessage(msg, '*'); } catch (e) {} }
@@ -260,12 +201,6 @@
     nextTitle.textContent = '› 下一张：' + (s.nextTitle || '—');
     pageNo.textContent = (s.slideIdx + 1) + (typeof s.total === 'number' ? ' / ' + s.total : '');
     if (s.anchor) { lastAnchor = s.anchor; if (scriptLoaded) toFrame({ type: 'fuquan-scroll', anchor: s.anchor }); }
-    // 翻到问答页 → iPad 自动切到「问答」；翻走了自动切回原来那个模式。
-    // 讲者手上不用做任何动作，这是用户点名要的那条。
-    if (QA_ON && QA_ANCHOR) {
-      if (s.anchor === QA_ANCHOR && mode !== 'qa') { qaAutoFrom = mode; setMode('qa'); }
-      else if (s.anchor !== QA_ANCHOR && mode === 'qa' && qaAutoFrom) { var back = qaAutoFrom; qaAutoFrom = null; setMode(back); }
-    }
   }
 
   // 计时：第一次收到状态就开始跑（= 你真正开讲的时刻）
@@ -316,20 +251,16 @@
     toFrame({ type: 'fuquan-cue', on: cueOn });
   });
 
-  // 模式切换（三态：遥控 / 讲稿 / 问答）
-  var mPad = document.getElementById('mPad'), mScript = document.getElementById('mScript'), mQa = document.getElementById('mQa');
-  var padPane = document.getElementById('padPane'), scriptPane = document.getElementById('scriptPane'), qaPane = document.getElementById('qaPane');
-  var mode = 'pad';
-  function setMode(m) {
-    if (m === true) m = 'script'; else if (m === false) m = 'pad';   // 兼容旧的布尔调用
-    if (m === 'qa' && !QA_ON) m = 'script';
-    mode = m;
-    mPad.classList.toggle('on', m === 'pad'); mScript.classList.toggle('on', m === 'script'); mQa.classList.toggle('on', m === 'qa');
-    padPane.classList.toggle('on', m === 'pad'); scriptPane.classList.toggle('on', m === 'script'); qaPane.classList.toggle('on', m === 'qa');
-    try { localStorage.setItem('sm-remote-mode', m); } catch (e) {}
+  // 模式切换
+  var mPad = document.getElementById('mPad'), mScript = document.getElementById('mScript');
+  var padPane = document.getElementById('padPane'), scriptPane = document.getElementById('scriptPane');
+  function setMode(script) {
+    mPad.classList.toggle('on', !script); mScript.classList.toggle('on', script);
+    padPane.classList.toggle('on', !script); scriptPane.classList.toggle('on', script);
+    try { localStorage.setItem('sm-remote-mode', script ? 'script' : 'pad'); } catch (e) {}
     // 讲稿面板隐藏时 iframe 高度是 0，那期间收到的滚动指令等于打空枪。
     // 所以每次切回讲稿都要按最后一次状态重新定位，否则你切过去看到的是上一次的位置。
-    if (m === 'script') {
+    if (script) {
       askInfo();
       setTimeout(function () {
         if (lastAnchor) toFrame({ type: 'fuquan-scroll', anchor: lastAnchor });
@@ -337,77 +268,9 @@
       }, 120);
     }
   }
-  mPad.addEventListener('click', function () { setMode('pad'); });
-  mScript.addEventListener('click', function () { setMode('script'); });
-  mQa.addEventListener('click', function () { setMode('qa'); });
-  try { var sv = localStorage.getItem('sm-remote-mode'); if (sv === 'script' || sv === 'qa') setMode(sv); } catch (e) {}
-
-  // ══════════════ 问答主持视图 ══════════════
-  // 独立的一条 WS（role=host），和遥控那条互不影响：遥控断了问题照收，反之亦然。
-  // 只在链接带 ?qa=1 时出现，所以对不做问答的 deck 零影响。
-  var qaList = document.getElementById('qaList'), qaEmptyR = document.getElementById('qaEmptyR');
-  var qaN = document.getElementById('qaN'), qaBadge = document.getElementById('qaBadge');
-  var qaDotR = document.getElementById('qaDotR'), qaStatR = document.getElementById('qaStatR');
-  var qaCloseBtn = document.getElementById('qaClose'), qaClearBtn = document.getElementById('qaClear');
-  var qws = null, qtries = 0, qItems = [], qClosed = false, qDone = {}, qSeen = 0;
-
-  if (QA_ON) mQa.classList.add('show');
-
-  function qaRender() {
-    qaN.textContent = String(qItems.length);
-    var unseen = Math.max(0, qItems.length - qSeen);
-    qaBadge.textContent = String(unseen);
-    qaBadge.style.display = (unseen > 0 && mode !== 'qa') ? '' : 'none';
-    qaList.innerHTML = '';
-    if (!qItems.length) { qaList.appendChild(qaEmptyR); return; }
-    // 新的在上：讲者是从上往下扫的
-    qItems.slice().reverse().forEach(function (q) {
-      var row = document.createElement('div'); row.className = 'qitem' + (qDone[q.id] ? ' done' : '');
-      var col = document.createElement('div'); col.style.flex = '1';
-      var t = document.createElement('div'); t.className = 'qt'; t.textContent = q.t;
-      var m = document.createElement('div'); m.className = 'qm';
-      var dt = new Date(q.ts); m.textContent = ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2);
-      col.appendChild(t); col.appendChild(m);
-      var x = document.createElement('button'); x.className = 'qx'; x.textContent = '隐藏';
-      x.addEventListener('click', function () { qSend({ type: 'qa-hide', id: q.id }); });
-      row.appendChild(col); row.appendChild(x);
-      // 点一下标记「已答」——只是本机的视觉记号，不动大屏
-      col.addEventListener('click', function () { qDone[q.id] = !qDone[q.id]; qaRender(); });
-      qaList.appendChild(row);
-    });
-  }
-  function qSend(o) { try { if (qws && qws.readyState === 1) qws.send(JSON.stringify(o)); } catch (e) {} }
-  function qaState(cls, text) { qaDotR.className = cls || ''; qaStatR.textContent = text; }
-  function qConnect() {
-    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    try { qws = new WebSocket(proto + '//' + location.host + '/ws?room=' + encodeURIComponent(ROOM) + '&role=host'); }
-    catch (e) { qRetry(); return; }
-    qws.onopen = function () { qtries = 0; qaState('ok', '已连接'); };
-    qws.onclose = function () { qaState('bad', '断开，重连中'); qRetry(); };
-    qws.onerror = function () { /* onclose 会跟上 */ };
-    qws.onmessage = function (e) {
-      var d = null; try { d = JSON.parse(e.data); } catch (x) { return; }
-      if (d.type === 'qa-init') { qItems = d.questions || []; qClosed = !!d.closed; qSeen = qItems.length; syncCloseBtn(); qaRender(); }
-      else if (d.type === 'qa-new') { qItems.push(d.q); if (mode === 'qa') qSeen = qItems.length; qaRender(); }
-      else if (d.type === 'qa-cleared') { qItems = []; qSeen = 0; qaRender(); }
-      else if (d.type === 'qa-hidden') { qItems = qItems.filter(function (x) { return x.id !== d.id; }); qSeen = Math.min(qSeen, qItems.length); qaRender(); }
-      else if (d.type === 'qa-state') { qClosed = !!d.closed; syncCloseBtn(); }
-    };
-  }
-  function qRetry() { if (qtries > 60) { qaState('bad', '连接失败'); return; } qtries++; setTimeout(qConnect, Math.min(1200 * qtries, 8000)); }
-  function syncCloseBtn() {
-    qaCloseBtn.textContent = qClosed ? '重新开放提问' : '关闭提问';
-    qaCloseBtn.classList.toggle('on', qClosed);
-  }
-  qaCloseBtn.addEventListener('click', function () { qSend({ type: qClosed ? 'qa-open' : 'qa-close' }); });
-  // 大屏问题墙滚动：问题多了大屏一屏放不下，讲者在台上用这两颗翻
-  document.getElementById('qaUp').addEventListener('click', function () { qSend({ type: 'qa-scroll', dir: -1 }); });
-  document.getElementById('qaDown').addEventListener('click', function () { qSend({ type: 'qa-scroll', dir: 1 }); });
-  qaClearBtn.addEventListener('click', function () {
-    if (!qItems.length) return;
-    if (window.confirm('清空大屏上的全部 ' + qItems.length + ' 个问题？此操作不可撤销。')) qSend({ type: 'qa-clear' });
-  });
-  if (QA_ON) { qConnect(); qaRender(); }
+  mPad.addEventListener('click', function () { setMode(false); });
+  mScript.addEventListener('click', function () { setMode(true); });
+  try { if (localStorage.getItem('sm-remote-mode') === 'script') setMode(true); } catch (e) {}
 
   document.addEventListener('touchmove', function (e) { if (e.scale !== 1) e.preventDefault(); }, { passive: false });
   document.addEventListener('gesturestart', function (e) { e.preventDefault(); });

@@ -231,13 +231,7 @@
     startDomWatch();
     // 同一页面里另建一个同名 channel 是能收到本页 postMessage 的（规范只排除发送者
     // 自己那个对象），所以不用碰 deck 的代码就能旁听。
-    //
-    // ⚠️ 必须判空。猜不到频道名（deck 没烘 __SM_PRESENTER_CHANNEL__ / __SM_DECK_ID__，
-    // 且 localStorage 里还没有 *-state —— 全新打开的页面就是这个状态）时 chan 是 null，
-    // 直接挂 onmessage 会抛，把整个 sendDeckInfo 打断，讲稿第一次推送就丢了。
-    // 表现很隐蔽：第二设备每 2 秒重问一次，第二次才拿到，看起来"只是慢了点"。
-    // 上面那条 DOM 兜底（startDomWatch）本来就是为这种情况准备的，让它单独扛住即可。
-    if (PFEED.chan) PFEED.chan.onmessage = function (e) {
+    PFEED.chan.onmessage = function (e) {
       var d = e && e.data;
       if (!d || typeof d.slideIdx !== 'number') return;
       if (d.type === 'jump-to-slide') return;       // 那是反向指令，不是状态
@@ -260,10 +254,7 @@
       // 手表提词表（锚点 → 短语数组）。只有 presenter-mode 开了 watch mode 的 deck 才有。
       // 没有时手表会回落到「运行时从讲稿里抠 <strong>」——能用，但质量不保证：
       // <strong> 在讲稿里同时担着「阅读强调」和「口播提词」两个角色。
-      cues: (window.__SM_CUES__ && typeof window.__SM_CUES__ === 'object') ? window.__SM_CUES__ : null,
-      // 现场问答：房间号 + 问答页锚点。第二设备靠这两个自动开出「问答」面板并在翻到那页时自动切过去。
-      qaRoom: (typeof window.__SM_QA_ROOM__ === 'string' && window.__SM_QA_ROOM__) || null,
-      qaAnchor: (typeof window.__SM_QA_ANCHOR__ === 'string' && window.__SM_QA_ANCHOR__) || null
+      cues: (window.__SM_CUES__ && typeof window.__SM_CUES__ === 'object') ? window.__SM_CUES__ : null
     });
   }
   // 第二设备点「上一页/下一页」时也可以直接指定页码（讲稿模式下点目录跳转用）
@@ -430,13 +421,7 @@
     var qrBox = card.querySelector('#__sm_qr'); var qrEl = qrBox.querySelector('svg');
     if (qrEl) { qrEl.setAttribute('width', '224'); qrEl.setAttribute('height', '224'); }
 
-    openDeckWs(wsBaseHttp, room, label, false);
-  }
-
-  // 放映端连接。中转是「先到先得」：房间里已经有放映端时会回 deck-busy，
-  // 这时给一颗「接管」按钮让讲者显式抢过来——学生随手点一下是抢不走的。
-  function openDeckWs(wsBaseHttp, room, label, takeover) {
-    try { ws = new WebSocket(wsBaseHttp.replace(/^http/, 'ws') + '/ws?room=' + room + '&role=deck' + (takeover ? '&takeover=1' : '')); }
+    try { ws = new WebSocket(wsBaseHttp.replace(/^http/, 'ws') + '/ws?room=' + room + '&role=deck'); }
     catch (e) { pairError('无法建立连接。'); return; }
     ws.onmessage = function (e) {
       var m; try { m = JSON.parse(e.data); } catch (x) { return; }
@@ -444,25 +429,9 @@
       else if (m.type === 'joined' && m.peers && m.peers.remote > 0) { markPaired(); startRtc(); }
       else if (m.type === 'signal') { if (m.kind === 'answer') onAnswer(m.data); else if (m.kind === 'ice') onIce(m.data); }
       else if (m.type === 'cmd' && m.action) handle(m.action);   // 云端回落路径
-      else if (m.type === 'evicted') {                            // 别的窗口显式接管了
+      else if (m.type === 'evicted') {                            // 被同一份 slides 的另一个窗口顶掉了
         closePc();
-        pairError('另一台设备接管了本房间的放映端。要在本窗口讲，重新点一次「手机遥控」并选择「接管」。');
-      }
-      else if (m.type === 'deck-busy') {                          // 房间里已经有放映端
-        var msg = card.querySelector('#__sm_pairmsg');
-        if (msg) {
-          msg.innerHTML = '⚠️ 本房间已有放映端在线。<br>'
-            + '<span style="color:#888">若<b>这一台</b>才是要讲的那台，点下面接管。</span><br>'
-            + '<button id="__sm_takeover" style="margin-top:10px;border:0;background:#1c1c1f;color:#fff;'
-            + 'border-radius:8px;padding:8px 18px;font-size:13.5px;cursor:pointer">接管本房间</button>';
-          msg.style.color = '#8a6224';
-          var tb = msg.querySelector('#__sm_takeover');
-          if (tb) tb.onclick = function () {
-            msg.textContent = '正在接管…'; msg.style.color = '#888';
-            try { ws.close(); } catch (e2) {}
-            openDeckWs(wsBaseHttp, room, label, true);
-          };
-        }
+        pairError('这份 slides 的另一个窗口/副本接管了遥控。要在本窗口讲，重新点一次「手机遥控」。');
       }
       else if (m.type === 'need-info') sendDeckInfo();            // 第二设备要讲稿
       else if (m.type === 'jump' && typeof m.slideIdx === 'number') presenterJump(m.slideIdx);

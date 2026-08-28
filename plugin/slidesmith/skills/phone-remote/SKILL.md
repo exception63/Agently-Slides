@@ -51,6 +51,23 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/phone-remote/relay/relay.mjs" --port 8787
 
 ---
 
+
+## 中转怎么选：workers.dev vs 自己的域名
+
+两份实现，**协议完全一样**，换地址即可切换：
+
+| | `relay/cloudflare/`（Worker） | `relay/selfhost/`（smrelay.py） |
+|---|---|---|
+| 地址 | `https://<name>.workers.dev` | 你自己的域名，现为 `https://live.zhouliying.com` |
+| 部署 | `npx wrangler deploy` | `sudo bash install.sh`（零依赖 Python + systemd + Caddy） |
+| 适合 | 自己测、海外场合 | **国内现场，给学生扫码** |
+
+⚠️ **给学生扫的码不要用 `*.workers.dev`。** 2026-08-28 实测：讲台电脑打得开（多半因为挂了代理），
+学生手机用流量却加载不出来——这是域名级的问题，换成自有域名即正常。
+自托管版还多了：问题落盘（重启不丢）、`/var/lib/smrelay` 可直接查、日志在 journalctl。
+
+细节见 `relay/selfhost/README.md`。
+
 ## 云中转（已部署 · 归用户 Cloudflare）
 - URL：`https://slidesmith-remote.zly-scu.workers.dev`（Durable Object 每 room 一实例 + WebSocket Hibernation，免费额度）。
 - 源码：`relay/cloudflare/{worker.mjs, wrangler.toml, remote.html}`；重部署：`cd` 进该目录 → `npx wrangler deploy`。
