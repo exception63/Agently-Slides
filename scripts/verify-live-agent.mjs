@@ -6,7 +6,7 @@
 // 覆盖：令牌门（对/错/不带）· whoami · 建房间 · 列房间 · 改名 · 场次 ·
 //       条目 · 导出 CSV(BOM)/MD · 远程清屏「只清大屏、账本一条不少」·
 //       关/开提问 · 删房间 · **管理台那道门(/api/admin/*)没被令牌绕开**。
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -110,7 +110,44 @@ ok('接口给的条目时间是秒（不是毫秒）', new Date(r.items[0].ts * 
    new Date(r.items[0].ts * 1000).toISOString().slice(0, 10));
 ok('导出里的时间是今年（不是公元 58626 年）', readFileSync(md, 'utf8').includes(String(yr) + '-'));
 
-// ── 6. 删除要显式确认 ──────────────────────────────────────────────
+// ── 6. 没人连着也要能关提问 ────────────────────────────────────────
+// 课讲完了、投影关了，可二维码还贴在那儿 —— **这恰恰是最需要关提问的时刻**。
+// 原来管理台这两颗按钮按 deck 是否在线禁用，中转也回「这个房间现在没人连着」，
+// 于是最该用的时候用不了。这里用一个**从来没有人连过**的房间来验（只在库里，不在 ROOMS 里）。
+const COLD = 'coldroom2026';
+await jq(['new', COLD, '--name', '没人连过的房间']);
+r = await cli(['close', COLD]);
+ok('房间没人连着时也能关提问', r.code === 0, r.err.trim());
+await sleep(600);
+ok('关了之后管理端看得到是关的', (await jq(['rooms'])).rooms.find((x) => x.id === COLD)?.closed === true);
+const cold1 = await new Promise((res) => {
+  const w = new WebSocket(`${BASE.replace('http', 'ws')}/ws?room=${COLD}&role=ask`);
+  const st = {}; w.onmessage = (e) => { const d = JSON.parse(e.data); if (d.type === 'qa-state') st.closed = d.closed;
+    if (d.type === 'qa-ack') { st.ack = d; res({ w, st }); } };
+  w.onopen = () => setTimeout(() => w.send(JSON.stringify({ type: 'qa-add', text: '还能提吗' })), 250);
+  setTimeout(() => res({ w, st }), 4000);
+});
+ok('学生一连上就被告知已关闭', cold1.st.closed === true);
+ok('关闭状态落了盘，新连上的学生提交被挡', cold1.st.ack?.ok === false && cold1.st.ack?.why === 'closed');
+cold1.w?.close();
+await cli(['rm', COLD, '--yes']);
+
+// ── 7. 场次分界：隔久了要另起一场 ──────────────────────────────────
+// 线上真出过：放映端 14:54 就断了，16:29 的 21 条提问全被记进那一场。
+// 原因是取「这个房间的最后一场」而不判间隔。
+const dbf = join(tmp, 'data', 'live.db');
+execSync(`sqlite3 "${dbf}" "UPDATE session SET ended=strftime('%s','now')-4000 WHERE id=${SID}"`);
+const late = await ws('ask');
+late.send(JSON.stringify({ type: 'qa-add', text: '隔了很久之后才提的问题' }));
+await sleep(800);
+r = await jq(['sessions', ROOM]);
+ok('隔过 SESSION_GAP 的提问另起一场', r.sessions.length === 2, `${r.sessions.length} 场`);
+ok('新那一场只有这一条', r.sessions[0].items === 1);
+ok('旧那一场的条目没被动', r.sessions[1].items === 3);
+ok('旧那一场的峰值没被后来的连接改写', r.sessions[1].peak === 2, String(r.sessions[1].peak));
+late.close();
+
+// ── 8. 删除要显式确认 ──────────────────────────────────────────────
 r = await cli(['rm', ROOM]);
 ok('删房间不加 --yes 就拦下来', r.code !== 0 && /--yes/.test(r.err));
 r = await cli(['rm', ROOM, '--yes']);

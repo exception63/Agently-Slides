@@ -100,7 +100,10 @@ function render() {
   var box = $('#list');
   if (!state.rooms.length) { box.innerHTML = '<div class="card"><div class="empty">还没有房间。点右上角「＋ 新建房间」建第一个 —— 一门课建一个，二维码烘一次就永远不用换。</div></div>'; return; }
   box.innerHTML = state.rooms.map(function (r) {
-    var on = r.online, live = on && on.deck > 0;
+    var on = r.online, live = on && on.deck > 0;   // live 只用来显示「● 正在讲」这颗徽标
+    // 清屏 / 关提问**不要求房间在线**。原来按 deck 是否在线禁用这两颗，
+    // 结果「讲完了、投影关了、二维码还在外面」这个最需要关提问的时刻恰恰按不动。
+    // 中转那边已经改成：没人连着也照样改状态并落盘，下一个学生连上就被挡。
     var open = state.open === r.id;
     return '<div class="card" data-room="' + esc(r.id) + '">'
       + '<div class="rhead">'
@@ -119,8 +122,8 @@ function render() {
       + '<div class="links"><span>学生扫码</span> ' + location.origin + '/q/' + esc(r.id)
       +   '　<span>你的 iPad</span> ' + location.origin + '/r/' + esc(r.id) + '</div>'
       + '<div class="acts">'
-      +   '<button class="btn" data-act="clear"' + (live ? '' : ' disabled') + '>清屏</button>'
-      +   '<button class="btn" data-act="' + (r.closed ? 'open' : 'close') + '"' + (live ? '' : ' disabled') + '>'
+      +   '<button class="btn" data-act="clear">清屏</button>'
+      +   '<button class="btn" data-act="' + (r.closed ? 'open' : 'close') + '">'
       +     (r.closed ? '开放提问' : '关闭提问') + '</button>'
       +   '<button class="btn" data-act="rename">改名</button>'
       +   '<button class="btn danger" data-act="delete">删除</button>'

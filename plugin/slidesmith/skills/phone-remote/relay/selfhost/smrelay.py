@@ -259,13 +259,25 @@ def touch_session_end(rid):
     ex("UPDATE session SET ended=? WHERE room=? AND ended IS NULL", int(time.time()), rid)
 
 def bump_peak(rid, n):
-    r = q1("SELECT id, peak FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
-    if r and n > (r["peak"] or 0):
+    r = q1("SELECT id, ended, peak FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
+    # 上一场早就结束了、这会儿只是有人点开了链接：既不该把峰值记到那一场上，
+    # 也不该为此凭空开一场（deck 和提问页都是公开分享的，随时有人点开看看）。
+    # 真开一场是由「第一条提问」或「放映端上线」触发的，见 current_session()。
+    if not r or (r["ended"] is not None and time.time() - r["ended"] > SESSION_GAP):
+        return
+    if n > (r["peak"] or 0):
         ex("UPDATE session SET peak=? WHERE id=?", n, r["id"])
 
 def current_session(rid):
-    r = q1("SELECT id FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
-    return r["id"] if r else open_session(rid)
+    """条目该记进哪一场。
+
+    ⚠️ 原来是「拿这个房间的最后一场」，**不判间隔** —— 于是放映端早就下线一个半小时了，
+    学生这会儿扫码提的问题仍旧记进上一场。线上真出过：8-30 那场放映端 14:54 就断了，
+    16:29–16:42 的 21 条提问全被算进那一场，导出来时间对不上课。
+
+    open_session() 本身就是「当前这一场，没有就开一场」（还开着就接着用 · 刚结束不到
+    SESSION_GAP 就续上 · 隔久了才另起一场），语义正是这里要的，别再写第二份。"""
+    return open_session(rid)
 
 
 ROOMS = {}
@@ -431,7 +443,10 @@ async def ws_session(ws, room_name, role, takeover=False, passhash=""):
     finally:
         room.socks[role].discard(ws)
         await ws.close()
-        if role == "deck" and not room.socks["deck"]:
+        # 收场时间＝**房间彻底空了**那一刻，不是「放映端走了」那一刻。
+        # 纯扫码提问的场次常常根本没有 deck 连过（只有 wall 和 ask），
+        # 只认 deck 的话那种场次的 ended 永远是空的，列表里一直显示「进行中」。
+        if room.empty():
             try: touch_session_end(room_name)
             except Exception: pass
         log("leave", room_name, role, room.counts())
@@ -584,8 +599,17 @@ def admin_api(path, qs, body):
     if path == "/api/admin/control" and body is not None:
         rid = str(body.get("room") or "")
         act = str(body.get("action") or "")
+        if act not in ("clear", "close", "open"):
+            return {"ok": False, "error": "不认识的操作"}
         live = ROOMS.get(rid)
-        if not live: return {"ok": False, "error": "这个房间现在没人连着"}
+        if not live:
+            # **没人连着恰恰是最需要「关提问」的时刻** —— 课讲完了、投影关了，
+            # 可二维码还贴在那儿/还在别人手机相册里，谁扫谁都还能提。
+            # 房间存在就把它取出来（Room.__init__ 会从盘上读回 closed/questions），
+            # 改完落盘；下一个学生连上时 _load() 把这个状态带回去，照样挡得住。
+            if not q1("SELECT id FROM room WHERE id=?", rid):
+                return {"ok": False, "error": "没有这个房间"}
+            live = room_of(rid)
         PENDING_CONTROL.append((live, act))
         return {"ok": True}
 
