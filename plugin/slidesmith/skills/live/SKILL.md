@@ -4,12 +4,12 @@ description: |
   给 HTML slides 加「现场互动」，并接到常驻服务 Slidesmith Live（https://live.zhouliying.com）上统一管理。
   一次装配 = 往 deck 里插一页互动页 + 烘一个房间号；学生扫码参与，内容实时上大屏，讲者用 iPad 主持，课后在管理台按场次导出。
   现在能装的玩法：**qa 扫码匿名提问 · 实时上墙**（已现场实战）。投票 / 词云 / 小测 / 抢答 / 评分 / 分组答案是菜单上还没做的，做法见 references/new-block.md。
-  数据模型是「课 → 场次 → 条目」：一门课一个房间号（烘一次、二维码永不变），每次开讲自动分一场（判据＝静默 30 分钟），事后能按场次导出 CSV / Markdown 做分析。不存任何设备标识。
+  数据模型是「课 → 场次 → 条目」：一门课一个房间号（烘一次、二维码永不变），**一个自然日一场**（同一天里隔多久都算一场，跨天才分），事后能按场次导出 CSV / Markdown 做分析。不存任何设备标识。
   **管理台的每一件事 AI 都能直接做**：`smlive` CLI 走令牌版接口 `/api/agent/*`，建/改名/删房间 · 看在线 · 列场次 · 读提问 · 导出 CSV/MD · 远程清屏 · 关/开提问。用户只当指挥者。
   当用户说 "加个扫码提问 / 现场互动 / 课堂互动 / 学生扫码 / 提问上墙 / 弹幕上屏 / 现场投票 / 词云 / 随堂小测 / 抢答 / 匿名反馈 / 二维码提问 / live / 管理台 / 我的互动服务 / 这门课要互动 / 把提问导出来" 时启用。
   只负责「互动」；要手机翻页遥控是 phone-remote skill，要副屏讲稿同步是 slides-presenter-mode skill，要从零做 slides 是 editorial-slides skill。
 metadata:
-  version: 0.2.1
+  version: 0.3.0
   status: dogfood-validated
   part_of: slidesmith
   service: https://live.zhouliying.com

@@ -38,7 +38,7 @@ ROOM_RE = re.compile(r"^[A-Za-z0-9_-]{4,64}$")
 MAX_LEN, MAX_KEEP, MIN_GAP = 200, 300, 4.0     # 单条字数 / 留存条数 / 同设备提交间隔（秒）
 MAX_AUTH_FAIL, AUTH_COOLDOWN = 6, 60.0         # 密码连错几次 / 冷却多少秒
 MAX_ROOMS = 200
-SESSION_GAP = 30 * 60          # 放映端下线满这么久，就认为这一场讲完了
+SESSION_GAP = 30 * 60          # 房间空这么久就从内存里清出去（**不再用来分场**，分场看自然日）
 DB = DATA / "live.db"
 TOKEN_FILE = pathlib.Path(os.environ.get("SMRELAY_TOKEN_FILE", "/etc/smrelay/token"))
 VERSION = "0.3.0"
@@ -46,7 +46,7 @@ VERSION = "0.3.0"
 
 # ═══════════════════ 存储：一个 SQLite 文件 ═══════════════════
 # 三层：课/活动（room）→ 场次（session）→ 条目（item）。
-# 「一门课一个房间、每次开讲自动分一场」就落在这个结构上：
+# 「一门课一个房间、**一个自然日一场**」就落在这个结构上：
 # slides 里的房间号一次烘死、二维码永不变，而每次上课各成一场，事后好分析。
 #
 # **不存任何设备标识**（用户明确要求）：只在场次上记一个「同时在线峰值」的数字，
@@ -236,21 +236,33 @@ class Room:
 
 
 # ── 场次生命周期 ─────────────────────────────────────────────
-# 放映端一上线就开一场；下线满 SESSION_GAP 才算讲完。
-# 中途刷新页面、网断一下重连，都还算同一场——现场这两件事天天发生。
+# **分场判据＝自然日**：同一天里的所有动静都算一场（见 open_session 的注释）。
+# 收场时间记的是「当天房间最后一次空掉」那一刻，当天再有动静就把它清回 NULL。
 def ensure_room(rid, name=""):
     if not q1("SELECT id FROM room WHERE id=?", rid):
         ex("INSERT INTO room(id,name,created) VALUES(?,?,?)", rid, name or "", int(time.time()))
 
+def same_day(a, b):
+    """同一个自然日。用本地时区（服务单元里设了 TZ=Asia/Shanghai），不是 UTC——
+    否则北京时间早上 8 点前的课会被算成前一天。"""
+    la, lb = time.localtime(a), time.localtime(b)
+    return (la.tm_year, la.tm_yday) == (lb.tm_year, lb.tm_yday)
+
 def open_session(rid):
+    """当前这一场。
+
+    **分场判据＝自然日**：同一天里的所有动静都算同一场，中间隔多久都不分——
+    放映端断开、页面刷新、试机和正课隔了一个半小时、上午讲一遍下午再讲一遍，
+    统统记在这一天名下。跨到第二天才另起一场。
+
+    （早先按「静默 30 分钟」分，边界太碎：同一堂课的课前试机和正式开讲之间隔了
+    一个半小时，就会被切成两场。按天分，一门课的账目和课表天然对得上。）"""
     ensure_room(rid)
     now = int(time.time())
-    cur = q1("SELECT id, started FROM session WHERE room=? AND ended IS NULL ORDER BY id DESC LIMIT 1", rid)
-    if cur:
-        return cur["id"]                       # 还开着，接着用（刷新/断线重连不该另起一场）
-    last = q1("SELECT id, ended FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
-    if last and last["ended"] and now - last["ended"] < SESSION_GAP:
-        ex("UPDATE session SET ended=NULL WHERE id=?", last["id"])   # 刚讲完又连回来 = 同一场
+    last = q1("SELECT id, started, ended FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
+    if last and same_day(last["started"], now):
+        if last["ended"] is not None:
+            ex("UPDATE session SET ended=NULL WHERE id=?", last["id"])   # 当天又有动静，这一场继续
         return last["id"]
     return ex("INSERT INTO session(room,started) VALUES(?,?)", rid, now).lastrowid
 
@@ -259,11 +271,10 @@ def touch_session_end(rid):
     ex("UPDATE session SET ended=? WHERE room=? AND ended IS NULL", int(time.time()), rid)
 
 def bump_peak(rid, n):
-    r = q1("SELECT id, ended, peak FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
-    # 上一场早就结束了、这会儿只是有人点开了链接：既不该把峰值记到那一场上，
-    # 也不该为此凭空开一场（deck 和提问页都是公开分享的，随时有人点开看看）。
-    # 真开一场是由「第一条提问」或「放映端上线」触发的，见 current_session()。
-    if not r or (r["ended"] is not None and time.time() - r["ended"] > SESSION_GAP):
+    r = q1("SELECT id, started, peak FROM session WHERE room=? ORDER BY id DESC LIMIT 1", rid)
+    # 最后一场不是今天的，说明这会儿只是有人点开了链接看看（deck 和提问页都是公开分享的）：
+    # 既不该把峰值记到旧场上，也不该为此凭空开一场。真开一场由「放映端上线」或「第一条提问」触发。
+    if not r or not same_day(r["started"], time.time()):
         return
     if n > (r["peak"] or 0):
         ex("UPDATE session SET peak=? WHERE id=?", n, r["id"])
@@ -512,6 +523,19 @@ def agent_ok(headers):
 # ═══════════════════ 管理台 API ═══════════════════
 # 门由 Caddy 的 forward_auth 把（复用 MySpace 的 msauth，密码天然同一个）。
 # 这里假定「能走到这儿的就是本人」——服务只监听 127.0.0.1，绕不过去。
+def state_on_disk(rid):
+    """房间当前不在内存里时，「提问关没关 / 墙上还留着几条」得从盘上读。
+
+    ⚠️ 原来这两项在房间不在线时一律报「没关 · 0 条」。但**关闭状态是持久化的**
+    （Room._load 会读回来，学生照样被挡），于是服务一重启、或者房间被清扫出内存，
+    管理台就把「已关闭」显示成「开着」—— 显示和真相不一致比显示错更糟：
+    讲者会以为二维码还敞着，或者反过来以为关上了其实没关。"""
+    try:
+        d = json.loads((DATA / (rid + ".json")).read_text("utf-8"))
+        return len(d.get("questions") or []), bool(d.get("closed", False))
+    except Exception:
+        return 0, False
+
 def secs(t):
     """条目的 ts 在库里是**毫秒**（墙上那份 questions 用的是 JS 的 Date.now()，入库时原样带进来），
     而场次的 started/ended 是**秒**。两种单位混在同一个接口里，谁读谁猜错：
@@ -540,14 +564,16 @@ def admin_api(path, qs, body):
             st = q1("SELECT id,started,ended,peak FROM session WHERE room=? ORDER BY id DESC LIMIT 1", r["id"])
             n = q1("SELECT COUNT(*) c FROM item WHERE session IN (SELECT id FROM session WHERE room=?)", r["id"])["c"]
             ns = q1("SELECT COUNT(*) c FROM session WHERE room=?", r["id"])["c"]
+            wall_n, closed = ((len(live.questions), bool(live.closed_qa)) if live
+                              else state_on_disk(r["id"]))
             rooms.append({
                 "id": r["id"], "name": r["name"], "created": r["created"],
                 "sessions": ns, "items": n,
                 "online": {"deck": len(live.socks["deck"]) if live else 0,
                            "remote": len(live.socks["remote"]) if live else 0,
                            "ask": len(live.socks["ask"]) if live else 0} if live else None,
-                "wallNow": len(live.questions) if live else 0,
-                "closed": bool(live.closed_qa) if live else False,
+                "wallNow": wall_n,
+                "closed": closed,
                 "last": ({"id": st["id"], "started": st["started"], "ended": st["ended"], "peak": st["peak"]}
                          if st else None),
             })
@@ -658,7 +684,8 @@ async def drain_control():
 
 
 async def sweep_sessions():
-    """放映端下线满 SESSION_GAP 就把那一场封存（ended 已写，这里只做日志和收敛）。"""
+    """房间空满 SESSION_GAP 就从内存里清出去（只是回收 Room 对象；**分场看自然日**，
+    和这里无关。问题和 closed 状态都在盘上，下次有人连上会重新读回来）。"""
     while True:
         await asyncio.sleep(120)
         try:

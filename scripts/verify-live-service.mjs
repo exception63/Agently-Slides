@@ -58,19 +58,20 @@ ok('管理台「清屏」→ 大屏清空', true);
 ov=await api('/api/admin/overview'); room=ov.rooms.find(x=>x.id===RID);
 ok('★ 清屏只清大屏，账本一条不少', room.items===3, `账本仍 ${room.items} 条`);
 
-// 场次分割：放映端下线再上线（模拟隔了一次课）
+// 场次分割：隔一天再开讲（**分场判据＝自然日**，不是「静默多久」）
 for (const p of [deck1,a1,a2,a3,wall]) await p.close();
 await new Promise(r=>setTimeout(r,600));
-// 直接改库把上一场推远，模拟"隔了一天"
+// 直接改库把上一场的 started 推到两天前，模拟"隔了一天再上课"。
+// ⚠️ 推 ended 没用 —— 同一个自然日里断多久都还是同一场。
 const { execSync } = await import('node:child_process');
-execSync(`sqlite3 "${process.env.SP}/livedata/live.db" "UPDATE session SET ended=strftime('%s','now')-4000 WHERE room='${RID}'"`);
+execSync(`sqlite3 "${process.env.SP}/livedata/live.db" "UPDATE session SET started=strftime('%s','now')-86400*2, ended=strftime('%s','now')-86400*2+600 WHERE room='${RID}'"`);
 const deck2=await conn('deck',RID);
 await deck2.waitForFunction(()=>window.__m.some(m=>m.type==='joined'),null,{timeout:5000});
 const b1=await conn('ask',RID);
 await send(b1,{type:'qa-add',text:'第二场的问题'});
 await b1.waitForFunction(()=>window.__m.some(m=>m.type==='qa-ack'&&m.ok),null,{timeout:5000});
 ss=await api('/api/admin/sessions?room='+RID);
-ok('★ 隔了一次课再开讲 = 自动分成第二场', ss.sessions.length===2, `${ss.sessions.length} 场`);
+ok('★ 隔一天再开讲 = 自动分成第二场', ss.sessions.length===2, `${ss.sessions.length} 场`);
 ok('新问题记在第二场，不和上一场混', ss.sessions[0].items===1 && ss.sessions[1].items===3,
    `新场 ${ss.sessions[0].items} 条 / 旧场 ${ss.sessions[1].items} 条`);
 

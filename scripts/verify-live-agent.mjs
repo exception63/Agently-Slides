@@ -24,7 +24,7 @@ const tmp = mkdtempSync(join(tmpdir(), 'smagent-'));
 const tokFile = join(tmp, 'token');
 writeFileSync(tokFile, TOKEN + '\n');
 
-const srv = spawn('python3', [RELAY], {
+let srv = spawn('python3', [RELAY], {
   env: { ...process.env, SMRELAY_DATA: join(tmp, 'data'), SMRELAY_PORT: String(PORT),
          SMRELAY_HOST: '127.0.0.1', SMRELAY_TOKEN_FILE: tokFile },
   stdio: 'ignore',
@@ -130,22 +130,62 @@ const cold1 = await new Promise((res) => {
 ok('学生一连上就被告知已关闭', cold1.st.closed === true);
 ok('关闭状态落了盘，新连上的学生提交被挡', cold1.st.ack?.ok === false && cold1.st.ack?.why === 'closed');
 cold1.w?.close();
+await sleep(300);
+
+// **重启中转**再看一眼：关闭状态是落盘的，重启后学生照样被挡；
+// 管理台也必须照样显示「已关闭」。原来这里会显示成「开着」——
+// 房间不在内存里时 overview 一律报 false，讲者会以为二维码还敞着。
+srv.kill(); await sleep(500);
+srv = spawn('python3', [RELAY], {
+  env: { ...process.env, SMRELAY_DATA: join(tmp, 'data'), SMRELAY_PORT: String(PORT),
+         SMRELAY_HOST: '127.0.0.1', SMRELAY_TOKEN_FILE: tokFile },
+  stdio: 'ignore',
+});
+for (let i = 0; i < 40; i++) { try { if ((await fetch(BASE + '/health')).ok) break; } catch { } await sleep(150); }
+ok('重启后管理台仍显示「已关闭」（不是内存状态，是盘上的）',
+   (await jq(['rooms'])).rooms.find((x) => x.id === COLD)?.closed === true);
+const cold2 = await new Promise((res) => {
+  const w = new WebSocket(`${BASE.replace('http', 'ws')}/ws?room=${COLD}&role=ask`);
+  w.onmessage = (e) => { const d = JSON.parse(e.data); if (d.type === 'qa-ack') { res(d); w.close(); } };
+  w.onopen = () => setTimeout(() => w.send(JSON.stringify({ type: 'qa-add', text: '重启之后呢' })), 250);
+  setTimeout(() => res(null), 4000);
+});
+ok('重启后学生仍旧被挡', cold2?.ok === false && cold2?.why === 'closed');
+
 await cli(['rm', COLD, '--yes']);
 
-// ── 7. 场次分界：隔久了要另起一场 ──────────────────────────────────
-// 线上真出过：放映端 14:54 就断了，16:29 的 21 条提问全被记进那一场。
-// 原因是取「这个房间的最后一场」而不判间隔。
+// ── 7. 分场判据＝自然日 ────────────────────────────────────────────
+// 线上真出过：放映端 14:54 就断了（那只是课前试机），16:29 才真上课，
+// 按「静默 30 分钟」分会把同一堂课切成两场。改成按自然日。
 const dbf = join(tmp, 'data', 'live.db');
-execSync(`sqlite3 "${dbf}" "UPDATE session SET ended=strftime('%s','now')-4000 WHERE id=${SID}"`);
+
+// (a) 同一天里放映端早就断了、隔很久再提问 —— 仍是同一场
+execSync(`sqlite3 "${dbf}" "UPDATE session SET ended=strftime('%s','now')-9000 WHERE id=${SID}"`);
 const late = await ws('ask');
-late.send(JSON.stringify({ type: 'qa-add', text: '隔了很久之后才提的问题' }));
+late.send(JSON.stringify({ type: 'qa-add', text: '隔了两个半小时才提的问题' }));
 await sleep(800);
 r = await jq(['sessions', ROOM]);
-ok('隔过 SESSION_GAP 的提问另起一场', r.sessions.length === 2, `${r.sessions.length} 场`);
-ok('新那一场只有这一条', r.sessions[0].items === 1);
-ok('旧那一场的条目没被动', r.sessions[1].items === 3);
-ok('旧那一场的峰值没被后来的连接改写', r.sessions[1].peak === 2, String(r.sessions[1].peak));
+ok('同一天里隔多久都还是同一场', r.sessions.length === 1, `${r.sessions.length} 场`);
+ok('这条记进了当天那一场', r.sessions[0].items === 4);
+ok('当天又有动静，收场时间被清回「进行中」', r.sessions[0].ended === null);
 late.close();
+await sleep(300);
+// 当天的峰值本来就该跟着涨（上面这些连接都还开着），所以先记下真值，
+// 换天之后拿它比对，别写死一个数。
+const peakBefore = (await jq(['sessions', ROOM])).sessions[0].peak;
+
+// (b) 换一天 —— 才另起一场
+execSync(`sqlite3 "${dbf}" "UPDATE session SET started=strftime('%s','now')-86400*2, ended=strftime('%s','now')-86400*2+600 WHERE id=${SID}"`);
+const nextday = await ws('ask');
+nextday.send(JSON.stringify({ type: 'qa-add', text: '第二天的问题' }));
+await sleep(800);
+r = await jq(['sessions', ROOM]);
+ok('跨到另一个自然日才另起一场', r.sessions.length === 2, `${r.sessions.length} 场`);
+ok('新那一场只有这一条', r.sessions[0].items === 1);
+ok('前一天那一场的条目没被动', r.sessions[1].items === 4);
+ok('前一天那一场的峰值没被今天的连接改写', r.sessions[1].peak === peakBefore,
+   `${r.sessions[1].peak} vs ${peakBefore}`);
+nextday.close();
 
 // ── 8. 删除要显式确认 ──────────────────────────────────────────────
 r = await cli(['rm', ROOM]);

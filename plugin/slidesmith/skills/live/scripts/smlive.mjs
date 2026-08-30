@@ -64,7 +64,13 @@ async function api(path, { method = 'GET', body = null, raw = false } = {}) {
 
 // ── 显示 ────────────────────────────────────────────────────────────
 const t = (s) => (s ? new Date(s * 1000).toLocaleString('zh-CN', { hour12: false }) : '—');
-const dur = (a, b) => (a && b ? Math.max(1, Math.round((b - a) / 60)) + ' 分钟' : '进行中');
+// 一场＝一个自然日，所以这是「当天第一个动静到最后一个动静」的**跨度**，
+// 不是连续讲了这么久（中间可能试机完隔了一个半小时才上课）。
+const dur = (a, b) => {
+  if (!a || !b) return '进行中';
+  const m = Math.max(1, Math.round((b - a) / 60));
+  return m < 60 ? m + ' 分钟' : Math.floor(m / 60) + ' 小时' + (m % 60 ? (m % 60) + ' 分' : '');
+};
 // 定宽列：中日韩字符占两格。**超长要截断**，否则那一格把后面所有列一起挤歪。
 const cw = (c) => (/[⺀-￿]/.test(c) ? 2 : 1);
 const w = (s, n) => {
@@ -108,13 +114,13 @@ switch (cmd) {
     const r = await api('/api/agent/overview');
     out(r, () => {
       if (!r.rooms.length) return console.log('还没有房间。建一个：node smlive.mjs new <房间号> --name "课程名"');
-      console.log(w('房间号', 20) + w('名字', 30) + w('场次', 6) + w('累计', 6) + w('现在', 22) + '最近一场');
-      console.log('─'.repeat(108));
+      console.log(w('房间号', 20) + w('名字', 30) + w('场次', 6) + w('累计', 6) + w('现在', 26) + '最近一场');
+      console.log('─'.repeat(112));
       for (const m of r.rooms) {
         const on = m.online
           ? `放映${m.online.deck} 学生${m.online.ask}${m.closed ? ' · 已关提问' : ''}`
-          : '—';
-        console.log(w(m.id, 20) + w(m.name || '（没起名）', 30) + w(m.sessions, 6) + w(m.items, 6) + w(on, 22)
+          : (m.closed ? '没人连着 · 已关提问' : '—');   // 关闭状态是落盘的，房间不在线也照样成立
+        console.log(w(m.id, 20) + w(m.name || '（没起名）', 30) + w(m.sessions, 6) + w(m.items, 6) + w(on, 26)
           + (m.last ? t(m.last.started) + (m.last.ended ? '' : ' · 进行中') : '未开讲'));
       }
     });
@@ -154,7 +160,7 @@ switch (cmd) {
     out(r, () => {
       console.log(`${room}${r.name ? ' · ' + r.name : ''}`);
       if (!r.sessions.length) return console.log('  还没有开讲记录。放映端第一次连上就会自动开一场。');
-      console.log('  ' + w('场次', 8) + w('id', 8) + w('开始', 22) + w('时长', 12) + w('提问', 6) + '在线峰值');
+      console.log('  ' + w('场次', 8) + w('id', 8) + w('日期 · 首个动静', 22) + w('跨度', 12) + w('提问', 6) + '在线峰值');
       for (const s of r.sessions)
         console.log('  ' + w('第 ' + s.no + ' 场', 8) + w(s.id, 8) + w(t(s.started), 22) + w(dur(s.started, s.ended), 12) + w(s.items, 6) + (s.peak || 0));
     });
