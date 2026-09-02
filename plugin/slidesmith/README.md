@@ -8,9 +8,12 @@ click, and watch them land on the slide.
 
 - **Bundled skills (the HTML-slides pipeline)** — auto-discovered from `skills/`, invoked
   as `/slidesmith:<name>` and auto-triggered from natural language:
-  - `slidesmith:editorial-slides` — author multi-style HTML slides (杂志/学术/暗场主旨 + 移植皮).
+  - `slidesmith:editorial-slides` — author HTML slides in any of 22 skins (学术 / 杂志 / 暗场主旨 / 毛玻璃 …) with a numbered animation library.
   - `slidesmith:transcripts_html` — a matching magazine-style HTML transcript (锚点对齐 slides).
-  - `slidesmith:slides-presenter-mode` — turn slides + transcript into a synced second-screen presenter view.
+  - `slidesmith:slides-presenter-mode` — stitch slides + transcript into a synced second-screen presenter view (一体化单文件).
+  - `slidesmith:phone-remote` — page with an iPhone / Apple Watch; iPad follows the transcript (cloud relay baked into the export).
+  - `slidesmith:live` — 现场互动：students scan a QR to ask questions that land on the big screen; sessions ledgered on
+    the self-hosted service `live.zhouliying.com`; the `smlive` CLI gives the agent the whole admin console.
   > Single source of truth: these live here now (previously standalone / under AutoCourses).
 - **MCP server `slidesmith`** (stdio) — runs the local bridge (HTTP + WebSocket) and
   exposes four tools to Claude Code:

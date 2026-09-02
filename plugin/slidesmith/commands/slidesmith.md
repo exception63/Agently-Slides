@@ -12,10 +12,10 @@ argument-hint: [deck.html 的路径]
 
 1. 调用 MCP 工具 **`slidesmith_open`**，`deckPath` = 上面的路径。这会启动本地桥接、在浏览器打开 Studio、并把**本会话「握手」绑定**为该桥接的 owner——Studio 顶栏会显示「● 已连接 Claude · 会话 X · 端口 Y」。把返回的 `url` 和 `owner` 告诉用户。
 2. 告诉用户：现在去浏览器里改——点文字直接改、右侧换配色/字号/动效；**复杂改动**就选中那一页写一句要求、点 **发送给 Claude**（可一次写多页再发）。右侧「改前先问我」开关：开了的话你要以**提议预览**方式回写，关了就直接生效。
-3. **进入自动环**：调用 **`slidesmith_wait`**（会阻塞，直到用户提交就立刻返回那条请求；空闲到 timeout 则返回 `timedOut`）。
-   - 也可以用后台轮询命令实现同样效果：`curl -s "<url>api/wait?timeout=280000"`——它挂起等待，用户一提交就返回并退出，从而唤醒你。挂起期间你什么都不用做。
+3. **进入自动环（首选后台挂起）**：用 `run_in_background` 跑 `curl -s "<url>api/wait?timeout=280000"`（**别 nohup**）。它挂着不动，用户一按「发送给 Claude」就退出并把请求交给你；挂起期间零消耗，对话也不被占住，用户随时能跟你说话。每轮改完**重新挂一次**。
+   - `slidesmith_wait` 是同一件事的 MCP 版，适合一次性短等；它会**占住这一轮对话**，别拿它当常驻环。
 4. 拿到请求后，对它列出的页：**只改它**，遵守 Deck 契约（颜色/字号走令牌、不写死内联 hex/px、保持单个 `<section class="slide …" data-id="…">` 且 data-id 原样不动）。
-5. 把改好的页拼成 `<section data-id>`，调用 **`slidesmith_apply_patch`**（`sections` = 这些 section 的 HTML）。
+5. 把改好的页拼成 `<section data-id>`，调用 **`slidesmith_apply_patch`**（`sections` = 这些 section 的 HTML，**`summary` = 一句话说改了什么**——Studio 会显示给用户）。请求里 `src="sm-img://N"` 的图是占位符，原样保留别动。
    - 若该请求 `confirm: true`（用户开了「改前先问我」），回写时把 **`preview: true`**——Studio 会以「保留 / 还原」提议呈现，让用户先看再定。
 6. **回到第 3 步** `slidesmith_wait`，继续守候下一批需求，直到用户说结束。随时可用 **`slidesmith_status`** 看连接/owner/待处理数。
 

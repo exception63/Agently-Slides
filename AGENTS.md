@@ -123,9 +123,21 @@ silently falls back to the manual path above — nothing breaks.
 **Handshake + auto-loop (the primary model).** `slidesmith_open` (or `slidesmith_connect`)
 **handshakes** the bridge: it binds *this session* as the bridge's `owner`, and the Studio's
 top bar shows **● 已连接 Claude · 会话 X · 端口 Y** — so there's never ambiguity about which
-session a request lands in. After the handshake you don't poll-and-guess; you **block on
-`slidesmith_wait`** (a long-poll). It returns the instant the user submits, or `timedOut`
-when idle — then you change the slides and loop back to `slidesmith_wait`. Zero manual pull.
+session a request lands in. After the handshake you don't poll-and-guess — you wait to be woken:
+
+- **Preferred — a background long-poll that wakes you.** Run
+  `curl -s "<url>api/wait?timeout=280000"` with `run_in_background` (never `nohup`; the harness
+  must own the process). It hangs while the user works and **exits the instant they hit
+  发送给 Claude**, which wakes you with the request. Idle time costs nothing and the conversation
+  stays free — the user can keep talking to you while the loop waits. Re-arm it after every round;
+  a new session has to arm it again.
+- **`slidesmith_wait`** is the same long-poll as an MCP call. It is fine for a one-shot or a short
+  wait, but it **occupies the turn** while it blocks (default 25 s, cap 290 s) — the user cannot
+  talk to you until it returns. Do not build the standing loop on it.
+
+Either way: handle the request, `slidesmith_apply_patch` it back, re-arm, repeat. Zero manual pull.
+(This paragraph is the single source of truth for the loop; older notes that said "block on
+`slidesmith_wait`" are superseded.)
 
 MCP tools (server name `slidesmith-bridge`):
 - `slidesmith_open({ deckPath, label? })` — load a contract HTML deck, open the Studio in the
@@ -155,10 +167,13 @@ MCP tools (server name `slidesmith-bridge`):
   their own tools. Their hard constraints (cue length/count; transcript anchor + block
   structure) are in the tool descriptions, and the Studio **re-checks them on write**: a
   transcript block that lost its `<h3 id="…">` is rejected, not silently accepted.
-- `slidesmith_apply_patch({ sections, preview? })` — push your rewritten `<section data-id>`(s)
+- `slidesmith_apply_patch({ sections, preview?, summary? })` — push your rewritten `<section data-id>`(s)
   back; the Studio replaces those slides by `data-id` immediately. `preview: true` lands the
   change as a **proposal** (Studio shows a 保留/还原 bar) — use it whenever the request had
-  `confirm: true`. Same patch format as §4.
+  `confirm: true`. **Always pass `summary`** — one sentence on what you changed
+  (「第 7 页三个要点改成两栏，去掉第二段铺垫」). The Studio shows it in the AI pane under
+  「AI 改了什么」 and in the toast, so the user doesn't have to diff the page by eye.
+  Same patch format as §4.
 - `slidesmith_status()` — is a Studio connected, the `owner`, which deck, how many pending.
 
 The connected loop: `slidesmith_open` (handshake) → `slidesmith_wait` (blocks) → user edits
@@ -182,6 +197,12 @@ complex/fuzzy asks. Only touch the pages a comment names, or (for a deck-level a
 pages it clearly implies. Every page you patch flips to **✓ 已改** in the Studio and the
 human can **还原本页** (revert) if they dislike it — so make the change worth keeping, and
 don't re-touch a page they reverted unless they ask again.
+
+**Images in a request are placeholders.** Any `<img src="data:…">` already on a page arrives as
+`src="sm-img://N"` (the Studio keeps the pixels and restores them when your patch lands). Leave
+those attributes exactly as they are — move or resize the element freely, but never rewrite the
+`src`, never drop it, never paste base64 back in. A request from a 44-page deck with three
+180 KB photos went from ~60k tokens to ~2k because of this; don't undo it.
 
 ### 4c. The unified AI-tasks request (`.ai-tasks.md`)
 

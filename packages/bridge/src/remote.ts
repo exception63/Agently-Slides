@@ -39,7 +39,7 @@ export interface BridgeFacade {
   waitForStudio(timeoutMs: number): Promise<void>;
   waitForRequests(timeoutMs: number): Promise<BridgeRequest[]>;
   getRequests(drain: boolean): Promise<BridgeRequest[]>;
-  applyPatch(sections: string, opts: { preview: boolean }): Promise<{ clients: number; queued: boolean }>;
+  applyPatch(sections: string, opts: { preview: boolean; summary?: string }): Promise<{ clients: number; queued: boolean }>;
   outline(withHtml: string[]): Promise<OutlineEntry[]>;
   /** 手表提词表的读 / 写。null = Studio 没连上或没回话 */
   cues(): Promise<CueReport | null>;
@@ -159,7 +159,7 @@ export async function probeRemote(base: string, timeoutMs = 1200): Promise<Bridg
       const r = await jsonFetch(`${root}/api/patch`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sections, preview: opts.preview }),
+        body: JSON.stringify({ sections, preview: opts.preview, summary: opts.summary || '' }),
         timeoutMs: 30000,
       });
       return { clients: Number(r['clients'] || 0), queued: !!r['queued'] };

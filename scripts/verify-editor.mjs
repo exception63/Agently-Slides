@@ -52,6 +52,7 @@ try {
   else ck('① box follows the deck\'s OWN nav', true, 'no thumbs — skipped');
 
   // ── ② deck-level comment ──
+  await p.evaluate(() => document.querySelectorAll('details.aimore').forEach((d) => { d.open = true; })); // 整份 deck 折在展开区里
   await p.fill('#aiDeckInstruction', '统一所有页的标题字号，给内容过多的页瘦身。'); await p.waitForTimeout(120);
   const req = await p.evaluate(() => window.__SM_ALL_REQUEST__());
   ck('② deck task carries a deck-level block', !!req && req.content.includes('对整份 deck 的要求'));

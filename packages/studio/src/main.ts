@@ -31,6 +31,8 @@ const BRIDGE = `
   if(window.parent===window) return;
   var P=window.parent;
   function post(m){ try{P.postMessage(m,'*');}catch(e){} }
+  // ⌘K / Ctrl+K：焦点常常落在预览里，键盘事件不跨 frame，这里代收一下转给 Studio
+  document.addEventListener('keydown',function(e){ if((e.metaKey||e.ctrlKey)&&String(e.key).toLowerCase()==='k'){ e.preventDefault(); e.stopPropagation(); post({type:'sm-cmdk'}); } },true);
   function toMd(el){
     var h=el.innerHTML
       .replace(/<strong[^>]*>/gi,'**').replace(/<\\/strong>/gi,'**')
@@ -374,11 +376,15 @@ function renderInsertPane(): void {
   box.innerHTML = '<div class="insgrid">'
     + '<button class="inscard" data-act="image"><b>插入图片</b><span>从本地选图，插入到当前页</span></button>'
     + '<button class="inscard" data-act="ai"><b>AI 配图 / 图表</b><span>转到右栏「AI」，描述要生成的配图或图表</span></button>'
-    + '</div><div class="lpane-soon" style="text-align:left;padding:10px 4px">更多插入项（新页 / 引用 / 表格）会随 HTML 模式增删页能力一起补上。</div>';
+    + `<button class="inscard inscard-live" data-act="live"><b>现场互动 · 扫码提问</b><span>${liveRoomOf() ? '已装：房间 ' + liveRoomOf() + ' · 看在线 / 关提问 / 清屏' : '插一页学生扫码提问、实时上大屏'}</span></button>`
+    + '</div><div id="liveCard" class="livecard" hidden></div>'
+    + '<div class="lpane-soon" style="text-align:left;padding:10px 4px">更多插入项（新页 / 引用 / 表格）会随 HTML 模式增删页能力一起补上。</div>';
   box.querySelectorAll('.inscard').forEach((el) => el.addEventListener('click', () => {
     const act = (el as HTMLElement).dataset.act;
     if (act === 'image') (document.getElementById('hInsertImg') as HTMLElement | null)?.click();
-    else if (act === 'ai') (document.querySelector('.htab[data-htab="ai"]') as HTMLElement | null)?.click();
+    else if (act === 'ai') { (document.querySelector('.htab[data-htab="ai"]') as HTMLElement | null)?.click(); const d = document.getElementById('aimoreIll') as HTMLDetailsElement | null; if (d) d.open = true; }
+    else if (act === 'live') openLiveSetup();
+    else if (act === 'live-remove') void liveRemove();
   }));
 }
 
@@ -836,6 +842,8 @@ function insertBeforeHeadEnd(doc: string, s: string): string {
 // ——按键照常输入字符、照常移动光标，只是引擎收不到。带 ⌘/Ctrl/Alt 的一律放行，
 // 否则会连 Studio 自己的 ⌘S / ⌘Z 一起掐掉。放在 <head> 最前，先于任何 deck 脚本执行。
 const EDIT_KEYGUARD_JS = '<script id="sm-edit-keyguard">(function(){'
+  // ⌘K / Ctrl+K：焦点常常落在预览里（点过页、放映过），键盘事件不跨 frame——这里代收转给 Studio
+  + 'document.addEventListener("keydown",function(e){if((e.metaKey||e.ctrlKey)&&String(e.key).toLowerCase()==="k"){e.preventDefault();e.stopImmediatePropagation();try{parent.postMessage({type:"sm-cmdk"},"*");}catch(x){}}},true);'
   + 'function typing(){var a=document.activeElement;'
   + 'return !!(a&&(a.isContentEditable||a.tagName==="INPUT"||a.tagName==="TEXTAREA"||a.tagName==="SELECT"));}'
   + 'document.addEventListener("keydown",function(e){'
@@ -903,6 +911,10 @@ function assembleDeck(forEdit = false): string {
     + 'html[data-sm-deckchrome="off"] body > #segnav,html[data-sm-deckchrome="off"] body > nav.segnav{display:none!important}'
     + 'html[data-sm-deckchrome="off"] #deck{padding-left:0!important}'
     + 'html[data-sm-deckchrome="off"] body > .hint{display:none!important}'
+    // deck 自带顶栏上的按钮（← → 全屏播放 演讲者 提词…）在编辑态和 Studio 自己的顶栏叠成两层，
+    // 只留品牌 / 副标题两行文字（它们要能就地改）；放映和演讲者由 Studio 顶栏代劳。
+    + 'html[data-sm-deckchrome="off"] body > .topbar > *:not(.topbar__brand):not(.topbar__sub):not(.topbar__spacer){display:none!important}'
+    + 'html[data-sm-deckchrome="off"] body > .topbar{justify-content:flex-start}'
     // deck 自己的顶栏是按 1920 宽设计的，塞进编辑预览（约 1000 宽）会每个按钮都折行，
     // 看着像坏了。只在编辑预览里收紧间距 + 不许折行——导出的文件一个字节都不动。
     + 'body > .topbar{gap:10px!important;padding:0 14px!important}'
@@ -3390,6 +3402,7 @@ function refreshHtmlInspector(): void {
   // so we don't duplicate it here (avoids a localStorage tug-of-war).
   const wrap = $('#hThemeWrap'); if (wrap) wrap.style.display = 'none';
   const skinSel = $('#hSkin') as HTMLSelectElement | null; if (skinSel) skinSel.value = H.skin || '';
+  const skinNow = $('#hSkinNow'); if (skinNow) skinNow.textContent = H.skin ? ((SKINS[H.skin] && SKINS[H.skin].label) || H.skin) : '保持原样（不换皮）';
   // 设计旋钮 tab：颜色镜像 H.overrides，字体下拉按覆盖的字体栈反查，字号/留白滑块按基准比值反推
   refreshDeckTokenInputs();
   const fontSel = (id: string, name: string) => { const s = $(id) as HTMLSelectElement | null; if (s) s.value = fontIdForStack(H.overrides[name] || ''); };
@@ -3552,7 +3565,15 @@ function refreshSentBanner(): void {
   else el.style.display = 'none';
 }
 // one call to re-sync everything that depends on comments/config/status
-function refreshTasks(): void { renderLeft(); renderTodo(); refreshSentBanner(); refreshNotesStatus(); }
+/** 折叠区自动展开：里面有东西就别折着（整份 deck 写了字、暂存盘有图、本页排了配图）。 */
+function refreshAiMore(): void {
+  const open = (id: string, on: boolean) => { const d = document.getElementById(id) as HTMLDetailsElement | null; if (d && on && !d.open) d.open = true; };
+  open('aimoreDeck', !!aiDeckInstruction.trim());
+  open('aimoreTray', trayImages.length > 0);
+  const cs = htmlSlides[currentHtmlSlideIndex()]; open('aimoreIll', !!(cs && genQueue[cs.id]));
+}
+function refreshTasks(): void {
+  refreshAiMore(); renderLeft(); renderTodo(); refreshSentBanner(); refreshNotesStatus(); }
 /**
  * 把「现在选中的是哪一页」报给桥。
  *
@@ -3689,7 +3710,7 @@ ${FENCE}
    提示：用户也可在 Studio「动画效果 → 打开动画库」里**可视化挑选直接套用**，那条路不经过你。
 `;
 }
-function applyAiPatch(text: string, preview = false): void {
+function applyAiPatch(text: string, preview = false, summary = ''): void {
   if (mode !== 'html') { toast('请先导入 HTML deck', true); return; }
   let html = text;
   const m = text.match(/```html\s*([\s\S]*?)```/i); if (m) html = m[1];
@@ -3712,8 +3733,10 @@ function applyAiPatch(text: string, preview = false): void {
   if (imgs) renderTray(); // mark just-placed tray images
   htmlGotoAfterRender = firstIdx; // stay on the patched slide after re-render
   renderHtmlEdit(); refreshTasks(); markDirty();
-  if (preview) { refreshProposalBar(); toast('AI 提议修改 ' + applied + ' 页，请在顶部「保留 / 还原」'); }
-  else toast('AI 已修改 ' + applied + ' 页（左侧带勾标记），如不满意可使用「还原本页」');
+  pushChangeLog(ids, summary);
+  const sum = summary ? '：' + summary : '';
+  if (preview) { refreshProposalBar(); toast('AI 提议修改 ' + applied + ' 页' + sum + '，请在顶部「保留 / 还原」'); }
+  else toast('AI 已修改 ' + applied + ' 页' + sum + '（左侧带勾标记，可「还原本页」）');
 }
 // the proposal bar (改前先问我 mode): AI's patch is applied but flagged. The user
 // keeps all (dismiss) or reverts all (back to pre-AI). Reuses aiBefore for revert.
@@ -3963,6 +3986,224 @@ function toggleStudioTheme(): void {
   reportTheme();          // app 里的原生面板跟着切，一个开关管两边
 }
 
+// ======================= Studio 顶栏：放映 / 演讲者 =======================
+// 放映要用户手势才能进全屏；手势在 Studio 这个文档里，所以由 Studio 对 iframe 调 requestFullscreen，
+// 再把 deck 的 body 切进 present 态（引擎自己的 fullscreenchange 监听在 iframe 里，看不见父文档的全屏）。
+function studioPresent(): void {
+  const f = $('#preview') as HTMLIFrameElement | null; const d = f?.contentDocument; const w = f?.contentWindow as (Window & { deckAPI?: { setActive?: (i: number) => void; idx?: number } }) | null;
+  if (!f || !d || mode !== 'html') { toast('先导入一个 HTML deck', true); return; }
+  const on = () => { d.body.classList.add('present'); try { w?.deckAPI?.setActive?.(w.deckAPI.idx ?? cur); } catch { /* 非引擎 deck */ } w?.focus(); };
+  const off = () => { d.body.classList.remove('present'); };
+  const req = (f as HTMLIFrameElement & { webkitRequestFullscreen?: () => Promise<void> }).requestFullscreen || (f as HTMLIFrameElement & { webkitRequestFullscreen?: () => Promise<void> }).webkitRequestFullscreen;
+  if (!req) { on(); toast('浏览器不支持全屏，已切到放映排版；Esc 退出'); return; }
+  req.call(f).then(on).catch(() => { on(); toast('进不了全屏（可能是权限），已切到放映排版；Esc 退出'); });
+  const onChange = () => { if (!document.fullscreenElement) { off(); document.removeEventListener('fullscreenchange', onChange); } };
+  document.addEventListener('fullscreenchange', onChange);
+}
+function studioPresenter(): void {
+  const w = ($('#preview') as HTMLIFrameElement | null)?.contentWindow as (Window & { deckAPI?: { openPresenter?: () => void } }) | null;
+  if (mode !== 'html') { toast('先导入一个 HTML deck', true); return; }
+  if (w?.deckAPI?.openPresenter) w.deckAPI.openPresenter();
+  else toast('这份 deck 没有演讲者模式。用 /slidesmith:slides-presenter-mode 缝一份一体版就有了', true);
+}
+
+// ======================= ⌘K 命令面板 =======================
+// 所有能做的事收成一张清单，打字就能找到：换皮 / 跳页 / 导出 / 面板 / 发给 AI / 放映 / 互动。
+// 对不想记菜单的人，这是搜索、帮助和快捷键表三合一。
+interface CmdItem { label: string; hint?: string; group: string; run: () => void; keys?: string }
+function cmdkItems(): CmdItem[] {
+  const it: CmdItem[] = [];
+  const click = (sel: string) => () => (document.querySelector(sel) as HTMLElement | null)?.click();
+  if (mode === 'html') {
+    htmlSlides.forEach((sl, i) => it.push({ group: '跳页', label: `第 ${i + 1} 页 · ${sl.title || '（无标题）'}`, hint: sl.id, run: () => selectHtmlSlide(i), keys: String(i + 1) }));
+    it.push({ group: '换皮', label: '保持原样（不换皮）', run: () => applySkinFromGallery('') });
+    SKIN_ORDER.forEach((n) => { const b = SKINS[n]; if (b) it.push({ group: '换皮', label: `换皮：${b.label || n}`, hint: (b.dark ? '暗 · ' : '浅 · ') + n, run: () => applySkinFromGallery(n), keys: n }); });
+    it.push({ group: 'AI', label: '一键发送给 AI', hint: '把待办清单发出去', run: click('#aiSendAll') });
+    it.push({ group: 'AI', label: '视觉自检', hint: '溢出 / 对比度 / 坏图', run: () => { click('.htab[data-htab="ai"]')(); (document.getElementById('aimoreLib') as HTMLDetailsElement | null)?.setAttribute('open', ''); click('#auditRun')(); } });
+    it.push({ group: 'AI', label: '搜图（免费图库）', run: click('#imgSearchOpen') });
+    it.push({ group: 'AI', label: '图片库', run: click('#genOpenLib') });
+    it.push({ group: '放映', label: '全屏放映', hint: 'F', run: studioPresent });
+    it.push({ group: '放映', label: '打开演讲者副屏', hint: 'S', run: studioPresenter });
+    it.push({ group: '页', label: '新增一页', run: click('#add') }); it.push({ group: '页', label: '删除当前页', run: click('#del') });
+    it.push({ group: '页', label: '当前页上移', run: click('#up') }); it.push({ group: '页', label: '当前页下移', run: click('#down') });
+    it.push({ group: '互动', label: liveRoomOf() ? `现场互动：房间 ${liveRoomOf()}（看在线 / 关提问）` : '现场互动：加一页扫码提问', run: () => { click('.ltab[data-ltab="insert"]')(); openLiveSetup(); } });
+    if (liveRoomOf()) { it.push({ group: '互动', label: '关闭提问', run: () => void liveControl('close') }); it.push({ group: '互动', label: '开放提问', run: () => void liveControl('open') }); it.push({ group: '互动', label: '清空大屏', hint: '账本不动', run: () => void liveControl('clear') }); }
+  }
+  it.push({ group: '文件', label: '保存（写回源文件）', hint: '⌘S', run: click('#saveHtml') });
+  it.push({ group: '文件', label: '另存为 HTML 副本', run: click('#expHtml') });
+  it.push({ group: '文件', label: '导出 PDF', run: click('#expPdf') });
+  it.push({ group: '文件', label: '导入 HTML', run: click('#imp') });
+  it.push({ group: '文件', label: '导出 / 保存选项（嵌字体 · 手机遥控）', run: click('#expOpts') });
+  [['ai', 'AI'], ['script', '讲稿 / 提词'], ['fmt', '格式'], ['anim', '动画'], ['design', '设计']].forEach(([k, l]) => it.push({ group: '面板', label: `右栏：${l}`, run: click(`.htab[data-htab="${k}"]`) }));
+  [['pages', '页面'], ['skins', '换装'], ['insert', '插入']].forEach(([k, l]) => it.push({ group: '面板', label: `左栏：${l}`, run: click(`.ltab[data-ltab="${k}"]`) }));
+  it.push({ group: '界面', label: '切换深色界面', run: click('#themeToggle, .iconbtn[title*="深色"]') });
+  it.push({ group: '界面', label: '显示 / 隐藏 deck 自带段导航', run: click('.iconbtn[title*="段导航"]') });
+  it.push({ group: '编辑', label: '撤销', hint: '⌘Z', run: () => undo() }); it.push({ group: '编辑', label: '重做', hint: '⌘⇧Z', run: () => redo() });
+  it.push({ group: '帮助', label: '连接 Claude Code', run: click('#connectBtn') });
+  return it;
+}
+let cmdkSel = 0; let cmdkShown: CmdItem[] = [];
+function cmdkScore(q: string, item: CmdItem): number {
+  if (!q) return 1;
+  const hay = (item.label + ' ' + (item.hint || '') + ' ' + (item.keys || '') + ' ' + item.group).toLowerCase();
+  if (hay.includes(q)) return 100 - hay.indexOf(q);
+  let i = 0; for (const ch of q) { const j = hay.indexOf(ch, i); if (j < 0) return 0; i = j + 1; } // 顺序子序列
+  return 10;
+}
+function cmdkRender(): void {
+  const q = (($('#cmdkQ') as HTMLInputElement | null)?.value || '').trim().toLowerCase();
+  cmdkShown = cmdkItems().map((it) => ({ it, sc: cmdkScore(q, it) })).filter((x) => x.sc > 0).sort((a, b) => b.sc - a.sc).slice(0, 14).map((x) => x.it);
+  if (cmdkSel >= cmdkShown.length) cmdkSel = 0;
+  const box = $('#cmdkList'); if (!box) return;
+  box.innerHTML = cmdkShown.length ? cmdkShown.map((it, i) =>
+    `<div class="cmdk-item${i === cmdkSel ? ' on' : ''}" data-i="${i}"><span class="cmdk-g">${esc(it.group)}</span><span class="cmdk-l">${esc(it.label)}</span>${it.hint ? `<span class="cmdk-h">${esc(it.hint)}</span>` : ''}</div>`).join('')
+    : '<div class="cmdk-empty">没有匹配的动作</div>';
+  box.querySelectorAll('.cmdk-item').forEach((el) => el.addEventListener('click', () => { cmdkSel = +((el as HTMLElement).dataset.i || 0); cmdkRun(); }));
+}
+function cmdkRun(): void { const it = cmdkShown[cmdkSel]; closeCmdk(); if (it) { try { it.run(); } catch (e) { toast('执行失败：' + (e as Error).message, true); } } }
+function openCmdk(): void {
+  const m = $('#cmdk'); if (!m) return; m.style.display = 'flex'; cmdkSel = 0;   // .libmodal 样式表默认 display:none，'' 等于没打开
+  const q = $('#cmdkQ') as HTMLInputElement; q.value = ''; cmdkRender();
+  // 焦点多半还在预览 iframe 里（点过页、放过映）：先把它请出来，再把焦点给搜索框。
+  // 不这么做的话 focus() 在 iframe 持有焦点时会被忽略，打的字全进了 deck。
+  try { (document.activeElement as HTMLElement | null)?.blur(); ($('#preview') as HTMLIFrameElement | null)?.blur(); window.focus(); } catch { /* noop */ }
+  const grab = () => { q.focus({ preventScroll: true }); if (document.activeElement !== q) setTimeout(() => q.focus({ preventScroll: true }), 30); };
+  grab(); requestAnimationFrame(grab);
+}
+function closeCmdk(): void { const m = $('#cmdk'); if (m) m.style.display = 'none'; }
+
+// ======================= AI 回写：改了什么 =======================
+// 页面从「已发送」变成「✓ 已改」是好的，但用户要靠眼睛对比才知道改了哪里。
+// apply_patch 带一句 summary，这里留一份最近几条，页名 + 一句话。
+const aiChangeLog: { t: number; pages: string[]; summary: string }[] = [];
+function pushChangeLog(ids: string[], summary: string): void {
+  const pages = ids.map((id) => { const i = htmlSlides.findIndex((s) => s.id === id); return i >= 0 ? `第 ${i + 1} 页${htmlSlides[i].title ? '「' + htmlSlides[i].title + '」' : ''}` : id; });
+  aiChangeLog.unshift({ t: Date.now(), pages, summary }); aiChangeLog.splice(6);
+  const box = $('#aiChangeLog'); if (!box) return;
+  box.hidden = false;
+  box.innerHTML = '<div class="sechead">AI 改了什么</div>' + aiChangeLog.map((e) => {
+    const d = new Date(e.t); const hh = ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+    return `<div class="chg"><span class="chg-t">${hh}</span><span class="chg-p">${esc(e.pages.join('、'))}</span>${e.summary ? `<div class="chg-s">${esc(e.summary)}</div>` : '<div class="chg-s chg-none">（AI 没说改了什么）</div>'}</div>`;
+  }).join('');
+}
+
+// ======================= 现场互动（Slidesmith Live）就在 Studio 里 =======================
+// 以前只有 skill / CLI 有入口，管理台是另一个网站另一次登录。现在：插入 → 现场互动 → 装进 deck，
+// 之后同一张卡变成状态卡（在线 / 提问数 / 关提问 / 清屏 / 三个网址）。桥代跑 inject-live.mjs 和令牌接口。
+const LIVE_RELAY = 'https://live.zhouliying.com';
+function liveRoomOf(): string {
+  const m = /__SM_QA_ROOM__\s*=\s*["']([A-Za-z0-9_-]{4,64})["']/.exec(H.prelude + '\n' + H.trailing);
+  return m ? m[1] : '';
+}
+function liveSuggestRoom(): string {
+  const base = (fileBase || 'deck').replace(/[^A-Za-z0-9_-]+/g, '').slice(0, 24);
+  return (base.length >= 4 ? base : 'room' + base) + new Date().getFullYear();
+}
+let liveTimer: ReturnType<typeof setInterval> | null = null;
+function openLiveSetup(): void {
+  (document.querySelector('.ltab[data-ltab="insert"]') as HTMLElement | null)?.click();
+  const card = document.getElementById('liveCard'); if (!card) return;
+  card.hidden = false; card.scrollIntoView({ block: 'nearest' });
+  renderLiveCard();
+}
+function renderLiveCard(): void {
+  const card = document.getElementById('liveCard'); if (!card) return;
+  const room = liveRoomOf();
+  const canBridge = location.protocol.startsWith('http');
+  if (!room) {
+    card.innerHTML = `<div class="livehead"><b>现场互动 · 扫码提问</b><span class="grow"></span><button class="mini" id="liveClose">收起</button></div>
+      <div class="livehint">往 deck 末尾插一页「扫码提问」：学生扫码匿名提问、实时上大屏、你用 iPad 主持；课后在管理台按天导出。</div>
+      <div class="field"><label>房间号（烘进 deck，二维码永不变 · 4–64 位字母数字）</label><input id="liveRoom" type="text" value="${esc(liveSuggestRoom())}" spellcheck="false"></div>
+      <div class="field"><label>课程 / 活动名（管理台里认得出）</label><input id="liveName" type="text" value="${esc(fileBase)}"></div>
+      <div class="oprow"><button id="liveGo" class="primary-mini"${canBridge ? '' : ' disabled title="要先连上 Claude Code 的桥（用 slidesmith 打开这份 deck）"'}>装进 deck</button></div>
+      ${canBridge ? '' : '<div class="livehint warn">现在是离线打开的 Studio，装不了。让 Claude 用 slidesmith 打开这份 deck 再来。</div>'}`;
+    card.querySelector('#liveGo')?.addEventListener('click', () => void liveInject());
+    card.querySelector('#liveClose')?.addEventListener('click', () => { card.hidden = true; });
+    if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+    return;
+  }
+  const u = (p: string) => `${LIVE_RELAY}/${p}/${room}`;
+  card.innerHTML = `<div class="livehead"><b>现场互动</b><span class="livedot" id="liveDot"></span><span class="grow"></span><button class="mini" id="liveClose">收起</button></div>
+    <div class="liveroom">房间 <code>${esc(room)}</code></div>
+    <div class="livestat" id="liveStat">读取中…</div>
+    <div class="oprow"><button id="liveClose2" class="mini">关闭提问</button><button id="liveOpen2" class="mini">开放提问</button><button id="liveClear" class="mini" title="只清大屏，账本一条不少">清屏</button></div>
+    <div class="liveurls">
+      <div><span>学生扫码</span><a href="${u('q')}" target="_blank" rel="noopener">${esc(u('q').replace(/^https?:\/\//, ''))}</a></div>
+      <div><span>你的 iPad</span><a href="${u('r')}" target="_blank" rel="noopener">${esc(u('r').replace(/^https?:\/\//, ''))}</a></div>
+      <div><span>管理台</span><a href="${LIVE_RELAY}/" target="_blank" rel="noopener">${esc(LIVE_RELAY.replace(/^https?:\/\//, ''))}/</a></div>
+    </div>
+    <div class="oprow"><button id="liveCopy" class="mini">复制学生网址</button><button id="liveRemoveBtn" class="mini danger" title="把互动页和房间配置从 deck 里拆掉（管理台里的账本不动）">拆掉互动页</button></div>`;
+  card.querySelector('#liveClose')?.addEventListener('click', () => { card.hidden = true; if (liveTimer) { clearInterval(liveTimer); liveTimer = null; } });
+  card.querySelector('#liveClose2')?.addEventListener('click', () => void liveControl('close'));
+  card.querySelector('#liveOpen2')?.addEventListener('click', () => void liveControl('open'));
+  card.querySelector('#liveClear')?.addEventListener('click', () => void liveControl('clear'));
+  card.querySelector('#liveCopy')?.addEventListener('click', () => { void navigator.clipboard?.writeText(u('q')).then(() => toast('已复制：' + u('q'))); });
+  card.querySelector('#liveRemoveBtn')?.addEventListener('click', () => void liveRemove());
+  void liveRefresh();
+  if (liveTimer) clearInterval(liveTimer);
+  liveTimer = setInterval(() => { if (card.hidden || !document.body.contains(card)) { if (liveTimer) clearInterval(liveTimer); liveTimer = null; return; } void liveRefresh(); }, 5000);
+}
+async function liveRefresh(): Promise<void> {
+  const room = liveRoomOf(); const stat = document.getElementById('liveStat'); const dot = document.getElementById('liveDot');
+  if (!room || !stat) return;
+  if (!location.protocol.startsWith('http')) { stat.textContent = '离线打开的 Studio 看不到在线状态（要连桥）'; return; }
+  try {
+    const j = await (await fetch(`${libBase()}/api/live/status?room=${encodeURIComponent(room)}`)).json() as { ok: boolean; configured?: boolean; room?: { online: { deck: number; ask: number } | null; wallNow: number; closed: boolean; items: number; sessions: number; name: string } | null; error?: string };
+    if (!j.ok) { stat.textContent = '读不到：' + (j.error || '未知错误'); return; }
+    if (!j.configured) { stat.innerHTML = 'Mac 上还没配管理台令牌。让 Claude 跑一次 <code>smlive setup</code>（令牌在服务器 /etc/smrelay/token）。'; return; }
+    const r = j.room;
+    if (!r) { stat.textContent = '管理台里还没有这个房间——放映端第一次连上会自动建；或让 Claude 先建好并起名。'; if (dot) dot.className = 'livedot'; return; }
+    const on = r.online;
+    stat.innerHTML = `${on ? `<b>${on.ask}</b> 台学生在线 · 大屏 <b>${r.wallNow}</b> 条` : '现在没人连着'}${r.closed ? ' · <span class="livec">提问已关闭</span>' : ' · <span class="liveo">提问开放中</span>'}<br><span class="livemeta">${esc(r.name || '')}${r.name ? ' · ' : ''}累计 ${r.sessions} 场 / ${r.items} 条</span>`;
+    if (dot) dot.className = 'livedot ' + (on ? 'on' : '') + (r.closed ? ' closed' : '');
+    const c = document.getElementById('liveClose2') as HTMLButtonElement | null, o = document.getElementById('liveOpen2') as HTMLButtonElement | null;
+    if (c) c.hidden = r.closed; if (o) o.hidden = !r.closed;
+  } catch (e) { stat.textContent = '连不上桥：' + (e as Error).message; }
+}
+async function liveControl(action: 'close' | 'open' | 'clear'): Promise<void> {
+  const room = liveRoomOf(); if (!room) { toast('这份 deck 还没装互动页', true); return; }
+  try {
+    const j = await (await fetch(`${libBase()}/api/live/control`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ room, action }) })).json() as { ok: boolean; error?: string };
+    if (!j.ok) { toast('没成功：' + (j.error || ''), true); return; }
+    toast({ close: '已关闭提问：学生再扫码会看到「提问已关闭」', open: '已重新开放提问', clear: '大屏已清空（账本一条不少）' }[action]);
+    void liveRefresh();
+  } catch (e) { toast('连不上桥：' + (e as Error).message, true); }
+}
+async function liveInject(): Promise<void> {
+  if (mode !== 'html') { toast('先导入一个 HTML deck', true); return; }
+  const roomIn = (document.getElementById('liveRoom') as HTMLInputElement | null)?.value.trim() || '';
+  const name = (document.getElementById('liveName') as HTMLInputElement | null)?.value.trim() || '';
+  if (!/^[A-Za-z0-9_-]{4,64}$/.test(roomIn)) { toast('房间号只能是 4–64 位字母、数字、- 和 _', true); return; }
+  const btn = document.getElementById('liveGo') as HTMLButtonElement | null; if (btn) { btn.disabled = true; btn.textContent = '装配中…'; }
+  setBusy('正在把互动页装进 deck…');
+  try {
+    harvestAll(); pushHistory('live');
+    const html = exportHtmlDeck();
+    const j = await (await fetch(`${libBase()}/api/live/inject`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ html, room: roomIn, name }) })).json() as { ok: boolean; html?: string; error?: string; roomCreated?: boolean; roomError?: string };
+    if (!j.ok || !j.html) throw new Error(j.error || '桥没有返回装好的 deck');
+    loadHtmlDeck(fileBase + '.html', j.html);
+    markDirty(); syncExportToBridge();
+    selectHtmlSlide(htmlSlides.length - 1);
+    toast(`互动页已装进 deck（最后一页）${j.roomCreated ? '，管理台里房间也建好了' : (j.roomError ? '；管理台建房间没成功：' + j.roomError : '')}。记得保存。`);
+    renderInsertPane(); openLiveSetup();
+  } catch (e) { toast('装配失败：' + (e as Error).message, true); if (btn) { btn.disabled = false; btn.textContent = '装进 deck'; } }
+  finally { setBusy(null); }
+}
+async function liveRemove(): Promise<void> {
+  if (!liveRoomOf()) return;
+  if (!confirm('把互动页和房间配置从这份 deck 里拆掉？管理台里的账本不受影响。')) return;
+  setBusy('正在拆掉互动页…');
+  try {
+    harvestAll(); pushHistory('live');
+    const html = exportHtmlDeck();
+    const j = await (await fetch(`${libBase()}/api/live/inject`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ html, remove: true }) })).json() as { ok: boolean; html?: string; error?: string };
+    if (!j.ok || !j.html) throw new Error(j.error || '桥没有返回结果');
+    loadHtmlDeck(fileBase + '.html', j.html); markDirty(); syncExportToBridge();
+    toast('互动页已拆掉。记得保存。'); renderInsertPane(); openLiveSetup();
+  } catch (e) { toast('拆除失败：' + (e as Error).message, true); }
+  finally { setBusy(null); }
+}
+
 // ======================= bridge: connected mode =======================
 function updateBridgeBadge(): void {
   const b = $('#bridgeBadge');
@@ -4059,7 +4300,7 @@ function connectBridge(): void {
     }, 700);
   });
   ws.addEventListener('message', (e: MessageEvent) => {
-    let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; owner?: { label: string; since: number } | null; port?: number;
+    let m: { type?: string; name?: string; html?: string; text?: string; preview?: boolean; summary?: string; owner?: { label: string; since: number } | null; port?: number;
       cues?: Record<string, string[]>; replace?: boolean; watchJs?: string; replaceWatch?: boolean;
       anchors?: string[]; segments?: Record<string, string> };
     try { m = JSON.parse(String(e.data)); } catch { return; }
@@ -4072,7 +4313,7 @@ function connectBridge(): void {
     else if (m.type === 'import' && typeof m.html === 'string') { importedFromBridge = true; importFile(m.name || 'deck.html', m.html); importedFromBridge = false; }
     // after applying a patch, sync the updated full deck back so the bridge's
     // in-memory copy stays current (late-joiners / reconnects see the change)
-    else if (m.type === 'patch' && typeof m.text === 'string') { applyAiPatch(m.text, !!m.preview); setTimeout(syncExportToBridge, 500); }
+    else if (m.type === 'patch' && typeof m.text === 'string') { applyAiPatch(m.text, !!m.preview, typeof m.summary === 'string' ? m.summary : ''); setTimeout(syncExportToBridge, 500); }
     // 桥要一份最新的 deck（AI 读页之前会问一次）。**手打的编辑只有这条路能传上去**——
     // 保存/导出/AI 补丁之外，桥手里那份一直是旧的，AI 照旧内容重写就会盖掉手改。
     else if (m.type === 'sync-request') syncExportToBridge();
@@ -4520,6 +4761,43 @@ body.dark .tabnum,body.dark .stripnum{background:#B5402A}
 .insgrid{display:flex;flex-direction:column;gap:9px}
 .inscard{display:flex;flex-direction:column;gap:3px;padding:12px 13px;background:var(--sm-surface);border:1px solid var(--sm-line-2);border-radius:var(--sm-r-lg);cursor:pointer;text-align:left;font-family:inherit}
 .inscard:hover{border-color:var(--sm-accent-line);background:var(--sm-accent-tint)}
+/* ── AI 面板的折叠区 ── */
+.aimore-head{margin-top:22px;color:var(--sm-ink-4);font-weight:500}
+details.aimore{border-top:1px solid var(--sm-line-2);margin:0 -2px;padding:0 2px}
+details.aimore>summary{list-style:none;cursor:pointer;margin:6px 0;padding:7px 0;user-select:none}
+details.aimore>summary::-webkit-details-marker{display:none}
+details.aimore>summary .aimore-caret{margin-left:auto;color:var(--sm-ink-4);transition:transform .15s;font-size:15px}
+details.aimore[open]>summary .aimore-caret{transform:rotate(90deg)}
+details.aimore>summary:hover{color:var(--sm-ink)}
+/* ── AI 改了什么 ── */
+.aichangelog .chg{padding:7px 0;border-top:1px dashed var(--sm-line-2);font-size:12px}
+.aichangelog .chg-t{color:var(--sm-ink-4);font-variant-numeric:tabular-nums;margin-right:6px}
+.aichangelog .chg-p{color:var(--sm-ink-2);font-weight:600}
+.aichangelog .chg-s{margin-top:2px;color:var(--sm-ink-2);line-height:1.5}
+.aichangelog .chg-none{color:var(--sm-ink-4);font-style:italic}
+/* ── 设计 tab：当前皮肤（只读） ── */
+.skinnow{display:flex;align-items:center;gap:8px;font-size:13px}.skinnow span{flex:1;color:var(--sm-ink-2)}
+/* ── ⌘K ── */
+.cmdk-box{max-width:620px;padding:10px}
+.cmdk-box .searchq{width:100%;box-sizing:border-box;font-size:15px;padding:10px 12px}
+.cmdk-list{max-height:52vh;overflow:auto;margin:8px 0 4px}
+.cmdk-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--sm-r-md);cursor:pointer;font-size:13px}
+.cmdk-item.on,.cmdk-item:hover{background:var(--sm-accent-tint)}
+.cmdk-g{flex:none;font-size:11px;color:var(--sm-ink-4);width:34px}
+.cmdk-l{flex:1;color:var(--sm-ink)}.cmdk-h{color:var(--sm-ink-4);font-size:11px}
+.cmdk-empty{padding:16px;color:var(--sm-ink-4);text-align:center}
+/* ── 现场互动卡 ── */
+.inscard-live b::before{content:'●';color:var(--sm-ok);margin-right:6px;font-size:10px;vertical-align:middle}
+.livecard{margin:10px 0 4px;padding:12px 13px;background:var(--sm-surface);border:1px solid var(--sm-line-2);border-radius:var(--sm-r-lg);font-size:12px}
+.livehead{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px}
+.livehint{color:var(--sm-ink-3);line-height:1.55;margin-bottom:10px}.livehint.warn{color:var(--sm-warn-ink)}
+.liveroom code{background:var(--sm-surface-3);padding:1px 6px;border-radius:var(--sm-r-xs);font-size:12px}
+.livestat{margin:8px 0;line-height:1.6;color:var(--sm-ink-2)}.livemeta{color:var(--sm-ink-4);font-size:11px}
+.livec{color:var(--sm-warn-ink)}.liveo{color:var(--sm-ok-ink)}
+.livedot{width:8px;height:8px;border-radius:50%;background:var(--sm-ink-4);display:inline-block}.livedot.on{background:var(--sm-ok)}.livedot.closed{background:var(--sm-warn)}
+.liveurls{display:flex;flex-direction:column;gap:4px;margin:8px 0}.liveurls div{display:flex;gap:8px;align-items:baseline}
+.liveurls span{flex:none;width:56px;color:var(--sm-ink-4)}.liveurls a{color:var(--sm-info-ink);word-break:break-all;text-decoration:none}.liveurls a:hover{text-decoration:underline}
+body.dark .livecard{background:#1b1e25;border-color:#2c323d}
 .inscard b{font-size:14px;color:var(--sm-ink);font-weight:600}.inscard span{font-size:12px;color:var(--sm-ink-3);line-height:1.5}
 .hpane{flex:1;overflow:auto;padding:16px}
 #htmlpanel input[type=range]{width:100%;margin:6px 0 2px;accent-color:var(--sm-accent);cursor:pointer}
@@ -4654,6 +4932,12 @@ function buildUI(): void {
   <span class="grow"></span>
   <button id="imp">导入 HTML</button>
   <span class="sep"></span>
+  <span class="grp">
+    <button id="tbPlay" title="全屏放映（F）——就在这个窗口里放">▶ 放映</button>
+    <button id="tbPresenter" title="打开演讲者副屏（S）——要 deck 带演讲者模式">演讲者</button>
+    <button id="cmdkBtn" class="iconbtn" title="命令面板：输入想做的事（⌘K / Ctrl+K）">⌘K</button>
+  </span>
+  <span class="sep"></span>
   <span class="grp expwrap">
     <button id="expOpts" class="iconbtn" aria-expanded="false" title="导出选项">⚙</button>
     <div class="expmenu" id="expMenu">
@@ -4714,39 +4998,47 @@ function buildUI(): void {
 
       <!-- ===== AI 修改 ===== -->
       <div class="pane hpane" data-hpane="ai">
-        <div class="sechead sectop">交给 AI<button class="ihelp" type="button" data-help="人做细活（点字、换色、动画）；复杂的交给 AI——写修改意见、为页面配图，凑成一个待办，一键发送。">?</button><span class="grow"></span><label class="confirm-tog" title="开启后 AI 的改动先以「提议」呈现，点保留才算数；关闭则改完直接生效"><input id="aiConfirmTog" type="checkbox"> 先问我</label></div>
+        <div class="sechead sectop">交给 AI<button class="ihelp" type="button" data-help="写一句这一页要怎么改，凑成待办，一键发给 Claude。人做细活（点字、换色、动画），复杂的交给 AI。下面折叠着不常用的：整份 deck 的统一要求、配图、导入图片、图片库与自检。">?</button><span class="grow"></span><label class="confirm-tog" title="开启后 AI 的改动先以「提议」呈现，点保留才算数；关闭则改完直接生效"><input id="aiConfirmTog" type="checkbox"> 先问我</label></div>
         <div class="proposal-bar" id="aiProposalBar" style="display:none"><span class="proposal-dot">●</span><span id="aiProposalTxt">AI 提议了改动，请确认</span><span class="grow"></span><button id="aiKeep" class="mini">保留</button><button id="aiRevertAll" class="mini revert">还原</button></div>
 
-        <div class="sechead">整份 deck<button class="ihelp" type="button" data-help="对整份 deck 的统一要求，AI 自动挑相关页改。例：统一标题字号；精简过长的页。">?</button></div>
-        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的统一要求（可留空）"></textarea></div>
-
-        <div class="sechead">本页<button class="ihelp" type="button" data-help="给当前页写修改意见，或为它配图。切换页会自动保存。">?</button></div>
+        <div class="sechead">本页</div>
         <div class="aitarget" id="aiTarget"><span id="aiTargetTxt">本页：—</span><span class="applied-chip" id="aiAppliedChip" style="display:none">AI 已修改</span><button id="aiRevertOne" class="mini revert" style="display:none">还原本页</button></div>
         <div class="field"><textarea id="aiInstruction" rows="3" placeholder="这一页想怎么改？例：三个要点改成左右两栏。"></textarea></div>
         <div class="oprow"><button id="aiClearOne" title="清空本页的修改意见">清空</button></div>
+        <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
+
+        <div class="sechead">待办<span class="grow"></span><span class="sendnote" id="aiSendNote" style="display:none">含照片·计费</span></div>
+        <div id="aiTodo" class="aitodo"></div>
+        <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
+        <div id="aiChangeLog" class="aichangelog" hidden></div>
+
+        <div class="sechead aimore-head">不常用的<span class="grow"></span></div>
+        <details class="aimore" id="aimoreDeck">
+        <summary class="sechead aimore-sum" title="对整份 deck 的统一要求，AI 自动挑相关页改。例：统一标题字号；精简过长的页。">整份 deck<span class="aimore-caret">›</span></summary>
+        <div class="field"><textarea id="aiDeckInstruction" rows="2" placeholder="对整份 deck 的统一要求（可留空）"></textarea></div>
+        </details>
+        <details class="aimore" id="aimoreIll">
+        <summary class="sechead aimore-sum" title="矢量＝Claude 直接画 SVG（免费、可编辑）；图表＝按数据/描述画 SVG 图表（柱/折线/饼/雷达/散点…）；照片＝本机 codex 生成（按张计额度）。成品都进图片库。">配图 · 矢量 / 图表 / 照片<span class="aimore-caret">›</span></summary>
         <div class="illbox">
-          <div class="illrow"><span class="illlabel">配图<button class="ihelp" type="button" data-help="矢量＝Claude 直接画 SVG（免费、可编辑）；图表＝按数据/描述画 SVG 图表（柱/折线/饼/雷达/散点…）；照片＝本机 codex 生成（按张计额度）。成品都进图片库。">?</button></span>
+          <div class="illrow"><span class="illlabel">配图</span>
             <div class="seg" id="illSeg"><button type="button" class="segbtn on" data-illtype="vector">矢量</button><button type="button" class="segbtn" data-illtype="chart">图表</button><button type="button" class="segbtn" data-illtype="photo">照片</button></div>
           </div>
           <textarea id="illHint" rows="2" placeholder="想要什么画面（可留空）"></textarea>
           <div class="illrow illrow-act"><button id="illDataPick" class="mini" title="导入 CSV / 数字 / 文本数据文件，内容会填进上面的框" style="display:none">导入数据文件</button><span id="illDataNote" class="illnote"></span><span class="grow"></span><button id="illAdd" class="primary-mini" title="把本页 + 所选配图类型加入待办">＋ 加入</button></div>
         </div>
-        <div class="aisent-banner" id="aiSentBanner" style="display:none"></div>
-
-        <div class="sechead">导入图片<button class="ihelp" type="button" data-help="流程：先在左侧点你要配图的那一页 → 再导入 / 搜图，图片就自动归到那一页 → 多页都配好后一键发给 AI 排版。放错了？点缩略图角上的「⤴」即可移到当前选中页。">?</button><span class="grow"></span><button id="imgSearchOpen" class="mini" title="从免费图库搜图，点一下即加入暂存盘（无需手动下载导入）">搜图</button></div>
+        </details>
+        <details class="aimore" id="aimoreTray">
+        <summary class="sechead aimore-sum" title="流程：先在左侧点你要配图的那一页 → 再导入 / 搜图，图片就自动归到那一页 → 多页都配好后一键发给 AI 排版。放错了？点缩略图角上的「⤴」即可移到当前选中页。">导入图片<span class="grow"></span><button id="imgSearchOpen" class="mini" title="从免费图库搜图，点一下即加入暂存盘（无需手动下载导入）">搜图</button><span class="aimore-caret">›</span></summary>
         <div class="tray-target" id="trayTarget">导入 / 搜图将加到：<b id="trayTargetTxt">（先在左侧选一页）</b></div>
         <div id="trayDrop" class="tray-drop"><div class="tray-drop-in"><b>拖拽图片到此处</b><span>或</span><button id="trayPick" class="mini">导入图片</button></div></div>
         <div id="trayEmpty" class="tray-empty">暂存盘为空</div>
         <div id="trayGrid" class="tray-grid"></div>
-
-        <div class="sechead">待办<button class="ihelp" type="button" data-help="上面的「改字 / 配图 / 导入图」、幻灯片上的元素批注（预览里点中元素 → 💬）、以及「讲稿」里的批注，都汇总在这里。点「一键发送给 AI」一次全部交给 Claude —— 只有这一颗发送键，其它地方的发送按钮按的也是它。">?</button><span class="grow"></span><span class="sendnote" id="aiSendNote" style="display:none">含照片·计费</span></div>
-        <div id="aiTodo" class="aitodo"></div>
-        <div class="oprow"><button id="aiSendAll" class="primary-mini big" disabled>一键发送给 AI</button></div>
-
-        <div class="sechead">图片库<button class="ihelp" type="button" data-help="AI 生成过的矢量 / 图表 / 照片都存在这里（~/.slidesmith/library/），可重新插入到对应页或删除。">?</button><span class="grow"></span><button id="genOpenLib" class="mini">打开</button></div>
-
-        <div class="sechead">视觉自检<button class="ihelp" type="button" data-help="检查每页的内容溢出、文字对比度、坏图，点结果可跳到对应页。">?</button><span class="grow"></span><button id="auditRun" class="mini">检查</button></div>
+        </details>
+        <details class="aimore" id="aimoreLib">
+        <summary class="sechead aimore-sum" title="AI 生成过的矢量 / 图表 / 照片都在图片库（~/.slidesmith/library/）；视觉自检查溢出、对比度、坏图">图片库 · 视觉自检<span class="grow"></span><button id="genOpenLib" class="mini">打开</button><span class="aimore-caret">›</span></summary>
+        <div class="sechead">视觉自检<span class="grow"></span><button id="auditRun" class="mini">检查</button></div>
         <div id="auditOut" class="auditout"></div>
+        </details>
       </div>
 
       <!-- ===== 讲稿 / 提词（原先讲稿只是 AI tab 里的一个按钮，提词是独立 tab；
@@ -4761,7 +5053,7 @@ function buildUI(): void {
 
       <!-- ===== 格式（选中元素） ===== -->
       <div class="pane hpane" data-hpane="fmt" hidden>
-        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑。<button class="ihelp" type="button" data-help="选中后可调整字体、字号、颜色、粗细与位置；元素上方那排把手：✥ 拖动移动 · 💬 给这个元素加一条 AI 批注 · 右下角 ◢ 缩放。打字时空格 / 方向键归输入，按 Esc 退出文本框即可继续用键盘翻页。">?</button></div>
+        <div class="nosel hseloff" id="hNoSel">在预览中<b>点选文字</b>即可直接编辑。要插图请到左栏「插入」。<button class="ihelp" type="button" data-help="选中后可调整字体、字号、颜色、粗细与位置；元素上方那排把手：✥ 拖动移动 · 💬 给这个元素加一条 AI 批注 · 右下角 ◢ 缩放。打字时空格 / 方向键归输入，按 Esc 退出文本框即可继续用键盘翻页。">?</button></div>
         <div id="hSel" class="hselon" style="display:none">
           <div class="tag" id="hSelTag">—</div>
           <div class="field"><label>字体</label><select id="hFont"></select></div>
@@ -4785,11 +5077,8 @@ function buildUI(): void {
             <div class="field"><label>宽度(px)</label><input id="hElW" type="number" min="20" placeholder="自动"></div>
             <div class="field"><label>位置 / 大小<button class="ihelp" type="button" data-help="拖动选框上方的 ✥ 可移动，拖动右下角的 ◢ 可调整大小；「复位」清除拖动产生的位移与尺寸。">?</button></label><button id="hBoxReset" class="mini" title="清除拖动产生的位移与尺寸">复位</button></div>
           </div>
-          <div class="oprow"><button id="hElUp" title="次序上移">↑ 次序</button><button id="hElDown" title="次序下移">↓ 次序</button><button id="hElDel" class="danger" title="删除该元素">删除</button></div>
+          <div class="oprow"><button id="hElUp" title="次序上移">↑ 次序</button><button id="hElDown" title="次序下移">↓ 次序</button><button id="hInsertImg" title="在选中元素后插入一张图片（内联进 HTML，导出离线可用；也可直接在预览里粘贴）">插入图片</button><button id="hElDel" class="danger" title="删除该元素">删除</button></div>
         </div>
-
-        <div class="sechead">插入<button class="ihelp" type="button" data-help="图片以内联方式写入 HTML，导出后离线可用。也可在预览中直接粘贴图片；若已选中元素，将插入其后。">?</button></div>
-        <div class="oprow"><button id="hInsertImg">插入图片</button></div>
       </div>
 
       <!-- ===== 动画效果 ===== -->
@@ -4833,7 +5122,7 @@ function buildUI(): void {
              #dAccent/#dPaper/#dInk 写的是同一批令牌），现已合并到这里，只留一份。 ===== -->
       <div class="pane hpane" data-hpane="design" hidden>
         <div class="sechead sectop">整份 deck 的设计旋钮<button class="ihelp" type="button" data-help="对整份 deck 生效的「全局旋钮」：皮肤 / 配色 / 字体 / 字号 / 留白。拖一下立刻变、零 token、不经过 AI——人手高频细活就在这里调。所有改动都写入 HTML，导出后离线一致。">?</button></div>
-        <div class="field"><label>皮肤</label><select id="hSkin"></select></div>
+        <div class="field"><label>皮肤</label><div class="skinnow"><span id="hSkinNow">保持原样</span><button id="hSkinGo" class="mini" type="button" title="换皮在左栏「换装」里挑，22 张卡片看得见摸得着">去「换装」挑 ›</button></div><select id="hSkin" hidden></select></div>
         <div class="field" id="hThemeWrap" style="display:none"><label>主题</label><select id="hTheme"></select></div>
         <h3>配色</h3>
         <div class="grid2">
@@ -4972,6 +5261,13 @@ function buildUI(): void {
     <div id="imgSearchGrid" class="libgrid"></div>
   </div>
 </div>
+<div class="libmodal" id="cmdk" style="display:none">
+  <div class="libbox cmdk-box">
+    <input id="cmdkQ" class="searchq" type="text" placeholder="输入想做的事：学术 / 第 12 页 / 导出 PDF / 发给 AI / 关提问 …" autocomplete="off" spellcheck="false">
+    <div id="cmdkList" class="cmdk-list"></div>
+    <div class="libhint">↑↓ 选择 · Enter 执行 · Esc 关闭 · 随时按 ⌘K（Windows: Ctrl+K）呼出</div>
+  </div>
+</div>
 <div class="helppop" id="helpPop"></div>
 <div class="swpop" id="swPop">
   <div class="sw-area" id="swArea"><i class="sw-dot" id="swDot"></i></div>
@@ -5074,10 +5370,26 @@ function buildUI(): void {
   $('#redoBtn').addEventListener('click', redo);
   $('#restoreBar'); // (handlers attached in maybeOfferDraftRestore)
   initEmbedFontsToggle();
+  document.querySelectorAll('details.aimore > summary button').forEach((b) => b.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); }));
+  window.addEventListener('message', (e) => { const d = e.data as { type?: string } | null; if (d && d.type === 'sm-cmdk') openCmdk(); });
+  $('#tbPlay').addEventListener('click', studioPresent);
+  $('#tbPresenter').addEventListener('click', studioPresenter);
+  $('#cmdkBtn').addEventListener('click', openCmdk);
+  $('#hSkinGo').addEventListener('click', () => (document.querySelector('.ltab[data-ltab="skins"]') as HTMLElement | null)?.click());
+  $('#cmdk').addEventListener('click', (e) => { if (e.target === $('#cmdk')) closeCmdk(); });
+  ($('#cmdkQ') as HTMLInputElement).addEventListener('input', () => { cmdkSel = 0; cmdkRender(); });
+  ($('#cmdkQ') as HTMLInputElement).addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowDown') { cmdkSel = Math.min(cmdkSel + 1, cmdkShown.length - 1); cmdkRender(); e.preventDefault(); }
+    else if (e.key === 'ArrowUp') { cmdkSel = Math.max(cmdkSel - 1, 0); cmdkRender(); e.preventDefault(); }
+    else if (e.key === 'Enter') { cmdkRun(); e.preventDefault(); }
+    else if (e.key === 'Escape') { closeCmdk(); e.preventDefault(); }
+    e.stopPropagation();
+  });
   document.addEventListener('keydown', (e) => {
     const meta = e.metaKey || e.ctrlKey;
     const k = e.key.toLowerCase();
     if (meta) {
+      if (k === 'k') { e.preventDefault(); if (($('#cmdk') as HTMLElement).style.display !== 'flex') openCmdk(); else closeCmdk(); return; }
       if (k === 's') { e.preventDefault(); void saveHtmlInPlace(); }
       else if (k === 'z' && !e.shiftKey) { if (mode === 'html') { e.preventDefault(); undo(); } }
       else if ((k === 'z' && e.shiftKey) || k === 'y') { if (mode === 'html') { e.preventDefault(); redo(); } }
@@ -5150,7 +5462,7 @@ function buildUI(): void {
 
   // --- Submit-to-AI: per-page memory + batch send (apply comes back over the bridge) ---
   ($('#aiInstruction') as HTMLTextAreaElement).addEventListener('input', onAiInput);
-  ($('#aiDeckInstruction') as HTMLTextAreaElement).addEventListener('input', (e) => { aiDeckInstruction = (e.target as HTMLTextAreaElement).value; renderTodo(); });
+  ($('#aiDeckInstruction') as HTMLTextAreaElement).addEventListener('input', (e) => { aiDeckInstruction = (e.target as HTMLTextAreaElement).value; renderTodo(); refreshAiMore(); });
   // unified send: one button does text edits + 配图(矢量/照片) + 导入图 for the whole deck
   $('#aiSendAll').addEventListener('click', submitAll);
   // 本页 配图: pick type (segmented) + add to the 配图清单
@@ -5471,6 +5783,7 @@ function buildUI(): void {
   // edits from the preview iframe
   window.addEventListener('message', (e) => {
     const d = e.data; if (!d || typeof d !== 'object') return;
+    if (d.type === 'sm-cmdk') { openCmdk(); return; }
     if (d.type === 'sm-edit') applyEdit(d.bid, d.field, d.value);
     else if (d.type === 'sm-select') { selBid = d.bid; showBlock(d.bid, d.btype); }
     else if (d.type === 'sm-ready') gotoPreview(cur);

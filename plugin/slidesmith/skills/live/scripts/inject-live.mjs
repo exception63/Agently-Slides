@@ -78,6 +78,27 @@ for (const k of ['qa', 'poll', 'quiz', 'cloud', 'buzz', 'rate']) {
   const [s, n] = cutBetween(html, sB(k), sE(k)); html = s; cut += n;
 }
 { const [s, n] = cutBetween(html, B, E); html = s; cut += n; }
+// 注释标记不一定还在：Studio 导入后按 <section> 收割、导出时只重发 section 本体，
+// 夹在 section 之间的标记注释就没了。所以互动页自己还带一个 data-sm-live 属性，
+// 拆的时候按属性找、按 <section> 层级配平（页里还有 <section class="qa-wall">，不能用非贪婪正则）。
+function cutLiveSections(s) {
+  let n = 0;
+  for (;;) {
+    const m = /<section\b[^>]*\bdata-sm-live=/i.exec(s);
+    if (!m) break;
+    const re = /<section\b|<\/section\s*>/gi;
+    re.lastIndex = m.index + 1;
+    let depth = 1, end = -1, t;
+    while ((t = re.exec(s))) { depth += t[0][1] === '/' ? -1 : 1; if (depth === 0) { end = t.index + t[0].length; break; } }
+    if (end < 0) break;
+    if (s[end] === '\n') end++;
+    s = s.slice(0, m.index) + s.slice(end);
+    n++;
+    if (n > 20) break;
+  }
+  return [s, n];
+}
+{ const [s, n] = cutLiveSections(html); html = s; cut += n; }
 if (cut) console.log(`· 拆掉上一次装的 ${cut} 段`);
 
 if (has('remove')) {

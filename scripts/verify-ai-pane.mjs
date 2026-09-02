@@ -51,6 +51,9 @@ try {
   await page.waitForFunction(() => window.__SM_BRIDGE__().connected === true, { timeout: 8000 });
   await page.waitForFunction(() => { const d = document.getElementById('preview')?.contentDocument; return d && d.querySelectorAll('#deck .slide').length > 6; }, { timeout: 10000 });
   await page.click('.htab[data-htab="ai"]');
+  // 批次三把不常用的（整份 deck / 配图 / 导入图片 / 图片库·自检）折进 <details>；测试先全展开再点
+  const openMore = () => page.evaluate(() => document.querySelectorAll('details.aimore').forEach((d) => { d.open = true; }));
+  await openMore();
   check('Studio connected + deck imported (html mode)', true);
 
   const ids = await page.evaluate(() => Array.from(document.querySelector('#preview').contentDocument.querySelectorAll('#deck .slide')).map((s) => s.getAttribute('data-id')));
@@ -60,19 +63,22 @@ try {
   const ui = await page.evaluate(() => ['aiDeckInstruction', 'illSeg', 'illHint', 'illAdd', 'aiTodo', 'aiSendAll', 'genOpenLib'].every((id) => !!document.getElementById(id)) && document.querySelectorAll('#illSeg .segbtn').length === 3);
   check('unified UI present (deck-ask · 配图 segmented 3类 · 待办 · 一键发送 · 图片库)', ui);
   const order = await page.evaluate(() => {
-    const seq = ['aiDeckInstruction', 'aiInstruction', 'illSeg', 'aiTodo', 'aiSendAll', 'genOpenLib'].map((id) => document.getElementById(id));
+    // 新版面：本页在最上、待办和发送紧跟；不常用的折在下面（整份 deck → 配图 → 图片库）
+    const seq = ['aiInstruction', 'aiTodo', 'aiSendAll', 'aiDeckInstruction', 'illSeg', 'genOpenLib'].map((id) => document.getElementById(id));
     for (let i = 1; i < seq.length; i++) if (!(seq[i - 1].compareDocumentPosition(seq[i]) & Node.DOCUMENT_POSITION_FOLLOWING)) return false;
     return true;
   });
-  check('order: 对整份 deck → 本页 → 配图 → 待办 → 一键发送 → 图片库', order);
+  check('order: 本页 → 待办 → 一键发送 → (折叠) 整份 deck → 配图 → 图片库', order);
 
   // clean UI: explanations live in ⓘ popovers, not inline paragraphs
+  // 批次三：小问号从 8 颗收成 1 颗（面板顶部那颗讲全局），其余帮助文字挪到折叠区标题的 title 上
   const helpN = await page.evaluate(() => document.querySelectorAll('.hpane[data-hpane="ai"] .ihelp').length);
-  await page.click('.hpane[data-hpane="ai"] .ihelp >> nth=3');
+  const titledN = await page.evaluate(() => document.querySelectorAll('.hpane[data-hpane="ai"] details.aimore > summary[title]').length);
+  await page.click('.hpane[data-hpane="ai"] .ihelp >> nth=0');
   const popOpen = await page.evaluate(() => { const p = document.getElementById('helpPop'); return !!p && p.classList.contains('show') && p.textContent.length > 5; });
   await page.click('#aiDeckInstruction'); // click away closes it
   const popClosed = await page.evaluate(() => !document.getElementById('helpPop').classList.contains('show'));
-  check('ⓘ help popovers (≥6 icons, open with text, click-away closes)', helpN >= 6 && popOpen && popClosed, `${helpN} icons`);
+  check('ⓘ help: 面板只留 1 颗问号（能开能关），4 个折叠区标题带 title 说明', helpN === 1 && titledN === 4 && popOpen && popClosed, `${helpN} icon · ${titledN} titled`);
 
   // segmented control toggles illType (矢量 / 图表 / 照片) + 图表 swaps the hint placeholder to a data prompt
   await page.click('#illSeg .segbtn[data-illtype="photo"]');

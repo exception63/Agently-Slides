@@ -5,7 +5,7 @@
      **qa-slide 必须留着** —— 块脚本靠它算出「问答是第几页」，iPad 翻到这页才会自动切过去。
      ⚠️ data-seg **必须是数字**：引擎 segOf() 用 parseInt，写成 "LAST" 会算出 NaN，
         锚点变成 sNaN-1、段导航里也找不到这一页。 -->
-<section data-seg="__SEG__" data-segname="__SEGNAME__" data-title="现场答疑" class="slide qa-slide">
+<section data-seg="__SEG__" data-segname="__SEGNAME__" data-title="现场答疑" class="slide qa-slide" data-sm-live="qa">
   <div class="head">
     <div class="eyebrow head__eyebrow">Q &amp; A · 现场答疑</div>
     <h2 class="title head__title">现在开始<em>提问</em></h2>

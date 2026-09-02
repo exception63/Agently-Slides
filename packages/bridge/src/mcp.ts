@@ -267,10 +267,11 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
       inputSchema: {
         sections: z.string().describe('一个或多个 <section ... data-id="…"> 整页 HTML（可含 ```html 围栏）。务必保留原 data-id。'),
         preview: z.boolean().optional().describe('是否作为「改前先问我」的提议预览呈现（默认 false=直接生效）。'),
+        summary: z.string().optional().describe('一句话说明这次改了什么（例：「第 7 页三个要点改成两栏，去掉第二段铺垫」）。Studio 会显示给用户，别省。'),
       },
     },
-    async ({ sections, preview }) => {
-      const r = await bridge.applyPatch(sections, { preview: !!preview });
+    async ({ sections, preview, summary }) => {
+      const r = await bridge.applyPatch(sections, { preview: !!preview, summary: summary || '' });
       return text({ ok: true, deliveredTo: r.clients, queuedForLater: r.queued, preview: !!preview, status: await bridge.status() });
     },
   );

@@ -9,7 +9,7 @@
 // drives it over MCP. User edit-requests flow UP (Studio→bridge→Claude); AI
 // patches flow DOWN (Claude→bridge→Studio). All state lives in memory.
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
-import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync, mkdtempSync, rmSync } from 'node:fs';
 import { dirname, resolve, basename, join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
@@ -291,7 +291,7 @@ export interface BridgeHandle extends EventEmitter {
   /** push an AI patch (one or more <section data-id>) down to the connected Studio(s).
    *  preview=true marks it as a *proposal* so the Studio shows it behind a 保留/还原
    *  banner instead of committing silently (the 改前先问我 permission mode). */
-  applyPatch(text: string, opts?: { preview?: boolean }): { clients: number; queued: boolean };
+  applyPatch(text: string, opts?: { preview?: boolean; summary?: string }): { clients: number; queued: boolean };
   /** ask the connected Studio to push its *current* deck up, and resolve once it
    *  lands (or after timeoutMs). Resolves immediately when no Studio is connected.
    *  See the comment on the implementation for why a read must do this first. */
@@ -336,6 +336,44 @@ export interface BridgeHandle extends EventEmitter {
 }
 
 let reqSeq = 0;
+
+// ---- Slidesmith Live 的令牌与脚本 ----
+// 令牌文件和 smlive CLI 共用一份（~/.slidesmith/live.json，0600）。SMLIVE_CONFIG 让回归指到假的。
+function liveCfg(): { base: string; token: string } | null {
+  try {
+    const f = process.env['SMLIVE_CONFIG'] || join(homedir(), '.slidesmith', 'live.json');
+    const j = JSON.parse(readFileSync(f, 'utf8')) as { base?: string; token?: string };
+    if (!j.token) return null;
+    return { base: (j.base || 'https://live.zhouliying.com').replace(/\/$/, ''), token: j.token };
+  } catch { return null; }
+}
+async function liveApi(cfg: { base: string; token: string }, path: string, body?: unknown): Promise<unknown> {
+  const r = await fetch(cfg.base + '/api/agent' + path, {
+    method: body ? 'POST' : 'GET',
+    headers: { authorization: 'Bearer ' + cfg.token, ...(body ? { 'content-type': 'application/json' } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(15000),
+  });
+  if (r.status === 401) return { ok: false, error: '令牌不对（服务器 /etc/smrelay/token，再 smlive setup）' };
+  try { return await r.json(); } catch { return { ok: false, error: `管理台返回的不是 JSON（HTTP ${r.status}）` }; }
+}
+// 插件里的 live 脚本：从桥的源码位置往上找仓库根（tsx 跑 src、打包后跑 dist 都试）
+function liveScript(name: string): string | null {
+  for (const up of ['../../..', '../..', '../../../..']) {
+    const p = resolve(HERE, up, 'plugin', 'slidesmith', 'skills', 'live', 'scripts', name);
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+function run(cmd: string, args: string[]): Promise<{ code: number; out: string; err: string }> {
+  return new Promise((res) => {
+    const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    let out = '', err = '';
+    p.stdout.on('data', (d) => (out += d)); p.stderr.on('data', (d) => (err += d));
+    p.on('close', (code) => res({ code: code ?? 1, out, err }));
+    p.on('error', (e) => res({ code: 1, out, err: String(e) }));
+  });
+}
 
 function loadStudioHtml(studioPath: string): string {
   if (!existsSync(studioPath)) {
@@ -442,7 +480,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
   // the instant a request arrives (push-like), or by their own timeout.
   const waiters = new Set<(reqs: BridgeRequest[]) => void>();
   // patches that arrived while no Studio was connected — flushed on next connect
-  const queuedPatches: Array<{ text: string; preview: boolean }> = [];
+  const queuedPatches: Array<{ text: string; preview: boolean; summary?: string }> = [];
 
   // permissive CORS so the offline (file://) Studio can probe the bridge and hand
   // its deck over before jumping to the connected version. Localhost dev tool only.
@@ -589,9 +627,9 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     if (url === '/api/patch' && req.method === 'POST') {
       let preview = /[?&]preview=1\b/.test(req.url || '');
       readBody(req).then((body) => {
-        let text = body;
-        try { const j = JSON.parse(body); if (j && typeof j.sections === 'string') { text = j.sections; if (typeof j.preview === 'boolean') preview = j.preview; } } catch { /* raw html body */ }
-        const r = handle.applyPatch(text, { preview });
+        let text = body; let summary = '';
+        try { const j = JSON.parse(body); if (j && typeof j.sections === 'string') { text = j.sections; if (typeof j.preview === 'boolean') preview = j.preview; if (typeof j.summary === 'string') summary = j.summary; } } catch { /* raw html body */ }
+        const r = handle.applyPatch(text, { preview, summary });
         sendJson(res, { ok: true, ...r, preview, status: statusObj() });
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
@@ -607,6 +645,59 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
         const r = await renderDeckPdf(body, nm);
         if (r.ok && wantOpen) openFile(r.path);
         sendJson(res, r, r.ok ? 200 : 500);
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
+      return;
+    }
+    // ---- Slidesmith Live（现场互动）：Studio 里的入口 ----
+    // Studio 网页拿不到 ~/.slidesmith/live.json 里的令牌，也跑不了 inject-live.mjs，都由桥代劳。
+    // 令牌接口的业务在服务端（smrelay.py 的 /api/agent/*），这里只是带令牌转一手。
+    if (url === '/api/live/status' && req.method === 'GET') {
+      const room = decodeURIComponent((/[?&]room=([^&]+)/.exec(req.url || '') || [])[1] || '');
+      void (async () => {
+        const cfg = liveCfg();
+        if (!cfg) { sendJson(res, { ok: true, configured: false }); return; }
+        try {
+          const j = await liveApi(cfg, '/overview') as { ok: boolean; rooms?: Array<{ id: string }>; error?: string };
+          if (!j.ok) { sendJson(res, { ok: false, error: j.error || 'overview 失败' }); return; }
+          sendJson(res, { ok: true, configured: true, room: (j.rooms || []).find((r) => r.id === room) || null });
+        } catch (e) { sendJson(res, { ok: false, error: String((e as Error)?.message || e) }); }
+      })();
+      return;
+    }
+    if (url === '/api/live/control' && req.method === 'POST') {
+      readBody(req).then(async (body) => {
+        const cfg = liveCfg(); if (!cfg) { sendJson(res, { ok: false, error: '没配管理台令牌（smlive setup）' }); return; }
+        const j = JSON.parse(body || '{}') as { room?: string; action?: string };
+        if (!j.room || !['close', 'open', 'clear'].includes(j.action || '')) { sendJson(res, { ok: false, error: 'bad request' }, 400); return; }
+        sendJson(res, await liveApi(cfg, '/control', { room: j.room, action: j.action }));
+      }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
+      return;
+    }
+    // POST /api/live/inject {html, room, name?} → 装好互动页的 HTML；{html, remove:true} → 拆掉
+    if (url === '/api/live/inject' && req.method === 'POST') {
+      readBody(req).then(async (body) => {
+        const j = JSON.parse(body || '{}') as { html?: string; room?: string; name?: string; remove?: boolean };
+        if (!j.html) { sendJson(res, { ok: false, error: 'empty html' }, 400); return; }
+        if (!j.remove && !/^[A-Za-z0-9_-]{4,64}$/.test(j.room || '')) { sendJson(res, { ok: false, error: '房间号只能是 4–64 位字母数字和 - _' }, 400); return; }
+        const script = liveScript('inject-live.mjs');
+        if (!script) { sendJson(res, { ok: false, error: '找不到 skills/live/scripts/inject-live.mjs（插件目录不在预期位置）' }, 500); return; }
+        const dir = mkdtempSync(join(tmpdir(), 'smlive-'));
+        const inP = join(dir, 'deck.html'), outP = join(dir, 'out.html');
+        writeFileSync(inP, j.html);
+        const args = j.remove ? [script, inP, '--remove', '--out', outP] : [script, inP, '--room', j.room!, '--out', outP];
+        const r = await run(process.execPath, args);
+        if (r.code !== 0 || !existsSync(outP)) { rmSync(dir, { recursive: true, force: true }); sendJson(res, { ok: false, error: (r.err || r.out || '注入脚本失败').trim().slice(-600) }, 500); return; }
+        const html = readFileSync(outP, 'utf8'); rmSync(dir, { recursive: true, force: true });
+        // 顺手在管理台建房间起名（有令牌才做；「已经有了」不算错）
+        let roomCreated = false; let roomError = '';
+        const cfg = liveCfg();
+        if (!j.remove && cfg) {
+          try {
+            const rj = await liveApi(cfg, '/room', { action: 'create', id: j.room, name: j.name || '' }) as { ok: boolean; error?: string };
+            if (rj.ok) roomCreated = true; else if (!/已经有了/.test(rj.error || '')) roomError = rj.error || '';
+          } catch (e) { roomError = String((e as Error)?.message || e); }
+        }
+        sendJson(res, { ok: true, html, room: j.room, roomCreated, roomError: roomError || undefined, configured: !!cfg });
       }).catch((e) => sendJson(res, { ok: false, error: String(e) }, 400));
       return;
     }
@@ -804,7 +895,7 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
     send(ws, helloMsg());
     if (deck) send(ws, { type: 'import', name: deck.name, html: deck.html });
     // flush any patches that were waiting for a Studio to show up
-    while (queuedPatches.length) { const p = queuedPatches.shift()!; send(ws, { type: 'patch', text: p.text, preview: p.preview }); }
+    while (queuedPatches.length) { const p = queuedPatches.shift()!; send(ws, { type: 'patch', text: p.text, preview: p.preview, summary: p.summary || '' }); }
     emitter.emit('studio-connected');
 
     ws.on('message', (data) => {
@@ -903,9 +994,9 @@ export function startBridge(opts: BridgeOptions = {}): Promise<BridgeHandle> {
       waiters.add(settle);
     });
   handle.applyPatch = (text, opts = {}) => {
-    const preview = !!opts.preview;
-    const clients = broadcast({ type: 'patch', text, preview });
-    if (clients === 0) { queuedPatches.push({ text, preview }); return { clients: 0, queued: true }; }
+    const preview = !!opts.preview; const summary = opts.summary || '';
+    const clients = broadcast({ type: 'patch', text, preview, summary });
+    if (clients === 0) { queuedPatches.push({ text, preview, summary }); return { clients: 0, queued: true }; }
     return { clients, queued: false };
   };
   handle.handshake = (label) => {
