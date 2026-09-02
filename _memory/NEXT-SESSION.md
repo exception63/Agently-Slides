@@ -5,6 +5,31 @@
 
 ---
 
+## 〇、2026-08-30 这一天做了什么（先看这个）
+
+用户要「让它变成高级的插件和应用」→ 出了 `docs/REVIEW-2026-08-30.md`（全面审查，三个批次）→
+用户拍板做批次一和批次三，批次二（装到别的机器）**暂不做**。全部完成、上线、回归全绿：
+
+- **批次一**（省钱）：skill / MCP 描述瘦身（每会话固定税 27 KB → 14 KB）· AI 请求里已有 base64 图换
+  `sm-img://` 占位符（一页 180 KB 图 ≈ 6 万 token → 2k）· 字体只嵌预览里真用到的字重 + 去重 +
+  「嵌入字体」默认开；**「保存」写回源文件不嵌字体，「另存为 / 导出」才嵌**（verify-save 靠这条过的）。
+- **批次三**（界面）：**现场互动进 Studio**（左栏「插入」→ 装进 deck → 状态卡：在线 / 提问 / 关提问 / 清屏 /
+  网址 / 拆掉；桥新增 `/api/live/*`）· AI tab 渐进披露（首屏只剩本页 → 待办 → 发送，其余四块折叠、有内容自动展开，
+  8 颗问号收成 1 颗）· 设计 tab 皮肤只读 +「去换装」· 格式 tab 孤儿「插入」归位 · 编辑态藏 deck 顶栏按钮，
+  Studio 顶栏接管「放映」「演讲者」· **⌘K 命令面板** · `apply_patch` 带 `summary`，AI tab 显示「AI 改了什么」。
+- **拆 main.ts**：`packages/studio/src/parts/*.ts` 20 个 part，构建时原样拼成 `main.ts`（生成物，直接改会被
+  哈希守卫拒绝）。拼回去逐字节一致、bundle 哈希不变——零风险。真模块化以后逐个 part 做。
+- **文档一份真相**：AGENTS.md §4b 协作环＝后台 curl 自循环首选、`slidesmith_wait` 只短等（active.md 旧说法作废）；
+  §4d 收纳提词 / 讲稿硬约束；README 重写；GUIDE 补「批次三之后的 Studio」「E2 现场」；插件 README 补齐 5 个 skill。
+
+**新增回归**：`verify-ai-slim.mjs`（15）· `verify-studio-premium.mjs`（27）。**旧账**：`verify-n3.mjs` 引用早没了的
+`__SM_AI_REQUEST__`、`verify-polish.mjs` 引用 `__SM_AI_REQUEST_ALL__`，都是历史遗留，别以为是自己弄坏的。
+
+**没做（用户定的）**：批次二 —— `${CLAUDE_PLUGIN_ROOT}`、esbuild 预打包、`smdoctor`、中转收成一份、
+`npm run verify` 统一入口。审查文档里都有写法。
+
+---
+
 ## 一、下一件事：再挑一两种玩法做出来
 
 **「装配」这件事的形状已经定下来了**（2026-08-28）：`/slidesmith:live`，

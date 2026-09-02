@@ -10,5 +10,5 @@
       "@slidesmith/themes": ["../themes/src/index.ts"]
     }
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/main.ts", "src/*.d.ts"]
 }

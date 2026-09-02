@@ -5,7 +5,7 @@
 ## ⚡ 启动须知（省 token · 每个新会话先读这块）
 - **不要通读整个仓库**。开工只需：① 本文件 ② `_memory/NEXT-SESSION.md`（下阶段任务）③ 要驱动 Studio 时 `AGENTS.md §4b/§4c`（接口契约）。具体某功能细节再去 `_memory/history.md` 里 grep/跳读，别整篇通读。
 - **Studio 对话机制不靠"读代码"，靠 MCP 工具 + AGENTS.md**。新会话启动即自动加载 `slidesmith` 插件的 MCP 工具（`slidesmith_open / wait / apply_patch / status / connect`，用户级安装，任意会话可用）。
-- 改了 Studio 源（`packages/studio/src/main.ts`）要 `node scripts/build-studio.mjs` 重建 `studio/slidesmith-studio.html`；bridge 每请求重读，刷新浏览器即见。
+- 改 Studio 源改 **`packages/studio/src/parts/*.ts`**（20 个 part，见其 README；`main.ts` 是拼出来的生成物，直接改会被构建的哈希守卫拒绝），然后 `node scripts/build-studio.mjs` 重建 `studio/slidesmith-studio.html`；bridge 每请求重读，刷新浏览器即见。
 
 ## 🔌 Studio ↔ Claude 协作机制（一图流）
 1. `slidesmith_open(deckPath)` → 浏览器开 Studio + 握手（连上即顶栏「● 已连接 Claude」）。deck = **契约 HTML**（`#deck > .slide[data-id]`）。

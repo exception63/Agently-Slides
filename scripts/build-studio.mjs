@@ -120,6 +120,34 @@ export const SKINS = ${JSON.stringify(skinBundles)};
 export const SKIN_ORDER = ${JSON.stringify(SKIN_ORDER)};
 `;
 
+// ---- Studio 源码是 20 个 part 拼出来的（见 packages/studio/src/parts/README.md）----
+// main.ts 是生成物。这里先按文件名顺序把 parts 原样拼成 main.ts，再交给 esbuild。
+// 哈希守卫：如果 main.ts 被人直接改过（和上次生成的不一样、也和这次拼出来的不一样），
+// 就停下来提醒，别悄悄用 parts 覆盖掉那份改动。
+import { createHash } from 'node:crypto';
+import { existsSync as _exists } from 'node:fs';
+function assembleStudioMain() {
+  const partsDir = P('studio', 'src', 'parts');
+  if (!_exists(partsDir)) return;
+  const files = readdirSync(partsDir).filter((f) => /^\d\d-.*\.ts$/.test(f)).sort();
+  const joined = files.map((f) => read(join(partsDir, f))).join('');
+  const mainPath = P('studio', 'src', 'main.ts');
+  const shaFile = join(partsDir, '.main.sha1');
+  const sha = (t) => createHash('sha1').update(t).digest('hex');
+  if (_exists(mainPath) && _exists(shaFile)) {
+    const onDisk = read(mainPath), last = read(shaFile).trim();
+    if (sha(onDisk) !== last && sha(onDisk) !== sha(joined)) {
+      console.error('✗ packages/studio/src/main.ts 被直接改过，但它是由 src/parts/*.ts 生成的。\n'
+        + '  把改动搬到对应的 part 里再构建；或者删掉 src/parts/.main.sha1 表示「就用 main.ts 这份」。');
+      process.exit(1);
+    }
+  }
+  if (!_exists(mainPath) || read(mainPath) !== joined) writeFileSync(mainPath, joined);
+  writeFileSync(shaFile, sha(joined) + '\n');
+  console.log(`· main.ts ← ${files.length} 个 part 拼成（${(joined.length / 1024) | 0} KB）`);
+}
+assembleStudioMain();
+
 const virtualPlugin = {
   name: 'slidesmith-virtual',
   setup(build) {
