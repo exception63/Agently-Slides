@@ -1,23 +1,24 @@
 ---
 name: slides-presenter-mode
 description: |
-  给已有 HTML slides 加 "演讲者模式" · 主屏翻页时副屏（iPad / 便携屏）自动同步显示当前 slide 对应的讲稿 · 并把该 slide 对应的讲稿段落整块浅色高亮。
-  v0.3 新增：双向联动（演讲者按键 / TOC 点击 → slides 翻页）· 正向跟随 + 反向跟随分离 · Keywords 提词高亮（仅激活板块）· 红绿状态色。
-  适用场景：现场授课讲师有第二屏 / iPad · 想要"翻 PPT 时副屏自动跟到当前 slide 的讲稿" · 或者讲师在副屏用键盘控制翻页。
-  类似传统 PPT 的"演讲者视图（presenter view）" · 但用纯 HTML + 浏览器原生 API 实现 · 不依赖任何 PPT 软件。
-  当用户说 "演讲者模式 / presenter mode / 副屏 / 第二屏 / iPad 第二屏 / 讲稿同步 / 讲师视图 / 备课时翻页同步 / 主副屏 / 反向联动 / 双向同步 / 关键词高亮 / 提词" 时启用。
-  也适用于"我的 slides 已经有了 · 讲稿也有了 · 想把它们对接起来" 这种整合性需求。
+  给已有 HTML slides 加「演讲者模式」：主屏翻页，副屏（iPad / 便携屏）自动跟到当前页的讲稿并整块高亮；双向联动、Keywords 提词。首选交付是**一体化单文件**——slides + 讲稿 + 副屏缝成一个 HTML，拷一个文件双击即用。
+  当用户说「演讲者模式 / presenter mode / 副屏 / 第二屏 / iPad 第二屏 / 讲稿同步 / 讲师视图 / 主副屏 / 双向同步 / 提词 / 一体化 / 单文件 / 合成一个文件」时启用；也适用于「slides 有了、讲稿也有了、想接起来」。
+  只做「接」：从零做 slides 是 editorial-slides，写讲稿是 transcripts_html。
 metadata:
   version: 0.3.0
   status: dogfood-validated-v3
-  part_of: auto_courses
-  layer: horizontal_sub_skill
-  serves_phases: [6, 9]
-  dogfood_case: 福泉商务局 5h 课程 · 2026-05-27 · 145 slides + 5 段讲稿 · 4 轮迭代（v0.1 → v0.3）
-  dogfood_date: 2026-05-27
 ---
 
 # slides-presenter-mode v0.3.0
+
+> **速览**（原 frontmatter 元数据，按需查阅）
+>
+> - part_of: auto_courses
+> - layer: horizontal_sub_skill
+> - serves_phases: [6, 9]
+> - dogfood_case: 福泉商务局 5h 课程 · 2026-05-27 · 145 slides + 5 段讲稿 · 4 轮迭代（v0.1 → v0.3）
+> - dogfood_date: 2026-05-27
+
 
 > 把任意 HTML slides 升级为带"演讲者模式"的**双向**演示系统。
 > 关键洞察：**用浏览器原生跨窗口通信（BroadcastChannel + postMessage + localStorage event）就能实现媲美 Keynote / PowerPoint Presenter View 的效果 · 但完全是 HTML + JS · 文件可移植 · 不依赖任何专门软件**。

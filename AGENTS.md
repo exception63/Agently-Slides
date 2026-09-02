@@ -255,6 +255,46 @@ Then `slidesmith_apply_patch` (`preview: true` if the request had `confirm: true
 to ✓ 已改; placed 导入图 show 已放置; the human fine-tunes after. Honor the division of labor —
 the human does high-frequency fine edits (text, color, size, animation, move/delete) themselves.
 
+## 4d. Cues and notes — the two things `apply_patch` cannot reach
+
+Both live **outside `#deck`**, so `slidesmith_apply_patch` (which replaces `<section data-id>`
+inside `#deck`) cannot touch them. They have their own tools, and the Studio **re-validates on
+write** — a block that breaks a rule is rejected, not silently accepted. The MCP tool
+descriptions are deliberately short; the full rules are here.
+
+### `slidesmith_cues` — Apple Watch cue table (`window.__SM_CUES__`)
+
+- Call without `set` = read (per page: page №, anchor, title, current cues, health verdict).
+  Call with `set` = write. `enableWatchMode` bakes the watch template into a deck that has none.
+- **Keys must be the `anchor` this tool returned** — never invent one and never substitute
+  `slidesmith_outline` ids (on some decks the two differ; the outline falls back to `s1/s2/s3`
+  when the deck has no `window.SLIDE_MAP`). A wrong key fails the whole batch as "unknown anchor".
+- **Hard limits (measured on Apple Watch Ultra 3 / Series 11 — do not relax):**
+  1–5 cues per page (the face fits 5 lines) · each **≤10 CJK chars** (≤16 Latin) — longer wraps
+  and becomes the transcript · must be a **content anchor** (「无缝嵌入」) not a **structure label**
+  (「第一部分」) · must **not repeat the slide title** (the watch header already shows it) ·
+  **every page needs one** — a missing page is worse than no feature.
+- Default is **fill only empty pages, never overwrite** (the user may have hand-tuned cues in the
+  Studio panel); pass `replace: true` only when explicitly asked to rewrite. After a write the
+  Studio prompts the user to review page by page and keeps an undo.
+
+### `slidesmith_notes` — embedded transcript (`window.__TXB64__`)
+
+- Only a **一体版** deck (stitched by slides-presenter-mode) has one; the three-file variant keeps
+  the transcript in a sibling file the Studio cannot see.
+- Call without `set` = table of contents (anchor · title · length · the user's annotations); name
+  `anchors` to get whole blocks. Call with `set` = write blocks back (`{ anchor: html }`).
+- **Rules the Studio enforces on write:**
+  1. `<h3 … id="anchor">` stays verbatim, unique, and is the block's **first top-level element** —
+     the anchor is the key for second-screen sync and watch cues.
+  2. `<p class="cue">` / `<div class="golden">` / `<div class="data">` blocks that were there stay,
+     unless the user explicitly asked to remove them.
+  3. `<strong>` seeds the watch cues — don't bold whole paragraphs, don't strip them all.
+  4. Touch only the blocks that carry an annotation; never rewrite the whole transcript in passing.
+- Typical flow: user selects a passage in the Studio transcript view → writes a note → the note
+  arrives inside the AI-tasks request (with the original block) → you rewrite that block → `set` it
+  back → the user sees it in the Studio and can 「撤销 Claude 的改写」.
+
 ## 5. Hand-off to the human
 
 Best path: call `slidesmith_open(deckPath)` — the Studio opens in their browser already

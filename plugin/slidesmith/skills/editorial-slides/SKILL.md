@@ -1,26 +1,26 @@
 ---
 name: editorial-slides
 description: |
-  做"出版物级"的 HTML 演示 slides · 中文 · 多风格可选（每次调用先挑一种皮肤 skin）。
-  原生风格：① editorial 杂志风（纸色 + 朱红 + 宋体大字 + 大数字冲击，抓眼）；② academic 学术汇报风（社科/人文 · 深靛青 + 衬线 + 概念模型图 + 规范参考文献，专业克制）；③ keynote-dark 暗场主旨风（近黑底 + 巨大白字 + 琥珀点睛，大场子/发布会感）。
-  另有从「风格银行」(beautiful-html-templates) 移植的皮：cartesian 极简 / signal 机构正式 / vellum 暗色文艺学术 / daisy-days 温暖活泼；自有旗舰 acrylic 亚克力毛玻璃（微软 Fluent/Mica 感，发布会/科技产品）；以及 14 张流行色/设计流派薄皮，共 22 套（还可按需现移植更多，见 references/external-templates.md）。
-  所有风格共用同一引擎：单文件、可移植、离线可用；固定 1920×1080 画布；自带全屏投屏、左侧段导航 + 实时缩略图、进度条、键盘控制、演讲者双屏钩子。
-  还自带「动画库」：A 入场 / B 分步揭示 / C 强调 / D 持续动效 / E 跨页转场 / F 神奇移动(Magic Move) / G 消失 / H 点睛 / I 背景氛围 共九类、带编号、所见即所得预览（gallery/animations.html）；用户可按编号点名要某个动画/转场（"入场用 A8、大数字 F1 神奇移动、转场 E2"），见 references/animations.md。也在用户说"给 slides 加动画 / 加转场 / 加动效 / 神奇移动 / 分步出现 / Magic Move / 让某页动起来"时启用。
-  当用户说 "做 slides / 做 PPT / 做演示 / 做讲演幻灯 / 学术 slides / 学术汇报 slides / 会议汇报 PPT / 杂志风 slides / keynote / 漂亮的 slides / 把讲稿做成 slides / 做 HTML slides / 换个风格的 slides" 时启用，即使没点名某个风格也要启用并先让用户挑风格。
-  这个 skill 负责"从内容生成成品 slides"；若用户是"slides 已经有了、想加副屏讲稿同步"，那是 slides-presenter-mode skill。
+  从内容做成品 HTML slides（任何风格）：22 套皮肤可选、单文件离线、1920×1080，自带全屏放映 / 段导航 / 演讲者钩子，以及带编号的动画库（入场 / 分步 / 强调 / 转场 / 神奇移动…）。
+  当用户说「做 slides / 做 PPT / 做演示 / 学术汇报 / 答辩 / 会议汇报 / keynote / 把讲稿做成 slides / 换个风格 / 加动画 / 加转场 / 神奇移动」时启用；没点名风格也要启用，先让用户挑皮肤。
+  只负责「从内容生成 slides」：已有 slides 加副屏讲稿是 slides-presenter-mode，写讲稿是 transcripts_html，加现场互动是 live，手机翻页是 phone-remote。
 metadata:
   version: 1.6.0
   status: dogfood-validated
-  skins: [editorial, academic, keynote-dark, acrylic, cartesian, signal, vellum, daisy-days, dracula, nord, tokyo-night, catppuccin-mocha, catppuccin-latte, vaporwave, swiss-grid, bauhaus, cyberpunk-neon, glassmorphism, y2k-chrome, neo-brutalism, terminal-green, rose-pine]
-  skins_note: 22 套 = 7 原生厚皮 + acrylic 毛玻璃旗舰 + 14 薄皮（令牌 + 共享 _components.css）· 选皮流程见 Step 0（推荐→看总览图→真内容试皮→定）· 总览图 gallery/theme-contact-sheet.png · 活展厅 gallery/theme-showcase.html
-  animations: 10 类编号库（入场/分步/强调/持续/转场/神奇移动/消失/点睛/背景/Canvas特效）· 所见即所得画廊 gallery/animations.html · 见 references/animations.md
-  layouts: kpi-grid/vs/timeline/gantt/roadmap/diff/mindmap + cover/secdiv/cards/compare/steps/table/bignum… · 版式展厅 gallery/layout-showcase.html
-  engine: 段导航 + 缩略图 + 进度 + 投屏 + 概览网格(O 键) + 演讲者钩子 + 动画引擎(_fx/_fx-canvas)
-  dogfood: 7 张皮 gallery 全部浏览器 present 态截图核版（2026-06-04）· 后 4 张移植自 beautiful-html-templates (MIT)
   pairs_with: [transcripts_html, slides-presenter-mode]
 ---
 
 # editorial-slides · 多风格 HTML 演示
+
+> **速览**（原 frontmatter 元数据，按需查阅）
+>
+> - skins: [editorial, academic, keynote-dark, acrylic, cartesian, signal, vellum, daisy-days, dracula, nord, tokyo-night, catppuccin-mocha, catppuccin-latte, vaporwave, swiss-grid, bauhaus, cyberpunk-neon, glassmorphism, y2k-chrome, neo-brutalism, terminal-green, rose-pine]
+> - skins_note: 22 套 = 7 原生厚皮 + acrylic 毛玻璃旗舰 + 14 薄皮（令牌 + 共享 _components.css）· 选皮流程见 Step 0（推荐→看总览图→真内容试皮→定）· 总览图 gallery/theme-contact-sheet.png · 活展厅 gallery/theme-showcase.html
+> - animations: 10 类编号库（入场/分步/强调/持续/转场/神奇移动/消失/点睛/背景/Canvas特效）· 所见即所得画廊 gallery/animations.html · 见 references/animations.md
+> - layouts: kpi-grid/vs/timeline/gantt/roadmap/diff/mindmap + cover/secdiv/cards/compare/steps/table/bignum… · 版式展厅 gallery/layout-showcase.html
+> - engine: 段导航 + 缩略图 + 进度 + 投屏 + 概览网格(O 键) + 演讲者钩子 + 动画引擎(_fx/_fx-canvas)
+> - dogfood: 7 张皮 gallery 全部浏览器 present 态截图核版（2026-06-04）· 后 4 张移植自 beautiful-html-templates (MIT)
+
 
 > 一句话：**用纯 HTML 做出"出版物级"的演示**——单文件、投屏即用、演讲者模式就绪，而且**每次可选不同风格（skin）**。
 > 架构：一套**共用引擎**（导航/缩略图/投屏/副屏）+ **可换的皮肤**（每个风格 = 一份 CSS）。源是模块化的（联邦、不堆巨型文件），输出是单文件。

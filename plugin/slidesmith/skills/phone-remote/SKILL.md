@@ -1,20 +1,22 @@
 ---
 name: phone-remote
 description: |
-  用手机（iPhone / Android）遥控正在放映的 HTML slides 翻页 —— 手机上是 ◀ ▶ 两个大按钮 + 首页/末页/黑屏/放映态。
-  两种用法：① 【推荐】在 Slidesmith Studio 勾「嵌入手机遥控」导出 deck → 那份 HTML 拿到任何电脑打开→点「📱 手机遥控」→手机扫码配对→遥控（自带云中转，无需装任何东西）；② 让 Claude 起本机 relay，给「局域网/离线」模式或不走 Studio 的 deck 用。
-  连接方式演讲者可选：☁️云端（任何网络·会场隔离 Wi-Fi 也行·需联网）/ 📶局域网直连（同 Wi-Fi 或手机热点·WebRTC P2P·更快更私密·可离线）。
-  当用户说 "手机遥控 / iPhone 遥控 / 用手机翻页 / 手机当遥控器 / 遥控翻页 / 放映遥控 / phone remote / 拿手机控制 PPT" 时启用。
-  只负责「手机翻页遥控」；要副屏演讲者视图 + 讲稿同步是 slides-presenter-mode skill。
+  用手机 / Apple Watch 遥控正在放映的 HTML slides 翻页，iPad 上还能同步看讲稿。推荐路径：Studio 导出时勾「嵌入手机遥控」→ 那份 HTML 在任何电脑打开 → 点「📱 手机遥控」→ 扫码即用（云中转，不装任何东西）；现场彻底没网才起本机 relay。
+  当用户说「手机遥控 / iPhone 遥控 / 手表遥控 / 用手机翻页 / 遥控翻页 / phone remote / 拿手机控制 PPT / iPad 看讲稿」时启用。
+  只管「遥控 + 讲稿落到第二设备」：学生扫码提问是 live，副屏演讲者视图是 slides-presenter-mode。
 metadata:
   version: 0.2.0
   status: dogfood-validated
   part_of: slidesmith
-  cloud_relay: https://slidesmith-remote.zly-scu.workers.dev
-  dogfood_case: virtual-journeys.html · 2026-07-09 · Playwright 全链路（本机 relay + 云端 Cloudflare 全通；Studio 嵌入开关导出含客户端；WebRTC 代码就绪·P2P 直连待真机确认）
 ---
 
 # phone-remote v0.2.0
+
+> **速览**（原 frontmatter 元数据，按需查阅）
+>
+> - cloud_relay: https://slidesmith-remote.zly-scu.workers.dev
+> - dogfood_case: virtual-journeys.html · 2026-07-09 · Playwright 全链路（本机 relay + 云端 Cloudflare 全通；Studio 嵌入开关导出含客户端；WebRTC 代码就绪·P2P 直连待真机确认）
+
 
 > 把手机变成 HTML slides 的翻页遥控器。**deck 不用改一行**，任意 Slidesmith 皮通用。
 >

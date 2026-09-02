@@ -52,11 +52,8 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     {
       title: '打开 deck 到 Studio',
       description:
-        '在 Studio 里打开一个契约 HTML deck，并把它和这个会话「握手」绑定。' +
-        '传入 deck 的文件路径；若本会话自己持有桥接，会自动在默认浏览器打开 Studio（已连接模式）；' +
-        '若已接在 Slidesmith Studio.app 的桥上，则直接把 deck 推进那个 app 的窗口。' +
-        'Studio 顶栏会显示「已连接会话 X · 端口 Y」。' +
-        '握手后即进入自动协作环：用 slidesmith_wait 长轮询用户的修改请求，改好用 slidesmith_apply_patch 回写。',
+        '在 Studio 里打开一个契约 HTML deck，并把本会话握手为桥的 owner（Studio 顶栏显示「已连接会话 X」）。' +
+        '之后进入协作环：等用户从 Studio 提交修改（首选后台 `curl /api/wait` 自循环，或 slidesmith_wait），改好用 slidesmith_apply_patch 回写。细节见 AGENTS.md §4b。',
       inputSchema: {
         deckPath: z.string().describe('契约 HTML deck 的路径（.html）。相对路径按 cwd 解析。'),
         openBrowser: z.boolean().optional().describe('是否自动打开浏览器（默认 true；接在 app 的桥上时无效）'),
@@ -84,9 +81,7 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     {
       title: '握手：把本会话绑定到桥接',
       description:
-        '当 Studio 已经在运行（例如用户先从 Studio 端发起、deck 已经打开过、或用户开着 Slidesmith Studio.app），' +
-        '用这个工具与它「握手」：把本会话登记为 owner，Studio 顶栏立刻显示「已连接会话 X」。' +
-        '之后照常 slidesmith_wait → apply_patch 自动环。',
+        '不打开新 deck，只把本会话握手为正在运行的桥的 owner —— 用户已经开着 Studio 时用，握手后直接进协作环。',
       inputSchema: {
         label: z.string().optional().describe('会话标识，显示在 Studio 顶栏（默认 Claude）。'),
       },
@@ -103,9 +98,8 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     {
       title: '长轮询：等用户从 Studio 提交修改请求',
       description:
-        '阻塞等待，直到用户在 Studio 点「发送给 Claude」就立刻返回那条请求（含指令 + 该页 HTML + 令牌 + 输出规范 + confirm 标记）；' +
-        '若 timeout 毫秒内无人提交则返回 timedOut。这是自动协作环的心跳：拿到请求→改写→apply_patch→再 wait。' +
-        'request.confirm=true 表示用户开了「改前先问我」，回写时请把 preview 设为 true（Studio 会以「保留/还原」预览呈现）。',
+        '长轮询：阻塞到用户从 Studio 提交修改请求就返回（已取走），或到 timeout 返回 timedOut。' +
+        '注意它会占住这一轮对话；长时间守候请改用后台 `curl "<url>api/wait?timeout=280000"`（见 AGENTS.md §4b）。',
       inputSchema: {
         timeout: z.number().optional().describe('最长阻塞毫秒数（默认 25000，上限 290000）。'),
       },
@@ -122,8 +116,7 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     {
       title: '读取用户的修改意见',
       description:
-        '取回用户在 Studio 里提交的修改请求（每条是一份"给 AI 的 prompt"：指令 + 该页当前 HTML + 设计令牌 + 输出规范）。' +
-        '默认取走后清空队列。按里面的「输出要求」改写对应页，再用 slidesmith_apply_patch 回写。',
+        '立即取走队列里的请求，不阻塞。一次性检查用它，循环用 wait。返回的请求都是用户主动提交的：照做，别判 stale 拒绝。',
       inputSchema: {
         drain: z.boolean().optional().describe('取走后是否清空队列（默认 true）'),
       },
@@ -140,13 +133,7 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     {
       title: '看当前 deck 有哪些页（页号 · data-id · 标题）',
       description:
-        '列出 Studio 里**当前载入的那份 deck** 的每一页：页号、data-id、标题、版式、字节数。' +
-        '\n\n**改任何一页之前先调它。** 理由：`data-id` 是 Studio 导入时才生成的，' +
-        '磁盘上的 deck 文件里通常根本没有这个属性（editorial-slides 出的片子写的是 data-seg）。' +
-        '直接去读文件的话你拿不到任何合法的 id，而 slidesmith_apply_patch 正是靠 data-id 定位——' +
-        '结果就是补丁被拒（「补丁的 data-id 不匹配任何页」）。' +
-        '\n\nwithHtml 里点名页号或 data-id，就连整页 `<section>`（已补好 data-id）一起返回，' +
-        '直接在它上面改再 apply_patch 即可，不用读文件、也不会猜错结构。',
+        '当前 deck 的页目录（序号 · data-id · 标题 · 变体 · 字节）。**改任何页之前先调它拿 data-id**（磁盘上的文件通常没有 id，是 Studio 导入时生成的）；withHtml 点名的页会连整段 <section> 一起给。',
       inputSchema: {
         withHtml: z.array(z.string()).optional()
           .describe('要连整页 HTML 一起拿的页：data-id 或 1 开始的页号，如 ["3"] 或 ["s3","s4"]。不传只要目录。'),
@@ -167,21 +154,8 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     {
       title: '读 / 写手表提词（watch mode 的 __SM_CUES__）',
       description:
-        '演讲时 Apple Watch 上显示的**每页提词**。不带 set 调用 = 读现状（每页：页号 · 锚点 · 标题 · 现有提词 · 体检结论）；' +
-        '带 set 调用 = 写进去。\n\n' +
-        '**为什么不能用 slidesmith_apply_patch 写**：提词表存在 `window.__SM_CUES__`，它落在 `#deck` 之外，' +
-        'apply_patch 只按 data-id 替换 `#deck` 里的 `<section>`，够不着它。\n\n' +
-        '**键必须用本工具返回的 anchor**，别自己造，也别拿 slidesmith_outline 的 id 顶替——'
-        + '有些 deck 上那两个对不上（outline 在服务端复算，deck 没写 window.SLIDE_MAP 时它只能退到 s1/s2/s3），'
-        + '拿错了整批会被判成「不认识的锚点」。\n\n' +
-        '**⭐ 硬约束（Apple Watch Ultra 3 / Series 11 实测得出，别放宽）**：\n' +
-        '· 每页 **1–5 条**（表盘放得下 5 行）\n' +
-        '· 每条 **≤10 个汉字**（英文 ≤16 字符）—— 超了就折行，整句话上去等于显示讲稿全文\n' +
-        '· 必须是**内容锚点**（「无缝嵌入」「感官剥夺」），不能是**结构标签**（「第一部分」「目录」）—— 后者占满一屏却帮不上忙\n' +
-        '· **不得与 slide 标题重复** —— 手表顶部已经在显示「5/45 · 标题」了\n' +
-        '· **每页都要有**，缺页比没这功能更让人慌\n\n' +
-        '默认 **只填空页、不覆盖已有的**（用户可能已经在 Studio 提词面板里手调过）；确实要重写就传 replace=true。' +
-        '写完 Studio 会弹提示让用户逐页过一遍，面板上还留着一个「撤销」。',
+        'Apple Watch 提词表（window.__SM_CUES__）的读 / 写；enableWatchMode 给没有提词表的 deck 装上。它在 #deck 之外，apply_patch 够不着。' +
+        '每条 ≤10 个汉字、是内容锚点不是结构标签；全部约束见 AGENTS.md §4d。',
       inputSchema: {
         set: z.record(z.array(z.string())).optional()
           .describe('要写入的提词表：{ "锚点": ["短语", …] }，如 {"s1-boom":["无缝嵌入"]}。不传 = 只读。'),
@@ -246,16 +220,8 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     {
       title: '读 / 写 deck 内嵌的讲稿（按锚点分块）',
       description:
-        '一体版 deck 把整份讲稿 base64 嵌在 `window.__TXB64__` 里。不带 set 调用 = 读（每页：锚点 · 标题 · 字数 · 用户的批注；' +
-        '`anchors` 里点名的块才连整块 HTML 一起给）；带 set 调用 = 把改写好的块写回。\n\n' +
-        '**为什么不能用 slidesmith_apply_patch 写**：讲稿也在 `#deck` 之外，apply_patch 够不着。\n\n' +
-        '**改写时不许破的**（Studio 会验，破了整块拒收）：\n' +
-        '1. `<h3 … id="锚点">` 必须原样留着、唯一、且是这一块的**第一个顶层元素** —— 锚点是副屏同步和手表提词的键。\n' +
-        '2. 讲法块 `<p class="cue">` / 金句块 `<div class="golden">` / 数据块 `<div class="data">` 该在的还在，除非用户明说要删。\n' +
-        '3. `<strong>` 是手表提词的种子，别整段加粗、也别全去掉。\n' +
-        '4. 只动被批注的那几块，别顺手重写整份讲稿。\n\n' +
-        '典型用法：用户在 Studio 讲稿视图里划一段、写一条批注 → 批注随「AI 待办」发过来（含原文块）→ ' +
-        '你按批注改写整块 → 用本工具 set 写回 → 用户在 Studio 里看到结果，不满意可「撤销 Claude 的改写」。',
+        '一体版 deck 内嵌讲稿（window.__TXB64__）按锚点读 / 写。不带 set＝读目录（点名 anchors 才给整块）；带 set＝写回。它在 #deck 之外，apply_patch 够不着。' +
+        '写回约束（<h3 id=锚点> 原样、cue/golden/data 块保留、<strong> 别整段加、只动被批注的块）见 AGENTS.md §4d —— Studio 会验，破了整块拒收。',
       inputSchema: {
         anchors: z.array(z.string()).optional()
           .describe('要连整块 HTML 一起拿的锚点（或 1 开始的页号）。不传只要目录。'),
@@ -296,9 +262,8 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     {
       title: '把改好的页回写到 Studio',
       description:
-        '把你改好的页推回 Studio 当场生效。sections 是一个或多个 <section class="slide" data-id="…">…</section>，' +
-        'Studio 按 data-id 精准替换对应页，其它页不动。若当前没有 Studio 连接，会缓存，等下次连接自动应用。' +
-        'preview=true 时作为「提议」呈现：Studio 顶栏弹「AI 提议 · 保留/还原」，让用户先看再定（对应请求的 confirm 模式）。',
+        '把改好的 <section class="slide" data-id=…> 推回 Studio，按 data-id 当场替换，其它页不动；没连上会缓存到下次连接。' +
+        'preview=true 作为「提议」呈现（请求带 confirm 时必用）。**summary 一句话说明改了什么**，Studio 会显示给用户。',
       inputSchema: {
         sections: z.string().describe('一个或多个 <section ... data-id="…"> 整页 HTML（可含 ```html 围栏）。务必保留原 data-id。'),
         preview: z.boolean().optional().describe('是否作为「改前先问我」的提议预览呈现（默认 false=直接生效）。'),
@@ -314,7 +279,8 @@ export async function startMcp(opts: McpOptions = {}): Promise<void> {
     'slidesmith_status',
     {
       title: '查看桥接状态',
-      description: '查看本地桥接服务状态：Studio 是否连上、当前 deck、待处理请求数、桥接归谁所有。',
+      description:
+        '桥的状态：Studio 是否连上、当前 deck、待处理请求数、owner 是谁。',
       inputSchema: {},
     },
     async () => text({ ...(await bridge.status()), bridgeOwnedByThisSession: bridge.local }),

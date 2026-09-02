@@ -537,7 +537,10 @@ function download(name: string, content: string, mime: string): void {
 // handle (deck came from the bridge, or first save) it asks the user to pick the file
 // once and remembers it; browsers without the File System Access API get a download.
 async function saveHtmlInPlace(): Promise<void> {
-  const html = mode === 'html' ? await buildExportHtml() : renderDeckHtml(deck);
+  // 「保存」＝写回**源文件**，不嵌字体：源文件要精简、⌘S 是高频动作要快、而且内容还在改
+  // （嵌进去的是子集，新打的字会缺字形）。要拿去别的电脑放的**交付件**走「另存为 / 导出」，
+  // 那里才按 ⚙ 的勾选嵌字体。
+  const html = mode === 'html' ? exportHtmlDeck() : renderDeckHtml(deck);
   // 0) 连着桥就让桥写回原文件。
   //
   // **这一条以前没有，后果是 app 里的「保存」从来没真正保存过。** 下面那两条走的都是
@@ -2762,6 +2765,43 @@ function aiImageGenSpec(): string {
 - codex 示例：\`codex exec --skip-git-repo-check -C <dir> -s workspace-write -c sandbox_workspace_write.network_access=true "Generate <prompt>. Save as out.png."\`（按张计 codex 额度）
 `;
 }
+// ---- 已有图片在请求里换成占位符 ----
+// 请求体带的是「该页当前 HTML」。暂存盘的新图早就是占位符了，可页里**已经内联的** base64 图
+// 一直是原样带走的：一页 180 KB 的图 ≈ 6 万 token，AI 改完还得原样吐回来，双倍。
+// 而 AI 本来就看不见 base64（它只是一串字符），剥掉毫无损失。
+// 做法：发送前把 data:image URL 换成 sm-img://<n>，Studio 侧留一张表；回写时按表还原。
+// 表跨请求累积（AI 回写的页可能引用上一次请求里的 id），只随页面刷新清空。
+const imgVault = new Map<string, string>();
+let imgVaultSeq = 0;
+function vaultPut(dataUrl: string): string {
+  for (const [k, v] of imgVault) if (v === dataUrl) return k; // 同一张图多处引用 → 同一个 id
+  const k = `sm-img://${++imgVaultSeq}`; imgVault.set(k, dataUrl); return k;
+}
+/** 把一段 HTML 里的 data:image 换成占位符（src / href / xlink:href / CSS url() 都管）。 */
+function slimHtmlForAi(html: string): string {
+  return html
+    .replace(/((?:src|href|xlink:href)=["'])(data:image\/[^"']+)(["'])/g, (_m, a, d, b) => a + vaultPut(d) + b)
+    .replace(/url\((['"]?)(data:image\/[^)'"]+)\1\)/g, (_m, q, d) => `url(${q}${vaultPut(d)}${q})`);
+}
+/** AI 回写的页：把占位符还原成真实图片。表里没有的占位符（AI 手误）删掉 src，别留一个坏链接。 */
+function restoreVaultImages(root: Element): number {
+  let n = 0;
+  root.querySelectorAll('[src^="sm-img://"],[href^="sm-img://"]').forEach((el) => {
+    for (const attr of ['src', 'href', 'xlink:href']) {
+      const v = el.getAttribute(attr); if (!v || !v.startsWith('sm-img://')) continue;
+      const real = imgVault.get(v);
+      if (real) { el.setAttribute(attr, real); n++; } else el.removeAttribute(attr);
+    }
+  });
+  root.querySelectorAll('[style*="sm-img://"]').forEach((el) => {
+    const st = el.getAttribute('style') || '';
+    el.setAttribute('style', st.replace(/sm-img:\/\/\d+/g, (k) => imgVault.get(k) || 'none'));
+    n++;
+  });
+  return n;
+}
+const aiImgVaultRule = '页里 `src="sm-img://N"` 的图片是**已有图片的占位符**（真图 Studio 会自动还原）：保留原样、可以移动或调大小，**别改它的 src、别删成空、别自己补 base64**。';
+
 // a per-page block: optional 修改要求 + optional 配图(矢量/照片) + optional 待插入图片 + current HTML
 function aiTaskBlock(s: HtmlSlide, i: number, o: { instr?: string; gen?: { type: 'vector' | 'chart' | 'photo'; hint: string }; trayImgs?: TrayImage[]; anns?: SlideAnn[] }): string {
   const trayImgs = o.trayImgs || [];
@@ -2776,7 +2816,9 @@ function aiTaskBlock(s: HtmlSlide, i: number, o: { instr?: string; gen?: { type:
   if (o.gen?.type === 'chart') { const h = o.gen.hint || '按本页内容选图型并作图'; b += h.includes('\n') ? `**图表（按以下数据/描述画内联 <svg> 图表）：**\n${FENCE}\n${h}\n${FENCE}\n` : `**图表（按数据/描述画内联 <svg> 图表）：** ${h}\n`; }
   if (o.gen?.type === 'photo') b += `**配图（照片级 · 用 codex 生成→存图片库→内联）：** ${o.gen.hint || '按本页内容生成一张合适的照片'}\n`;
   if (trayImgs.length) b += `**在本页插入这些图片（占位 <img data-img-id>，勿写 src/base64）：**\n${aiImageLines(trayImgs)}\n`;
-  b += `\n当前 HTML（在此基础上改写/插入/配图）：\n${FENCE}html\n${s.html}\n${FENCE}\n`;
+  const slim = slimHtmlForAi(s.html);
+  if (slim !== s.html) b += `（${aiImgVaultRule}）\n`;
+  b += `\n当前 HTML（在此基础上改写/插入/配图）：\n${FENCE}html\n${slim}\n${FENCE}\n`;
   return b;
 }
 // THE unified request: deck-ask + every page that has a 改字 / 配图(矢量·照片) / 待插入图片.
@@ -3367,6 +3409,14 @@ function exportHtmlDeck(): string {
 }
 // ---- offline-portable export: inline used Google fonts as subset @font-face data URIs ----
 function embedFontsChecked(): boolean { return !!($('#embedFonts') as HTMLInputElement | null)?.checked; }
+// 「嵌入字体」默认开：不嵌的导出件靠外链 Google Fonts，墙内打不开（6-29 那次黑屏的另一半）。
+// 子集化 + 只嵌用到的字重之后代价已经很小。用户改过就记住他的选择。
+function initEmbedFontsToggle(): void {
+  const ck = $('#embedFonts') as HTMLInputElement | null; if (!ck) return;
+  let saved: string | null = null; try { saved = localStorage.getItem('sm-embed-fonts'); } catch { /* noop */ }
+  ck.checked = saved === null ? true : saved === '1';
+  ck.addEventListener('change', () => { try { localStorage.setItem('sm-embed-fonts', ck.checked ? '1' : '0'); } catch { /* noop */ } });
+}
 // every character the deck actually shows → we only download those glyphs (CJK stays tiny)
 function deckChars(): string {
   const raw = htmlSlides.map((s) => s.html).join(' ').replace(/<[^>]+>/g, ' ').replace(/&[#a-z0-9]+;/gi, ' ');
@@ -3381,7 +3431,7 @@ function abToBase64(buf: ArrayBuffer): string {
   return btoa(bin);
 }
 // fetch with a hard timeout so an offline/slow embed fails fast instead of hanging
-async function fetchTimeout(url: string, ms = 15000): Promise<Response> {
+async function fetchTimeout(url: string, ms = 8000): Promise<Response> {
   const c = new AbortController(); const t = setTimeout(() => c.abort(), ms);
   try { return await fetch(url, { signal: c.signal }); } finally { clearTimeout(t); }
 }
@@ -3399,29 +3449,72 @@ async function inlineGoogleCss(cssUrl: string, chars: string): Promise<string> {
   for (const [orig, rep] of pairs) if (orig !== rep) out = out.split(orig).join(rep);
   return out;
 }
+// ---- 只嵌 deck 真正用到的字重 ----
+// 实测一份 44 页 deck 嵌了 3.9 MB 字体：Noto Sans SC 四个字重各 400 KB、Serif 三个字重各 260 KB，
+// 而正文只用到其中两三个。皮肤的 Google Fonts 链接是「一族全要」写死的，这里按预览里
+// **实际渲染出来**的（字族, 字重）过滤——从 iframe 的 computedStyle 读，不猜。
+function usedFontWeights(): Map<string, Set<string>> {
+  const used = new Map<string, Set<string>>();
+  try {
+    const doc = ($('#preview') as HTMLIFrameElement).contentDocument; if (!doc) return used;
+    const all = doc.querySelectorAll('#deck *, body > .topbar *');
+    for (const el of Array.from(all)) {
+      if (!(el as HTMLElement).textContent?.trim()) continue;
+      const cs = doc.defaultView!.getComputedStyle(el);
+      const fam = (cs.fontFamily.split(',')[0] || '').trim().replace(/^["']|["']$/g, '');
+      if (!fam) continue;
+      let w = cs.fontWeight; if (w === 'normal') w = '400'; else if (w === 'bold') w = '700';
+      if (!used.has(fam)) used.set(fam, new Set());
+      used.get(fam)!.add(w);
+    }
+  } catch { /* 跨域或还没渲染好：返回空表 = 不过滤，宁多勿缺 */ }
+  return used;
+}
+/** 把 css2 URL 里每个 family 的 wght 列表过滤到实际用到的；解析不了的原样放过。 */
+function trimGoogleCssUrl(cssUrl: string, used: Map<string, Set<string>>): string {
+  if (!used.size) return cssUrl;
+  return cssUrl.replace(/family=([^&]+)/g, (whole, spec: string) => {
+    const [famRaw, axes] = decodeURIComponent(spec.replace(/\+/g, ' ')).split(':');
+    const want = used.get(famRaw);
+    if (!want || !axes || !/wght@/.test(axes)) return whole;
+    const [axisNames, list] = axes.split('@');
+    const names = axisNames.split(',');
+    const wi = names.indexOf('wght'); if (wi < 0) return whole;
+    const kept = list.split(';').filter((tuple) => want.has(tuple.split(',')[wi]));
+    if (!kept.length) return whole; // 一个都没匹配上（比如可变字重）→ 别删，保持原样
+    return 'family=' + encodeURIComponent(famRaw).replace(/%20/g, '+') + ':' + axisNames + '@' + kept.join(';');
+  });
+}
 // rewrite an assembled deck so every Google font becomes a self-contained @font-face block
-async function embedFonts(html: string): Promise<string> {
+async function embedFonts(html: string, used: Map<string, Set<string>> = usedFontWeights()): Promise<string> {
   // gather Google Fonts CSS URLs from both <link> tags and @import rules
   const urls = new Set<string>();
   for (const m of html.matchAll(/<link[^>]+href="(https:\/\/fonts\.googleapis\.com\/css2[^"]+)"[^>]*>/g)) urls.add(m[1]);
   for (const m of html.matchAll(/@import\s+url\((['"]?)(https:\/\/fonts\.googleapis\.com\/css2[^'")]+)\1\)/g)) urls.add(m[2]);
-  if (!urls.size) return html;
+  if (!urls.size) return dedupeFontFaces(html);
   const chars = deckChars();
   // all font families resolved in parallel (each also parallelizes its woff2 downloads)
-  const faces = await Promise.all(Array.from(urls).map((u) => inlineGoogleCss(u, chars)));
+  const faces = await Promise.all(Array.from(urls).map((u) => inlineGoogleCss(trimGoogleCssUrl(u, used), chars)));
   const out = html
     .replace(/<link[^>]+fonts\.(googleapis|gstatic)\.com[^>]*>\s*/g, '') // drop remote links/preconnects
     .replace(/@import\s+url\((['"]?)https:\/\/fonts\.googleapis\.com\/css2[^'")]+\1\)\s*;?/g, '') // and @imports
     ;
-  return insertBeforeHeadEnd(out, '<style id="sm-embedded-fonts">\n' + faces.join('\n') + '\n</style>\n');
+  return dedupeFontFaces(insertBeforeHeadEnd(out, '<style id="sm-embedded-fonts">\n' + faces.join('\n') + '\n</style>\n'));
+}
+// 同一份 @font-face 出现两遍（导出过的 deck 再走一遍一体版缝合就会这样）——实测一份 deck 里
+// 白白多了 1.9 MB。按整块字面去重，一个字节不同就当两块。
+function dedupeFontFaces(html: string): string {
+  const seen = new Set<string>();
+  return html.replace(/@font-face\s*\{[^}]*\}/g, (blk) => { if (seen.has(blk)) return ''; seen.add(blk); return blk; });
 }
 // the bytes we save/download: assembled deck, optionally with fonts inlined for offline use
 async function buildExportHtml(): Promise<string> {
+  const used = usedFontWeights();     // 先量，再装配——装配时预览若重绘，量到的就是回退字体
   const html = exportHtmlDeck();
   if (!embedFontsChecked()) return html;
   setBusy('正在下载并嵌入字体子集，首次稍慢…');
-  try { const out = await embedFonts(html); setBusy(null); toast('已嵌入字体，离线可用'); return out; }
-  catch (e) { setBusy(null); toast('嵌入字体失败（需联网下载），已改为不嵌入字体导出：' + (e as Error).message, true); return html; }
+  try { const out = await embedFonts(html, used); setBusy(null); toast('已嵌入字体，离线可用'); return out; }
+  catch (e) { setBusy(null); toast('嵌入字体失败（要能连上 Google Fonts），这次按不嵌字体导出。不想每次等可在 ⚙ 里关掉「嵌入字体」：' + (e as Error).message, true); return html; }
 }
 
 // ======================= N3: Submit-to-AI single-slide loop =======================
@@ -3611,7 +3704,7 @@ function applyAiPatch(text: string, preview = false): void {
     let id = sec.getAttribute('data-id');
     let idx = id ? htmlSlides.findIndex((s) => s.id === id) : -1;
     if (idx < 0 && secs.length === 1) { idx = currentHtmlSlideIndex(); id = htmlSlides[idx]?.id || null; } // lenient fallback
-    if (idx >= 0 && htmlSlides[idx]) { if (id) { sec.setAttribute('data-id', id); if (aiBefore[id] === undefined) aiBefore[id] = htmlSlides[idx].html; aiApplied.add(id); aiSent.delete(id); ids.push(id); if (preview) proposed.add(id); } imgs += backfillTrayImages(sec); htmlSlides[idx].html = sec.outerHTML; applied++; if (firstIdx < 0) firstIdx = idx; }
+    if (idx >= 0 && htmlSlides[idx]) { if (id) { sec.setAttribute('data-id', id); if (aiBefore[id] === undefined) aiBefore[id] = htmlSlides[idx].html; aiApplied.add(id); aiSent.delete(id); ids.push(id); if (preview) proposed.add(id); } imgs += backfillTrayImages(sec); restoreVaultImages(sec); htmlSlides[idx].html = sec.outerHTML; applied++; if (firstIdx < 0) firstIdx = idx; }
   });
   if (!applied) { toast('补丁的 data-id 不匹配任何页', true); return; }
   // 改过的那几页的元素批注算办完了，从待办里撤掉（和「改字」→ ✓ 已改 同一个道理）
@@ -4565,7 +4658,7 @@ function buildUI(): void {
     <button id="expOpts" class="iconbtn" aria-expanded="false" title="导出选项">⚙</button>
     <div class="expmenu" id="expMenu">
       <div class="expmenu-t">导出 / 保存选项</div>
-      <label class="embedck"><input id="embedFonts" type="checkbox"> <span>嵌入字体<span class="ck-sub">把用到的字体子集写进 HTML，换台电脑或离线也不走样，文件略大</span></span></label>
+      <label class="embedck"><input id="embedFonts" type="checkbox"> <span>嵌入字体<span class="ck-sub">「另存为 / 导出」时把用到的字（只嵌用到的字重）写进 HTML，换台电脑、没网、墙内都不走样。默认开；「保存」写回源文件时不嵌</span></span></label>
       <label class="embedck"><input id="embedRemote" type="checkbox"> <span>嵌入手机遥控<span class="ck-sub">导出的 HTML 里多一个「📱 手机遥控」按钮，扫码即可用手机翻页</span></span></label>
       <label class="embedck" id="newRoomWrap" style="display:none"><input id="newRoom" type="checkbox"> <span>换新房间号<span class="ck-sub">默认沿用这份 deck 原有的房间号，手机不用重新扫码；勾上才铸新号，旧二维码作废</span></span></label>
       <div id="relayWrap" class="prcfg" style="display:none">
@@ -4577,7 +4670,7 @@ function buildUI(): void {
     </div>
     <button id="expPdf">导出 PDF</button>
     <button id="expHtml" title="另存为：下载一份新的 HTML 副本，不覆盖原文件">另存为</button>
-    <button id="saveHtml" class="primary" title="保存：覆盖导入的源 HTML；首次保存会让你选一次文件，之后一键覆盖">保存</button>
+    <button id="saveHtml" class="primary" title="保存（⌘S）：写回源 HTML，不嵌字体，快。要拿去别的电脑放映用「另存为」（按 ⚙ 里的勾选嵌字体 / 遥控）">保存</button>
   </span>
   <input id="file" type="file" accept=".html,.htm" style="display:none">
 </div>
@@ -4980,6 +5073,7 @@ function buildUI(): void {
   $('#undoBtn').addEventListener('click', undo);
   $('#redoBtn').addEventListener('click', redo);
   $('#restoreBar'); // (handlers attached in maybeOfferDraftRestore)
+  initEmbedFontsToggle();
   document.addEventListener('keydown', (e) => {
     const meta = e.metaKey || e.ctrlKey;
     const k = e.key.toLowerCase();
@@ -5306,6 +5400,8 @@ function buildUI(): void {
   (window as unknown as { __SM_EXPORT_HTML__: () => string }).__SM_EXPORT_HTML__ = () =>
     mode === 'html' ? exportHtmlDeck() : renderDeckHtml(deck);
   (window as unknown as { __SM_BUILD_EXPORT__: () => Promise<string> }).__SM_BUILD_EXPORT__ = buildExportHtml;
+  (window as unknown as { __SM_DEDUPE_FONTS__: typeof dedupeFontFaces }).__SM_DEDUPE_FONTS__ = dedupeFontFaces;
+  (window as unknown as { __SM_USED_FONTS__: () => Record<string, string[]> }).__SM_USED_FONTS__ = () => Object.fromEntries(Array.from(usedFontWeights(), ([k, v]) => [k, Array.from(v)]));
   (window as unknown as { __SM_SAVE_HTML__: typeof saveHtmlInPlace }).__SM_SAVE_HTML__ = saveHtmlInPlace;
   (window as unknown as { __SM_HAS_FILE_HANDLE__: () => boolean }).__SM_HAS_FILE_HANDLE__ = () => !!fileHandle;
   (window as unknown as { __SM_SET_INSTR__: (id: string, t: string) => void }).__SM_SET_INSTR__ = (id, t) => {

@@ -1,19 +1,21 @@
 ---
 name: transcripts_html
 description: |
-  做"杂志级（editorial）"风格的 HTML 讲稿 / 备课稿 · 中文 · 纸色底 + 朱红强调 + 宋体大标题 · 与 editorial-slides 同一套视觉语言。
-  单文件、可移植、离线可用；自带"演讲者模式"钩子——每张 slide 对应讲稿一个唯一锚点，副屏翻页时整块高亮、Keywords 提词。
-  内置三种讲师专用块：cue（讲法提示）/ golden（金句）/ data（数据）；以及段封面、TOC、原文引述。
-  当用户说 "写讲稿 / 做讲稿 / 把讲稿做成 HTML / 备课稿 / 讲师稿 / transcript / 讲演稿 html / 给这套 slides 配讲稿" 时启用。
-  这个 skill 负责"从内容生成成品讲稿 HTML"；要做 slides 是 editorial-slides；要把 slides 和讲稿接成双屏同步是 slides-presenter-mode。
+  给 slides 配「杂志级」HTML 讲稿 / 备课稿：纸色 + 朱红 + 宋体大标题，与 editorial-slides 同一套视觉；单文件离线；每页一个锚点，副屏翻页整块高亮、Keywords 提词；讲师专用块 cue（讲法）/ golden（金句）/ data（数据）。
+  当用户说「写讲稿 / 做讲稿 / 备课稿 / 讲师稿 / transcript / 讲演稿 html / 给这套 slides 配讲稿」时启用。
+  要做 slides 是 editorial-slides；要把 slides 和讲稿接成双屏同步是 slides-presenter-mode。
 metadata:
   version: 0.1.0
   status: dogfood-validated
-  dogfood: 国企改革深化与现代企业制度建设 · 讲稿约 1.65 万字 · 49 锚点（2026-06-03）· 见 CHANGELOG
   pairs_with: [editorial-slides, slides-presenter-mode]
 ---
 
 # transcripts_html · 杂志级 HTML 讲稿
+
+> **速览**（原 frontmatter 元数据，按需查阅）
+>
+> - dogfood: 国企改革深化与现代企业制度建设 · 讲稿约 1.65 万字 · 49 锚点（2026-06-03）· 见 CHANGELOG
+
 
 > 从 `CoursesDevelopment/国企改革深化课程/讲稿.html`（49 锚点 · 约 1.65 万字 · dogfood 验证）抽象出来的可复用讲稿风格系统。
 > 一句话：**用纯 HTML 做出"出版物级"的讲稿——纸色版面、宋体标题、朱红点睛、讲师专用块（讲法/金句/数据），并且出厂即带演讲者模式锚点与监听**。

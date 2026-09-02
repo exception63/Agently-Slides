@@ -1,25 +1,26 @@
 ---
 name: live
 description: |
-  给 HTML slides 加「现场互动」，并接到常驻服务 Slidesmith Live（https://live.zhouliying.com）上统一管理。
-  一次装配 = 往 deck 里插一页互动页 + 烘一个房间号；学生扫码参与，内容实时上大屏，讲者用 iPad 主持，课后在管理台按场次导出。
-  现在能装的玩法：**qa 扫码匿名提问 · 实时上墙**（已现场实战）。投票 / 词云 / 小测 / 抢答 / 评分 / 分组答案是菜单上还没做的，做法见 references/new-block.md。
-  数据模型是「课 → 场次 → 条目」：一门课一个房间号（烘一次、二维码永不变），**一个自然日一场**（同一天里隔多久都算一场，跨天才分），事后能按场次导出 CSV / Markdown 做分析。不存任何设备标识。
-  **管理台的每一件事 AI 都能直接做**：`smlive` CLI 走令牌版接口 `/api/agent/*`，建/改名/删房间 · 看在线 · 列场次 · 读提问 · 导出 CSV/MD · 远程清屏 · 关/开提问。用户只当指挥者。
-  当用户说 "加个扫码提问 / 现场互动 / 课堂互动 / 学生扫码 / 提问上墙 / 弹幕上屏 / 现场投票 / 词云 / 随堂小测 / 抢答 / 匿名反馈 / 二维码提问 / live / 管理台 / 我的互动服务 / 这门课要互动 / 把提问导出来" 时启用。
-  只负责「互动」；要手机翻页遥控是 phone-remote skill，要副屏讲稿同步是 slides-presenter-mode skill，要从零做 slides 是 editorial-slides skill。
+  给 HTML slides 加现场互动，并接到常驻服务 Slidesmith Live（live.zhouliying.com）统一管理：一次装配＝插一页互动页 + 烘一个房间号；学生扫码参与、实时上大屏、讲者用 iPad 主持、课后按场次（一个自然日一场）导出 CSV / Markdown。现有玩法：qa 扫码匿名提问；投票 / 词云 / 小测等未建，做法见 references/new-block.md。
+  **管理台的每件事 AI 都能用 smlive CLI 直接做**：建 / 改名 / 删房间 · 看在线 · 列场次 · 读提问 · 导出 · 清屏 · 关 / 开提问。
+  当用户说「扫码提问 / 现场互动 / 课堂互动 / 提问上墙 / 弹幕上屏 / 投票 / 词云 / 小测 / 抢答 / 匿名反馈 / 管理台 / 把提问导出来 / 关掉提问」时启用。
+  手机翻页是 phone-remote，副屏讲稿是 slides-presenter-mode，从零做 slides 是 editorial-slides。
 metadata:
   version: 0.3.0
   status: dogfood-validated
   part_of: slidesmith
   service: https://live.zhouliying.com
-  blocks: [qa]
-  cli: scripts/smlive.mjs（令牌版管理接口 · 配置在 ~/.slidesmith/live.json 0600）
-  verify: node scripts/verify-live-inject.mjs（16/16 · 装配）+ node scripts/verify-live-agent.mjs（22/22 · 管理 CLI）—— 都自己起本地中转，不碰线上
-  dogfood_case: 企业管理硕士 2026 级培养方案宣讲 · 2026-08-28 · 31 页 academic deck + 扫码提问，三端联调 12/12
 ---
 
 # slidesmith:live · 把现场互动做进 slides
+
+> **速览**（原 frontmatter 元数据，按需查阅）
+>
+> - blocks: [qa]
+> - cli: scripts/smlive.mjs（令牌版管理接口 · 配置在 ~/.slidesmith/live.json 0600）
+> - verify: node scripts/verify-live-inject.mjs（16/16 · 装配）+ node scripts/verify-live-agent.mjs（22/22 · 管理 CLI）—— 都自己起本地中转，不碰线上
+> - dogfood_case: 企业管理硕士 2026 级培养方案宣讲 · 2026-08-28 · 31 页 academic deck + 扫码提问，三端联调 12/12
+
 
 > 一句话：**给 deck 装一个房间号和一页互动页，学生扫码参与，你在管理台看账。**
 > 底座（中转 + 管理台 + 账本 + 备份）已经常驻在新加坡那台机器上，**这个 skill 只管装配和交接**。
