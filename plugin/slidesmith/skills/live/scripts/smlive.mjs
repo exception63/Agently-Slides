@@ -15,6 +15,15 @@
  *   node smlive.mjs clear|close|open qygl2026
  *   node smlive.mjs rename qygl2026 --name "…"   /   rm qygl2026 --yes
  *
+ * 问卷房间（0.4.0）—— 和现场问答共用房间号空间，但走 /s/ 这条路，不实时：
+ *   node smlive.mjs survey set  <房间> --schema 问卷.json [--title "…"] [--code 访问码]
+ *   node smlive.mjs survey list <房间>                     谁交了、交了几题
+ *   node smlive.mjs survey export <房间> --fmt csv|json|md [--out 路径] [--done]
+ *   node smlive.mjs survey close|open <房间>                收卷 / 重新开放
+ *   node smlive.mjs survey urls <房间>   /   survey rm <房间> --yes
+ *   node smlive.mjs survey rm-answer <房间> <答卷id> --yes   删掉某一份（测试行 / 灌水行）
+ *   ⚠️ 位置参数写在 --flag 前面
+ *
  * 任何命令加 --json 出机器可读的原始结果。令牌在服务器 /etc/smrelay/token。
  */
 import { readFileSync, writeFileSync, mkdirSync, chmodSync, existsSync } from 'node:fs';
@@ -114,9 +123,14 @@ switch (cmd) {
     const r = await api('/api/agent/overview');
     out(r, () => {
       if (!r.rooms.length) return console.log('还没有房间。建一个：node smlive.mjs new <房间号> --name "课程名"');
-      console.log(w('房间号', 20) + w('名字', 30) + w('场次', 6) + w('累计', 6) + w('现在', 26) + '最近一场');
+      console.log(w('房间号', 20) + w('名字', 30) + w('场次', 6) + w('累计/份', 6) + w('现在', 26) + '最近一场 / 网址');
       console.log('─'.repeat(112));
       for (const m of r.rooms) {
+        if (m.kind === 'survey') {   // 问卷房间没有"场次/在线"这回事，硬套那几列只会读出错觉
+          console.log(w(m.id, 20) + w(m.name || '（没起名）', 30) + w('问卷', 6) + w(m.answers ?? 0, 6)
+            + w(m.surveyClosed ? '已收卷' : '开放填写中', 26) + '/s/' + m.id);
+          continue;
+        }
         const on = m.online
           ? `放映${m.online.deck} 学生${m.online.ask}${m.closed ? ' · 已关提问' : ''}`
           : (m.closed ? '没人连着 · 已关提问' : '—');   // 关闭状态是落盘的，房间不在线也照样成立
@@ -196,6 +210,84 @@ switch (cmd) {
                   close: `✓ ${room} 已关闭提问（学生再提交会被挡下）`,
                   open: `✓ ${room} 已重新开放提问` }[cmd]);
     break;
+  }
+
+  // ══════════ 问卷房间 ══════════
+  case 'survey': {
+    const act = pos[0] || 'help';
+    const room = pos[1] || '';
+    const { base } = cfg();
+    const needRoom = () => room || die(`要给房间号。例：node smlive.mjs survey ${act} zhenhua2026`);
+
+    if (act === 'set') {
+      const f = flag('schema') || die('要 --schema <问卷.json>');
+      let sch;
+      try { sch = JSON.parse(readFileSync(f, 'utf8')); }
+      catch (e) { die(`读不了 ${f}：${e.message}`); }
+      if (!sch.sections?.length) die('这个 JSON 里没有 sections，不像是问卷');
+      const r = await api('/api/agent/survey', { method: 'POST', body: {
+        action: 'set', id: needRoom(), title: flag('title', sch.title || ''), code: flag('code', ''), schema: sch } });
+      out(r, () => {
+        console.log(`✓ 问卷 ${r.id} 已就绪 · ${r.questions} 道题${r.code ? ' · 设了访问码' : ''}`);
+        console.log(`  发给填表人  ${base}/s/${r.id}`);
+        console.log(`  改题就再跑一次 set，链接和二维码都不用换`);
+      });
+      break;
+    }
+    if (act === 'list') {
+      const r = await api('/api/agent/survey/list?room=' + encodeURIComponent(needRoom()));
+      out(r, () => {
+        console.log(`${r.room}${r.title ? ' · ' + r.title : ''}${r.closed ? ' 〔已收卷〕' : ''}`);
+        console.log(`共 ${r.total} 份，其中已提交 ${r.done} 份` +
+          (Object.keys(r.byTrack).length ? '　·　' + Object.entries(r.byTrack).map(([k, v]) => `${k} ${v}`).join(' / ') : ''));
+        if (!r.answers.length) return console.log('还没有人填。把链接发出去：' + base + '/s/' + r.room);
+        console.log('─'.repeat(88));
+        console.log(w('分册', 8) + w('填表人', 26) + w('已答', 8) + w('状态', 12) + '最后更新');
+        for (const a of r.answers)
+          console.log(w(a.track, 8) + w(a.who, 26) + w(a.answered + ' 题', 8) + w(a.done ? '已提交' : '草稿', 12) + t(a.updated));
+      });
+      break;
+    }
+    if (act === 'export') {
+      const fmt = flag('fmt', 'csv');
+      const { buf } = await api(`/api/agent/survey/export?room=${encodeURIComponent(needRoom())}` +
+        `&fmt=${encodeURIComponent(fmt)}${has('done') ? '&done=1' : ''}`, { raw: true });
+      const ext = fmt === 'md' ? 'md' : fmt === 'json' ? 'json' : 'csv';
+      const dest = flag('out', join(homedir(), 'Desktop', `${room}-答卷.${ext}`));
+      writeFileSync(dest, buf);
+      console.log(`✓ ${room} 的答卷导出 → ${dest}（${buf.length} 字节${ext === 'csv' ? ' · 带 BOM，Excel 开中文不乱码' : ''}）`);
+      console.log(has('done') ? '  只含已提交的' : '  含草稿（CSV 里「是否提交」那一列分得出来）');
+      break;
+    }
+    if (act === 'close' || act === 'open') {
+      await api('/api/agent/survey', { method: 'POST', body: { action: act, id: needRoom() } });
+      console.log(act === 'close'
+        ? `✓ ${room} 已收卷（再有人打开链接会看到「已结束」，填不了了）`
+        : `✓ ${room} 已重新开放填写`);
+      break;
+    }
+    if (act === 'rm') {
+      needRoom();
+      if (!has('yes')) die(`删问卷会**连同所有答卷一起删掉，不可恢复**。先导一份再删：\n` +
+        `  node smlive.mjs survey export ${room} --fmt json\n  node smlive.mjs survey rm ${room} --yes`);
+      await api('/api/agent/survey', { method: 'POST', body: { action: 'delete', id: room } });
+      console.log(`✓ 问卷 ${room} 和它的全部答卷已删除`);
+      break;
+    }
+    if (act === 'rm-answer') {
+      needRoom();
+      const aid = pos[2] || die('要给答卷 id（survey list 里第一列没显示，加 --json 看 answers[].id）');
+      if (!has('yes')) die(`删掉这一份答卷不可恢复。确认请加 --yes：\n  node smlive.mjs survey rm-answer ${room} ${aid} --yes`);
+      const r = await api('/api/agent/survey', { method: 'POST', body: { action: 'rm-answer', id: room, answer: +aid } });
+      console.log(r.removed ? `✓ 已删掉第 ${aid} 份答卷` : `没找到第 ${aid} 份答卷，什么都没动`);
+      break;
+    }
+    if (act === 'urls') {
+      needRoom();
+      console.log(`房间号     ${room}\n发给填表人  ${base}/s/${room}\n管理台     ${base}/`);
+      break;
+    }
+    die('survey 后面要跟 set / list / export / close / open / rm / rm-answer / urls');
   }
 
   case 'urls': {

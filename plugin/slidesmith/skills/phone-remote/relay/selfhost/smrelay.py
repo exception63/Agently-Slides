@@ -19,6 +19,8 @@ WebSocket 服务端握手 + 帧解析总共两百行，不值得为它引入依�
   GET /health              存活探测
   GET /r/<room>            遥控 + 讲稿 + 问答主持页
   GET /q/<room>            学生提问页
+  GET /s/<room>            问卷页（0.4.0）—— 纯 HTTP，不走 WebSocket
+  *   /api/survey/<...>    问卷的公开接口（填表人用，无认证；门是房间号 + 可选访问码）
   GET /ws?room=&role=      WebSocket
   *   /api/admin/<...>     管理台接口 —— 门在 Caddy（forward_auth → msauth）
   *   /api/agent/<...>     同一批接口的**令牌版**，给 AI / 脚本用（smlive CLI）
@@ -38,10 +40,11 @@ ROOM_RE = re.compile(r"^[A-Za-z0-9_-]{4,64}$")
 MAX_LEN, MAX_KEEP, MIN_GAP = 200, 300, 4.0     # 单条字数 / 留存条数 / 同设备提交间隔（秒）
 MAX_AUTH_FAIL, AUTH_COOLDOWN = 6, 60.0         # 密码连错几次 / 冷却多少秒
 MAX_ROOMS = 200
+MAX_PAYLOAD, MAX_ANSWERS = 1 << 18, 2000   # 单份答卷字节上限 / 单个问卷答卷份数上限
 SESSION_GAP = 30 * 60          # 房间空这么久就从内存里清出去（**不再用来分场**，分场看自然日）
 DB = DATA / "live.db"
 TOKEN_FILE = pathlib.Path(os.environ.get("SMRELAY_TOKEN_FILE", "/etc/smrelay/token"))
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 # ═══════════════════ 存储：一个 SQLite 文件 ═══════════════════
@@ -66,6 +69,21 @@ CREATE TABLE IF NOT EXISTS item(
   FOREIGN KEY(session) REFERENCES session(id));
 CREATE INDEX IF NOT EXISTS ix_session_room ON session(room, started DESC);
 CREATE INDEX IF NOT EXISTS ix_item_session ON item(session, ts);
+
+-- 问卷房间（0.4.0 新增）。和现场问答共用 room 表，但走完全独立的两张表和
+-- 独立的 HTTP 路径 —— 问卷不是实时的，硬塞进 WebSocket 那条路只会两边都别扭：
+-- 答卷动辄几 KB（qa 单条上限 200 字），一个人只交一次（qa 是连续多条），
+-- 而且要能改能续填（qa 是只追加）。所以另起两张表，一行 qa 的代码都不动。
+CREATE TABLE IF NOT EXISTS survey(
+  room TEXT PRIMARY KEY, title TEXT NOT NULL DEFAULT '',
+  schema TEXT NOT NULL, code TEXT NOT NULL DEFAULT '',
+  closed INT NOT NULL DEFAULT 0, updated INT NOT NULL);
+CREATE TABLE IF NOT EXISTS answer(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, room TEXT NOT NULL,
+  rid TEXT NOT NULL, track TEXT NOT NULL DEFAULT '',
+  started INT, updated INT NOT NULL, done INT NOT NULL DEFAULT 0,
+  payload TEXT NOT NULL);
+CREATE UNIQUE INDEX IF NOT EXISTS ix_answer_rid ON answer(room, rid);
 """
 _db = None
 
@@ -549,6 +567,108 @@ def csv_escape(v):
     v = "" if v is None else str(v)
     return '"' + v.replace('"', '""') + '"' if any(c in v for c in ',"\n\r') else v
 
+# ═══════════════════ 问卷房间（0.4.0）═══════════════════
+# 和现场问答的关系：**共用房间号空间，其余全部分开**。
+#   /q/<房间>  扫码提问（WebSocket，实时上墙）
+#   /s/<房间>  填问卷  （纯 HTTP，不实时）
+# 一个房间号只当一种用：建问卷房间时会占掉这个号，qa 那边照旧看不见它。
+#
+# 为什么问卷不走 WebSocket：一份答卷几 KB（qa 单条限 200 字）、一个人只交一次
+# 且要能回来改（qa 是只追加）、填到一半要能存草稿。硬套 qa 的通道，两边都残废。
+#
+# 这条路径**不要密码**：填问卷的是外单位的人，不可能给他们 MySpace 的密码。
+# 门就是房间号本身（猜不到），需要更严就给问卷设一个访问码（code）。
+RID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+
+
+def survey_row(rid):
+    return q1("SELECT * FROM survey WHERE room=?", rid)
+
+
+def survey_api(path, qs, body):
+    """公开接口：填表人用。没有任何认证，所以每一个入口都要自己把住。"""
+    now = int(time.time())
+
+    if path == "/api/survey/meta":
+        rid = (qs.get("room") or [""])[0]
+        if not ROOM_RE.match(rid or ""):
+            return {"ok": False, "error": "房间号不对"}
+        r = survey_row(rid)
+        if not r:
+            return {"ok": False, "error": "没有这份问卷"}
+        out = {"ok": True, "room": rid, "title": r["title"],
+               "closed": bool(r["closed"]), "needCode": bool(r["code"])}
+        if r["code"] and (qs.get("code") or [""])[0] != r["code"]:
+            out["locked"] = True          # 题目本身也不给，访问码才是门
+            return out
+        out["locked"] = False
+        try:
+            out["schema"] = json.loads(r["schema"])
+        except Exception:
+            return {"ok": False, "error": "问卷内容坏了，联系发问卷的人"}
+        return out
+
+    if path == "/api/survey/save" and body is not None:
+        rid = str(body.get("room") or "")
+        r = survey_row(rid) if ROOM_RE.match(rid) else None
+        if not r:
+            return {"ok": False, "error": "没有这份问卷"}
+        if r["code"] and str(body.get("code") or "") != r["code"]:
+            return {"ok": False, "error": "访问码不对"}
+        if r["closed"]:
+            return {"ok": False, "error": "这份问卷已经收卷了"}
+        aid = str(body.get("rid") or "")
+        if not RID_RE.match(aid):
+            return {"ok": False, "error": "答卷编号不对"}
+        payload = body.get("payload")
+        if not isinstance(payload, dict):
+            return {"ok": False, "error": "答卷格式不对"}
+        blob = json.dumps(payload, ensure_ascii=False)
+        if len(blob.encode("utf-8")) > MAX_PAYLOAD:
+            return {"ok": False, "error": "答卷太大了"}
+        track = str(body.get("track") or "")[:16]
+        done = 1 if body.get("done") else 0
+        old = q1("SELECT id,started FROM answer WHERE room=? AND rid=?", rid, aid)
+        if old:
+            ex("UPDATE answer SET track=?,updated=?,done=?,payload=? WHERE id=?",
+               track, now, done, blob, old["id"])
+        else:
+            if q1("SELECT COUNT(*) c FROM answer WHERE room=?", rid)["c"] >= MAX_ANSWERS:
+                return {"ok": False, "error": "这份问卷的答卷数已达上限"}
+            ex("INSERT INTO answer(room,rid,track,started,updated,done,payload) VALUES(?,?,?,?,?,?,?)",
+               rid, aid, track, now, now, done, blob)
+        if done:
+            log("问卷交卷", rid, track)
+        return {"ok": True, "saved": now, "done": bool(done)}
+
+    return {"ok": False, "error": "未知接口"}
+
+
+# ── 导出：把答卷摊平成表 ──────────────────────────────────────
+# 矩阵题一行一列（`题号::行名`），多选题用「；」连接。
+# 列的顺序跟着问卷本身走，不跟着答卷走 —— 不然谁先交卷谁决定列序，两次导出对不上。
+def survey_columns(schema):
+    cols = []
+    for sec_ in schema.get("sections", []):
+        for qq in sec_.get("questions", []):
+            if qq.get("type") == "matrix":
+                for rw in qq.get("rows", []):
+                    cols.append(("%s::%s" % (qq["id"], rw), "%s·%s" % (qq["id"], rw)))
+            else:
+                cols.append((qq["id"], "%s %s" % (qq["id"], qq.get("title", ""))))
+    return cols
+
+
+def flat(payload, key):
+    qid, _, row = key.partition("::")
+    v = payload.get(qid)
+    if row:
+        v = v.get(row) if isinstance(v, dict) else None
+    if isinstance(v, list):
+        return "；".join(str(x) for x in v)
+    return "" if v is None else str(v)
+
+
 def admin_api(path, qs, body):
     now = int(time.time())
 
@@ -566,8 +686,13 @@ def admin_api(path, qs, body):
             ns = q1("SELECT COUNT(*) c FROM session WHERE room=?", r["id"])["c"]
             wall_n, closed = ((len(live.questions), bool(live.closed_qa)) if live
                               else state_on_disk(r["id"]))
+            sv = survey_row(r["id"])
             rooms.append({
                 "id": r["id"], "name": r["name"], "created": r["created"],
+                "kind": "survey" if sv else "qa",
+                "answers": (q1("SELECT COUNT(*) c FROM answer WHERE room=? AND done=1",
+                               r["id"])["c"] if sv else None),
+                "surveyClosed": (bool(sv["closed"]) if sv else None),
                 "sessions": ns, "items": n,
                 "online": {"deck": len(live.socks["deck"]) if live else 0,
                            "remote": len(live.socks["remote"]) if live else 0,
@@ -659,6 +784,126 @@ def admin_api(path, qs, body):
                                       "是" if r["hidden"] else "否")
         return ("text/csv; charset=utf-8", out.encode("utf-8"))
 
+    # ── 问卷（0.4.0）──────────────────────────────────────────
+    if path == "/api/admin/survey" and body is not None:
+        act = str(body.get("action") or "")
+        rid = str(body.get("id") or body.get("room") or "").strip()
+        if not ROOM_RE.match(rid):
+            return {"ok": False, "error": "房间号只能是 4–64 位字母数字和 - _"}
+        if act == "set":
+            sch = body.get("schema")
+            if not isinstance(sch, dict) or not sch.get("sections"):
+                return {"ok": False, "error": "问卷内容必须是带 sections 的对象"}
+            title = str(body.get("title") or sch.get("title") or "")
+            code = str(body.get("code") or "")
+            ensure_room(rid, title)      # 顺手在房间表里登记，管理台看得到
+            if survey_row(rid):
+                ex("UPDATE survey SET title=?,schema=?,code=?,updated=? WHERE room=?",
+                   title, json.dumps(sch, ensure_ascii=False), code, now, rid)
+            else:
+                ex("INSERT INTO survey(room,title,schema,code,closed,updated) VALUES(?,?,?,?,0,?)",
+                   rid, title, json.dumps(sch, ensure_ascii=False), code, now)
+            nq = sum(len(x.get("questions") or []) for x in sch.get("sections") or [])
+            return {"ok": True, "id": rid, "questions": nq, "code": bool(code)}
+        r = survey_row(rid)
+        if not r:
+            return {"ok": False, "error": "没有这份问卷"}
+        if act in ("close", "open"):
+            ex("UPDATE survey SET closed=?,updated=? WHERE room=?", 1 if act == "close" else 0, now, rid)
+            return {"ok": True, "closed": act == "close"}
+        if act == "rm-answer":
+            # 测试时留下的行、明显灌水的行，总得能单独摘掉，
+            # 否则唯一的清理手段就是把整份问卷连同真答卷一起删了。
+            aid = int(body.get("answer") or 0)
+            c = ex("DELETE FROM answer WHERE room=? AND id=?", rid, aid)
+            return {"ok": True, "removed": c.rowcount}
+        if act == "delete":
+            # 和删问答房间一个规矩：连答卷一起删、不可恢复，所以 CLI 那头要显式 --yes
+            ex("DELETE FROM answer WHERE room=?", rid)
+            ex("DELETE FROM survey WHERE room=?", rid)
+            ex("DELETE FROM room WHERE id=?", rid)
+            return {"ok": True}
+        return {"ok": False, "error": "不认识的操作"}
+
+    if path == "/api/admin/survey/list":
+        rid = (qs.get("room") or [""])[0]
+        r = survey_row(rid)
+        if not r:
+            return {"ok": False, "error": "没有这份问卷"}
+        rows = qa_("SELECT id,rid,track,started,updated,done,payload FROM answer WHERE room=? ORDER BY id", rid)
+        try:
+            sch = json.loads(r["schema"])
+        except Exception:
+            sch = {"sections": []}
+        who = {}
+        for x in (sch.get("sections") or []):
+            for qq in (x.get("questions") or []):
+                if qq.get("id") in ("R1", "R2", "R3", "R4"):
+                    who[qq["id"]] = True
+        out, by_track = [], {}
+        for x in rows:
+            try:
+                pl = json.loads(x["payload"])
+            except Exception:
+                pl = {}
+            n_ans = sum(1 for v in pl.values() if v not in ("", None, [], {}))
+            t = x["track"] or "?"
+            by_track[t] = by_track.get(t, 0) + (1 if x["done"] else 0)
+            out.append({"id": x["id"], "rid": x["rid"], "track": t,
+                        "started": x["started"], "updated": x["updated"],
+                        "done": bool(x["done"]), "answered": n_ans,
+                        "who": " · ".join(str(pl.get(k)) for k in ("R2", "R3", "R1")
+                                          if pl.get(k)) or "（未留名）"})
+        return {"ok": True, "room": rid, "title": r["title"], "closed": bool(r["closed"]),
+                "total": len(out), "done": sum(1 for x in out if x["done"]),
+                "byTrack": by_track, "answers": out}
+
+    if path == "/api/admin/survey/export":
+        rid = (qs.get("room") or [""])[0]
+        fmt = (qs.get("fmt") or ["csv"])[0]
+        only_done = (qs.get("done") or ["0"])[0] == "1"
+        r = survey_row(rid)
+        if not r:
+            return {"ok": False, "error": "没有这份问卷"}
+        sch = json.loads(r["schema"])
+        rows = qa_("SELECT * FROM answer WHERE room=?%s ORDER BY id"
+                   % (" AND done=1" if only_done else ""), rid)
+        recs = []
+        for x in rows:
+            try:
+                recs.append((x, json.loads(x["payload"])))
+            except Exception:
+                pass
+        tf = lambda t: time.strftime("%Y-%m-%d %H:%M", time.localtime(int(t or 0)))
+        if fmt == "json":
+            return ("application/json; charset=utf-8", json.dumps(
+                {"room": rid, "title": r["title"], "exported": now,
+                 "answers": [{"rid": x["rid"], "track": x["track"], "done": bool(x["done"]),
+                              "updated": x["updated"], "payload": pl} for x, pl in recs]},
+                ensure_ascii=False, indent=2).encode("utf-8"))
+        cols = survey_columns(sch)
+        if fmt == "md":
+            L = ["# %s · 答卷汇总" % (r["title"] or rid), "",
+                 "导出于 %s ·共 %d 份（完成 %d 份）" % (tf(now), len(recs),
+                                                    sum(1 for x, _ in recs if x["done"])), ""]
+            for i, (x, pl) in enumerate(recs):
+                L += ["---", "", "## 第 %d 份 · %s 卷 · %s%s" % (
+                    i + 1, x["track"] or "?", tf(x["updated"]),
+                    "" if x["done"] else "　**（未提交，草稿）**"), ""]
+                for k, h in cols:
+                    v = flat(pl, k)
+                    if v:
+                        L.append("- **%s**：%s" % (h, v))
+                L.append("")
+            return ("text/markdown; charset=utf-8", "\n".join(L).encode("utf-8"))
+        head = ["序号", "答卷编号", "分册", "是否提交", "最后更新"] + [h for _, h in cols]
+        out = "\ufeff" + ",".join(csv_escape(h) for h in head) + "\n"
+        for i, (x, pl) in enumerate(recs):
+            line = [str(i + 1), x["rid"], x["track"] or "", "是" if x["done"] else "否（草稿）",
+                    tf(x["updated"])] + [flat(pl, k) for k, _ in cols]
+            out += ",".join(csv_escape(c) for c in line) + "\n"
+        return ("text/csv; charset=utf-8", out.encode("utf-8"))
+
     return {"ok": False, "error": "未知接口"}
 
 
@@ -727,6 +972,24 @@ async def handle(reader, writer):
                 await http_reply(writer, "200 OK", "ok"); return       # 管理台还没装，退回探测响应
             await http_reply(writer, "200 OK", html, "text/html; charset=utf-8"); return
 
+        # 问卷的公开接口。填表的是外单位的人，给不了他们密码，所以这条路径没有门
+        # ——门是房间号本身（猜不到），要更严就给问卷设访问码。
+        # ⚠️ Caddy 上 /s/* 和 /api/survey/* 必须绕开 forward_auth，否则外人只看到登录页。
+        if path.startswith("/api/survey/"):
+            body = None
+            if method == "POST":
+                n = int(headers.get("content-length") or 0)
+                raw = await reader.readexactly(n) if 0 < n <= MAX_PAYLOAD + (1 << 14) else b""
+                try: body = json.loads(raw.decode("utf-8") or "{}")
+                except Exception: body = {}
+            try:
+                r = survey_api(path, qs, body)
+            except Exception as e:
+                log("问卷接口出错", path, repr(e))
+                r = {"ok": False, "error": "服务器出错了"}
+            await http_reply(writer, "200 OK", json.dumps(r, ensure_ascii=False),
+                             "application/json; charset=utf-8"); return
+
         # 同一批接口，两道门：/api/admin/*（人 · Caddy 上的 msauth）和
         # /api/agent/*（AI 和脚本 · 这里校验 Bearer 令牌）。业务逻辑只有一份。
         if path.startswith("/api/admin/") or path.startswith("/api/agent/"):
@@ -761,9 +1024,9 @@ async def handle(reader, writer):
             await http_reply(writer, "200 OK", json.dumps(r, ensure_ascii=False),
                              "application/json; charset=utf-8"); return
 
-        m = re.match(r"^/(r|q)/([A-Za-z0-9_-]{4,64})$", path)
+        m = re.match(r"^/(r|q|s)/([A-Za-z0-9_-]{4,64})$", path)
         if m and method == "GET":
-            html = page("remote.html" if m.group(1) == "r" else "ask.html",
+            html = page({"r": "remote.html", "q": "ask.html", "s": "survey.html"}[m.group(1)],
                         m.group(2), (qs.get("t") or [""])[0])
             if html is None:
                 await http_reply(writer, "500 Internal Server Error", "页面缺失"); return

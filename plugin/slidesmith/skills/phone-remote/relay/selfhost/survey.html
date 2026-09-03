@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="format-detection" content="telephone=no">
+<title>调研问卷</title>
+<style>
+/* ═══════════════════════════════════════════════════════════
+   Slidesmith Live · 问卷页
+   设计取向：技术档案（technical dossier）——精密仪器说明书的冷静与秩序，
+   不是"企业官网风"。三套字形拉开层次：宋体做标题（公文/白皮书的语感）、
+   黑体做正文、等宽做编号与数字。
+   ⚠️ 全部用系统字体栈：这份问卷八成从微信里点开，Google Fonts 在国内
+   加载不出来，一旦 fallback 就会掉进最难看的默认字体。排版的高级感
+   必须来自字号/字重/字距/留白，不能指望下载一个花哨字体。
+   ═══════════════════════════════════════════════════════════ */
+:root{
+  --paper:#F4F2ED; --paper-2:#FCFBF8; --paper-3:#EDEAE3;
+  --ink:#1A1A1C; --ink-2:#57565B; --ink-3:#8D8B8F;
+  --rule:#DEDAD1; --rule-2:#C9C4B8;
+  --accent:#9E2B25; --accent-soft:#F5E6E4; --accent-line:#D9B4B0;
+  --ok:#2F6B4F; --ok-soft:#E6EFEA;
+  --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","Source Han Sans SC","Noto Sans CJK SC",sans-serif;
+  --serif:Georgia,"Songti SC","STSong","Noto Serif CJK SC","Source Han Serif SC",SimSun,serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+  --r:3px;
+  --shadow:0 1px 2px rgba(26,26,28,.04),0 8px 24px -12px rgba(26,26,28,.10);
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --paper:#131416; --paper-2:#1B1D20; --paper-3:#212428;
+    --ink:#EDEBE5; --ink-2:#A8A6A0; --ink-3:#76746F;
+    --rule:#2B2E32; --rule-2:#3A3E43;
+    --accent:#D8574E; --accent-soft:#2E1D1B; --accent-line:#5A3733;
+    --ok:#6FBF95; --ok-soft:#1B2A22;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px -12px rgba(0,0,0,.6);
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:16px; line-height:1.65;
+  -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent;
+  overflow-wrap:break-word;
+}
+button,input,textarea{font:inherit;color:inherit}
+button{background:none;border:0;cursor:pointer}
+a{color:var(--accent)}
+::selection{background:var(--accent-soft);color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+/* ── 极淡的方格纸底纹，只铺在封面 ────────────────────────── */
+.grid-bg{
+  position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.5;
+  background-image:linear-gradient(var(--rule) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--rule) 1px,transparent 1px);
+  background-size:28px 28px;
+  -webkit-mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,transparent 72%);
+          mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,transparent 72%);
+}
+.wrap{position:relative;z-index:1}
+
+/* ═══════════ 封面 ═══════════ */
+.cover{max-width:860px;margin:0 auto;padding:clamp(40px,9vw,88px) clamp(20px,5vw,40px) 72px}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 26px
+}
+.eyebrow::before{content:"";width:26px;height:2px;background:var(--accent)}
+h1.title{
+  font-family:var(--serif);font-weight:700;
+  font-size:clamp(30px,6.4vw,52px);line-height:1.22;letter-spacing:.01em;
+  margin:0 0 18px;
+}
+h1.title .l2{display:block;color:var(--ink-2);font-size:.72em;font-weight:400;margin-top:.28em;letter-spacing:.04em}
+.sub{
+  font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;color:var(--accent);
+  margin:0 0 30px;padding-bottom:26px;border-bottom:1px solid var(--rule);
+}
+.intro p{margin:0 0 14px;color:var(--ink-2);max-width:62ch}
+.intro strong{color:var(--ink);font-weight:600}
+.privacy{
+  margin:30px 0 0;padding:16px 18px;background:var(--paper-3);
+  border-left:2px solid var(--rule-2);border-radius:0 var(--r) var(--r) 0;
+  font-size:13.5px;line-height:1.7;color:var(--ink-2);
+}
+.privacy b{font-weight:600;color:var(--ink);letter-spacing:.04em}
+
+.pick-h{
+  margin:52px 0 4px;font-size:13px;font-family:var(--mono);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);
+}
+.pick-note{margin:0 0 20px;font-size:14px;color:var(--ink-2)}
+.tracks{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.tcard{
+  position:relative;display:block;width:100%;text-align:left;
+  background:var(--paper-2);border:1px solid var(--rule);border-radius:var(--r);
+  padding:18px 18px 16px 20px;transition:border-color .18s,transform .18s,box-shadow .18s;
+}
+.tcard::before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--rule-2);
+  transition:background .18s,width .18s;
+}
+.tcard:hover,.tcard:focus-visible{border-color:var(--rule-2);transform:translateY(-2px);box-shadow:var(--shadow)}
+.tcard:hover::before,.tcard:focus-visible::before{background:var(--accent);width:3px}
+.tcard[data-primary]::before{background:var(--accent)}
+.tcard[data-primary]{border-color:var(--accent-line)}
+.tcard .row1{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.tcard .tid{
+  font-family:var(--mono);font-size:20px;font-weight:600;letter-spacing:.06em;color:var(--accent);
+}
+.tcard .meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.04em;white-space:nowrap}
+.tcard .tname{font-size:17px;font-weight:600;margin:2px 0 6px;letter-spacing:.02em}
+.tcard .twho{font-size:13px;color:var(--ink-2);margin:0 0 6px}
+.tcard .tdesc{font-size:12.5px;color:var(--ink-3);line-height:1.6;margin:0}
+.tcard .tag{
+  display:inline-block;margin-left:8px;padding:1px 7px;border:1px solid var(--accent-line);
+  border-radius:2px;font-family:var(--mono);font-size:10px;letter-spacing:.1em;color:var(--accent);
+  vertical-align:2px;
+}
+.foot{margin-top:44px;padding-top:20px;border-top:1px solid var(--rule);
+  font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--ink-3)}
+
+/* ═══════════ 表单外壳 ═══════════ */
+.shell{display:flex;min-height:100vh;min-height:100dvh;align-items:flex-start}
+.rail{
+  display:none;width:262px;flex:0 0 262px;position:sticky;top:0;height:100vh;height:100dvh;
+  padding:34px 22px 24px 30px;border-right:1px solid var(--rule);
+}
+@media (min-width:940px){.rail{display:block}}
+.rail .rtrack{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--ink-3);text-transform:uppercase}
+.rail h2{font-size:19px;margin:6px 0 22px;font-weight:600;letter-spacing:.02em}
+.rail ol{list-style:none;margin:0;padding:0}
+.rail li{margin:0 0 2px}
+.rail li button{
+  display:flex;gap:11px;align-items:flex-start;width:100%;text-align:left;padding:7px 9px;
+  border-radius:var(--r);font-size:13.5px;color:var(--ink-2);line-height:1.45;
+  transition:background .15s,color .15s;
+}
+.rail li button:hover{background:var(--paper-3);color:var(--ink)}
+.rail li[data-on] button{color:var(--ink);font-weight:600;background:var(--paper-3)}
+.rail li[data-done] .n{color:var(--ok);border-color:var(--ok)}
+.rail .n{
+  flex:0 0 auto;font-family:var(--mono);font-size:10.5px;width:19px;height:19px;
+  display:grid;place-items:center;border:1px solid var(--rule-2);border-radius:2px;
+  color:var(--ink-3);margin-top:2px;
+}
+.rail li[data-on] .n{border-color:var(--accent);color:var(--accent)}
+.rail .backlink{margin-top:26px;padding-top:18px;border-top:1px solid var(--rule);
+  font-size:12.5px;color:var(--ink-3)}
+.rail .backlink button{color:var(--ink-2);font-size:12.5px}
+.rail .backlink button:hover{color:var(--accent)}
+
+.main{flex:1;min-width:0;padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+
+/* ── 移动端顶栏 + 刻度 ─────────────────────────────────── */
+.topbar{
+  position:sticky;top:0;z-index:20;
+  background:var(--paper);                       /* 老内核吃这一行 */
+  background:color-mix(in srgb,var(--paper) 88%,transparent);
+  backdrop-filter:saturate(1.6) blur(12px);-webkit-backdrop-filter:saturate(1.6) blur(12px);
+  border-bottom:1px solid var(--rule);
+}
+@supports not (backdrop-filter:blur(1px)){.topbar{background:var(--paper)}}
+.topbar .in{
+  max-width:760px;margin:0 auto;padding:11px clamp(16px,5vw,34px) 9px;
+  display:flex;align-items:center;gap:12px;
+}
+.topbar .bk{font-size:19px;line-height:1;color:var(--ink-3);padding:4px 6px 6px;margin-left:-6px}
+.topbar .bk:hover{color:var(--accent)}
+.topbar .tt{flex:1;min-width:0;font-size:14px;font-weight:600;letter-spacing:.02em;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.topbar .tt em{font-style:normal;font-family:var(--mono);color:var(--accent);margin-right:7px;font-size:12px;letter-spacing:.08em}
+.topbar .ct{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.05em;white-space:nowrap}
+/* 刻度尺：一段一格，像游标卡尺。填完的格子变实 */
+.scale{display:flex;gap:3px;padding:0 clamp(16px,5vw,34px) 9px;max-width:760px;margin:0 auto}
+.scale i{flex:1;height:3px;background:var(--rule-2);border-radius:1px;opacity:.55;
+  transition:background .3s,opacity .3s,transform .3s;transform-origin:left}
+.scale i[data-s="done"]{background:var(--accent);opacity:1}
+.scale i[data-s="now"]{background:var(--accent);opacity:1;box-shadow:0 0 0 1px var(--accent-soft)}
+/* 宽屏上左栏已经写清楚"哪一册、第几节"，顶栏再说一遍就是噪音，只留刻度尺 */
+@media (min-width:940px){.topbar{position:static;background:none;border:0;backdrop-filter:none}
+  .topbar .in{display:none}.scale{padding:34px clamp(16px,5vw,34px) 0}}
+
+/* ── 题目区 ────────────────────────────────────────────── */
+.sheet{max-width:760px;margin:0 auto;padding:26px clamp(16px,5vw,34px) 0}
+.sec-h{margin:0 0 6px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sec-h h3{font-family:var(--serif);font-size:clamp(21px,4.6vw,27px);font-weight:700;margin:0;letter-spacing:.01em}
+.sec-h .sn{font-family:var(--mono);font-size:11px;letter-spacing:.18em;color:var(--ink-3)}
+.sec-d{margin:8px 0 0;font-size:13.5px;color:var(--ink-2);line-height:1.7;
+  padding:12px 15px;background:var(--paper-3);border-radius:var(--r);border-left:2px solid var(--rule-2)}
+.qs{margin:30px 0 0}
+
+.q{
+  margin:0 0 30px;padding:0 0 0 0;
+  animation:rise .34s cubic-bezier(.22,.7,.3,1) both;
+}
+@keyframes rise{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.q{animation:none}}
+.q[data-star]{padding-left:15px;border-left:2px solid var(--accent-line)}
+.qh{display:flex;gap:11px;align-items:flex-start;margin:0 0 3px}
+.qid{
+  flex:0 0 auto;font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;color:var(--ink-3);
+  border:1px solid var(--rule-2);border-radius:2px;padding:2px 5px;margin-top:4px;
+}
+.q[data-star] .qid{color:var(--accent);border-color:var(--accent-line)}
+.qt{flex:1;min-width:0;font-size:16.5px;font-weight:600;line-height:1.55;letter-spacing:.01em;margin:0}
+.qt .req{color:var(--accent);margin-left:4px;font-weight:400}
+.qhint{margin:5px 0 0 0;padding-left:38px;font-size:13px;color:var(--ink-3);line-height:1.6}
+.q[data-star] .qhint{color:var(--accent);opacity:.86}
+.opts{margin:13px 0 0;padding-left:38px;display:grid;gap:6px}
+@media (max-width:520px){.qhint,.opts{padding-left:0}.q[data-star]{padding-left:12px}}
+
+/* 选项行：整行可点，触摸目标够大 */
+.opt{
+  position:relative;display:flex;gap:11px;align-items:flex-start;
+  padding:11px 14px;border:1px solid var(--rule);border-radius:var(--r);
+  background:var(--paper-2);cursor:pointer;transition:border-color .15s,background .15s;
+  min-height:44px;
+}
+.opt:hover{border-color:var(--rule-2)}
+.opt input{position:absolute;opacity:0;width:0;height:0}
+.opt .bx{
+  flex:0 0 auto;width:16px;height:16px;margin-top:3px;border:1.5px solid var(--rule-2);
+  background:var(--paper);transition:border-color .15s,background .15s;
+}
+.opt .bx.ra{border-radius:50%}
+.opt .lb{flex:1;min-width:0;font-size:15px;line-height:1.55}
+.opt .lb small{display:block;font-size:12.5px;color:var(--ink-3);margin-top:1px;line-height:1.5}
+.opt[data-on]{background:var(--accent-soft);border-color:var(--accent-line)}
+.opt[data-on] .bx{border-color:var(--accent);background:var(--accent);
+  box-shadow:inset 0 0 0 2.5px var(--paper-2)}
+.opt[data-on] .lb{color:var(--accent);font-weight:600}
+.opt[data-on] .lb small{color:var(--accent);opacity:.78;font-weight:400}
+.opt[data-off]{opacity:.38;cursor:not-allowed}
+.opt input:focus-visible ~ .lb{text-decoration:underline;text-underline-offset:3px}
+.maxnote{padding-left:38px;font-family:var(--mono);font-size:11px;color:var(--ink-3);margin:8px 0 0;letter-spacing:.05em}
+@media (max-width:520px){.maxnote{padding-left:0}}
+
+/* 自评量表：五个刻度并排，像仪表盘上的档位。
+   原来把六行长选项重复五遍，填的人第三遍就开始烦 —— 说明只出现一次（图例），
+   题目本身压缩成一排刻度，五道题一屏就点完。 */
+.legend{margin:13px 0 0;border:1px solid var(--rule);border-radius:var(--r);
+  background:var(--paper-2);padding:12px 15px}
+.legend .lgh{font-family:var(--mono);font-size:10.5px;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 9px}
+.legend ol{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.legend li{display:flex;gap:12px;font-size:13px;line-height:1.5;align-items:baseline}
+.legend b{flex:0 0 5.4em;font-weight:600;color:var(--ink);font-size:12.5px}
+.legend span{color:var(--ink-3)}
+.lk{margin:13px 0 0;padding-left:38px;display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+@media (max-width:520px){.lk{padding-left:0;gap:4px}}
+.lkc{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;padding:9px 2px;min-height:58px;border:1px solid var(--rule);border-radius:var(--r);
+  background:var(--paper-2);cursor:pointer;text-align:center;
+  transition:background .15s,border-color .15s}
+.lkc:hover{border-color:var(--rule-2)}
+.lkc input{position:absolute;opacity:0;width:0;height:0}
+.lkc .lv{font-family:var(--mono);font-size:16px;font-weight:600;color:var(--ink-2);line-height:1}
+.lkc .nm{font-size:11px;color:var(--ink-3);line-height:1.25;letter-spacing:.02em}
+.lkc[data-on]{background:var(--accent);border-color:var(--accent)}
+.lkc[data-on] .lv,.lkc[data-on] .nm{color:#fff}
+@media (prefers-color-scheme:dark){
+  .lkc[data-on] .lv,.lkc[data-on] .nm{color:#16100F}}
+
+/* 矩阵题：一行一张卡，选项做成 chip，绝不做横向滚动的表格 */
+.mx{margin:13px 0 0;padding-left:38px;display:grid;gap:8px}
+@media (max-width:520px){.mx{padding-left:0}}
+.mxr{border:1px solid var(--rule);border-radius:var(--r);background:var(--paper-2);padding:10px 12px}
+.mxr[data-filled]{border-color:var(--accent-line)}
+.mxr .rn{font-size:14.5px;font-weight:600;margin:0 0 7px;letter-spacing:.01em}
+.mxr[data-filled] .rn{color:var(--accent)}
+/* 自动列数：宽屏六个一行，手机上正好三个一行两行放完。
+   auto-fit 比 flex-wrap 好在最后一行不会被拉成两个大格子。绝不横向滚动。 */
+.chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:5px}
+.chip{position:relative;display:inline-flex;align-items:center;justify-content:center;
+  padding:6px 7px;min-height:36px;white-space:nowrap;
+  border:1px solid var(--rule);border-radius:var(--r);font-size:13px;color:var(--ink-2);
+  cursor:pointer;transition:border-color .15s,background .15s,color .15s;background:var(--paper)}
+.chip:hover{border-color:var(--rule-2);color:var(--ink)}
+.chip input{position:absolute;opacity:0;width:0;height:0}
+.chip[data-on]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+@media (prefers-color-scheme:dark){.chip[data-on]{color:#16100F}}
+
+/* 文本输入 */
+.ti,.ta{
+  width:100%;padding:11px 13px;background:var(--paper-2);color:var(--ink);
+  border:1px solid var(--rule);border-radius:var(--r);font-size:16px;line-height:1.6;
+  transition:border-color .15s;resize:vertical;font-family:inherit;
+}
+.ti:focus,.ta:focus{outline:0;border-color:var(--accent)}
+.ti::placeholder,.ta::placeholder{color:var(--ink-3)}
+.tw{padding-left:38px;margin-top:13px}
+@media (max-width:520px){.tw{padding-left:0}}
+.oth{margin-top:6px;padding-left:27px}
+.oth .ti{padding:8px 11px;font-size:15px}
+
+/* ── 底部导航 ─────────────────────────────────────────── */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  border-top:1px solid var(--rule);
+  background:var(--paper);
+  background:color-mix(in srgb,var(--paper) 90%,transparent);
+  backdrop-filter:saturate(1.6) blur(12px);-webkit-backdrop-filter:saturate(1.6) blur(12px);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+@supports not (backdrop-filter:blur(1px)){.nav{background:var(--paper)}}
+.nav .in{max-width:760px;margin:0 auto;padding:11px clamp(16px,5vw,34px);
+  display:flex;align-items:center;gap:10px}
+@media (min-width:940px){.nav .in{max-width:1022px;padding-left:284px}}
+.btn{
+  padding:11px 20px;border:1px solid var(--rule-2);border-radius:var(--r);
+  font-size:15px;font-weight:600;letter-spacing:.02em;color:var(--ink);
+  transition:background .15s,border-color .15s,opacity .15s;min-height:44px;
+}
+.btn:hover{background:var(--paper-3)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri:hover{opacity:.88;background:var(--accent)}
+@media (prefers-color-scheme:dark){.btn.pri{color:#16100F}}
+.btn[disabled]{opacity:.35;pointer-events:none}
+.nav .sp{flex:1}
+.nav .st{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.05em;
+  white-space:nowrap;transition:color .3s}
+.nav .st[data-ok]{color:var(--ok)}
+@media (max-width:400px){.nav .st{display:none}}
+
+/* ── 提交确认 / 提示 ────────────────────────────────────── */
+.mask{position:fixed;inset:0;z-index:50;background:rgba(20,19,18,.42);
+  display:grid;place-items:center;padding:20px;animation:fade .2s both}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.dlg{
+  width:100%;max-width:420px;background:var(--paper-2);border:1px solid var(--rule);
+  border-radius:var(--r);padding:24px;box-shadow:0 24px 60px -20px rgba(0,0,0,.4);
+  animation:pop .24s cubic-bezier(.22,.7,.3,1) both;
+}
+@keyframes pop{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+.dlg h4{margin:0 0 10px;font-family:var(--serif);font-size:19px;font-weight:700}
+.dlg p{margin:0 0 8px;font-size:14.5px;color:var(--ink-2);line-height:1.7}
+.dlg ul{margin:8px 0 0;padding-left:18px;font-size:13.5px;color:var(--ink-2);max-height:150px;overflow:auto}
+.dlg .acts{display:flex;gap:9px;margin-top:20px;justify-content:flex-end;flex-wrap:wrap}
+.toast{
+  position:fixed;left:50%;bottom:calc(78px + env(safe-area-inset-bottom));transform:translateX(-50%);
+  z-index:60;background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:var(--r);
+  font-size:13.5px;box-shadow:var(--shadow);animation:tin .25s both;max-width:90vw;text-align:center;
+}
+@keyframes tin{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* ── 完成页 / 状态页 ────────────────────────────────────── */
+.state{max-width:620px;margin:0 auto;padding:clamp(60px,14vh,120px) clamp(20px,5vw,34px)}
+.state .mk{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--accent);margin:0 0 18px}
+.state h2{font-family:var(--serif);font-size:clamp(26px,6vw,38px);margin:0 0 16px;font-weight:700;line-height:1.3}
+.state p{color:var(--ink-2);margin:0 0 12px;font-size:15.5px;line-height:1.75}
+.state .box{margin:26px 0 0;padding:16px 18px;border:1px solid var(--rule);border-radius:var(--r);
+  background:var(--paper-2);font-size:14px;color:var(--ink-2)}
+.state .box dl{margin:0;display:grid;grid-template-columns:auto 1fr;gap:6px 16px}
+.state .box dt{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:.06em}
+.state .box dd{margin:0}
+.state .acts{margin-top:26px;display:flex;gap:10px;flex-wrap:wrap}
+.err{color:var(--accent)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════
+   房间号由中转烘进来（page() 替换 __ROOM__）。
+   题目本身不写死在这个文件里 —— 从 /api/survey/meta 取，
+   这样改题只要重新推一次 schema，页面一个字都不用动。
+   ═══════════════════════════════════════════════════════════ */
+var ROOM = __ROOM__;
+var API  = "/api/survey";
+var LS   = "smsurvey2:" + ROOM;
+
+var S = null;        // schema
+var META = null;
+var TRACK = null;    // 当前分册 id
+var SEC = 0;         // 当前第几节
+var D = {};          // 当前这一册的答案 {qid: value}
+var RID = "";        // 当前这一册的答卷编号
+var CODE = "";
+/* 一册一份答卷。一个人可能先填 A 卷、再顺手填 B5，那是**两份**答卷，
+   共用一个编号就会互相覆盖 —— 后填的把先填的抹掉，而且两边都没有任何提示。
+   所以编号、答案、进度都按分册各存一份。 */
+var RIDS = {}, ALL = {}, SECS = {};
+var app = document.getElementById("app");
+var saveTimer = null, pushTimer = null, lastPush = 0;
+
+/* ── 本机草稿 ───────────────────────────────────────────── */
+function load(){
+  try{
+    var raw = localStorage.getItem(LS); if(!raw) return;
+    var o = JSON.parse(raw); if(!o) return;
+    RIDS = o.rids || {}; ALL = o.all || {}; SECS = o.secs || {};
+    CODE = o.code || "";
+    if(o.track && ALL[o.track]) setTrack(o.track);
+  }catch(e){}
+}
+function stash(){
+  if(TRACK){ ALL[TRACK] = D; SECS[TRACK] = SEC; }
+  try{ localStorage.setItem(LS, JSON.stringify(
+    {v:2, rids:RIDS, all:ALL, secs:SECS, track:TRACK, code:CODE, at:Date.now()})); }catch(e){}
+}
+/* 切到某一册：没填过就新开一份，填过就接着上次。
+   抬头那几题（单位、部门、称呼）在册之间是同一个人，自动带过去 —— 让人再填一遍
+   等于告诉他"你刚才白填了"。 */
+function setTrack(t){
+  if(TRACK && TRACK !== t){ ALL[TRACK] = D; SECS[TRACK] = SEC; }
+  TRACK = t;
+  if(!RIDS[t]) RIDS[t] = newRid();
+  if(!ALL[t]){
+    var seed = {};
+    for(var k in ALL){
+      ["R1","R2","R3","R4","R5"].forEach(function(f){
+        if(seed[f]===undefined && ALL[k] && ALL[k][f]!==undefined) seed[f]=ALL[k][f]; });
+    }
+    ALL[t] = seed;
+  }
+  RID = RIDS[t]; D = ALL[t]; SEC = SECS[t] || 0;
+}
+function newRid(){
+  var s="", a="abcdefghijkmnpqrstuvwxyz23456789";
+  for(var i=0;i<16;i++) s+=a[Math.floor(Math.random()*a.length)];
+  return s;
+}
+
+/* ── 存到服务器 ──────────────────────────────────────────
+   草稿每 6 秒最多推一次，换节和提交时立刻推。
+   推失败不打断填写 —— 本机那份才是主，服务器那份是"换台设备也能看到"。 */
+function push(done, cb){
+  var body = {room:ROOM, rid:RID, track:TRACK||"", payload:D, done:!!done};
+  if(CODE) body.code = CODE;
+  var x = new XMLHttpRequest();
+  x.open("POST", API+"/save", true);
+  x.setRequestHeader("Content-Type","application/json");
+  x.timeout = 15000;
+  x.onload = function(){
+    var r={}; try{ r=JSON.parse(x.responseText); }catch(e){}
+    lastPush = Date.now();
+    setStatus(r.ok ? (done?"已提交":"已保存") : (r.error||"保存失败"), r.ok);
+    if(cb) cb(r);
+  };
+  x.onerror = x.ontimeout = function(){
+    setStatus("网络不通，内容已存在本机", false);
+    if(cb) cb({ok:false, error:"网络不通。您填的内容已经存在这台设备上，联网后再点一次提交就行。"});
+  };
+  try{ x.send(JSON.stringify(body)); }
+  catch(e){ if(cb) cb({ok:false,error:"提交失败"}); }
+}
+function setStatus(t, ok){
+  var el = document.getElementById("st"); if(!el) return;
+  el.textContent = t;
+  if(ok) el.setAttribute("data-ok",""); else el.removeAttribute("data-ok");
+}
+function touch(){
+  stash();
+  setStatus("正在保存…", false);
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(function(){ push(false); }, Date.now()-lastPush > 6000 ? 400 : 6000);
+}
+function toast(t){
+  var d=document.createElement("div"); d.className="toast"; d.textContent=t;
+  document.body.appendChild(d);
+  setTimeout(function(){ d.style.opacity="0"; d.style.transition="opacity .3s";
+    setTimeout(function(){ d.remove(); }, 320); }, 2200);
+}
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+/* 只让 **粗体** 生效，其余一律转义 —— 题面是我们自己写的，但没必要开放 HTML */
+function md(s){ return esc(s).replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>"); }
+
+/* ── 取题目 ─────────────────────────────────────────────── */
+function fetchMeta(cb){
+  var u = API+"/meta?room="+encodeURIComponent(ROOM)+(CODE?"&code="+encodeURIComponent(CODE):"");
+  var x = new XMLHttpRequest();
+  x.open("GET", u, true); x.timeout = 15000;
+  x.onload = function(){ try{ cb(JSON.parse(x.responseText)); }catch(e){ cb({ok:false,error:"返回的内容看不懂"}); } };
+  x.onerror = x.ontimeout = function(){ cb({ok:false,error:"连不上服务器，请检查网络后刷新"}); };
+  x.send();
+}
+
+/* ── 分册里有哪些节 ─────────────────────────────────────── */
+function secsOf(t){
+  return S.sections.filter(function(s){
+    return s.tracks.indexOf("*")>=0 || s.tracks.indexOf(t)>=0; });
+}
+function trackOf(id){
+  for(var i=0;i<S.tracks.length;i++) if(S.tracks[i].id===id) return S.tracks[i];
+  return null;
+}
+function answered(q){
+  var v = D[q.id];
+  if(v==null || v==="") return false;
+  if(Array.isArray(v)) return v.length>0;
+  if(typeof v==="object"){
+    if(q.type==="matrix") return (q.rows||[]).every(function(r){ return v[r]; });
+    return Object.keys(v).length>0;
+  }
+  return true;
+}
+function secDone(s){ return s.questions.every(function(q){ return q.required===false || answered(q); }); }
+
+/* ═══════════ 封面 ═══════════ */
+function viewCover(){
+  var t = S.tracks.map(function(t,i){
+    return '<button class="tcard" data-t="'+esc(t.id)+'"'+(t.primary?' data-primary':'')+
+      ' style="animation:rise .4s cubic-bezier(.22,.7,.3,1) both;animation-delay:'+(120+i*45)+'ms">'+
+      '<div class="row1"><span class="tid">'+esc(t.id)+'</span>'+
+      '<span class="meta">'+t.count+' 题 · '+t.minutes+' 分钟</span></div>'+
+      '<div class="tname">'+esc(t.name)+(t.primary?'<span class="tag">建议先填</span>':'')+'</div>'+
+      '<p class="twho">'+esc(t.who)+'</p>'+
+      '<p class="tdesc">'+esc(t.desc||"")+'</p></button>';
+  }).join("");
+  var intro = (S.intro||[]).map(function(p){ return "<p>"+md(p)+"</p>"; }).join("");
+  // 标题拆两行：第二行去掉开头的分隔符，不然会显示成"· 振华集团调研"
+  var tt = String(S.title||"").split(/\s+/);
+  var l2 = tt.slice(1).join(" ").replace(/^[·•\-—|]+\s*/, "");
+  app.innerHTML =
+    '<div class="grid-bg"></div><div class="cover">'+
+      '<p class="eyebrow">'+esc(S.org||"调研")+'　调研问卷</p>'+
+      '<h1 class="title">'+esc(tt[0]||S.title)+'<span class="l2">'+esc(l2)+'</span></h1>'+
+      '<p class="sub">'+esc(S.subtitle||"")+'</p>'+
+      '<div class="intro">'+intro+'</div>'+
+      (S.privacy?'<div class="privacy"><b>关于隐私</b>　'+esc(S.privacy)+'</div>':'')+
+      '<p class="pick-h">选择分册</p>'+
+      '<p class="pick-note">您只需要填自己那一册。填到一半可以直接关掉，下次打开还在原处。</p>'+
+      '<div class="tracks">'+t+'</div>'+
+      '<p class="foot">'+esc(S.id||"")+' · v'+esc(S.version||"1")+'</p>'+
+    '</div>';
+  [].forEach.call(app.querySelectorAll(".tcard"), function(b){
+    b.onclick = function(){
+      setTrack(b.getAttribute("data-t")); stash();
+      window.scrollTo(0,0); viewForm();
+    };
+  });
+}
+
+/* ═══════════ 表单 ═══════════ */
+function viewForm(){
+  var secs = secsOf(TRACK), tk = trackOf(TRACK);
+  if(SEC >= secs.length) SEC = secs.length-1;
+  if(SEC < 0) SEC = 0;
+  var s = secs[SEC];
+
+  var rail = '<nav class="rail"><p class="rtrack">'+esc(TRACK)+' 卷</p><h2>'+esc(tk.name)+'</h2><ol>'+
+    secs.map(function(x,i){
+      return '<li'+(i===SEC?' data-on':'')+(secDone(x)?' data-done':'')+
+        '><button data-go="'+i+'"><span class="n">'+(i+1)+'</span><span>'+esc(x.title)+'</span></button></li>';
+    }).join("")+'</ol><div class="backlink"><button id="bk2">← 换一册填</button></div></nav>';
+
+  var scale = '<div class="scale">'+secs.map(function(x,i){
+      return '<i data-s="'+(i===SEC?"now":(secDone(x)?"done":"todo"))+'"></i>'; }).join("")+'</div>';
+
+  var body = '<div class="sheet"><div class="sec-h"><span class="sn">第 '+(SEC+1)+' 节 / 共 '+secs.length+' 节</span>'+
+    '<h3>'+esc(s.title)+'</h3></div>'+
+    (s.desc?'<p class="sec-d">'+md(s.desc)+'</p>':'')+ legendFor(s)+
+    '<div class="qs">'+s.questions.map(qHTML).join("")+'</div></div>';
+
+  var last = SEC===secs.length-1;
+  var nav = '<div class="nav"><div class="in">'+
+    '<button class="btn" id="prev"'+(SEC===0?' disabled':'')+'>上一节</button>'+
+    '<span class="sp"></span><span class="st" id="st"></span>'+
+    '<button class="btn pri" id="next">'+(last?'提交问卷':'下一节')+'</button>'+
+    '</div></div>';
+
+  app.innerHTML = '<div class="shell">'+rail+'<div class="main">'+
+    '<div class="topbar"><div class="in"><button class="bk" id="bk" aria-label="返回分册选择">←</button>'+
+    '<span class="tt"><em>'+esc(TRACK)+'</em>'+esc(s.title)+'</span>'+
+    '<span class="ct">'+(SEC+1)+'/'+secs.length+'</span></div>'+scale+'</div>'+
+    body+'</div></div>'+nav;
+
+  bindQs();
+  app.querySelector("#prev").onclick = function(){ go(SEC-1); };
+  app.querySelector("#next").onclick = function(){ last ? trySubmit(secs) : go(SEC+1); };
+  var bk = function(){ if(confirm("回到分册选择？您填的内容都留着。")){ window.scrollTo(0,0); viewCover(); } };
+  app.querySelector("#bk").onclick = bk;
+  app.querySelector("#bk2").onclick = bk;
+  [].forEach.call(app.querySelectorAll("[data-go]"), function(b){
+    b.onclick = function(){ go(+b.getAttribute("data-go")); };
+  });
+  // 每道题错开一点点出现，长表单一次性砸下来会让人先看到"好多题"再看到内容
+  [].forEach.call(app.querySelectorAll(".q"), function(el,i){
+    el.style.animationDelay = Math.min(i*38, 340)+"ms"; });
+}
+function go(i){
+  SEC = i; stash(); clearTimeout(pushTimer); push(false);
+  window.scrollTo(0,0); viewForm();
+}
+
+/* 这一节里有自评题就在节首放一次刻度说明，题目本身不再重复 */
+function legendFor(s){
+  var lk = null;
+  s.questions.forEach(function(q){ if(!lk && q.type==="likert") lk = q; });
+  if(!lk) return "";
+  return '<div class="legend"><p class="lgh">五个刻度各是什么意思</p><ol>'+
+    lk.scale.filter(function(o){ return o.desc; }).map(function(o){
+      return '<li><b>'+esc(o.label)+'</b><span>'+esc(o.desc)+'</span></li>'; }).join("")+
+    '</ol></div>';
+}
+
+/* ── 单题渲染 ───────────────────────────────────────────── */
+function qHTML(q){
+  var h = '<div class="q" data-q="'+esc(q.id)+'"'+(q.star?' data-star':'')+'>'+
+    '<div class="qh"><span class="qid">'+esc(q.id)+'</span>'+
+    '<p class="qt">'+md(q.title)+(q.required===false?'':'<span class="req">*</span>')+'</p></div>'+
+    (q.hint?'<p class="qhint">'+md(q.hint)+'</p>':'');
+  var v = D[q.id];
+
+  if(q.type==="likert"){
+    h += '<div class="lk" role="radiogroup">'+q.scale.map(function(o){
+      var parts = String(o.label).split(/\s*[·•]\s*/);
+      var lv = o.v ? String(o.v) : "—";
+      var nm = parts.length>1 ? parts[1] : parts[0];
+      return '<label class="lkc"'+(v===o.label?' data-on':'')+
+        ' title="'+esc(o.label+(o.desc?"　"+o.desc:""))+'">'+
+        '<input type="radio" name="'+esc(q.id)+'" value="'+esc(o.label)+'"'+
+        (v===o.label?' checked':'')+'>'+
+        '<span class="lv">'+esc(lv)+'</span><span class="nm">'+esc(nm)+'</span>'+
+        '<span class="sr">'+esc(o.label+" "+(o.desc||""))+'</span></label>';
+    }).join("")+'</div>';
+    return h+'</div>';
+  }
+  if(q.type==="single" || q.type==="multi"){
+    var multi = q.type==="multi";
+    var list = q.options.map(function(o){ return {label:o, desc:""}; });
+    if(q.other) list = list.concat([{label:"其他（请注明）", desc:"", other:true}]);
+    var cur = multi ? (Array.isArray(v)?v:[]) : v;
+    var full = multi && q.max && cur.length>=q.max;
+    h += '<div class="opts" role="'+(multi?"group":"radiogroup")+'">'+list.map(function(o,i){
+      var ov = o.other ? "__other__" : o.label;
+      var on = multi ? cur.some(function(x){ return x===ov || (o.other && String(x).indexOf("其他：")===0); })
+                     : (cur===ov || (o.other && String(cur||"").indexOf("其他：")===0));
+      var off = full && !on;
+      return '<label class="opt"'+(on?' data-on':'')+(off?' data-off':'')+'>'+
+        '<input type="'+(multi?"checkbox":"radio")+'" name="'+esc(q.id)+'" value="'+esc(ov)+'"'+
+        (on?' checked':'')+(off?' disabled':'')+'>'+
+        '<span class="bx'+(multi?"":" ra")+'"></span>'+
+        '<span class="lb">'+esc(o.label)+(o.desc?'<small>'+esc(o.desc)+'</small>':'')+'</span>'+
+        '</label>'+
+        (o.other && on ? '<div class="oth"><input class="ti" data-other="'+esc(q.id)+'" placeholder="请填写"'+
+          ' value="'+esc(otherText(v))+'"></div>' : '');
+    }).join("")+'</div>';
+    if(q.max) h += '<p class="maxnote">最多选 '+q.max+' 项'+(full?'　·　已选满，要换请先取消一个':'')+'</p>';
+  }
+  else if(q.type==="matrix"){
+    var mv = (v && typeof v==="object" && !Array.isArray(v)) ? v : {};
+    h += '<div class="mx">'+q.rows.map(function(r){
+      return '<div class="mxr"'+(mv[r]?' data-filled':'')+'><p class="rn">'+esc(r)+'</p><div class="chips">'+
+        q.cols.map(function(c){
+          return '<label class="chip"'+(mv[r]===c?' data-on':'')+
+            '><input type="radio" name="'+esc(q.id)+'::'+esc(r)+'" value="'+esc(c)+'"'+
+            (mv[r]===c?' checked':'')+' data-mx="'+esc(q.id)+'" data-row="'+esc(r)+'">'+esc(c)+'</label>';
+        }).join("")+'</div></div>';
+    }).join("")+'</div>';
+  }
+  else if(q.type==="textarea"){
+    h += '<div class="tw"><textarea class="ta" data-t="'+esc(q.id)+'" rows="'+(q.rows||3)+'" '+
+      'placeholder="'+esc(q.placeholder||"想到什么写什么，不用打磨")+'">'+esc(v||"")+'</textarea></div>';
+  }
+  else {
+    h += '<div class="tw"><input class="ti" data-t="'+esc(q.id)+'" '+
+      'placeholder="'+esc(q.placeholder||"")+'" value="'+esc(v||"")+'"></div>';
+  }
+  return h+'</div>';
+}
+function otherText(v){
+  var arr = Array.isArray(v) ? v : [v];
+  for(var i=0;i<arr.length;i++){ var s=String(arr[i]||"");
+    if(s.indexOf("其他：")===0) return s.slice(3); }
+  return "";
+}
+
+/* ── 绑事件 ─────────────────────────────────────────────── */
+function bindQs(){
+  var secs = secsOf(TRACK), s = secs[SEC];
+  var byId = {}; s.questions.forEach(function(q){ byId[q.id]=q; });
+
+  [].forEach.call(app.querySelectorAll('.lk input'), function(inp){
+    inp.onchange = function(){ D[inp.name] = inp.value; mark(inp,".lkc"); touch(); updateScale(); };
+  });
+  [].forEach.call(app.querySelectorAll('.opts input'), function(inp){
+    inp.onchange = function(){
+      var q = byId[inp.name]; if(!q) return;
+      var val = inp.value, wasFull = false, isFull = false;
+      if(q.type==="multi"){
+        var cur = Array.isArray(D[q.id]) ? D[q.id].slice() : [];
+        wasFull = !!(q.max && cur.length>=q.max);
+        if(inp.checked){
+          if(wasFull){ inp.checked=false; toast("最多选 "+q.max+" 项，要换请先取消一个"); return; }
+          cur.push(val==="__other__" ? "其他：" : val);
+        } else {
+          cur = cur.filter(function(x){
+            return val==="__other__" ? String(x).indexOf("其他：")!==0 : x!==val; });
+        }
+        D[q.id] = cur;
+        isFull = !!(q.max && cur.length>=q.max);
+      } else {
+        D[q.id] = (val==="__other__") ? "其他：" : val;
+      }
+      mark(inp, ".opt");
+      touch();
+      // 只有两件事非重画不可：「其他」那个输入框要出现/消失，以及选满/解封要变灰。
+      // 其余情况浏览器自己就把 checked 画好了 —— 每次都重画会打断连点、还会吃掉焦点。
+      if(q.other && (val==="__other__" || q.type==="single") || wasFull!==isFull) redrawQ(q);
+      else updateScale();
+    };
+  });
+  [].forEach.call(app.querySelectorAll('[data-other]'), function(inp){
+    inp.oninput = function(){
+      var q = byId[inp.getAttribute("data-other")]; if(!q) return;
+      var txt = "其他：" + inp.value;
+      if(q.type==="multi"){
+        var cur = (Array.isArray(D[q.id])?D[q.id]:[]).filter(function(x){
+          return String(x).indexOf("其他：")!==0; });
+        cur.push(txt); D[q.id]=cur;
+      } else D[q.id]=txt;
+      touch();
+    };
+  });
+  [].forEach.call(app.querySelectorAll('[data-mx]'), function(inp){
+    inp.onchange = function(){
+      var id = inp.getAttribute("data-mx"), row = inp.getAttribute("data-row");
+      if(!D[id] || typeof D[id]!=="object" || Array.isArray(D[id])) D[id] = {};
+      D[id][row] = inp.value;
+      mark(inp, ".chip");
+      var card = inp.closest(".mxr"); if(card) card.setAttribute("data-filled","");
+      touch(); updateScale();
+    };
+  });
+  [].forEach.call(app.querySelectorAll('[data-t]'), function(inp){
+    inp.oninput = function(){
+      D[inp.getAttribute("data-t")] = inp.value;
+      if(inp.tagName==="TEXTAREA"){ inp.style.height="auto"; inp.style.height=(inp.scrollHeight+2)+"px"; }
+      touch(); clearTimeout(saveTimer); saveTimer=setTimeout(updateScale, 600);
+    };
+    if(inp.tagName==="TEXTAREA" && inp.value){ inp.style.height="auto"; inp.style.height=(inp.scrollHeight+2)+"px"; }
+  });
+}
+/* 把选中态标到 label 上。单选要先把同组的清干净 —— 浏览器只管 input.checked，
+   不会替我们收拾兄弟节点的属性。 */
+function mark(inp, sel){
+  if(inp.type==="radio"){
+    [].forEach.call(app.querySelectorAll('input[name="'+CSS.escape(inp.name)+'"]'), function(o){
+      var L = o.closest(sel); if(L) L.removeAttribute("data-on");
+    });
+  }
+  var L = inp.closest(sel); if(!L) return;
+  if(inp.checked) L.setAttribute("data-on",""); else L.removeAttribute("data-on");
+}
+
+/* 只重画这一道题（"其他"输入框要跟着出现/消失、选满要变灰），不动整页 */
+function redrawQ(q){
+  var el = app.querySelector('.q[data-q="'+q.id+'"]'); if(!el) return;
+  var tmp = document.createElement("div"); tmp.innerHTML = qHTML(q);
+  var fresh = tmp.firstChild; fresh.style.animation="none";
+  el.replaceWith(fresh); bindQs(); updateScale();
+  var oi = fresh.querySelector("[data-other]"); if(oi){ oi.focus();
+    try{ oi.setSelectionRange(oi.value.length, oi.value.length); }catch(e){} }
+}
+function updateScale(){
+  var secs = secsOf(TRACK);
+  [].forEach.call(app.querySelectorAll(".scale i"), function(el,i){
+    el.setAttribute("data-s", i===SEC ? "now" : (secDone(secs[i])?"done":"todo")); });
+  [].forEach.call(app.querySelectorAll(".rail li"), function(li,i){
+    if(secDone(secs[i])) li.setAttribute("data-done",""); else li.removeAttribute("data-done"); });
+}
+
+/* ── 提交 ──────────────────────────────────────────────── */
+function trySubmit(secs){
+  var miss = [];
+  secs.forEach(function(s,i){
+    s.questions.forEach(function(q){
+      if(q.required!==false && !answered(q)) miss.push({s:i, t:"第"+(i+1)+"节 · "+q.id+" "+q.title});
+    });
+  });
+  if(!miss.length) return doSubmit();
+  var list = miss.slice(0,8).map(function(m){ return "<li>"+esc(m.t)+"</li>"; }).join("");
+  dialog(
+    "还有 "+miss.length+" 题没填",
+    "<p>没填的题不影响提交——有些题确实不方便回答。但每多一个答案，报告里就多一句有依据的话。</p><ul>"+list+
+      (miss.length>8?"<li>…还有 "+(miss.length-8)+" 题</li>":"")+"</ul>",
+    [{t:"去补一下", f:function(){ go(miss[0].s); }},
+     {t:"就这样提交", pri:true, f:doSubmit}]);
+}
+function doSubmit(){
+  var b = document.getElementById("next"); if(b){ b.disabled=true; b.textContent="提交中…"; }
+  clearTimeout(pushTimer);
+  push(true, function(r){
+    if(r.ok){ viewDone(); }
+    else{
+      if(b){ b.disabled=false; b.textContent="提交问卷"; }
+      dialog("没能提交", "<p class='err'>"+esc(r.error||"未知原因")+"</p>"+
+        "<p>您填的内容已经存在这台设备上，不会丢。换个网络再点一次提交就行。</p>",
+        [{t:"知道了", pri:true}]);
+    }
+  });
+}
+function dialog(title, html, acts){
+  var m = document.createElement("div"); m.className="mask";
+  m.innerHTML = '<div class="dlg" role="dialog" aria-modal="true"><h4>'+esc(title)+'</h4>'+html+
+    '<div class="acts">'+acts.map(function(a,i){
+      return '<button class="btn'+(a.pri?' pri':'')+'" data-a="'+i+'">'+esc(a.t)+'</button>'; }).join("")+
+    '</div></div>';
+  document.body.appendChild(m);
+  m.onclick = function(e){ if(e.target===m) m.remove(); };
+  [].forEach.call(m.querySelectorAll("[data-a]"), function(b){
+    b.onclick = function(){ var a = acts[+b.getAttribute("data-a")]; m.remove(); if(a.f) a.f(); };
+  });
+}
+
+/* ═══════════ 结束页与状态页 ═══════════ */
+function viewDone(){
+  var tk = trackOf(TRACK), secs = secsOf(TRACK);
+  var n = 0; secs.forEach(function(s){ s.questions.forEach(function(q){ if(answered(q)) n++; }); });
+  var tot = 0; secs.forEach(function(s){ tot += s.questions.length; });
+  app.innerHTML = '<div class="grid-bg"></div><div class="state">'+
+    '<p class="mk">已收到</p>'+
+    '<h2>'+esc(S.thanks||"收到了，谢谢。")+'</h2>'+
+    '<p>如果发现填错了，随时回到这个链接改，改完再提交一次就行——覆盖的是同一份，不会重复计数。</p>'+
+    '<div class="box"><dl>'+
+      '<dt>分册</dt><dd>'+esc(TRACK)+' · '+esc(tk.name)+'</dd>'+
+      '<dt>已答</dt><dd>'+n+' / '+tot+' 题</dd>'+
+      '<dt>答卷编号</dt><dd style="font-family:var(--mono);font-size:13px">'+esc(RID)+'</dd>'+
+    '</dl></div>'+
+    '<div class="acts"><button class="btn" id="again">修改我的答案</button>'+
+    '<button class="btn" id="other">再填一册</button></div></div>';
+  document.getElementById("again").onclick = function(){ window.scrollTo(0,0); viewForm(); };
+  document.getElementById("other").onclick = function(){
+    stash(); window.scrollTo(0,0); viewCover();   // 换册时 setTrack 会自己开新的一份
+  };
+}
+function viewState(mk, title, html, acts){
+  app.innerHTML = '<div class="grid-bg"></div><div class="state"><p class="mk">'+esc(mk)+'</p>'+
+    '<h2>'+esc(title)+'</h2>'+html+
+    (acts||'')+'</div>';
+}
+function viewCode(msg){
+  viewState("需要访问码", "请输入访问码",
+    '<p>这份问卷设了访问码，向发问卷给您的人要一下就行。</p>'+
+    (msg?'<p class="err">'+esc(msg)+'</p>':'')+
+    '<div style="margin-top:20px;max-width:280px"><input class="ti" id="cd" placeholder="访问码" '+
+    'autocomplete="off" autocapitalize="off" spellcheck="false"></div>',
+    '<div class="acts"><button class="btn pri" id="cok">进入</button></div>');
+  var go2 = function(){
+    CODE = document.getElementById("cd").value.trim();
+    if(!CODE) return;
+    stash(); boot();
+  };
+  document.getElementById("cok").onclick = go2;
+  document.getElementById("cd").onkeydown = function(e){ if(e.key==="Enter") go2(); };
+  document.getElementById("cd").focus();
+}
+
+/* ═══════════ 启动 ═══════════ */
+function boot(){
+  viewState("正在载入", "稍等一下", "<p>正在取问卷内容…</p>");
+  fetchMeta(function(r){
+    if(!r.ok){ return viewState("打不开", "没找到这份问卷",
+      "<p class='err'>"+esc(r.error||"")+"</p><p>确认一下链接是不是完整的；如果是从微信里点开的，可以试试复制到浏览器打开。</p>"); }
+    META = r;
+    if(r.locked) return viewCode(CODE?"访问码不对，再试一次":"");
+    if(r.closed) return viewState("已收卷", "这份问卷已经结束了",
+      "<p>感谢关注。如果您还有想说的，直接联系发问卷给您的人就行。</p>");
+    S = r.schema;
+    document.title = S.title || "调研问卷";
+    if(TRACK && !trackOf(TRACK)) TRACK = null;      // 问卷改版把某一册删了，别卡在死册上
+    if(TRACK && Object.keys(D).length>0){ viewForm(); toast("已恢复上次填写的内容"); }
+    else if(TRACK){ viewForm(); }
+    else { viewCover(); }
+  });
+}
+load();
+boot();
+/* 关页面前把草稿再推一次 —— 手机上切走就可能被冻住，这是最后的机会 */
+window.addEventListener("pagehide", function(){
+  if(!TRACK || !RID || !Object.keys(D).length) return;
+  stash();
+  try{
+    var b = new Blob([JSON.stringify({room:ROOM,rid:RIDS[TRACK]||RID,track:TRACK,payload:D,done:false,code:CODE})],
+                     {type:"application/json"});
+    navigator.sendBeacon(API+"/save", b);
+  }catch(e){}
+});
+</script>
+</body>
+</html>

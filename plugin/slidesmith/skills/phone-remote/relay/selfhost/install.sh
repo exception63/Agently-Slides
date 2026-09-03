@@ -7,7 +7,8 @@ DST=/opt/smrelay
 
 id -u smrelay >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin smrelay
 install -d -o root -g root -m 755 "$DST"
-install -o root -g root -m 644 "$SRC/smrelay.py" "$SRC/remote.html" "$SRC/ask.html" "$SRC/admin.html" "$DST/"
+install -o root -g root -m 644 "$SRC/smrelay.py" "$SRC/remote.html" "$SRC/ask.html" \
+        "$SRC/admin.html" "$SRC/survey.html" "$DST/"
 install -d -o smrelay -g smrelay -m 750 /var/lib/smrelay
 install -o root -g root -m 644 "$SRC/smrelay.service" /etc/systemd/system/smrelay.service
 
@@ -79,5 +80,10 @@ fi
 
 echo
 echo "════════ 配到 Mac 上（只用做一次）════════"
-echo "  node <slidesmith>/skills/live/scripts/smlive.mjs setup --token $(cat /etc/smrelay/token)"
+# 只报指纹，不打明文 —— 装机日志、终端回滚、录屏、会话记录都会留下这一行，
+# 而这个令牌能删掉用户所有房间和答卷。要用的时候现取，别让它到处躺着。
+echo "  当前令牌指纹 sha256:$(sha256sum /etc/smrelay/token | cut -c1-12)"
+echo "  在服务器上取：sudo cat /etc/smrelay/token"
+echo "  然后在 Mac 上：node <slidesmith>/skills/live/scripts/smlive.mjs setup --token <令牌>"
+echo "  （已经配过就不用再配 —— 令牌文件存在时 install.sh 不会覆盖它）"
 echo "════════════════════════════════════════"
